@@ -27,9 +27,12 @@ services:
       XLA_PYTHON_CLIENT_PREALLOCATE: "false"
       SORIDORMI_ONNXRUNTIME_GPU: ${SORIDORMI_ONNXRUNTIME_GPU:-1}
       SORIDORMI_USE_CUDA_PROVIDER: ${SORIDORMI_USE_CUDA_PROVIDER:-1}
+      SORIDORMI_ROBOT_CONFIG: ${SORIDORMI_ROBOT_CONFIG:-/app/configs/robots/open_duck_mini_v2.yaml}
+      MUJOCO_MODEL_PATH: ${MUJOCO_MODEL_PATH:-}
       PYTHONUNBUFFERED: "1"
     volumes:
       - ./src:/app/src
+      - ./configs:/app/configs:ro
       - ./tests:/app/tests:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
       - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
@@ -70,9 +73,13 @@ services:
       XLA_PYTHON_CLIENT_PREALLOCATE: "false"
       SIM_HOST: 0.0.0.0
       SIM_PORT: ${SIM_PORT:-5555}
+      SORIDORMI_SIM_BACKEND: ${SORIDORMI_SIM_BACKEND:-fake}
+      SORIDORMI_ROBOT_CONFIG: ${SORIDORMI_ROBOT_CONFIG:-/app/configs/robots/open_duck_mini_v2.yaml}
+      MUJOCO_MODEL_PATH: ${MUJOCO_MODEL_PATH:-}
       PYTHONUNBUFFERED: "1"
     volumes:
       - ./src:/app/src
+      - ./configs:/app/configs:ro
       - ./tests:/app/tests:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
       - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini

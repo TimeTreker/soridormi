@@ -5,11 +5,7 @@ from pathlib import Path
 
 import mujoco
 
-
-DEFAULT_MODEL_PATH = (
-    "/workspaces/Open_Duck_Playground/"
-    "playground/open_duck_mini_v2/xmls/scene_flat_terrain.xml"
-)
+from .robot_config import load_robot_config
 
 
 def _name(model: mujoco.MjModel, obj_type: mujoco.mjtObj, obj_id: int) -> str:
@@ -18,14 +14,16 @@ def _name(model: mujoco.MjModel, obj_type: mujoco.mjtObj, obj_id: int) -> str:
 
 
 def main() -> None:
-    model_path = Path(os.environ.get("SORIDORMI_MJCF_PATH", DEFAULT_MODEL_PATH))
+    config = load_robot_config(os.environ.get("SORIDORMI_ROBOT_CONFIG"))
+    model_path = Path(os.environ.get("MUJOCO_MODEL_PATH", config.model.path))
 
     if not model_path.exists():
         raise FileNotFoundError(
             f"MuJoCo XML not found: {model_path}\n"
-            "Check that Open_Duck_Playground is mounted and submodules are initialized."
+            "Check Open_Duck_Playground mount or set MUJOCO_MODEL_PATH."
         )
 
+    print(f"Robot config: {config.robot_name}")
     print(f"Loading MuJoCo model: {model_path}")
 
     model = mujoco.MjModel.from_xml_path(str(model_path))
@@ -59,14 +57,23 @@ def main() -> None:
     print()
     print("Actuators")
     print("---------")
+    model_actuators: list[str] = []
     for i in range(model.nu):
         name = _name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
+        model_actuators.append(name)
         trnid = model.actuator_trnid[i]
         ctrlrange = model.actuator_ctrlrange[i]
         print(
             f"{i:02d}  name={name:32s} "
             f"trnid={trnid.tolist()} ctrlrange={ctrlrange.tolist()}"
         )
+
+    print()
+    print("Config actuator validation")
+    print("--------------------------")
+    print(f"config actuators: {config.actuator_names}")
+    print(f"model actuators:  {model_actuators}")
+    print(f"matches:          {config.actuator_names == model_actuators}")
 
     print()
     print("Bodies")

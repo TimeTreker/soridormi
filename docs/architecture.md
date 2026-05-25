@@ -17,3 +17,22 @@ A single giant image is convenient at the beginning, but it makes real robot dep
 ## Why not make simulator environment identical to robot?
 
 The PC simulator is usually x86_64 and desktop-GPU based. Jetson hardware is ARM64 and JetPack-based. Identical binary environments are not realistic, but identical APIs are realistic and important.
+
+## Config-driven robot models
+
+`soridormi_sim.mujoco_backend.MujocoBackend` is intentionally model-independent. It reads robot-specific details from YAML config files under `configs/robots/`.
+
+The current default config is:
+
+```text
+configs/robots/open_duck_mini_v2.yaml
+```
+
+The design rule is:
+
+```text
+Code defines behavior.
+Config defines robot structure.
+```
+
+When a new MuJoCo robot model is introduced, add a new config file instead of hardcoding actuator names, base slices, or model paths in Python.

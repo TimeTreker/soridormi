@@ -78,6 +78,7 @@ COPY docker/simulator/bootstrap_simulator.sh /usr/local/bin/bootstrap_simulator
 RUN chmod +x /usr/local/bin/bootstrap_simulator
 
 COPY pyproject.toml README.md /app/
+COPY configs /app/configs
 COPY src /app/src
 RUN chown -R ${USER_ID}:${GROUP_ID} /app /opt/venvs/sim
 

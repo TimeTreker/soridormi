@@ -54,6 +54,10 @@ SIM_PORT=5555
 CONTROL_HZ=50
 SORIDORMI_ONNXRUNTIME_GPU=1
 SORIDORMI_USE_CUDA_PROVIDER=1
+
+SORIDORMI_SIM_BACKEND=fake
+SORIDORMI_ROBOT_CONFIG=/app/configs/robots/open_duck_mini_v2.yaml
+MUJOCO_MODEL_PATH=
 EOF_ENV
 
 echo "Generated .env:"
@@ -64,3 +68,5 @@ echo "  VIDEO_GID=${VIDEO_GID_VALUE}"
 echo "  RENDER_GID=${RENDER_GID_VALUE}"
 echo "  RUNTIME_DEV_BASE=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04"
 echo "  SIM_BASE=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04"
+echo "  SORIDORMI_SIM_BACKEND=fake"
+echo "  SORIDORMI_ROBOT_CONFIG=/app/configs/robots/open_duck_mini_v2.yaml"

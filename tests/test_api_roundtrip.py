@@ -44,7 +44,6 @@ def test_api_roundtrip_read_state_and_send_command() -> None:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
-    # Give ZeroMQ a short moment to bind the REP socket.
     time.sleep(0.2)
 
     client = RobotApiClient(host="127.0.0.1", port=port, timeout_ms=1000)

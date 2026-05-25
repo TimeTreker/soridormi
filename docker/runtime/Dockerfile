@@ -58,6 +58,7 @@ COPY docker/runtime/bootstrap_runtime.sh /usr/local/bin/bootstrap_runtime
 RUN chmod +x /usr/local/bin/bootstrap_runtime
 
 COPY pyproject.toml README.md /app/
+COPY configs /app/configs
 COPY src /app/src
 RUN chown -R ${USER_ID}:${GROUP_ID} /app /opt/venvs/runtime
 

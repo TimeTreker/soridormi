@@ -12,7 +12,7 @@ if [ -x "${VENV}/bin/python" ]; then
   echo "  source ${VENV}/bin/activate"
   echo ""
   echo "To reinstall Soridormi inside this running container, use:"
-  echo "  uv pip install --python ${VENV}/bin/python -e ${APP}[runtime-gpu]"
+  echo "  uv pip install --python ${VENV}/bin/python -e ${APP}[runtime-gpu,dev]"
   exit 0
 fi
 
@@ -24,7 +24,7 @@ RUNTIME_EXTRA="runtime"
 if [ "${SORIDORMI_ONNXRUNTIME_GPU:-0}" = "1" ]; then
   RUNTIME_EXTRA="runtime-gpu"
 fi
-uv pip install --python "${VENV}/bin/python" -e "${APP}[${RUNTIME_EXTRA}]"
+uv pip install --python "${VENV}/bin/python" -e "${APP}[${RUNTIME_EXTRA},dev]"
 
 if [ -d "${RUNTIME_REPO}" ]; then
   uv pip install --python "${VENV}/bin/python" -e "${RUNTIME_REPO}"

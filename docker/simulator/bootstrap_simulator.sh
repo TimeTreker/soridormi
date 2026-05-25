@@ -19,7 +19,7 @@ fi
 echo "Creating simulator Python environment..."
 uv venv --python python3 "${VENV}"
 uv pip install --python "${VENV}/bin/python" --upgrade pip setuptools wheel
-uv pip install --python "${VENV}/bin/python" -e "${APP}[sim]"
+uv pip install --python "${VENV}/bin/python" -e "${APP}[sim,dev]"
 uv pip install --python "${VENV}/bin/python" tensorboard
 
 if [ -d "${PLAYGROUND}" ]; then

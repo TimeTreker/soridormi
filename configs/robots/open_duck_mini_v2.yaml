@@ -1,0 +1,37 @@
+robot_name: open_duck_mini_v2
+
+model:
+  path: /workspaces/Open_Duck_Playground/playground/open_duck_mini_v2/xmls/scene_flat_terrain.xml
+
+simulation:
+  substeps_per_api_step: 10
+
+base:
+  free_joint_name: floating_base
+  qpos_xyz_slice: [0, 3]
+  qpos_quat_wxyz_slice: [3, 7]
+  qvel_linear_slice: [0, 3]
+  qvel_angular_slice: [3, 6]
+
+actuators:
+  - name: left_hip_yaw
+  - name: left_hip_roll
+  - name: left_hip_pitch
+  - name: left_knee
+  - name: left_ankle
+  - name: neck_pitch
+  - name: head_pitch
+  - name: head_yaw
+  - name: head_roll
+  - name: right_hip_yaw
+  - name: right_hip_roll
+  - name: right_hip_pitch
+  - name: right_knee
+  - name: right_ankle
+
+control:
+  mode: position
+  clip_to_ctrlrange: true
+
+imu:
+  accel_xyz_default: [0.0, 0.0, 9.81]

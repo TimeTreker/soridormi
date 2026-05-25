@@ -9,6 +9,7 @@ dependencies = [
     "pydantic>=2.6",
     "pyzmq>=25",
     "rich>=13",
+    "PyYAML>=6",
 ]
 
 [project.optional-dependencies]

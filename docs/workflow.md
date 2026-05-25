@@ -53,3 +53,39 @@ Normal edits under `src/` are bind-mounted and do not require rebuild.
 ## GPU inference during PC simulation
 
 The PC runtime-dev image uses the CUDA 13.1 cuDNN base image by default and is given GPU access in `compose.sim.yaml`. Policy loading prefers ONNX Runtime's `CUDAExecutionProvider` when available, then falls back to CPU.
+
+## Config-driven MuJoCo backend
+
+Robot/model-specific simulation settings live in YAML config files under:
+
+```text
+configs/robots/
+```
+
+The default Open Duck Mini v2 config is:
+
+```text
+configs/robots/open_duck_mini_v2.yaml
+```
+
+Daily fake-backend API testing uses:
+
+```bash
+SORIDORMI_SIM_BACKEND=fake ./scripts/run_sim_server.sh
+```
+
+To start the real MuJoCo backend with the configured Open Duck Mini v2 model:
+
+```bash
+SORIDORMI_SIM_BACKEND=mujoco ./scripts/run_sim_server.sh
+```
+
+To use a different robot model later, create a new config file and point the sim server at it:
+
+```bash
+SORIDORMI_ROBOT_CONFIG=/app/configs/robots/my_robot.yaml \
+SORIDORMI_SIM_BACKEND=mujoco \
+./scripts/run_sim_server.sh
+```
+
+The backend code should stay generic. Robot structure, actuator names, base joint layout, control mode, and model path belong in config.

@@ -64,6 +64,8 @@ soridormi/
 ├── compose.sim.yaml             # PC simulation: runtime-dev + simulator
 ├── compose.orin.yaml            # Jetson AGX Orin runtime deployment template
 ├── compose.thor.yaml            # Jetson AGX Thor runtime deployment template
+├── configs/
+│   └── robots/open_duck_mini_v2.yaml # robot-specific MuJoCo/API mapping
 ├── docker/
 │   ├── runtime/Dockerfile       # Runtime image, parameterized by BASE_IMAGE
 │   └── simulator/Dockerfile     # PC MuJoCo/CUDA simulation image
@@ -79,6 +81,7 @@ soridormi/
 │   ├── soridormi_api/
 │   ├── soridormi_runtime/
 │   └── soridormi_sim/
+├── tests/
 └── workspace/
     └── upstream Open Duck repos as git submodules
 ```
@@ -155,6 +158,29 @@ The runtime-dev container is GPU-enabled so ONNX Runtime can prefer `CUDAExecuti
 
 Python dependencies are installed during `docker compose build`. Source code is still bind-mounted from `./src`, so normal code edits do not require rebuilding the image. Rebuild only when `pyproject.toml`, a Dockerfile, system dependencies, or base images change.
 
+### Robot config
+
+The MuJoCo backend is config-driven. Robot/model-specific details live in:
+
+```text
+configs/robots/open_duck_mini_v2.yaml
+```
+
+The default `.env` points the simulator to:
+
+```text
+SORIDORMI_ROBOT_CONFIG=/app/configs/robots/open_duck_mini_v2.yaml
+SORIDORMI_SIM_BACKEND=fake
+```
+
+Use the fake backend for API development. Use the real MuJoCo backend with:
+
+```bash
+SORIDORMI_SIM_BACKEND=mujoco ./scripts/run_sim_server.sh
+```
+
+To switch robot models later, add another YAML file under `configs/robots/` and change only `SORIDORMI_ROBOT_CONFIG`. The backend code should not hardcode robot-specific actuator names or model paths.
+
 ### 5. Enter simulator container
 
 ```bash
@@ -189,7 +215,7 @@ sim
 python -m soridormi_sim.mujoco_server
 ```
 
-At this stage the server includes a safe fake backend so the API can be tested immediately. Replace or extend `src/soridormi_sim/mujoco_backend.py` to connect the API to the real Open Duck MuJoCo model.
+By default the server uses the safe fake backend so the API can be tested immediately. Set `SORIDORMI_SIM_BACKEND=mujoco` to use the config-driven real MuJoCo backend.
 
 ### 7. Start runtime container in another terminal
 
