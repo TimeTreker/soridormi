@@ -30,6 +30,7 @@ services:
       PYTHONUNBUFFERED: "1"
     volumes:
       - ./src:/app/src
+      - ./tests:/app/tests:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
       - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
       - ./workspace/Open_Duck_Mini_Runtime:/workspaces/Open_Duck_Mini_Runtime
@@ -72,6 +73,7 @@ services:
       PYTHONUNBUFFERED: "1"
     volumes:
       - ./src:/app/src
+      - ./tests:/app/tests:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
       - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
       - ./workspace/Open_Duck_Playground:/workspaces/Open_Duck_Playground

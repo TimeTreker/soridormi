@@ -88,7 +88,7 @@ WORKDIR /app
 # at runtime, so normal code edits do not require rebuilding the image.
 RUN uv venv --python python3 /opt/venvs/sim \
     && uv pip install --python /opt/venvs/sim/bin/python --upgrade pip setuptools wheel \
-    && uv pip install --python /opt/venvs/sim/bin/python -e "/app[sim]" \
+    && uv pip install --python /opt/venvs/sim/bin/python -e "/app[sim,dev]" \
     && uv pip install --python /opt/venvs/sim/bin/python tensorboard \
     && touch /opt/venvs/sim/.soridormi_sim_image_env
 

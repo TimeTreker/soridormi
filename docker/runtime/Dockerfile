@@ -68,7 +68,7 @@ WORKDIR /app
 # at runtime, so normal code edits do not require rebuilding the image.
 RUN uv venv --python python3 /opt/venvs/runtime \
     && uv pip install --python /opt/venvs/runtime/bin/python --upgrade pip setuptools wheel \
-    && uv pip install --python /opt/venvs/runtime/bin/python -e "/app[${RUNTIME_EXTRA}]" \
+    && uv pip install --python /opt/venvs/runtime/bin/python -e "/app[${RUNTIME_EXTRA},dev]" \
     && touch /opt/venvs/runtime/.soridormi_runtime_image_env
 
 RUN echo 'alias runtime="source /opt/venvs/runtime/bin/activate"' >> ~/.bashrc \
