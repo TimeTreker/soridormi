@@ -1,0 +1,99 @@
+services:
+  runtime:
+    build:
+      context: .
+      dockerfile: docker/runtime/Dockerfile
+      args:
+        BASE_IMAGE: ${RUNTIME_DEV_BASE:-ubuntu:24.04}
+        USER_ID: ${UID:-1000}
+        GROUP_ID: ${GID:-1000}
+    image: soridormi-runtime:dev
+    container_name: soridormi-runtime-dev
+    stdin_open: true
+    tty: true
+    init: true
+    network_mode: host
+    ipc: host
+    environment:
+      SORIDORMI_BACKEND: sim
+      SIM_HOST: ${SIM_HOST:-127.0.0.1}
+      SIM_PORT: ${SIM_PORT:-5555}
+      CONTROL_HZ: ${CONTROL_HZ:-50}
+      POLICY_PATH: /workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./src:/app/src
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
+      - ./workspace/Open_Duck_Mini_Runtime:/workspaces/Open_Duck_Mini_Runtime
+      - runtime-venv:/opt/venvs/runtime
+    working_dir: /app
+    command: bash
+
+  sim:
+    build:
+      context: .
+      dockerfile: docker/simulator/Dockerfile
+      args:
+        BASE_IMAGE: ${SIM_BASE:-nvidia/cuda:12.8.1-devel-ubuntu24.04}
+        USER_ID: ${UID:-1000}
+        GROUP_ID: ${GID:-1000}
+    image: soridormi-sim:cuda12.8
+    container_name: soridormi-sim
+    stdin_open: true
+    tty: true
+    init: true
+    network_mode: host
+    ipc: host
+    environment:
+      DISPLAY: ${DISPLAY}
+      QT_X11_NO_MITSHM: "1"
+      MUJOCO_GL: glfw
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics,display
+      XLA_PYTHON_CLIENT_PREALLOCATE: "false"
+      SIM_HOST: 0.0.0.0
+      SIM_PORT: ${SIM_PORT:-5555}
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./src:/app/src
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
+      - ./workspace/Open_Duck_Playground:/workspaces/Open_Duck_Playground
+      - ./data:/data
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - sim-venv:/opt/venvs/sim
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - video
+      - render
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    working_dir: /app
+    command: bash
+
+  tensorboard:
+    image: soridormi-sim:cuda12.8
+    container_name: soridormi-tensorboard
+    depends_on:
+      - sim
+    network_mode: host
+    volumes:
+      - ./workspace/Open_Duck_Playground:/workspaces/Open_Duck_Playground
+      - sim-venv:/opt/venvs/sim
+    command: >
+      bash -lc "source /opt/venvs/sim/bin/activate &&
+      tensorboard --host 0.0.0.0 --port 6006
+      --logdir /workspaces/Open_Duck_Playground"
+    profiles:
+      - tools
+
+volumes:
+  runtime-venv:
+  sim-venv:

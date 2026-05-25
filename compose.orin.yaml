@@ -1,0 +1,38 @@
+services:
+  runtime:
+    build:
+      context: .
+      dockerfile: docker/runtime/Dockerfile
+      args:
+        BASE_IMAGE: ${ORIN_RUNTIME_BASE:-nvcr.io/nvidia/l4t-jetpack:r36.4.0}
+        USER_ID: ${UID:-1000}
+        GROUP_ID: ${GID:-1000}
+    image: soridormi-runtime:orin
+    container_name: soridormi-runtime-orin
+    stdin_open: true
+    tty: true
+    init: true
+    network_mode: host
+    ipc: host
+    privileged: true
+    runtime: nvidia
+    environment:
+      SORIDORMI_BACKEND: hardware
+      CONTROL_HZ: ${CONTROL_HZ:-50}
+      POLICY_PATH: /workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./src:/app/src
+      - ./pyproject.toml:/app/pyproject.toml:ro
+      - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
+      - ./workspace/Open_Duck_Mini_Runtime:/workspaces/Open_Duck_Mini_Runtime
+      - ./data:/data
+      - runtime-venv-orin:/opt/venvs/runtime
+      - /dev:/host-dev
+    working_dir: /app
+    command: bash
+
+volumes:
+  runtime-venv-orin:

@@ -1,0 +1,23 @@
+name: Static Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  static-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Validate Compose files
+        run: |
+          cp .env.example .env
+          docker compose -f compose.sim.yaml config
+          docker compose -f compose.orin.yaml config
+          docker compose -f compose.thor.yaml config

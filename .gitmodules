@@ -1,0 +1,11 @@
+[submodule "workspace/Open_Duck_Mini"]
+	path = workspace/Open_Duck_Mini
+	url = https://github.com/apirrone/Open_Duck_Mini.git
+	branch = v2
+[submodule "workspace/Open_Duck_Mini_Runtime"]
+	path = workspace/Open_Duck_Mini_Runtime
+	url = https://github.com/apirrone/Open_Duck_Mini_Runtime.git
+	branch = v2
+[submodule "workspace/Open_Duck_Playground"]
+	path = workspace/Open_Duck_Playground
+	url = https://github.com/apirrone/Open_Duck_Playground.git
