@@ -113,6 +113,7 @@ class MujocoBackend:
 
         self.ctrl_min = np.array(self.model.actuator_ctrlrange[:, 0], dtype=float)
         self.ctrl_max = np.array(self.model.actuator_ctrlrange[:, 1], dtype=float)
+        self._initialize_ctrl_from_current_qpos()
 
         mujoco.mj_forward(self.model, self.data)
 
@@ -166,6 +167,24 @@ class MujocoBackend:
             joint_id,
         )
         return name if name is not None else f"joint_{joint_id}"
+
+    def _initialize_ctrl_from_current_qpos(self) -> None:
+        """Initialize position actuator controls to the model's initial joint pose.
+        Without this, MuJoCo position actuators may start with ctrl=0.0 even if
+        the model's initial qpos is non-zero, causing the robot to snap toward
+        zero before the runtime sends its first command.
+        """
+        for actuator_index, qpos_addr in enumerate(self.qpos_addrs):
+            target = float(self.data.qpos[qpos_addr])
+            if self.config.control.clip_to_ctrlrange:
+                target = float(
+                    np.clip(
+                        target,
+                        self.ctrl_min[actuator_index],
+                        self.ctrl_max[actuator_index],
+                    )
+                )
+            self.data.ctrl[actuator_index] = target
 
     def step(self) -> None:
         if self.last_command is not None:

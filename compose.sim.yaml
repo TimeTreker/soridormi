@@ -30,6 +30,7 @@ services:
       SORIDORMI_ROBOT_CONFIG: ${SORIDORMI_ROBOT_CONFIG:-/app/configs/robots/open_duck_mini_v2.yaml}
       MUJOCO_MODEL_PATH: ${MUJOCO_MODEL_PATH:-}
       PYTHONUNBUFFERED: "1"
+      SORIDORMI_RUNTIME_MODE: ${SORIDORMI_RUNTIME_MODE:-hold}
     volumes:
       - ./src:/app/src
       - ./configs:/app/configs:ro

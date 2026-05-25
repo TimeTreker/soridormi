@@ -41,3 +41,28 @@ viewer:
   sync_every_api_step: true
   show_left_ui: true
   show_right_ui: true
+
+default_pose:
+  positions:
+    left_hip_yaw: 0.0
+    left_hip_roll: 0.0
+    left_hip_pitch: -0.15
+    left_knee: 0.30
+    left_ankle: -0.15
+
+    neck_pitch: 0.0
+    head_pitch: 0.0
+    head_yaw: 0.0
+    head_roll: 0.0
+
+    right_hip_yaw: 0.0
+    right_hip_roll: 0.0
+    right_hip_pitch: 0.15
+    right_knee: -0.30
+    right_ankle: 0.15
+
+  gains:
+    kp_default: 10.0
+    kd_default: 0.5
+
+  torque_default: 0.0
