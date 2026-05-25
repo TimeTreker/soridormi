@@ -15,15 +15,12 @@ console = Console()
 
 def make_robot():
     backend = os.environ.get("SORIDORMI_BACKEND", "sim")
-
     if backend == "sim":
         host = os.environ.get("SIM_HOST", "127.0.0.1")
         port = int(os.environ.get("SIM_PORT", "5555"))
         return SimRobot(host=host, port=port)
-
     if backend == "hardware":
         return HardwareRobot()
-
     raise ValueError(f"Unknown SORIDORMI_BACKEND={backend!r}")
 
 
@@ -36,16 +33,12 @@ def make_controller():
     if mode in {"stand", "standing", "default_pose"}:
         return StandingPoseController()
 
-    raise ValueError(
-        f"Unknown SORIDORMI_RUNTIME_MODE={mode!r}. "
-        "Use one of: hold, stand."
-    )
+    raise ValueError(f"Unknown SORIDORMI_RUNTIME_MODE={mode!r}. Use one of: hold, stand.")
 
 
 def main() -> None:
     hz = float(os.environ.get("CONTROL_HZ", "50"))
     dt = 1.0 / hz
-
     robot = make_robot()
     controller = make_controller()
 
@@ -55,16 +48,13 @@ def main() -> None:
 
     while True:
         start = time.monotonic()
-
         state = robot.read_state()
         command = controller.compute(state)
         robot.send_motor_command(command)
-
         console.print(
             f"t={state.time:.3f} joints={len(state.joints.names)} ",
             end="\r",
         )
-
         elapsed = time.monotonic() - start
         time.sleep(max(0.0, dt - elapsed))
 

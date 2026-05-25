@@ -3,6 +3,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+if [ ! -f .env ]; then
+  ./scripts/setup_env.sh
+fi
+
 AUTO_XHOST="${SORIDORMI_XHOST_AUTO:-1}"
 VIEWER_ENABLED="${SORIDORMI_MUJOCO_VIEWER:-0}"
 XHOST_ADDED=0
@@ -34,14 +38,14 @@ enable_xhost_if_needed() {
   fi
 
   echo "Allowing local Docker containers to access X11..."
-  xhost +local:docker >/dev/null
+  xhost +local:docker >/dev/null || true
   XHOST_ADDED=1
 }
 
 cleanup_xhost() {
   if [ "$XHOST_ADDED" = "1" ]; then
     echo "Removing local Docker X11 access..."
-    xhost -local:docker >/dev/null || true
+    xhost -local:docker >/dev/null 2>&1 || true
   fi
 }
 

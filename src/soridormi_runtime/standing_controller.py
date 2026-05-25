@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Any
 
@@ -43,10 +44,10 @@ def load_default_pose(path: str | os.PathLike[str] | None = None) -> dict[str, A
 
 
 class StandingPoseController:
-    """Command a configured default standing pose.
+    """Command a configured default standing pose with a smooth ramp.
 
-    Unknown joints are commanded to hold their current positions. This lets the
-    same controller work even if the model contains extra joints.
+    Unknown joints are commanded to hold their current positions. The smooth ramp
+    avoids snapping all joints to a new target in one control step.
     """
 
     def __init__(self, config_path: str | os.PathLike[str] | None = None) -> None:
@@ -64,25 +65,43 @@ class StandingPoseController:
         if not isinstance(gains, dict):
             raise ValueError("default_pose.gains must be a mapping")
 
-        self.positions_by_name = {
-            str(name): float(value) for name, value in positions.items()
-        }
-
+        self.positions_by_name = {str(name): float(value) for name, value in positions.items()}
         self.kp_default = float(gains.get("kp_default", 10.0))
         self.kd_default = float(gains.get("kd_default", 0.5))
         self.torque_default = float(default_pose.get("torque_default", 0.0))
+
+        self.ramp_seconds = float(os.environ.get("SORIDORMI_STAND_RAMP_SECONDS", "3.0"))
+        self.start_time = time.monotonic()
+        self.start_positions_by_name: dict[str, float] | None = None
 
     def compute(self, state: RobotState) -> MotorCommand:
         names = list(state.joints.names)
         n = len(names)
 
+        if self.start_positions_by_name is None:
+            self.start_positions_by_name = {
+                name: float(position)
+                for name, position in zip(state.joints.names, state.joints.positions)
+            }
+
+        elapsed = time.monotonic() - self.start_time
+        if self.ramp_seconds <= 0.0:
+            alpha = 1.0
+        else:
+            alpha = min(1.0, max(0.0, elapsed / self.ramp_seconds))
+
         target_positions: list[float] = []
         for i, name in enumerate(names):
+            current = float(state.joints.positions[i])
+            start = self.start_positions_by_name.get(name, current)
+
             if name in self.positions_by_name:
-                target_positions.append(self.positions_by_name[name])
+                desired = self.positions_by_name[name]
+                target = start + alpha * (desired - start)
             else:
-                # Unknown joint: hold current position.
-                target_positions.append(float(state.joints.positions[i]))
+                target = current
+
+            target_positions.append(float(target))
 
         return MotorCommand(
             names=names,

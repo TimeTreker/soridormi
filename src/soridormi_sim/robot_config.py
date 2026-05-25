@@ -70,6 +70,14 @@ class ViewerConfig(BaseModel):
     show_right_ui: bool = True
 
 
+class ZeroGravityDebugConfig(BaseModel):
+    enabled_env: str = "SORIDORMI_MUJOCO_ZERO_GRAVITY"
+
+
+class DebugConfig(BaseModel):
+    zero_gravity: ZeroGravityDebugConfig = Field(default_factory=ZeroGravityDebugConfig)
+
+
 class RobotConfig(BaseModel):
     robot_name: str
     model: ModelConfig
@@ -79,6 +87,7 @@ class RobotConfig(BaseModel):
     control: ControlConfig = Field(default_factory=ControlConfig)
     imu: ImuConfig = Field(default_factory=ImuConfig)
     viewer: ViewerConfig = Field(default_factory=ViewerConfig)
+    debug: DebugConfig = Field(default_factory=DebugConfig)
 
     @field_validator("actuators")
     @classmethod

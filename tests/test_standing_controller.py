@@ -6,7 +6,12 @@ from soridormi_api import IMUState, JointState, RobotState
 from soridormi_runtime.standing_controller import StandingPoseController
 
 
-def test_standing_controller_uses_default_pose(tmp_path: Path) -> None:
+def test_standing_controller_uses_default_pose_with_unknown_joint_hold(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SORIDORMI_STAND_RAMP_SECONDS", "0")
+
     config = tmp_path / "robot.yaml"
     config.write_text(
         """

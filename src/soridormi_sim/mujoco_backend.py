@@ -96,14 +96,7 @@ class MujocoBackend:
         self.model = mujoco.MjModel.from_xml_path(str(self.model_path))
         self.data = mujoco.MjData(self.model)
         self.last_command: MotorCommand | None = None
-
-        self.viewer = MujocoViewerHandle(
-            model=self.model,
-            data=self.data,
-            enabled=env_flag(self.config.viewer.enabled_env, default=False),
-            show_left_ui=self.config.viewer.show_left_ui,
-            show_right_ui=self.config.viewer.show_right_ui,
-        )
+        self._original_gravity = np.array(self.model.opt.gravity, dtype=float)
 
         self.actuator_names = self._load_and_validate_actuator_names()
         self.joint_ids = self._load_actuator_joint_ids()
@@ -113,15 +106,45 @@ class MujocoBackend:
 
         self.ctrl_min = np.array(self.model.actuator_ctrlrange[:, 0], dtype=float)
         self.ctrl_max = np.array(self.model.actuator_ctrlrange[:, 1], dtype=float)
-        self._initialize_ctrl_from_current_qpos()
 
+        self._apply_startup_debug_options()
+        self._initialize_ctrl_from_current_qpos()
         mujoco.mj_forward(self.model, self.data)
+
+        self.viewer = MujocoViewerHandle(
+            model=self.model,
+            data=self.data,
+            enabled=env_flag(self.config.viewer.enabled_env, default=False),
+            show_left_ui=self.config.viewer.show_left_ui,
+            show_right_ui=self.config.viewer.show_right_ui,
+        )
 
         print(f"Loaded robot config: {self.config.robot_name}")
         print(f"Loaded MuJoCo model: {self.model_path}")
         print(f"MuJoCo timestep: {self.model.opt.timestep}")
         print(f"API step substeps: {self.substeps_per_api_step}")
         print(f"Actuators: {self.actuator_names}")
+
+    def _apply_startup_debug_options(self) -> None:
+        zero_gravity_env = self.config.debug.zero_gravity.enabled_env
+        if env_flag(zero_gravity_env, default=False):
+            self.model.opt.gravity[:] = 0.0
+            print(f"MuJoCo zero-gravity debug mode enabled via {zero_gravity_env}=1")
+
+    def _initialize_ctrl_from_current_qpos(self) -> None:
+        """Initialize actuator controls to the model's current joint pose.
+
+        Without this, MuJoCo position actuators can start with ctrl=0.0 even if
+        the XML's initial qpos is not zero. That can snap the robot toward zero
+        before the runtime sends its first command.
+        """
+        for actuator_index, qpos_addr in enumerate(self.qpos_addrs):
+            target = float(self.data.qpos[qpos_addr])
+            if self.config.control.clip_to_ctrlrange:
+                target = float(
+                    np.clip(target, self.ctrl_min[actuator_index], self.ctrl_max[actuator_index])
+                )
+            self.data.ctrl[actuator_index] = target
 
     def _load_and_validate_actuator_names(self) -> list[str]:
         model_names: list[str] = []
@@ -167,24 +190,6 @@ class MujocoBackend:
             joint_id,
         )
         return name if name is not None else f"joint_{joint_id}"
-
-    def _initialize_ctrl_from_current_qpos(self) -> None:
-        """Initialize position actuator controls to the model's initial joint pose.
-        Without this, MuJoCo position actuators may start with ctrl=0.0 even if
-        the model's initial qpos is non-zero, causing the robot to snap toward
-        zero before the runtime sends its first command.
-        """
-        for actuator_index, qpos_addr in enumerate(self.qpos_addrs):
-            target = float(self.data.qpos[qpos_addr])
-            if self.config.control.clip_to_ctrlrange:
-                target = float(
-                    np.clip(
-                        target,
-                        self.ctrl_min[actuator_index],
-                        self.ctrl_max[actuator_index],
-                    )
-                )
-            self.data.ctrl[actuator_index] = target
 
     def step(self) -> None:
         if self.last_command is not None:
@@ -233,7 +238,9 @@ class MujocoBackend:
 
             target = float(command_values[actuator_name])
             if self.config.control.clip_to_ctrlrange:
-                target = float(np.clip(target, self.ctrl_min[actuator_index], self.ctrl_max[actuator_index]))
+                target = float(
+                    np.clip(target, self.ctrl_min[actuator_index], self.ctrl_max[actuator_index])
+                )
             self.data.ctrl[actuator_index] = target
 
     def close(self) -> None:

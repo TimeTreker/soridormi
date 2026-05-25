@@ -1,0 +1,5 @@
+# Optional snippet to merge into configs/robots/open_duck_mini_v2.yaml.
+# The code works without this block because these are also the defaults.
+debug:
+  zero_gravity:
+    enabled_env: SORIDORMI_MUJOCO_ZERO_GRAVITY

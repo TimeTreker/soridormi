@@ -21,6 +21,8 @@ services:
       SIM_HOST: ${SIM_HOST:-127.0.0.1}
       SIM_PORT: ${SIM_PORT:-5555}
       CONTROL_HZ: ${CONTROL_HZ:-50}
+      SORIDORMI_RUNTIME_MODE: ${SORIDORMI_RUNTIME_MODE:-hold}
+      SORIDORMI_STAND_RAMP_SECONDS: ${SORIDORMI_STAND_RAMP_SECONDS:-3.0}
       POLICY_PATH: /workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
@@ -30,7 +32,6 @@ services:
       SORIDORMI_ROBOT_CONFIG: ${SORIDORMI_ROBOT_CONFIG:-/app/configs/robots/open_duck_mini_v2.yaml}
       MUJOCO_MODEL_PATH: ${MUJOCO_MODEL_PATH:-}
       PYTHONUNBUFFERED: "1"
-      SORIDORMI_RUNTIME_MODE: ${SORIDORMI_RUNTIME_MODE:-hold}
     volumes:
       - ./src:/app/src
       - ./configs:/app/configs:ro
@@ -76,6 +77,7 @@ services:
       SIM_PORT: ${SIM_PORT:-5555}
       SORIDORMI_SIM_BACKEND: ${SORIDORMI_SIM_BACKEND:-fake}
       SORIDORMI_MUJOCO_VIEWER: ${SORIDORMI_MUJOCO_VIEWER:-0}
+      SORIDORMI_MUJOCO_ZERO_GRAVITY: ${SORIDORMI_MUJOCO_ZERO_GRAVITY:-0}
       SORIDORMI_ROBOT_CONFIG: ${SORIDORMI_ROBOT_CONFIG:-/app/configs/robots/open_duck_mini_v2.yaml}
       MUJOCO_MODEL_PATH: ${MUJOCO_MODEL_PATH:-}
       PYTHONUNBUFFERED: "1"
