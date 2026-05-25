@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: docker/runtime/Dockerfile
       args:
-        BASE_IMAGE: ${THOR_RUNTIME_BASE:-nvidia/cuda:13.0.2-devel-ubuntu24.04}
+        BASE_IMAGE: ${THOR_RUNTIME_BASE:-nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04}
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
         USERNAME: ${CONTAINER_USER:-chromie}

@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=nvidia/cuda:12.8.1-devel-ubuntu24.04
+ARG BASE_IMAGE=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
 FROM ${BASE_IMAGE}
 
 ARG USER_ID=1000

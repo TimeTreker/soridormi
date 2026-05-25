@@ -12,13 +12,22 @@ Install:
 Test GPU access:
 
 ```bash
-docker run --rm --gpus all nvidia/cuda:12.8.1-devel-ubuntu24.04 nvidia-smi
+docker run --rm --gpus all nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04 nvidia-smi
 ```
 
-Pull your simulator base image:
+
+The default PC development base image includes CUDA, development headers, and cuDNN:
+
+```text
+nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
+```
+
+Use the same image for the runtime-dev container and the simulator container on your PC.
+
+Pull your simulator/runtime-dev base image:
 
 ```bash
-docker pull nvidia/cuda:12.8.1-devel-ubuntu24.04
+docker pull nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
 ```
 
 For X11 GUI:

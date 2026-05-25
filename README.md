@@ -139,11 +139,19 @@ workspace/Open_Duck_Playground
 This builds two logical images:
 
 ```text
-soridormi-runtime:dev       lightweight runtime image for PC simulation
-soridormi-sim:cuda12.8      heavy MuJoCo/CUDA simulation image
+soridormi-runtime:cuda13.1-cudnn-dev  GPU-capable runtime-dev image for PC simulation
+soridormi-sim:cuda13.1-cudnn          heavy MuJoCo/CUDA/cuDNN simulation image
 ```
 
 The real robot runtime uses the same runtime Dockerfile but a Jetson-specific base image.
+
+By default, the PC-side runtime-dev and simulator images use:
+
+```text
+nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
+```
+
+The runtime-dev container is GPU-enabled so ONNX Runtime can prefer `CUDAExecutionProvider` during PC simulation. If `onnxruntime-gpu` is not compatible with your local driver/CUDA stack, set `SORIDORMI_ONNXRUNTIME_GPU=0` in `.env` and rerun `bootstrap_runtime`.
 
 ### 5. Enter simulator container and bootstrap
 
@@ -254,11 +262,17 @@ docker compose -f compose.thor.yaml build runtime
 The exact Jetson base image depends on your installed JetPack/L4T version. Edit `.env` after `scripts/setup_env.sh` if needed:
 
 ```env
+RUNTIME_DEV_BASE=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
 ORIN_RUNTIME_BASE=nvcr.io/nvidia/l4t-jetpack:r36.4.0
-THOR_RUNTIME_BASE=nvidia/cuda:13.0.2-devel-ubuntu24.04
+THOR_RUNTIME_BASE=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
+SIM_BASE=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
+SORIDORMI_ONNXRUNTIME_GPU=1
+SORIDORMI_USE_CUDA_PROVIDER=1
 ```
 
 On Jetson, build the runtime image on the Jetson itself unless you already have a cross-build setup.
+
+For a real Jetson deployment, verify the base image against the JetPack/L4T release installed on the board. The CUDA 13.1 cuDNN image is a good PC development default, but Jetson images may require NVIDIA's Jetson/L4T container images instead of normal desktop CUDA images.
 
 ## Important warning
 

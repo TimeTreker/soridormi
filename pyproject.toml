@@ -15,6 +15,9 @@ dependencies = [
 runtime = [
     "onnxruntime>=1.16",
 ]
+runtime-gpu = [
+    "onnxruntime-gpu>=1.20",
+]
 sim = [
     "mujoco>=3.1",
 ]

@@ -4,11 +4,11 @@ services:
       context: .
       dockerfile: docker/runtime/Dockerfile
       args:
-        BASE_IMAGE: ${RUNTIME_DEV_BASE:-ubuntu:24.04}
+        BASE_IMAGE: ${RUNTIME_DEV_BASE:-nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04}
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
         USERNAME: ${CONTAINER_USER:-chromie}
-    image: soridormi-runtime:dev
+    image: soridormi-runtime:cuda13.1-cudnn-dev
     container_name: soridormi-runtime-dev
     stdin_open: true
     tty: true
@@ -21,6 +21,11 @@ services:
       SIM_PORT: ${SIM_PORT:-5555}
       CONTROL_HZ: ${CONTROL_HZ:-50}
       POLICY_PATH: /workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      XLA_PYTHON_CLIENT_PREALLOCATE: "false"
+      SORIDORMI_ONNXRUNTIME_GPU: ${SORIDORMI_ONNXRUNTIME_GPU:-1}
+      SORIDORMI_USE_CUDA_PROVIDER: ${SORIDORMI_USE_CUDA_PROVIDER:-1}
       PYTHONUNBUFFERED: "1"
     volumes:
       - ./src:/app/src
@@ -28,6 +33,13 @@ services:
       - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
       - ./workspace/Open_Duck_Mini_Runtime:/workspaces/Open_Duck_Mini_Runtime
       - runtime-venv:/opt/venvs/runtime
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     working_dir: /app
     command: bash
 
@@ -36,11 +48,11 @@ services:
       context: .
       dockerfile: docker/simulator/Dockerfile
       args:
-        BASE_IMAGE: ${SIM_BASE:-nvidia/cuda:12.8.1-devel-ubuntu24.04}
+        BASE_IMAGE: ${SIM_BASE:-nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04}
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
         USERNAME: ${CONTAINER_USER:-chromie}
-    image: soridormi-sim:cuda12.8
+    image: soridormi-sim:cuda13.1-cudnn
     container_name: soridormi-sim
     stdin_open: true
     tty: true
@@ -68,8 +80,8 @@ services:
     devices:
       - /dev/dri:/dev/dri
     group_add:
-      - video
-      - render
+      - "${VIDEO_GID:-44}"
+      - "${RENDER_GID:-109}"
     deploy:
       resources:
         reservations:
@@ -81,7 +93,7 @@ services:
     command: bash
 
   tensorboard:
-    image: soridormi-sim:cuda12.8
+    image: soridormi-sim:cuda13.1-cudnn
     container_name: soridormi-tensorboard
     depends_on:
       - sim

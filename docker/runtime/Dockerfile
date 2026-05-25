@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ubuntu:24.04
+ARG BASE_IMAGE=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
 FROM ${BASE_IMAGE}
 
 ARG USER_ID=1000
@@ -9,6 +9,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV UV_LINK_MODE=copy
 ENV PATH="/opt/venvs/runtime/bin:/home/${USERNAME}/.local/bin:/usr/local/bin:${PATH}"
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash-completion \

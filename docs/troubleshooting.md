@@ -58,3 +58,15 @@ Then rebuild:
 ```bash
 docker compose -f compose.sim.yaml build --no-cache
 ```
+
+
+## ONNX Runtime GPU install/provider issues
+
+The PC runtime-dev container defaults to `SORIDORMI_ONNXRUNTIME_GPU=1`, which installs the `runtime-gpu` extra and asks ONNX Runtime to prefer `CUDAExecutionProvider`. If that package or provider is incompatible with your host driver/CUDA stack, set this in `.env`:
+
+```env
+SORIDORMI_ONNXRUNTIME_GPU=0
+SORIDORMI_USE_CUDA_PROVIDER=0
+```
+
+Then remove the runtime venv volume or rerun `bootstrap_runtime` in a fresh runtime container.

@@ -21,3 +21,8 @@ Terminal 2:
 3. Keep runtime code in `src/soridormi_runtime`.
 4. Keep hardware integration behind `HardwareRobot`.
 5. Avoid importing MuJoCo in runtime code.
+
+
+## GPU inference during PC simulation
+
+The PC runtime-dev image uses the CUDA 13.1 cuDNN base image by default and is given GPU access in `compose.sim.yaml`. Policy loading prefers ONNX Runtime's `CUDAExecutionProvider` when available, then falls back to CPU.
