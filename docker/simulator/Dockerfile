@@ -77,14 +77,22 @@ RUN set -eux; \
 COPY docker/simulator/bootstrap_simulator.sh /usr/local/bin/bootstrap_simulator
 RUN chmod +x /usr/local/bin/bootstrap_simulator
 
-COPY pyproject.toml /app/pyproject.toml
+COPY pyproject.toml README.md /app/
 COPY src /app/src
-RUN chown -R ${USER_ID}:${GROUP_ID} /app
+RUN chown -R ${USER_ID}:${GROUP_ID} /app /opt/venvs/sim
 
 USER ${USERNAME}
 WORKDIR /app
 
+# Build the simulator Python environment into the image. Source is still bind-mounted
+# at runtime, so normal code edits do not require rebuilding the image.
+RUN uv venv --python python3 /opt/venvs/sim \
+    && uv pip install --python /opt/venvs/sim/bin/python --upgrade pip setuptools wheel \
+    && uv pip install --python /opt/venvs/sim/bin/python -e "/app[sim]" \
+    && uv pip install --python /opt/venvs/sim/bin/python tensorboard \
+    && touch /opt/venvs/sim/.soridormi_sim_image_env
+
 RUN echo 'alias sim="source /opt/venvs/sim/bin/activate"' >> ~/.bashrc \
-    && echo 'echo "Run bootstrap_simulator first. Then use: sim"' >> ~/.bashrc
+    && echo 'echo "Simulator env is already built into this image. Use: sim"' >> ~/.bashrc
 
 CMD ["bash"]

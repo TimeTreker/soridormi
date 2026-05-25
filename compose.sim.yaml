@@ -5,6 +5,7 @@ services:
       dockerfile: docker/runtime/Dockerfile
       args:
         BASE_IMAGE: ${RUNTIME_DEV_BASE:-nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04}
+        RUNTIME_EXTRA: ${RUNTIME_DEV_EXTRA:-runtime-gpu}
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
         USERNAME: ${CONTAINER_USER:-chromie}
@@ -32,7 +33,7 @@ services:
       - ./pyproject.toml:/app/pyproject.toml:ro
       - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
       - ./workspace/Open_Duck_Mini_Runtime:/workspaces/Open_Duck_Mini_Runtime
-      - runtime-venv:/opt/venvs/runtime
+      - ./data:/data
     deploy:
       resources:
         reservations:
@@ -76,7 +77,6 @@ services:
       - ./workspace/Open_Duck_Playground:/workspaces/Open_Duck_Playground
       - ./data:/data
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - sim-venv:/opt/venvs/sim
     devices:
       - /dev/dri:/dev/dri
     group_add:
@@ -100,14 +100,10 @@ services:
     network_mode: host
     volumes:
       - ./workspace/Open_Duck_Playground:/workspaces/Open_Duck_Playground
-      - sim-venv:/opt/venvs/sim
+      - ./data:/data
     command: >
       bash -lc "source /opt/venvs/sim/bin/activate &&
       tensorboard --host 0.0.0.0 --port 6006
-      --logdir /workspaces/Open_Duck_Playground"
+      --logdir /workspaces/Open_Duck_Playground,/data"
     profiles:
       - tools
-
-volumes:
-  runtime-venv:
-  sim-venv:

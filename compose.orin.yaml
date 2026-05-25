@@ -5,6 +5,7 @@ services:
       dockerfile: docker/runtime/Dockerfile
       args:
         BASE_IMAGE: ${ORIN_RUNTIME_BASE:-nvcr.io/nvidia/l4t-jetpack:r36.4.0}
+        RUNTIME_EXTRA: ${ORIN_RUNTIME_EXTRA:-runtime}
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
         USERNAME: ${CONTAINER_USER:-chromie}
@@ -30,10 +31,6 @@ services:
       - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
       - ./workspace/Open_Duck_Mini_Runtime:/workspaces/Open_Duck_Mini_Runtime
       - ./data:/data
-      - runtime-venv-orin:/opt/venvs/runtime
       - /dev:/host-dev
     working_dir: /app
     command: bash
-
-volumes:
-  runtime-venv-orin:

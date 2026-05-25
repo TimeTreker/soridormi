@@ -15,7 +15,6 @@ Test GPU access:
 docker run --rm --gpus all nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04 nvidia-smi
 ```
 
-
 The default PC development base image includes CUDA, development headers, and cuDNN:
 
 ```text
@@ -29,6 +28,14 @@ Pull your simulator/runtime-dev base image:
 ```bash
 docker pull nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
 ```
+
+Generate local settings before Compose commands:
+
+```bash
+./scripts/setup_env.sh
+```
+
+This automatically detects host UID/GID and GPU device group IDs such as `video` and `render` and writes them into `.env`.
 
 For X11 GUI:
 

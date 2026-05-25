@@ -4,6 +4,7 @@ FROM ${BASE_IMAGE}
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 ARG USERNAME=chromie
+ARG RUNTIME_EXTRA=runtime-gpu
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -56,14 +57,21 @@ RUN set -eux; \
 COPY docker/runtime/bootstrap_runtime.sh /usr/local/bin/bootstrap_runtime
 RUN chmod +x /usr/local/bin/bootstrap_runtime
 
-COPY pyproject.toml /app/pyproject.toml
+COPY pyproject.toml README.md /app/
 COPY src /app/src
-RUN chown -R ${USER_ID}:${GROUP_ID} /app
+RUN chown -R ${USER_ID}:${GROUP_ID} /app /opt/venvs/runtime
 
 USER ${USERNAME}
 WORKDIR /app
 
+# Build the runtime Python environment into the image. Source is still bind-mounted
+# at runtime, so normal code edits do not require rebuilding the image.
+RUN uv venv --python python3 /opt/venvs/runtime \
+    && uv pip install --python /opt/venvs/runtime/bin/python --upgrade pip setuptools wheel \
+    && uv pip install --python /opt/venvs/runtime/bin/python -e "/app[${RUNTIME_EXTRA}]" \
+    && touch /opt/venvs/runtime/.soridormi_runtime_image_env
+
 RUN echo 'alias runtime="source /opt/venvs/runtime/bin/activate"' >> ~/.bashrc \
-    && echo 'echo "Run bootstrap_runtime first. Then use: runtime"' >> ~/.bashrc
+    && echo 'echo "Runtime env is already built into this image. Use: runtime"' >> ~/.bashrc
 
 CMD ["bash"]

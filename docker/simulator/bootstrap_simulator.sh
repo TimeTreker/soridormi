@@ -1,34 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+VENV=/opt/venvs/sim
 APP=/app
-MINI=/workspaces/Open_Duck_Mini
 PLAYGROUND=/workspaces/Open_Duck_Playground
 
-uv venv --python python3 /opt/venvs/sim
-uv pip install --python /opt/venvs/sim/bin/python --upgrade pip setuptools wheel
-
-# Install this project first so the simulator API server works immediately.
-uv pip install --python /opt/venvs/sim/bin/python -e "$APP[sim]"
-
-# Install Open Duck Playground when available.
-if [ -d "$PLAYGROUND" ]; then
-  uv pip install --python /opt/venvs/sim/bin/python -e "$PLAYGROUND"
-else
-  echo "Warning: $PLAYGROUND not found. Run scripts/add_submodules.sh on host if needed."
+if [ -x "${VENV}/bin/python" ]; then
+  echo "Simulator environment already exists at ${VENV}."
+  echo "This environment is built into the Docker image by default."
+  echo "Use:"
+  echo "  source ${VENV}/bin/activate"
+  echo ""
+  echo "To install the optional editable Open Duck Playground repo into this running container, use:"
+  echo "  uv pip install --python ${VENV}/bin/python -e ${PLAYGROUND}"
+  exit 0
 fi
 
-# Install legacy Open Duck Mini optional dependencies only if needed.
-if [ -d "$MINI" ]; then
-  echo "Open_Duck_Mini found at $MINI"
-else
-  echo "Warning: $MINI not found. Run scripts/add_submodules.sh on host if needed."
-fi
+echo "Creating simulator Python environment..."
+uv venv --python python3 "${VENV}"
+uv pip install --python "${VENV}/bin/python" --upgrade pip setuptools wheel
+uv pip install --python "${VENV}/bin/python" -e "${APP}[sim]"
+uv pip install --python "${VENV}/bin/python" tensorboard
 
-# TensorBoard is useful for training logs.
-uv pip install --python /opt/venvs/sim/bin/python tensorboard
+if [ -d "${PLAYGROUND}" ]; then
+  uv pip install --python "${VENV}/bin/python" -e "${PLAYGROUND}"
+else
+  echo "Warning: ${PLAYGROUND} not found. Run scripts/add_submodules.sh on host if needed."
+fi
 
 echo ""
 echo "Simulation environment ready."
 echo "Use:"
-echo "  source /opt/venvs/sim/bin/activate"
+echo "  source ${VENV}/bin/activate"

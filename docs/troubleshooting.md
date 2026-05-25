@@ -15,6 +15,28 @@ echo $DISPLAY
 ls /tmp/.X11-unix
 ```
 
+## Docker error: `Unable to find group render`
+
+Do not use group names in Compose. This project uses numeric group IDs instead:
+
+```yaml
+group_add:
+  - "${VIDEO_GID:-44}"
+  - "${RENDER_GID:-109}"
+```
+
+Regenerate `.env` so the values match your host:
+
+```bash
+./scripts/setup_env.sh
+```
+
+Then retry:
+
+```bash
+./scripts/enter_sim.sh
+```
+
 ## JAX or CUDA grabs all GPU memory
 
 The Compose file sets:
@@ -59,14 +81,32 @@ Then rebuild:
 docker compose -f compose.sim.yaml build --no-cache
 ```
 
-
 ## ONNX Runtime GPU install/provider issues
 
-The PC runtime-dev container defaults to `SORIDORMI_ONNXRUNTIME_GPU=1`, which installs the `runtime-gpu` extra and asks ONNX Runtime to prefer `CUDAExecutionProvider`. If that package or provider is incompatible with your host driver/CUDA stack, set this in `.env`:
+The PC runtime-dev image defaults to the `runtime-gpu` extra and asks ONNX Runtime to prefer `CUDAExecutionProvider`. If that package or provider is incompatible with your host driver/CUDA stack, set this in `.env`:
 
 ```env
+RUNTIME_DEV_EXTRA=runtime
 SORIDORMI_ONNXRUNTIME_GPU=0
 SORIDORMI_USE_CUDA_PROVIDER=0
 ```
 
-Then remove the runtime venv volume or rerun `bootstrap_runtime` in a fresh runtime container.
+Then rebuild:
+
+```bash
+./scripts/build_sim.sh
+```
+
+## I changed Python dependencies but the container still uses the old environment
+
+The Python environment is built into the image. Rebuild after dependency changes:
+
+```bash
+./scripts/build_sim.sh
+```
+
+For a full clean rebuild:
+
+```bash
+docker compose -f compose.sim.yaml build --no-cache runtime sim
+```

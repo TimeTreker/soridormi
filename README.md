@@ -151,9 +151,11 @@ By default, the PC-side runtime-dev and simulator images use:
 nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
 ```
 
-The runtime-dev container is GPU-enabled so ONNX Runtime can prefer `CUDAExecutionProvider` during PC simulation. If `onnxruntime-gpu` is not compatible with your local driver/CUDA stack, set `SORIDORMI_ONNXRUNTIME_GPU=0` in `.env` and rerun `bootstrap_runtime`.
+The runtime-dev container is GPU-enabled so ONNX Runtime can prefer `CUDAExecutionProvider` during PC simulation. If `onnxruntime-gpu` is not compatible with your local driver/CUDA stack, set `RUNTIME_DEV_EXTRA=runtime` and `SORIDORMI_ONNXRUNTIME_GPU=0` in `.env`, then rebuild with `./scripts/build_sim.sh`.
 
-### 5. Enter simulator container and bootstrap
+Python dependencies are installed during `docker compose build`. Source code is still bind-mounted from `./src`, so normal code edits do not require rebuilding the image. Rebuild only when `pyproject.toml`, a Dockerfile, system dependencies, or base images change.
+
+### 5. Enter simulator container
 
 ```bash
 ./scripts/enter_sim.sh
@@ -162,15 +164,28 @@ The runtime-dev container is GPU-enabled so ONNX Runtime can prefer `CUDAExecuti
 Inside the container:
 
 ```bash
-bootstrap_simulator
+whoami
 sim
+python - <<'PY'
+import soridormi_api, soridormi_sim
+print("Soridormi simulator imports OK")
+PY
 ```
+
+The simulator Python environment is now built into the Docker image at `/opt/venvs/sim`, so `bootstrap_simulator` is no longer required for normal daily use.
 
 ### 6. Start simulator API server
 
-Inside the simulator container:
+You can start it directly from the host:
 
 ```bash
+./scripts/run_sim_server.sh
+```
+
+Or from inside the simulator container:
+
+```bash
+sim
 python -m soridormi_sim.mujoco_server
 ```
 
@@ -178,19 +193,26 @@ At this stage the server includes a safe fake backend so the API can be tested i
 
 ### 7. Start runtime container in another terminal
 
+You can start the runtime loop directly from the host:
+
+```bash
+./scripts/run_runtime_loop.sh
+```
+
+Or enter the runtime-dev container:
+
 ```bash
 ./scripts/enter_runtime_dev.sh
 ```
 
-Inside the runtime container:
+Inside the runtime-dev container:
 
 ```bash
-bootstrap_runtime
 runtime
 python -m soridormi_runtime.main
 ```
 
-The runtime will connect to the simulator using the same API shape that the real hardware backend should implement.
+The runtime Python environment is built into the Docker image at `/opt/venvs/runtime`. The runtime will connect to the simulator using the same API shape that the real hardware backend should implement.
 
 ## Common commands
 
