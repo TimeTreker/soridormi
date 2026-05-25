@@ -80,6 +80,21 @@ To start the real MuJoCo backend with the configured Open Duck Mini v2 model:
 SORIDORMI_SIM_BACKEND=mujoco ./scripts/run_sim_server.sh
 ```
 
+To start the real MuJoCo backend with the passive viewer enabled:
+
+```bash
+xhost +local:docker
+SORIDORMI_SIM_BACKEND=mujoco \
+SORIDORMI_MUJOCO_VIEWER=1 \
+./scripts/run_sim_server.sh
+```
+
+Then start the runtime loop from another terminal:
+
+```bash
+./scripts/run_runtime_loop.sh
+```
+
 To use a different robot model later, create a new config file and point the sim server at it:
 
 ```bash
@@ -89,3 +104,13 @@ SORIDORMI_SIM_BACKEND=mujoco \
 ```
 
 The backend code should stay generic. Robot structure, actuator names, base joint layout, control mode, and model path belong in config.
+
+## MuJoCo viewer mode
+
+The viewer is optional and is controlled by the robot config's `viewer.enabled_env` field. The default Open Duck Mini v2 config uses:
+
+```text
+SORIDORMI_MUJOCO_VIEWER
+```
+
+Set it to `1` only when you want a GUI window. Keep it unset for headless API tests and CI.

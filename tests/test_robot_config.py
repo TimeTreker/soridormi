@@ -28,3 +28,12 @@ def test_open_duck_mini_v2_robot_config_loads() -> None:
         "right_knee",
         "right_ankle",
     ]
+
+
+def test_open_duck_mini_v2_viewer_config_loads() -> None:
+    config = load_robot_config(Path("configs/robots/open_duck_mini_v2.yaml"))
+
+    assert config.viewer.enabled_env == "SORIDORMI_MUJOCO_VIEWER"
+    assert config.viewer.sync_every_api_step is True
+    assert config.viewer.show_left_ui is True
+    assert config.viewer.show_right_ui is True

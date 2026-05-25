@@ -2,7 +2,13 @@
 
 ## MuJoCo GUI does not open
 
-On host:
+Enable the viewer explicitly:
+
+```bash
+SORIDORMI_SIM_BACKEND=mujoco SORIDORMI_MUJOCO_VIEWER=1 ./scripts/run_sim_server.sh
+```
+
+On host, allow local Docker containers to connect to X11:
 
 ```bash
 xhost +local:docker
@@ -13,7 +19,13 @@ Inside sim container:
 ```bash
 echo $DISPLAY
 ls /tmp/.X11-unix
+python - <<'PY'
+import mujoco.viewer
+print("mujoco.viewer import OK")
+PY
 ```
+
+If you are using Wayland, make sure XWayland is available or run from an X11 session.
 
 ## Docker error: `Unable to find group render`
 

@@ -35,3 +35,9 @@ control:
 
 imu:
   accel_xyz_default: [0.0, 0.0, 9.81]
+
+viewer:
+  enabled_env: SORIDORMI_MUJOCO_VIEWER
+  sync_every_api_step: true
+  show_left_ui: true
+  show_right_ui: true

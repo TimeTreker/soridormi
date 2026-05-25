@@ -36,3 +36,10 @@ Config defines robot structure.
 ```
 
 When a new MuJoCo robot model is introduced, add a new config file instead of hardcoding actuator names, base slices, or model paths in Python.
+
+
+## Optional MuJoCo viewer
+
+The simulator backend can launch a passive MuJoCo viewer when the robot config's `viewer.enabled_env` environment variable is true. The backend still owns physics stepping and API timing; the viewer only displays the latest MuJoCo `model`/`data` state and is synchronized after API steps.
+
+This keeps runtime code unchanged: runtime sends the same `MotorCommand` messages whether the simulator is headless or visible in the viewer.

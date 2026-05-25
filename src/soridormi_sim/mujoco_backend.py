@@ -8,6 +8,7 @@ import numpy as np
 
 from soridormi_api import IMUState, JointState, MotorCommand, RobotState
 
+from .mujoco_viewer import MujocoViewerHandle, env_flag
 from .robot_config import RobotConfig, load_robot_config
 
 
@@ -96,6 +97,14 @@ class MujocoBackend:
         self.data = mujoco.MjData(self.model)
         self.last_command: MotorCommand | None = None
 
+        self.viewer = MujocoViewerHandle(
+            model=self.model,
+            data=self.data,
+            enabled=env_flag(self.config.viewer.enabled_env, default=False),
+            show_left_ui=self.config.viewer.show_left_ui,
+            show_right_ui=self.config.viewer.show_right_ui,
+        )
+
         self.actuator_names = self._load_and_validate_actuator_names()
         self.joint_ids = self._load_actuator_joint_ids()
         self.joint_names = [self._joint_name(joint_id) for joint_id in self.joint_ids]
@@ -165,6 +174,9 @@ class MujocoBackend:
         for _ in range(self.substeps_per_api_step):
             self.mujoco.mj_step(self.model, self.data)
 
+        if self.config.viewer.sync_every_api_step:
+            self.viewer.sync()
+
     def get_state(self) -> RobotState:
         positions = [float(self.data.qpos[addr]) for addr in self.qpos_addrs]
         velocities = [float(self.data.qvel[addr]) for addr in self.qvel_addrs]
@@ -204,6 +216,9 @@ class MujocoBackend:
             if self.config.control.clip_to_ctrlrange:
                 target = float(np.clip(target, self.ctrl_min[actuator_index], self.ctrl_max[actuator_index]))
             self.data.ctrl[actuator_index] = target
+
+    def close(self) -> None:
+        self.viewer.close()
 
     def _slice(self, vector: np.ndarray, bounds: tuple[int, int]) -> list[float]:
         start, stop = bounds

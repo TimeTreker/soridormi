@@ -179,7 +179,15 @@ Use the fake backend for API development. Use the real MuJoCo backend with:
 SORIDORMI_SIM_BACKEND=mujoco ./scripts/run_sim_server.sh
 ```
 
-To switch robot models later, add another YAML file under `configs/robots/` and change only `SORIDORMI_ROBOT_CONFIG`. The backend code should not hardcode robot-specific actuator names or model paths.
+To open the MuJoCo passive viewer while the API server runs, enable the viewer environment flag:
+
+```bash
+SORIDORMI_SIM_BACKEND=mujoco \
+SORIDORMI_MUJOCO_VIEWER=1 \
+./scripts/run_sim_server.sh
+```
+
+To switch robot models later, add another YAML file under `configs/robots/` and change only `SORIDORMI_ROBOT_CONFIG`. The backend code should not hardcode robot-specific actuator names or model paths. Viewer settings also live in the robot config under `viewer:`.
 
 ### 5. Enter simulator container
 

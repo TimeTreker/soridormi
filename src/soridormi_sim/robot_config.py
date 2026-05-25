@@ -63,6 +63,13 @@ class ImuConfig(BaseModel):
         return value
 
 
+class ViewerConfig(BaseModel):
+    enabled_env: str = "SORIDORMI_MUJOCO_VIEWER"
+    sync_every_api_step: bool = True
+    show_left_ui: bool = True
+    show_right_ui: bool = True
+
+
 class RobotConfig(BaseModel):
     robot_name: str
     model: ModelConfig
@@ -71,6 +78,7 @@ class RobotConfig(BaseModel):
     actuators: list[ActuatorConfig]
     control: ControlConfig = Field(default_factory=ControlConfig)
     imu: ImuConfig = Field(default_factory=ImuConfig)
+    viewer: ViewerConfig = Field(default_factory=ViewerConfig)
 
     @field_validator("actuators")
     @classmethod
