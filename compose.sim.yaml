@@ -7,6 +7,7 @@ services:
         BASE_IMAGE: ${RUNTIME_DEV_BASE:-ubuntu:24.04}
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
+        USERNAME: ${CONTAINER_USER:-chromie}
     image: soridormi-runtime:dev
     container_name: soridormi-runtime-dev
     stdin_open: true
@@ -38,6 +39,7 @@ services:
         BASE_IMAGE: ${SIM_BASE:-nvidia/cuda:12.8.1-devel-ubuntu24.04}
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
+        USERNAME: ${CONTAINER_USER:-chromie}
     image: soridormi-sim:cuda12.8
     container_name: soridormi-sim
     stdin_open: true

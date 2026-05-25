@@ -83,12 +83,23 @@ soridormi/
     └── upstream Open Duck repos as git submodules
 ```
 
+
+### Docker container user
+
+Both Docker images create and use the same non-root user:
+
+```text
+chromie
+```
+
+The username is controlled by `CONTAINER_USER=chromie` in `.env`. The Dockerfiles also handle base images where UID/GID 1000 already exists, so builds should not fail with `GID '1000' already exists`.
+
 ## Quick start on PC
 
 ### 1. Clone this repo
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/soridormi.git
+git clone https://github.com/TimeTreker/soridormi.git
 cd soridormi
 ```
 

@@ -3,7 +3,7 @@ FROM ${BASE_IMAGE}
 
 ARG USER_ID=1000
 ARG GROUP_ID=1000
-ARG USERNAME=duck
+ARG USERNAME=chromie
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -33,17 +33,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
-RUN groupadd --gid ${GROUP_ID} ${USERNAME} \
-    && useradd --uid ${USER_ID} --gid ${GROUP_ID} -m -s /bin/bash ${USERNAME} \
-    && mkdir -p /app /workspaces /opt/venvs/runtime /data \
-    && chown -R ${USERNAME}:${USERNAME} /app /workspaces /opt/venvs/runtime /data
+RUN set -eux; \
+    if getent group "${GROUP_ID}" >/dev/null; then \
+        echo "Using existing group with GID ${GROUP_ID}"; \
+    else \
+        groupadd --gid "${GROUP_ID}" "${USERNAME}"; \
+    fi; \
+    if id -u "${USERNAME}" >/dev/null 2>&1; then \
+        usermod --uid "${USER_ID}" --gid "${GROUP_ID}" "${USERNAME}"; \
+    elif getent passwd "${USER_ID}" >/dev/null; then \
+        EXISTING_USER="$(getent passwd "${USER_ID}" | cut -d: -f1)"; \
+        usermod --login "${USERNAME}" --home "/home/${USERNAME}" --move-home --gid "${GROUP_ID}" "$EXISTING_USER"; \
+    else \
+        useradd --uid "${USER_ID}" --gid "${GROUP_ID}" -m -s /bin/bash "${USERNAME}"; \
+    fi; \
+    mkdir -p "/home/${USERNAME}" /app /workspaces /opt/venvs/runtime /data; \
+    chown -R "${USER_ID}:${GROUP_ID}" "/home/${USERNAME}" /app /workspaces /opt/venvs/runtime /data
 
 COPY docker/runtime/bootstrap_runtime.sh /usr/local/bin/bootstrap_runtime
 RUN chmod +x /usr/local/bin/bootstrap_runtime
 
 COPY pyproject.toml /app/pyproject.toml
 COPY src /app/src
-RUN chown -R ${USERNAME}:${USERNAME} /app
+RUN chown -R ${USER_ID}:${GROUP_ID} /app
 
 USER ${USERNAME}
 WORKDIR /app

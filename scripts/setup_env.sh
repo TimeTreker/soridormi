@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 cat > .env <<EOF
 UID=$(id -u)
 GID=$(id -g)
+CONTAINER_USER=chromie
 RUNTIME_DEV_BASE=ubuntu:24.04
 ORIN_RUNTIME_BASE=nvcr.io/nvidia/l4t-jetpack:r36.4.0
 THOR_RUNTIME_BASE=nvidia/cuda:13.0.2-devel-ubuntu24.04
