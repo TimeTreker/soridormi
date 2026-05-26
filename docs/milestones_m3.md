@@ -1,63 +1,32 @@
-# M3 Milestones
+# M3 Policy Inference Milestones
 
-## M3.0 ONNX policy inspection
+## M3.0 ONNX inspection
 
-Status: implemented.
-
-Goal:
-
-```text
-load BEST_WALK_ONNX_2.onnx
-inspect input/output names and shapes
-run dummy inference
-```
+- Inspect ONNX model inputs/outputs.
+- Confirm dummy inference works.
 
 ## M3.1 Observation builder
 
-Status: implemented by this update.
+- Convert `RobotState` to `obs` with shape `[1, 101]`.
+- Keep policy action history.
 
-Goal:
+## M3.2 Persistent ONNX policy wrapper
 
-```text
-RobotState -> 101D Open Duck ONNX observation
-observation -> ONNX inference -> 14D action
-```
+- Load ONNX session once.
+- Prefer CUDAExecutionProvider when available.
+- Build observation from `RobotState`.
+- Return `continuous_actions` as shape `[14]`.
+- Do not control motors yet.
 
-This does not yet control the robot.
+## M3.3 Action-to-command mapper
 
-## M3.2 Policy wrapper
+- Convert 14 policy actions into `MotorCommand` position targets.
+- Apply action scale and limits.
 
-Next target.
+## M3.4 `onnx_policy` runtime mode
 
-Goal:
+- Run full `RobotState -> obs -> ONNX -> action -> MotorCommand` loop in simulation.
 
-```text
-persistent ONNX Runtime session
-action history updates
-provider reporting
-MCAP logging of observation/action
-```
+## M3.5 Policy evaluation in MuJoCo
 
-## M3.3 Action to MotorCommand mapper
-
-Goal:
-
-```text
-action[14] -> default_pose + action * action_scale -> MotorCommand
-```
-
-## M3.4 onnx_policy runtime mode
-
-Goal:
-
-```text
-SORIDORMI_RUNTIME_MODE=onnx_policy
-```
-
-## M3.5 MuJoCo policy smoke test
-
-Goal:
-
-```text
-run policy with viewer, auto-reset, and MCAP logging
-```
+- Run with viewer, auto-reset, and MCAP logging.

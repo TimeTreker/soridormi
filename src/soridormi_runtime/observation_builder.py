@@ -222,4 +222,6 @@ def _load_actuator_names_from_config(path: Path) -> list[str]:
 
     return names
 
+
+# Backward-compatible alias for older probe/controller code.
 OpenDuckObservationBuilder = ObservationBuilder
