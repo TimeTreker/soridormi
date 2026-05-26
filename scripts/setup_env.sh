@@ -39,7 +39,7 @@ CONTAINER_USER=chromie
 VIDEO_GID=${VIDEO_GID_VALUE}
 RENDER_GID=${RENDER_GID_VALUE}
 
-RUNTIME_DEV_BASE=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
+RUNTIME_DEV_BASE=nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04
 RUNTIME_DEV_EXTRA=runtime-gpu
 
 ORIN_RUNTIME_BASE=nvcr.io/nvidia/l4t-jetpack:r36.4.0
@@ -48,7 +48,7 @@ ORIN_RUNTIME_EXTRA=runtime
 THOR_RUNTIME_BASE=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
 THOR_RUNTIME_EXTRA=runtime
 
-SIM_BASE=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04
+SIM_BASE=nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04
 SIM_HOST=127.0.0.1
 SIM_PORT=5555
 CONTROL_HZ=50
