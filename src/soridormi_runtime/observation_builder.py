@@ -155,6 +155,21 @@ class ObservationBuilder:
     def __init__(self, config: ObservationBuilderConfig) -> None:
         self.config = config
 
+        # Keep policy defaults and live motor targets as independent mappings.
+        # from_robot_config() used to pass the same dict for both, and external
+        # callers may do the same. Updating motor targets after inference must
+        # not mutate default_positions_by_name, because joint_offsets are
+        # computed as joint_position - default_position. A shared dict causes a
+        # one-step offset drift equal to the speed-limited target update.
+        self.config.default_positions_by_name = {
+            str(name): float(value)
+            for name, value in self.config.default_positions_by_name.items()
+        }
+        self.config.motor_targets_by_name = {
+            str(name): float(value)
+            for name, value in self.config.motor_targets_by_name.items()
+        }
+
         self.last_action = np.zeros(self.ACTION_SIZE, dtype=np.float32)
         self.last_last_action = np.zeros(self.ACTION_SIZE, dtype=np.float32)
         self.last_last_last_action = np.zeros(self.ACTION_SIZE, dtype=np.float32)
@@ -177,7 +192,7 @@ class ObservationBuilder:
             ObservationBuilderConfig(
                 joint_names=joint_names,
                 default_positions_by_name=default_positions,
-                motor_targets_by_name=default_positions,
+                motor_targets_by_name=dict(default_positions),
                 accelerometer_bias_xyz=list(policy_options["accelerometer_bias_xyz"]),
                 use_state_feet_contacts=bool(policy_options["use_state_feet_contacts"]),
             )
