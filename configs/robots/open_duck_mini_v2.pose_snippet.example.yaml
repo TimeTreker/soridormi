@@ -1,0 +1,45 @@
+# Example only. Generate the real values with:
+#   python -m soridormi_sim.export_pose_from_model
+# Then paste/merge the generated reset_pose/default_pose into:
+#   configs/robots/open_duck_mini_v2.yaml
+
+reset_pose:
+  base:
+    position_xyz: [0.0, 0.0, 0.0]
+    quat_wxyz: [1.0, 0.0, 0.0, 0.0]
+  joints:
+    left_hip_yaw: 0.0
+    left_hip_roll: 0.0
+    left_hip_pitch: 0.0
+    left_knee: 0.0
+    left_ankle: 0.0
+    neck_pitch: 0.0
+    head_pitch: 0.0
+    head_yaw: 0.0
+    head_roll: 0.0
+    right_hip_yaw: 0.0
+    right_hip_roll: 0.0
+    right_hip_pitch: 0.0
+    right_knee: 0.0
+    right_ankle: 0.0
+
+default_pose:
+  positions:
+    left_hip_yaw: 0.0
+    left_hip_roll: 0.0
+    left_hip_pitch: 0.0
+    left_knee: 0.0
+    left_ankle: 0.0
+    neck_pitch: 0.0
+    head_pitch: 0.0
+    head_yaw: 0.0
+    head_roll: 0.0
+    right_hip_yaw: 0.0
+    right_hip_roll: 0.0
+    right_hip_pitch: 0.0
+    right_knee: 0.0
+    right_ankle: 0.0
+  gains:
+    kp_default: 10.0
+    kd_default: 0.5
+  torque_default: 0.0

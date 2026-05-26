@@ -78,6 +78,53 @@ class DebugConfig(BaseModel):
     zero_gravity: ZeroGravityDebugConfig = Field(default_factory=ZeroGravityDebugConfig)
 
 
+class ResetBasePoseConfig(BaseModel):
+    position_xyz: list[float] | None = None
+    quat_wxyz: list[float] | None = None
+
+    @field_validator("position_xyz")
+    @classmethod
+    def _position_xyz_has_three_values(cls, value: list[float] | None) -> list[float] | None:
+        if value is not None and len(value) != 3:
+            raise ValueError("reset_pose.base.position_xyz must contain exactly 3 values")
+        return value
+
+    @field_validator("quat_wxyz")
+    @classmethod
+    def _quat_wxyz_has_four_values(cls, value: list[float] | None) -> list[float] | None:
+        if value is not None and len(value) != 4:
+            raise ValueError("reset_pose.base.quat_wxyz must contain exactly 4 values")
+        return value
+
+
+class ResetPoseConfig(BaseModel):
+    """Optional initial pose applied immediately after creating MjData.
+
+    This makes simulator startup deterministic and lets the robot model start
+    from a known pose without changing Python backend code.
+    """
+
+    base: ResetBasePoseConfig | None = None
+    joints: dict[str, float] = Field(default_factory=dict)
+
+
+class DefaultPoseGainsConfig(BaseModel):
+    kp_default: float = 10.0
+    kd_default: float = 0.5
+
+
+class DefaultPoseConfig(BaseModel):
+    """Optional runtime default pose config.
+
+    The runtime standing controller still reads this directly from YAML for now,
+    but validating it here catches malformed robot config files earlier.
+    """
+
+    positions: dict[str, float] = Field(default_factory=dict)
+    gains: DefaultPoseGainsConfig = Field(default_factory=DefaultPoseGainsConfig)
+    torque_default: float = 0.0
+
+
 class RobotConfig(BaseModel):
     robot_name: str
     model: ModelConfig
@@ -88,6 +135,8 @@ class RobotConfig(BaseModel):
     imu: ImuConfig = Field(default_factory=ImuConfig)
     viewer: ViewerConfig = Field(default_factory=ViewerConfig)
     debug: DebugConfig = Field(default_factory=DebugConfig)
+    reset_pose: ResetPoseConfig | None = None
+    default_pose: DefaultPoseConfig | None = None
 
     @field_validator("actuators")
     @classmethod

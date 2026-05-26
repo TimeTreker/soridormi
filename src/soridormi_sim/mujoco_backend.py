@@ -107,6 +107,7 @@ class MujocoBackend:
         self.ctrl_min = np.array(self.model.actuator_ctrlrange[:, 0], dtype=float)
         self.ctrl_max = np.array(self.model.actuator_ctrlrange[:, 1], dtype=float)
 
+        self._apply_configured_reset_pose()
         self._apply_startup_debug_options()
         self._initialize_ctrl_from_current_qpos()
         mujoco.mj_forward(self.model, self.data)
@@ -124,6 +125,42 @@ class MujocoBackend:
         print(f"MuJoCo timestep: {self.model.opt.timestep}")
         print(f"API step substeps: {self.substeps_per_api_step}")
         print(f"Actuators: {self.actuator_names}")
+
+    def _apply_configured_reset_pose(self) -> None:
+        """Apply optional reset_pose from the robot config.
+
+        This sets the free-base qpos and named joint qpos before the first
+        mj_forward() call. It makes simulation startup repeatable and lets us
+        tune reset/default poses from YAML instead of changing backend code.
+        """
+        reset_pose = self.config.reset_pose
+        if reset_pose is None:
+            return
+
+        base_pose = reset_pose.base
+        if base_pose is not None:
+            if base_pose.position_xyz is not None:
+                start, stop = self.config.base.qpos_xyz_slice
+                self.data.qpos[start:stop] = np.array(base_pose.position_xyz, dtype=float)
+
+            if base_pose.quat_wxyz is not None:
+                start, stop = self.config.base.qpos_quat_wxyz_slice
+                self.data.qpos[start:stop] = np.array(base_pose.quat_wxyz, dtype=float)
+
+        for joint_name, value in reset_pose.joints.items():
+            joint_id = self.mujoco.mj_name2id(
+                self.model,
+                self.mujoco.mjtObj.mjOBJ_JOINT,
+                joint_name,
+            )
+            if joint_id < 0:
+                raise ValueError(f"reset_pose references unknown joint: {joint_name}")
+
+            qpos_addr = int(self.model.jnt_qposadr[joint_id])
+            self.data.qpos[qpos_addr] = float(value)
+
+        self.data.qvel[:] = 0.0
+        print("Applied reset_pose from robot config.")
 
     def _apply_startup_debug_options(self) -> None:
         zero_gravity_env = self.config.debug.zero_gravity.enabled_env
