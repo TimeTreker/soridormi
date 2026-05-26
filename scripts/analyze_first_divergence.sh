@@ -2,10 +2,46 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-OFFICIAL_TRACE="${1:-${SORIDORMI_OFFICIAL_TRACE:-/data/official_baseline/latest_official_baseline.trace.jsonl}}"
-SORIDORMI_LOG="${2:-${SORIDORMI_TRACE_LOG:-}}"
+OFFICIAL_TRACE="${SORIDORMI_OFFICIAL_TRACE:-/data/official_baseline/latest_official_baseline.trace.jsonl}"
+SORIDORMI_LOG="${SORIDORMI_TRACE_LOG:-}"
 STEPS="${SORIDORMI_TRACE_COMPARE_STEPS:-100}"
 THRESHOLD="${SORIDORMI_FIRST_DIVERGENCE_THRESHOLD:-1e-4}"
+EXTRA_ANALYZER_ARGS=()
+
+if [[ $# -gt 0 && "${1}" != --* ]]; then
+  OFFICIAL_TRACE="$1"
+  shift
+fi
+
+if [[ $# -gt 0 && "${1}" != --* ]]; then
+  SORIDORMI_LOG="$1"
+  shift
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --steps)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --steps" >&2
+        exit 2
+      fi
+      STEPS="$2"
+      shift 2
+      ;;
+    --threshold)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --threshold" >&2
+        exit 2
+      fi
+      THRESHOLD="$2"
+      shift 2
+      ;;
+    *)
+      EXTRA_ANALYZER_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
 
 if [ -z "${SORIDORMI_LOG}" ]; then
   if [ -d data/logs ]; then
@@ -34,5 +70,6 @@ docker compose -f compose.sim.yaml run --rm runtime bash -lc '
     --official "$1" \
     --soridormi "$2" \
     --steps "$3" \
-    --threshold "$4"
-' _ "${OFFICIAL_TRACE}" "${SORIDORMI_LOG}" "${STEPS}" "${THRESHOLD}"
+    --threshold "$4" \
+    "${@:5}"
+' _ "${OFFICIAL_TRACE}" "${SORIDORMI_LOG}" "${STEPS}" "${THRESHOLD}" "${EXTRA_ANALYZER_ARGS[@]}"

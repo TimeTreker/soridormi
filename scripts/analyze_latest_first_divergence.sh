@@ -54,4 +54,4 @@ echo "Soridormi log: ${soridormi_host}"
 echo "Container official trace: ${official_container}"
 echo "Container Soridormi log: ${soridormi_container}"
 
-./scripts/analyze_first_divergence.sh "${official_container}" "${soridormi_container}"
+./scripts/analyze_first_divergence.sh "${official_container}" "${soridormi_container}" "$@"
