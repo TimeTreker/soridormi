@@ -28,6 +28,7 @@ Current status:
 - M5.1 exports the static model replacement contract.
 - M5.2 makes `check_policy_model.sh --profile NAME` a combined static-contract plus ONNX-file preflight gate.
 - M5.3 centralizes ONNX Runtime execution provider selection and adds CUDA/provider preflight enforcement.
+- M5.4 adds a profile scaffolder for drop-in replacement ONNX profiles.
 
 ## M5: Model replacement interface
 

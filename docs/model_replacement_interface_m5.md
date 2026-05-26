@@ -104,6 +104,55 @@ For CPU-only debugging:
 SORIDORMI_USE_CUDA_PROVIDER=0 ./scripts/run_policy_experiment.sh open_duck_forward
 ```
 
+
+
+## M5.4 profile scaffolding
+
+Use the profile scaffolder when you have a new ONNX file that should follow the
+same Soridormi/Open Duck runtime contract as an existing profile. It clones a
+known-good profile, changes the model path, stamps the static observation/action
+contract into the YAML, and updates the logging prefix.
+
+```bash
+./scripts/create_policy_profile.sh my_replacement \
+  --model /models/my_replacement.onnx \
+  --template open_duck_forward \
+  --description "My replacement ONNX policy"
+```
+
+Then validate before runtime:
+
+```bash
+./scripts/export_policy_contract.sh my_replacement
+./scripts/check_policy_model.sh --profile my_replacement
+```
+
+The scaffolder does not load the ONNX model. This is intentional: profile
+creation is a static YAML operation, while `check_policy_model.sh` remains the
+preflight gate for actual ONNX metadata and provider selection.
+
+Useful options:
+
+```bash
+# Preview YAML without writing a file
+./scripts/create_policy_profile.sh my_replacement \
+  --model /models/my_replacement.onnx \
+  --stdout
+
+# Write to a custom path
+./scripts/create_policy_profile.sh my_replacement \
+  --model /models/my_replacement.onnx \
+  --output configs/policies/my_replacement.yaml
+
+# Override model IO names/shapes when the compatible ONNX uses different names
+./scripts/create_policy_profile.sh my_replacement \
+  --model /models/my_replacement.onnx \
+  --input-name obs \
+  --output-name continuous_actions \
+  --input-shape '[1, 101]' \
+  --output-shape '[1, 14]'
+```
+
 ## Runtime contract
 
 Current Open Duck-compatible replacement models must use:
