@@ -136,6 +136,24 @@ class DefaultPoseConfig(BaseModel):
     torque_default: float = 0.0
 
 
+class AutoResetSafetyConfig(BaseModel):
+    """Debug/safety option for resetting MuJoCo after a fall.
+
+    This is meant for simulation iteration: when the free-base robot falls below
+    a height threshold or tilts too far, the backend can reset to reset_pose
+    without restarting the server.
+    """
+
+    enabled_env: str = "SORIDORMI_AUTO_RESET"
+    min_base_height: float = 0.05
+    max_tilt_rad: float = 1.2
+    cooldown_seconds: float = 1.0
+
+
+class SafetyConfig(BaseModel):
+    auto_reset: AutoResetSafetyConfig = Field(default_factory=AutoResetSafetyConfig)
+
+
 class RobotConfig(BaseModel):
     robot_name: str
     model: ModelConfig
@@ -146,6 +164,7 @@ class RobotConfig(BaseModel):
     imu: ImuConfig = Field(default_factory=ImuConfig)
     viewer: ViewerConfig = Field(default_factory=ViewerConfig)
     debug: DebugConfig = Field(default_factory=DebugConfig)
+    safety: SafetyConfig = Field(default_factory=SafetyConfig)
     reset_pose: ResetPoseConfig | None = None
     default_pose: DefaultPoseConfig | None = None
 

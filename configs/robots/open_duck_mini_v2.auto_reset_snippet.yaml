@@ -1,0 +1,10 @@
+# Optional snippet for configs/robots/open_duck_mini_v2.yaml
+# Add this under the top level of the robot config.
+# Do not duplicate an existing safety: section; merge into it if present.
+
+safety:
+  auto_reset:
+    enabled_env: SORIDORMI_AUTO_RESET
+    min_base_height: 0.05
+    max_tilt_rad: 1.2
+    cooldown_seconds: 1.0

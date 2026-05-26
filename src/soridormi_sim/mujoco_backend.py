@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -121,6 +122,22 @@ class MujocoBackend:
                 f"{self.config.debug.fixed_base.enabled_env}=1"
             )
 
+        auto_reset = self.config.safety.auto_reset
+        self.auto_reset_enabled = env_flag(auto_reset.enabled_env, default=False)
+        self.auto_reset_min_base_height = auto_reset.min_base_height
+        self.auto_reset_max_tilt_rad = auto_reset.max_tilt_rad
+        self.auto_reset_cooldown_seconds = auto_reset.cooldown_seconds
+        self.last_reset_time = time.monotonic()
+        self.reset_count = 0
+        if self.auto_reset_enabled:
+            print(
+                "MuJoCo auto-reset enabled via "
+                f"{auto_reset.enabled_env}=1 "
+                f"(min_base_height={self.auto_reset_min_base_height}, "
+                f"max_tilt_rad={self.auto_reset_max_tilt_rad}, "
+                f"cooldown_seconds={self.auto_reset_cooldown_seconds})"
+            )
+
         self.viewer = MujocoViewerHandle(
             model=self.model,
             data=self.data,
@@ -134,6 +151,25 @@ class MujocoBackend:
         print(f"MuJoCo timestep: {self.model.opt.timestep}")
         print(f"API step substeps: {self.substeps_per_api_step}")
         print(f"Actuators: {self.actuator_names}")
+
+    def reset(self) -> None:
+        """Reset MuJoCo data to the configured reset_pose.
+
+        The model stays loaded and the viewer stays open. The runtime can keep
+        sending commands while the simulation returns to a known safe pose.
+        """
+        self.mujoco.mj_resetData(self.model, self.data)
+        self._apply_configured_reset_pose()
+        self._apply_startup_debug_options()
+        self._initialize_ctrl_from_current_qpos()
+        self.mujoco.mj_forward(self.model, self.data)
+        self.last_command = None
+        self.reset_count += 1
+
+        # If fixed-base mode is enabled, the fixed pose should match the new
+        # reset pose rather than the previous fallen pose.
+        if hasattr(self, "fixed_base_qpos_slices"):
+            self.fixed_base_qpos_slices = self._capture_fixed_base_qpos_slices()
 
     def _apply_configured_reset_pose(self) -> None:
         """Apply optional reset_pose from the robot config.
@@ -213,6 +249,54 @@ class MujocoBackend:
         self.data.qvel[ang_start:ang_stop] = 0.0
         self.mujoco.mj_forward(self.model, self.data)
 
+    def _base_height(self) -> float:
+        start, _ = self.config.base.qpos_xyz_slice
+        return float(self.data.qpos[start + 2])
+
+    def _base_tilt_rad(self) -> float:
+        """Return max absolute roll/pitch tilt from base quaternion.
+
+        MuJoCo free-joint quaternion is stored as wxyz. Yaw is ignored because
+        yawing does not mean the robot has fallen.
+        """
+        start, stop = self.config.base.qpos_quat_wxyz_slice
+        w, x, y, z = [float(v) for v in self.data.qpos[start:stop]]
+
+        sinr_cosp = 2.0 * (w * x + y * z)
+        cosr_cosp = 1.0 - 2.0 * (x * x + y * y)
+        roll = math.atan2(sinr_cosp, cosr_cosp)
+
+        sinp = 2.0 * (w * y - z * x)
+        sinp = max(-1.0, min(1.0, sinp))
+        pitch = math.asin(sinp)
+
+        return max(abs(roll), abs(pitch))
+
+    def _auto_reset_if_needed(self) -> None:
+        if not self.auto_reset_enabled:
+            return
+
+        # Fixed-base and zero-gravity debug modes are normally used to inspect
+        # poses, so auto-reset would be noisy and unnecessary there.
+        if self.fixed_base_enabled:
+            return
+
+        now = time.monotonic()
+        if now - self.last_reset_time < self.auto_reset_cooldown_seconds:
+            return
+
+        height = self._base_height()
+        tilt = self._base_tilt_rad()
+
+        if height < self.auto_reset_min_base_height or tilt > self.auto_reset_max_tilt_rad:
+            print(
+                "Auto reset triggered: "
+                f"height={height:.3f}, tilt={tilt:.3f} rad, "
+                f"reset_count={self.reset_count + 1}"
+            )
+            self.reset()
+            self.last_reset_time = now
+
     def _initialize_ctrl_from_current_qpos(self) -> None:
         """Initialize actuator controls to the model's current joint pose.
 
@@ -284,6 +368,8 @@ class MujocoBackend:
         for _ in range(self.substeps_per_api_step):
             self.mujoco.mj_step(self.model, self.data)
             self._enforce_fixed_base_debug()
+
+        self._auto_reset_if_needed()
 
         if self.config.viewer.sync_every_api_step:
             self.viewer.sync()
