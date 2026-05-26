@@ -25,11 +25,14 @@ class PolicyLogComparisonRow:
     latest_action_scale: float | None
     latest_max_motor_velocity: float | None
     latest_command: list[float] | None
+    forward_x: float | None = None
+    horizontal_distance: float | None = None
 
     def score_tuple(self) -> tuple[float, float, int]:
         mean_cycle = self.mean_cycle_seconds or 0.0
         best_cycle = self.best_cycle_seconds or 0.0
-        return (mean_cycle, best_cycle, -self.reset_count)
+        forward = self.forward_x or 0.0
+        return (mean_cycle, best_cycle, forward, -self.reset_count)
 
 
 def expand_log_paths(inputs: Iterable[str | Path]) -> list[Path]:
@@ -76,6 +79,7 @@ def comparison_row(path: str | Path) -> PolicyLogComparisonRow:
     if latest_command is not None:
         latest_command = [float(value) for value in latest_command]
 
+    displacement = summary.get("base_displacement", {}) or {}
     return PolicyLogComparisonRow(
         path=str(path),
         profile=guess_profile_from_path(path),
@@ -89,6 +93,8 @@ def comparison_row(path: str | Path) -> PolicyLogComparisonRow:
         latest_action_scale=summary.get("latest_action_scale"),
         latest_max_motor_velocity=summary.get("latest_max_motor_velocity"),
         latest_command=latest_command,
+        forward_x=displacement.get("forward_x"),
+        horizontal_distance=displacement.get("horizontal_distance"),
     )
 
 
@@ -110,13 +116,13 @@ def print_comparison(rows: list[PolicyLogComparisonRow]) -> None:
     print("================================")
     print(
         f"{'rank':>4}  {'profile':<18} {'resets':>6} {'best_s':>8} {'mean_s':>8} "
-        f"{'policy':>7} {'abs_act':>8} {'scale':>7} {'max_vel':>7}  log"
+        f"{'fwd_x':>8} {'policy':>7} {'abs_act':>8} {'scale':>7} {'max_vel':>7}  log"
     )
     for index, row in enumerate(rows, start=1):
         print(
             f"{index:>4}  {row.profile:<18} {row.reset_count:>6} "
             f"{_fmt(row.best_cycle_seconds):>8} {_fmt(row.mean_cycle_seconds):>8} "
-            f"{row.policy_records:>7} {_fmt(row.action_abs_max):>8} "
+            f"{_fmt(row.forward_x):>8} {row.policy_records:>7} {_fmt(row.action_abs_max):>8} "
             f"{_fmt(row.latest_action_scale):>7} {_fmt(row.latest_max_motor_velocity):>7}  "
             f"{row.path}"
         )
@@ -129,6 +135,7 @@ def print_comparison(rows: list[PolicyLogComparisonRow]) -> None:
     print(f"  mean_cycle_seconds: {_fmt(best.mean_cycle_seconds)}")
     print(f"  best_cycle_seconds: {_fmt(best.best_cycle_seconds)}")
     print(f"  resets: {best.reset_count}")
+    print(f"  forward_x: {_fmt(best.forward_x)}")
     if best.latest_command is not None:
         print(f"  latest_command: {best.latest_command}")
 

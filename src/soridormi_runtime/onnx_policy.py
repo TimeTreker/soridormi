@@ -83,6 +83,8 @@ class OnnxPolicy:
         self.observation_builder = observation_builder or ObservationBuilder.from_robot_config(
             path=robot_config_path
         )
+        self.expected_input_name = os.environ.get("SORIDORMI_POLICY_INPUT_NAME") or None
+        self.expected_output_name = os.environ.get("SORIDORMI_POLICY_OUTPUT_NAME") or None
 
         if session_factory is None:
             if not self.policy_path.exists():
@@ -91,24 +93,61 @@ class OnnxPolicy:
         else:
             self.session = session_factory(str(self.policy_path), providers=self.providers)
 
-        self.input_name = self._single_input_name()
-        self.output_name = self._first_output_name()
+        self.input_name = self._select_input_name(self.expected_input_name)
+        self.output_name = self._select_output_name(self.expected_output_name)
+        self._validate_io_contract_from_env()
         self.last_observation: np.ndarray | None = None
         self.last_observation_stats: dict[str, object] | None = None
         self.last_action: np.ndarray | None = None
         self.last_action_stats: dict[str, object] | None = None
 
-    def _single_input_name(self) -> str:
+    def _select_input_name(self, expected_name: str | None = None) -> str:
         inputs = self.session.get_inputs()
+        if not inputs:
+            raise RuntimeError("ONNX policy has no inputs")
+        if expected_name:
+            for item in inputs:
+                if str(item.name) == expected_name:
+                    return expected_name
+            available = [str(item.name) for item in inputs]
+            raise RuntimeError(f"Expected ONNX input {expected_name!r}, available inputs={available}")
         if len(inputs) != 1:
             raise RuntimeError(f"Expected exactly one ONNX input, got {len(inputs)}")
         return str(inputs[0].name)
 
-    def _first_output_name(self) -> str:
+    def _select_output_name(self, expected_name: str | None = None) -> str:
         outputs = self.session.get_outputs()
         if not outputs:
             raise RuntimeError("ONNX policy has no outputs")
+        if expected_name:
+            for item in outputs:
+                if str(item.name) == expected_name:
+                    return expected_name
+            available = [str(item.name) for item in outputs]
+            raise RuntimeError(f"Expected ONNX output {expected_name!r}, available outputs={available}")
         return str(outputs[0].name)
+
+    def _validate_io_contract_from_env(self) -> None:
+        expected_input_shape = _parse_shape_env("SORIDORMI_POLICY_EXPECTED_INPUT_SHAPE")
+        expected_output_shape = _parse_shape_env("SORIDORMI_POLICY_EXPECTED_OUTPUT_SHAPE")
+        expected_input_type = os.environ.get("SORIDORMI_POLICY_EXPECTED_INPUT_TYPE") or None
+        expected_output_type = os.environ.get("SORIDORMI_POLICY_EXPECTED_OUTPUT_TYPE") or None
+        inputs = {str(item.name): item for item in self.session.get_inputs()}
+        outputs = {str(item.name): item for item in self.session.get_outputs()}
+        input_info = inputs[self.input_name]
+        output_info = outputs[self.output_name]
+        if expected_input_shape and not _shape_matches(list(input_info.shape), expected_input_shape):
+            raise RuntimeError(
+                f"Policy input shape mismatch for {self.input_name!r}: expected {expected_input_shape}, got {list(input_info.shape)}"
+            )
+        if expected_output_shape and not _shape_matches(list(output_info.shape), expected_output_shape):
+            raise RuntimeError(
+                f"Policy output shape mismatch for {self.output_name!r}: expected {expected_output_shape}, got {list(output_info.shape)}"
+            )
+        if expected_input_type and str(input_info.type) != expected_input_type:
+            raise RuntimeError(f"Policy input type mismatch for {self.input_name!r}: expected {expected_input_type}, got {input_info.type}")
+        if expected_output_type and str(output_info.type) != expected_output_type:
+            raise RuntimeError(f"Policy output type mismatch for {self.output_name!r}: expected {expected_output_type}, got {output_info.type}")
 
     @property
     def joint_names(self) -> list[str]:
@@ -123,8 +162,36 @@ class OnnxPolicy:
     def set_motor_targets_by_name(self, targets_by_name: dict[str, float]) -> None:
         self.observation_builder.set_motor_targets_by_name(targets_by_name)
 
+    def set_default_positions_by_name(self, positions_by_name: dict[str, float]) -> None:
+        setter = getattr(self.observation_builder, "set_default_positions_by_name", None)
+        if callable(setter):
+            setter(positions_by_name)
+        else:
+            self.observation_builder.config.default_positions_by_name.update(
+                {str(name): float(value) for name, value in positions_by_name.items()}
+            )
+
+    def bootstrap_defaults_from_state(self, state: RobotState) -> dict[str, float]:
+        defaults = {
+            str(name): float(value)
+            for name, value in zip(state.joints.names, state.joints.positions)
+            if name in self.joint_names
+        }
+        self.set_default_positions_by_name(defaults)
+        self.set_motor_targets_by_name(defaults)
+        return defaults
+
     def set_motor_targets(self, joint_names: list[str], positions: list[float] | np.ndarray) -> None:
         self.observation_builder.set_motor_targets(joint_names, positions)
+
+    def reset_state(self) -> None:
+        resetter = getattr(self.observation_builder, "reset_action_history", None)
+        if callable(resetter):
+            resetter()
+        self.last_observation = None
+        self.last_observation_stats = None
+        self.last_action = None
+        self.last_action_stats = None
 
     def compute_action(self, state: RobotState) -> np.ndarray:
         obs = self.observation_builder.build_batch(state)
@@ -166,8 +233,47 @@ class OnnxPolicy:
             "policy_path": str(self.policy_path),
             "providers": list(self.providers),
             "input_name": self.input_name,
-            "input_shape": list(inputs[0].shape),
+            "input_shape": _shape_for_name(inputs, self.input_name),
             "output_name": self.output_name,
-            "output_shape": list(outputs[0].shape),
+            "output_shape": _shape_for_name(outputs, self.output_name),
+            "available_inputs": [str(item.name) for item in inputs],
+            "available_outputs": [str(item.name) for item in outputs],
             "joint_names": self.joint_names,
         }
+
+
+def _parse_shape_env(name: str) -> list[object] | None:
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return None
+    out: list[object] = []
+    for raw in value.split(","):
+        item = raw.strip()
+        if item in {"", "?", "None", "none", "null", "-1"}:
+            out.append(None)
+        else:
+            try:
+                out.append(int(item))
+            except ValueError:
+                out.append(item)
+    return out
+
+
+def _shape_matches(actual: list[object], expected: list[object]) -> bool:
+    if len(actual) != len(expected):
+        return False
+    for a, e in zip(actual, expected):
+        if e is None:
+            continue
+        if a in {None, "", "?"}:
+            continue
+        if str(a) != str(e):
+            return False
+    return True
+
+
+def _shape_for_name(items: list[object], name: str) -> list[object] | None:
+    for item in items:
+        if str(getattr(item, "name", "")) == name:
+            return list(getattr(item, "shape", []) or [])
+    return None

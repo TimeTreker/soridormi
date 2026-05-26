@@ -1,0 +1,50 @@
+# Soridormi M4.2 policy profile.
+name: open_duck_forward
+description: Open Duck Mini v2 pretrained ONNX forward policy experiment.
+
+model:
+  path: /workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx
+  input_name: obs
+  output_name: continuous_actions
+  input_shape: [1, 101]
+  output_shape: [1, 14]
+  input_type: tensor(float)
+  output_type: tensor(float)
+
+runtime:
+  mode: onnx_policy
+  backend: sim
+  control_hz: 50
+
+command:
+  x: 0.06
+  y: 0.0
+  yaw: 0.0
+  neck_pitch: 0.0
+  head_pitch: 0.0
+  head_yaw: 0.0
+  head_roll: 0.0
+  ramp_seconds: 1.0
+
+phase:
+  mode: step
+  frequency: 1.0
+  period_steps: 50
+  step_increment: 1.0
+  enabled: true
+  offset: 0.0
+
+action_mapping:
+  action_scale: 0.25
+  max_motor_velocity: 5.24
+
+observation:
+  accel_bias_xyz: [1.3, 0.0, 0.0]
+  use_state_feet_contacts: true
+  bootstrap_policy_defaults_from_state: true
+
+logging:
+  enabled: true
+  format: mcap
+  every_n: 1
+  prefix: policy_open_duck_forward

@@ -65,6 +65,7 @@ class FakeMujocoBackend:
                 torques=list(self.torques),
             ),
             imu=IMUState(accel_xyz=list(self.config.imu.accel_xyz_default)),
+            feet_contacts=[0.0, 0.0],
         )
 
     def apply_command(self, command: MotorCommand) -> None:
@@ -105,6 +106,8 @@ class MujocoBackend:
         self.qvel_addrs = [int(self.model.jnt_dofadr[joint_id]) for joint_id in self.joint_ids]
         self.ctrl_min = np.array(self.model.actuator_ctrlrange[:, 0], dtype=float)
         self.ctrl_max = np.array(self.model.actuator_ctrlrange[:, 1], dtype=float)
+        self.gyro_sensor_id = self._sensor_id("gyro")
+        self.accelerometer_sensor_id = self._sensor_id("accelerometer")
 
         self._apply_configured_reset_pose()
         self._apply_startup_debug_options()
@@ -388,6 +391,9 @@ class MujocoBackend:
                 torques=torques,
             ),
             imu=self._read_base_imu(),
+            feet_contacts=self._read_feet_contacts(),
+            base_position_xyz=self._slice(self.data.qpos, self.config.base.qpos_xyz_slice),
+            base_quat_wxyz=self._slice(self.data.qpos, self.config.base.qpos_quat_wxyz_slice),
         )
 
     def apply_command(self, command: MotorCommand) -> None:
@@ -429,6 +435,104 @@ class MujocoBackend:
         base = self.config.base
         return IMUState(
             quat_wxyz=self._slice(self.data.qpos, base.qpos_quat_wxyz_slice),
-            gyro_xyz=self._slice(self.data.qvel, base.qvel_angular_slice),
-            accel_xyz=list(self.config.imu.accel_xyz_default),
+            gyro_xyz=self._read_sensor_or_qvel(
+                sensor_id=self.gyro_sensor_id,
+                expected_size=3,
+                fallback=self._slice(self.data.qvel, base.qvel_angular_slice),
+            ),
+            accel_xyz=self._read_sensor_or_qvel(
+                sensor_id=self.accelerometer_sensor_id,
+                expected_size=3,
+                fallback=list(self.config.imu.accel_xyz_default),
+            ),
         )
+
+    def _sensor_id(self, name: str) -> int:
+        sensor_id = self.mujoco.mj_name2id(
+            self.model,
+            self.mujoco.mjtObj.mjOBJ_SENSOR,
+            name,
+        )
+        return int(sensor_id)
+
+    def _read_sensor_or_qvel(
+        self,
+        *,
+        sensor_id: int,
+        expected_size: int,
+        fallback: list[float],
+    ) -> list[float]:
+        if sensor_id < 0:
+            return [float(x) for x in fallback]
+
+        addr = int(self.model.sensor_adr[sensor_id])
+        dim = int(self.model.sensor_dim[sensor_id])
+        if dim < expected_size:
+            return [float(x) for x in fallback]
+
+        values = self.data.sensordata[addr : addr + expected_size]
+        return [float(x) for x in values]
+
+    def _read_feet_contacts(self) -> list[float]:
+        contact = self.config.policy_observation.foot_contact
+        left = self._check_named_body_contact(contact.left_body, contact.ground_body)
+        right = self._check_named_body_contact(contact.right_body, contact.ground_body)
+
+        if not left:
+            left = self._check_named_geom_contact(contact.left_geoms, contact.ground_geoms)
+        if not right:
+            right = self._check_named_geom_contact(contact.right_geoms, contact.ground_geoms)
+
+        return [1.0 if left else 0.0, 1.0 if right else 0.0]
+
+    def _body_id(self, name: str) -> int:
+        return int(
+            self.mujoco.mj_name2id(
+                self.model,
+                self.mujoco.mjtObj.mjOBJ_BODY,
+                name,
+            )
+        )
+
+    def _geom_id(self, name: str) -> int:
+        return int(
+            self.mujoco.mj_name2id(
+                self.model,
+                self.mujoco.mjtObj.mjOBJ_GEOM,
+                name,
+            )
+        )
+
+    def _check_named_body_contact(self, body_a: str, body_b: str) -> bool:
+        body_a_id = self._body_id(body_a)
+        body_b_id = self._body_id(body_b)
+        if body_a_id < 0 or body_b_id < 0:
+            return False
+
+        for i in range(int(self.data.ncon)):
+            contact = self.data.contact[i]
+            geom1_body = int(self.model.geom_bodyid[contact.geom1])
+            geom2_body = int(self.model.geom_bodyid[contact.geom2])
+            if (geom1_body == body_a_id and geom2_body == body_b_id) or (
+                geom1_body == body_b_id and geom2_body == body_a_id
+            ):
+                return True
+        return False
+
+    def _check_named_geom_contact(self, geoms_a: list[str], geoms_b: list[str]) -> bool:
+        geom_ids_a = {self._geom_id(name) for name in geoms_a}
+        geom_ids_b = {self._geom_id(name) for name in geoms_b}
+        geom_ids_a.discard(-1)
+        geom_ids_b.discard(-1)
+        if not geom_ids_a or not geom_ids_b:
+            return False
+
+        for i in range(int(self.data.ncon)):
+            contact = self.data.contact[i]
+            geom1 = int(contact.geom1)
+            geom2 = int(contact.geom2)
+            if (geom1 in geom_ids_a and geom2 in geom_ids_b) or (
+                geom1 in geom_ids_b and geom2 in geom_ids_a
+            ):
+                return True
+        return False

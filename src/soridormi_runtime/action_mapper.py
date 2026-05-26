@@ -129,6 +129,20 @@ class PolicyActionMapper:
             )
         )
 
+
+    def set_default_positions_by_name(self, positions_by_name: dict[str, float]) -> None:
+        clean = {str(name): float(value) for name, value in positions_by_name.items()}
+        self.config.default_positions_by_name.update(clean)
+        for name, value in clean.items():
+            if name in self.config.joint_names:
+                self.last_motor_targets_by_name[name] = float(value)
+
+    def reset_targets(self) -> None:
+        self.last_motor_targets_by_name = {
+            name: float(self.config.default_positions_by_name.get(name, 0.0))
+            for name in self.config.joint_names
+        }
+
     def action_to_targets(
         self,
         action: np.ndarray | list[float],

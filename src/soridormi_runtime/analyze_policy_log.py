@@ -28,6 +28,7 @@ class PolicyLogRecord:
     motor_positions: list[float] | None = None
     joint_positions: list[float] | None = None
     joint_velocities: list[float] | None = None
+    base_position_xyz: list[float] | None = None
 
 
 @dataclass
@@ -145,6 +146,7 @@ def _ingest_payload(dataset: PolicyLogDataset, topic: str, payload: dict[str, An
             if isinstance(joints, dict):
                 record.joint_positions = _coerce_float_list(joints.get("positions"))
                 record.joint_velocities = _coerce_float_list(joints.get("velocities"))
+            record.base_position_xyz = _coerce_float_list(state.get("base_position_xyz"))
 
 
 def _iter_jsonl_payloads(path: Path) -> Iterator[tuple[str, dict[str, Any]]]:
@@ -259,6 +261,35 @@ def _last_debug(records: list[PolicyLogRecord]) -> dict[str, Any] | None:
     return None
 
 
+def _base_displacement(records: list[PolicyLogRecord]) -> dict[str, Any]:
+    base_records = [record for record in records if record.base_position_xyz is not None]
+    if len(base_records) < 2:
+        return {
+            "available": False,
+            "start_xyz": None,
+            "end_xyz": None,
+            "delta_xyz": None,
+            "forward_x": None,
+            "lateral_y": None,
+            "vertical_z": None,
+            "horizontal_distance": None,
+        }
+    start = base_records[0].base_position_xyz or [0.0, 0.0, 0.0]
+    end = base_records[-1].base_position_xyz or [0.0, 0.0, 0.0]
+    delta = [float(end[i] - start[i]) for i in range(3)]
+    horizontal = math.sqrt(delta[0] * delta[0] + delta[1] * delta[1])
+    return {
+        "available": True,
+        "start_xyz": [float(x) for x in start],
+        "end_xyz": [float(x) for x in end],
+        "delta_xyz": delta,
+        "forward_x": delta[0],
+        "lateral_y": delta[1],
+        "vertical_z": delta[2],
+        "horizontal_distance": horizontal,
+    }
+
+
 def detect_reset_cycles(records: list[PolicyLogRecord]) -> list[dict[str, Any]]:
     time_records = [record for record in records if record.robot_time is not None]
     if not time_records:
@@ -314,6 +345,7 @@ def summarize_policy_log(dataset: PolicyLogDataset) -> dict[str, Any]:
     motor_positions = _all_values(records, "motor_positions")
     joint_positions = _all_values(records, "joint_positions")
     joint_velocities = _all_values(records, "joint_velocities")
+    base_displacement = _base_displacement(records)
 
     obs_min = _debug_series(policy_records, "observation_min")
     obs_max = _debug_series(policy_records, "observation_max")
@@ -369,6 +401,7 @@ def summarize_policy_log(dataset: PolicyLogDataset) -> dict[str, Any]:
             "max": _basic_stats(obs_max),
             "l2_norm": _basic_stats(obs_l2),
         },
+        "base_displacement": base_displacement,
         "latest_command": last_debug.get("command"),
         "latest_phase": last_debug.get("phase"),
         "latest_action_scale": last_debug.get("action_scale"),
@@ -378,6 +411,7 @@ def summarize_policy_log(dataset: PolicyLogDataset) -> dict[str, Any]:
             cycles=cycles,
             actions=actions,
             latest_debug=last_debug,
+            base_displacement=base_displacement,
         ),
     }
     return summary
@@ -389,6 +423,7 @@ def build_diagnosis(
     cycles: list[dict[str, Any]],
     actions: list[float],
     latest_debug: dict[str, Any],
+    base_displacement: dict[str, Any] | None = None,
 ) -> list[str]:
     findings: list[str] = []
 
@@ -434,6 +469,18 @@ def build_diagnosis(
             findings.append("Latest phase vector norm is small; verify SORIDORMI_PHASE_FREQUENCY is nonzero.")
         else:
             findings.append(f"Latest phase vector norm is {norm:.3f}.")
+
+    displacement = base_displacement or {}
+    if displacement.get("available"):
+        forward = float(displacement.get("forward_x") or 0.0)
+        lateral = float(displacement.get("lateral_y") or 0.0)
+        findings.append(f"Base displacement: forward_x={forward:.3f} m, lateral_y={lateral:.3f} m.")
+        if abs(forward) < 0.01:
+            findings.append("Base forward displacement is near zero; inspect command sign/frame and action symmetry.")
+        elif forward < -0.01:
+            findings.append("Base moved backward; command sign or body/world frame convention may be inverted.")
+    else:
+        findings.append("Base displacement is unavailable; upgrade logs to include RobotState.base_position_xyz.")
 
     speed_limit = latest_debug.get("speed_limit_enabled")
     if speed_limit is False:
@@ -492,6 +539,14 @@ def print_policy_analysis(summary: dict[str, Any]) -> None:
         f"count={joints['count']} min={_fmt(joints['min'])} max={_fmt(joints['max'])} "
         f"abs_max={_fmt(joints['abs_max'])}"
     )
+
+    displacement = summary.get("base_displacement", {})
+    if displacement.get("available"):
+        print(
+            "Base displacement: "
+            f"start={displacement['start_xyz']} end={displacement['end_xyz']} "
+            f"delta={displacement['delta_xyz']} forward_x={_fmt(displacement['forward_x'])}m"
+        )
 
     obs = summary["observation"]
     if obs["l2_norm"]["count"]:

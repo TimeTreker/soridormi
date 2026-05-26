@@ -11,6 +11,21 @@ from soridormi_runtime.onnx_policy import OnnxPolicy, resolve_policy_path
 from soridormi_runtime.policy_command import GaitPhaseGenerator, PolicyCommand
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on", "y"}
+
+
+def _env_float(name: str, default: float) -> float:
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return default
+    return float(value)
+
+
+
 class PolicyLike(Protocol):
     def compute_action(self, state: RobotState) -> np.ndarray:
         ...
@@ -76,11 +91,24 @@ class OnnxPolicyController:
         self.last_phase: list[float] = [0.0, 0.0]
         self.last_policy_debug: dict[str, Any] | None = None
         self.last_policy_observation_stats: dict[str, Any] | None = None
+        self.last_robot_time: float | None = None
+        self.last_sim_time_rewind_reset = False
+        self.bootstrap_policy_defaults_from_state = _env_bool(
+            "SORIDORMI_BOOTSTRAP_POLICY_DEFAULTS_FROM_STATE",
+            True,
+        )
+        self.policy_defaults_bootstrapped = False
+        self.command_ramp_seconds = _env_float("SORIDORMI_COMMAND_RAMP_SECONDS", 0.0)
+        self.last_command_scale = 1.0
+        self.bootstrapped_defaults: dict[str, float] = {}
 
     def compute(self, state: RobotState) -> MotorCommand:
         current_step = self.step_count
-        command_vector = self.command.as_list()
-        phase_vector = self.phase_generator.as_list()
+        self.last_sim_time_rewind_reset = self._reset_if_robot_time_rewound(state)
+        self._bootstrap_policy_defaults_from_state_once(state)
+
+        command_vector = self._command_vector_for_step()
+        phase_vector = self._next_phase_vector()
         self.last_phase = list(phase_vector)
 
         self._set_policy_command(command_vector)
@@ -115,8 +143,74 @@ class OnnxPolicyController:
             action=action,
         )
         self.step_count += 1
+        self.last_robot_time = float(state.time)
 
         return command
+
+    def _bootstrap_policy_defaults_from_state_once(self, state: RobotState) -> None:
+        if not self.bootstrap_policy_defaults_from_state or self.policy_defaults_bootstrapped:
+            return
+
+        defaults = {
+            str(name): float(value)
+            for name, value in zip(state.joints.names, state.joints.positions)
+        }
+        self.bootstrapped_defaults = dict(defaults)
+
+        policy_bootstrap = getattr(self.policy, "bootstrap_defaults_from_state", None)
+        if callable(policy_bootstrap):
+            returned = policy_bootstrap(state)
+            if isinstance(returned, dict):
+                self.bootstrapped_defaults = {str(k): float(v) for k, v in returned.items()}
+        else:
+            setter = getattr(self.policy, "set_default_positions_by_name", None)
+            if callable(setter):
+                setter(defaults)
+            motor_setter = getattr(self.policy, "set_motor_targets_by_name", None)
+            if callable(motor_setter):
+                motor_setter(defaults)
+
+        mapper_setter = getattr(self.mapper, "set_default_positions_by_name", None)
+        if callable(mapper_setter):
+            mapper_setter(self.bootstrapped_defaults)
+
+        self.policy_defaults_bootstrapped = True
+
+    def _command_vector_for_step(self) -> list[float]:
+        if self.command_ramp_seconds <= 0.0:
+            self.last_command_scale = 1.0
+            return self.command.as_list()
+
+        ramp_steps = max(1.0, self.command_ramp_seconds * self.control_hz)
+        scale = min(1.0, float(self.step_count + 1) / ramp_steps)
+        self.last_command_scale = scale
+        return self.command.scaled(scale).as_list()
+
+    def _next_phase_vector(self) -> list[float]:
+        getter = getattr(self.phase_generator, "advance_and_as_list", None)
+        if callable(getter):
+            return list(getter())
+        return self.phase_generator.as_list()
+
+    def _reset_if_robot_time_rewound(self, state: RobotState) -> bool:
+        current_time = float(state.time)
+        if self.last_robot_time is None or current_time + 1e-9 >= self.last_robot_time:
+            return False
+
+        for obj in (self.policy, self.mapper, self.phase_generator):
+            for method_name in ("reset_state", "reset_targets", "reset"):
+                method = getattr(obj, method_name, None)
+                if callable(method):
+                    method()
+                    break
+
+        self.last_action = None
+        self.last_command = None
+        self.last_phase = [0.0, 0.0]
+        # After MuJoCo auto-reset, the next state is again the best source of
+        # policy default/home targets. Re-bootstrap once after each rewind.
+        self.policy_defaults_bootstrapped = False
+        return True
 
     def _set_policy_command(self, command_vector: list[float]) -> None:
         setter = getattr(self.policy, "set_command_vector", None)
@@ -159,14 +253,22 @@ class OnnxPolicyController:
         motor_targets = np.asarray(command.positions, dtype=np.float32)
         joint_positions = np.asarray(state.joints.positions, dtype=np.float32)
         joint_velocities = np.asarray(state.joints.velocities, dtype=np.float32)
+        feet_contacts = getattr(state, "feet_contacts", None)
 
         return {
             "step_count": int(step_count),
             "robot_time": float(state.time),
             "control_hz": float(self.control_hz),
             "dt": float(self.dt),
+            "sim_time_rewind_reset": bool(self.last_sim_time_rewind_reset),
+            "policy_defaults_bootstrapped": bool(self.policy_defaults_bootstrapped),
+            "bootstrapped_default_count": int(len(self.bootstrapped_defaults)),
+            "command_scale": float(self.last_command_scale),
             "command": [float(x) for x in command_vector],
             "phase": [float(x) for x in phase_vector],
+            "feet_contacts": None
+            if feet_contacts is None
+            else [float(x) for x in feet_contacts],
             "action_min": float(action_arr.min()),
             "action_max": float(action_arr.max()),
             "action_mean": float(action_arr.mean()),
@@ -214,4 +316,7 @@ class OnnxPolicyController:
             "command": self.command.describe(),
             "phase": self.phase_generator.describe(),
             "last_phase": list(self.last_phase),
+            "bootstrap_policy_defaults_from_state": self.bootstrap_policy_defaults_from_state,
+            "policy_defaults_bootstrapped": self.policy_defaults_bootstrapped,
+            "command_ramp_seconds": self.command_ramp_seconds,
         }

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export SORIDORMI_SIM_BACKEND=mujoco
+export SORIDORMI_MUJOCO_VIEWER=${SORIDORMI_MUJOCO_VIEWER:-1}
+export SORIDORMI_AUTO_RESET=${SORIDORMI_AUTO_RESET:-1}
+
+./scripts/run_sim_server.sh

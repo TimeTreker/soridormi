@@ -14,6 +14,20 @@ from soridormi_api import RobotState
 DEFAULT_ROBOT_CONFIG_PATH = Path("/app/configs/robots/open_duck_mini_v2.yaml")
 
 
+def _env_float(name: str, default: float) -> float:
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return default
+    return float(value)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on", "y"}
+
+
 def resolve_robot_config_path(path: str | os.PathLike[str] | None = None) -> Path:
     explicit = path or os.environ.get("SORIDORMI_ROBOT_CONFIG")
     return Path(explicit) if explicit else DEFAULT_ROBOT_CONFIG_PATH
@@ -42,6 +56,46 @@ def load_default_pose_positions(
         return {}
 
     return {str(name): float(value) for name, value in positions.items()}
+
+
+def load_policy_observation_options(
+    path: str | os.PathLike[str] | None = None,
+) -> dict[str, object]:
+    """Load Open Duck policy-observation compatibility options from YAML/env.
+
+    The original Open Duck Mini v2 MuJoCo inference adds +1.3 to accelerometer x
+    and includes real [left, right] foot contacts in the 101D observation. We keep
+    constructor defaults conservative, but from_robot_config() enables these
+    compatibility options by default for first-walk experiments.
+    """
+    config_path = resolve_robot_config_path(path)
+    payload: dict[str, Any] = {}
+    if config_path.exists():
+        with config_path.open("r", encoding="utf-8") as f:
+            loaded = yaml.safe_load(f)
+        if isinstance(loaded, dict):
+            payload = loaded
+
+    policy_observation = payload.get("policy_observation", {})
+    if policy_observation is None:
+        policy_observation = {}
+    if not isinstance(policy_observation, dict):
+        raise ValueError("policy_observation must be a YAML mapping")
+
+    accel_bias = policy_observation.get("accelerometer_bias_xyz", [1.3, 0.0, 0.0])
+    use_state_feet_contacts = bool(policy_observation.get("use_state_feet_contacts", True))
+
+    accel_bias_arr = _array(accel_bias, 3, "policy_observation.accelerometer_bias_xyz")
+    accel_bias_arr[0] = _env_float("SORIDORMI_POLICY_ACCEL_BIAS_X", float(accel_bias_arr[0]))
+    accel_bias_arr[1] = _env_float("SORIDORMI_POLICY_ACCEL_BIAS_Y", float(accel_bias_arr[1]))
+    accel_bias_arr[2] = _env_float("SORIDORMI_POLICY_ACCEL_BIAS_Z", float(accel_bias_arr[2]))
+
+    return {
+        "accelerometer_bias_xyz": [float(x) for x in accel_bias_arr.tolist()],
+        "use_state_feet_contacts": _env_bool(
+            "SORIDORMI_USE_STATE_FEET_CONTACTS", use_state_feet_contacts
+        ),
+    }
 
 
 def _array(values: list[float] | tuple[float, ...] | np.ndarray, size: int, name: str) -> np.ndarray:
@@ -79,6 +133,8 @@ class ObservationBuilderConfig:
     feet_contacts: list[float] = field(default_factory=lambda: [0.0, 0.0])
     imitation_phase: list[float] = field(default_factory=lambda: [0.0, 0.0])
     dof_vel_scale: float = 0.05
+    accelerometer_bias_xyz: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0])
+    use_state_feet_contacts: bool = False
 
     def __post_init__(self) -> None:
         if len(self.joint_names) != 14:
@@ -87,6 +143,7 @@ class ObservationBuilderConfig:
         _array(self.command, 7, "command")
         _array(self.feet_contacts, 2, "feet_contacts")
         _array(self.imitation_phase, 2, "imitation_phase")
+        _array(self.accelerometer_bias_xyz, 3, "accelerometer_bias_xyz")
 
 
 class ObservationBuilder:
@@ -114,12 +171,15 @@ class ObservationBuilder:
             joint_names = _load_actuator_names_from_config(config_path)
 
         default_positions = load_default_pose_positions(config_path)
+        policy_options = load_policy_observation_options(config_path)
 
         return cls(
             ObservationBuilderConfig(
                 joint_names=joint_names,
                 default_positions_by_name=default_positions,
                 motor_targets_by_name=default_positions,
+                accelerometer_bias_xyz=list(policy_options["accelerometer_bias_xyz"]),
+                use_state_feet_contacts=bool(policy_options["use_state_feet_contacts"]),
             )
         )
 
@@ -134,8 +194,11 @@ class ObservationBuilder:
         }
 
         gyro = _array(state.imu.gyro_xyz, 3, "state.imu.gyro_xyz")
-        accel = _array(state.imu.accel_xyz, 3, "state.imu.accel_xyz")
+        accel = _array(state.imu.accel_xyz, 3, "state.imu.accel_xyz") + _array(
+            self.config.accelerometer_bias_xyz, 3, "accelerometer_bias_xyz"
+        )
         command = _array(self.config.command, 7, "command")
+        feet_contacts = self._feet_contacts_from_state_or_config(state)
 
         joint_offsets: list[float] = []
         joint_velocities: list[float] = []
@@ -160,7 +223,7 @@ class ObservationBuilder:
             self.last_last_action,
             self.last_last_last_action,
             np.asarray(motor_targets, dtype=np.float32),
-            _array(self.config.feet_contacts, 2, "feet_contacts"),
+            feet_contacts,
             _array(self.config.imitation_phase, 2, "imitation_phase"),
         ]
 
@@ -173,6 +236,11 @@ class ObservationBuilder:
 
     def build_batch(self, state: RobotState) -> np.ndarray:
         return self.build(state)[None, :]
+
+    def reset_action_history(self) -> None:
+        self.last_action = np.zeros(self.ACTION_SIZE, dtype=np.float32)
+        self.last_last_action = np.zeros(self.ACTION_SIZE, dtype=np.float32)
+        self.last_last_last_action = np.zeros(self.ACTION_SIZE, dtype=np.float32)
 
     def update_action_history(self, action: np.ndarray | list[float]) -> None:
         action_arr = np.asarray(action, dtype=np.float32)
@@ -200,6 +268,26 @@ class ObservationBuilder:
 
     def set_feet_contacts(self, feet_contacts: list[float] | tuple[float, ...] | np.ndarray) -> None:
         self.config.feet_contacts = [float(x) for x in _array(feet_contacts, 2, "feet_contacts").tolist()]
+
+    def _feet_contacts_from_state_or_config(self, state: RobotState) -> np.ndarray:
+        state_contacts = getattr(state, "feet_contacts", None)
+        if self.config.use_state_feet_contacts and state_contacts is not None:
+            return _array(state_contacts, 2, "state.feet_contacts")
+        return _array(self.config.feet_contacts, 2, "feet_contacts")
+
+
+    def set_default_positions_by_name(self, positions_by_name: dict[str, float]) -> None:
+        """Update the policy default actuator pose used for joint offsets.
+
+        This is useful for first-walk experiments: the Open Duck policy expects
+        joint_angles - default_actuator, where default_actuator comes from the
+        MuJoCo home keyframe ctrl. If the YAML default pose is stale, we can
+        bootstrap these defaults from the first simulator state.
+        """
+        clean = {str(name): float(value) for name, value in positions_by_name.items()}
+        self.config.default_positions_by_name.update(clean)
+        for name, value in clean.items():
+            self.config.motor_targets_by_name.setdefault(name, float(value))
 
     def set_motor_targets_by_name(self, targets_by_name: dict[str, float]) -> None:
         """Update motor target values used in future observations."""

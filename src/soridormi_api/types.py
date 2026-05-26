@@ -36,6 +36,36 @@ class RobotState(BaseModel):
     joints: JointState
     imu: IMUState
     battery: BatteryState | None = None
+    # Optional policy-observation metadata. MuJoCo fills this with
+    # [left_foot_contact, right_foot_contact] as floats 0.0/1.0.
+    # Hardware backends can leave it unset until contact sensing exists.
+    feet_contacts: list[float] | None = None
+    # Optional floating-base pose. The simulator backend fills this so M4.2
+    # analysis can report forward/lateral displacement. Real hardware backends
+    # can leave it unset until state estimation is available.
+    base_position_xyz: list[float] | None = None
+    base_quat_wxyz: list[float] | None = None
+
+    @field_validator("feet_contacts")
+    @classmethod
+    def _feet_contacts_shape(cls, value: list[float] | None) -> list[float] | None:
+        if value is not None and len(value) != 2:
+            raise ValueError("feet_contacts must contain exactly [left, right]")
+        return value
+
+    @field_validator("base_position_xyz")
+    @classmethod
+    def _base_position_shape(cls, value: list[float] | None) -> list[float] | None:
+        if value is not None and len(value) != 3:
+            raise ValueError("base_position_xyz must contain exactly [x, y, z]")
+        return value
+
+    @field_validator("base_quat_wxyz")
+    @classmethod
+    def _base_quat_shape(cls, value: list[float] | None) -> list[float] | None:
+        if value is not None and len(value) != 4:
+            raise ValueError("base_quat_wxyz must contain exactly [w, x, y, z]")
+        return value
 
 
 class MotorCommand(BaseModel):

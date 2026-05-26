@@ -154,6 +154,36 @@ class SafetyConfig(BaseModel):
     auto_reset: AutoResetSafetyConfig = Field(default_factory=AutoResetSafetyConfig)
 
 
+class FootContactObservationConfig(BaseModel):
+    """Names used to infer [left, right] foot contact in MuJoCo.
+
+    Open Duck Mini v2 upstream currently uses body contact checks:
+    left foot body=foot_assembly, right foot body=foot_assembly_2, ground=floor.
+    Geom names are included as a fallback because XML variants may expose
+    left_foot_bottom_tpu/right_foot_bottom_tpu instead.
+    """
+
+    left_body: str = "foot_assembly"
+    right_body: str = "foot_assembly_2"
+    ground_body: str = "floor"
+    left_geoms: list[str] = Field(default_factory=lambda: ["left_foot_bottom_tpu"])
+    right_geoms: list[str] = Field(default_factory=lambda: ["right_foot_bottom_tpu"])
+    ground_geoms: list[str] = Field(default_factory=lambda: ["floor"])
+
+
+class PolicyObservationConfig(BaseModel):
+    accelerometer_bias_xyz: list[float] = Field(default_factory=lambda: [1.3, 0.0, 0.0])
+    use_state_feet_contacts: bool = True
+    foot_contact: FootContactObservationConfig = Field(default_factory=FootContactObservationConfig)
+
+    @field_validator("accelerometer_bias_xyz")
+    @classmethod
+    def _accelerometer_bias_has_three_values(cls, value: list[float]) -> list[float]:
+        if len(value) != 3:
+            raise ValueError("policy_observation.accelerometer_bias_xyz must contain exactly 3 values")
+        return value
+
+
 class RobotConfig(BaseModel):
     robot_name: str
     model: ModelConfig
@@ -167,6 +197,7 @@ class RobotConfig(BaseModel):
     safety: SafetyConfig = Field(default_factory=SafetyConfig)
     reset_pose: ResetPoseConfig | None = None
     default_pose: DefaultPoseConfig | None = None
+    policy_observation: PolicyObservationConfig = Field(default_factory=PolicyObservationConfig)
 
     @field_validator("actuators")
     @classmethod
