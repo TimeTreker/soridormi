@@ -77,6 +77,7 @@ class PolicyActionMapper:
     def from_robot_config(
         cls,
         path: str | os.PathLike[str] | None = None,
+        use_env_overrides: bool = False,
     ) -> PolicyActionMapper:
         config_path = resolve_robot_config_path(path)
         payload = _load_yaml_mapping(config_path)
@@ -98,14 +99,20 @@ class PolicyActionMapper:
         if not isinstance(gains, dict):
             gains = {}
 
-        action_scale = _env_float(
-            "SORIDORMI_ACTION_SCALE",
-            float(action_mapping.get("action_scale", DEFAULT_ACTION_SCALE)),
+        config_action_scale = float(action_mapping.get("action_scale", DEFAULT_ACTION_SCALE))
+        config_max_motor_velocity = float(
+            action_mapping.get("max_motor_velocity", DEFAULT_MAX_MOTOR_VELOCITY)
         )
-        max_motor_velocity = _env_float(
-            "SORIDORMI_MAX_MOTOR_VELOCITY",
-            float(action_mapping.get("max_motor_velocity", DEFAULT_MAX_MOTOR_VELOCITY)),
-        )
+
+        if use_env_overrides:
+            action_scale = _env_float("SORIDORMI_ACTION_SCALE", config_action_scale)
+            max_motor_velocity = _env_float(
+                "SORIDORMI_MAX_MOTOR_VELOCITY",
+                config_max_motor_velocity,
+            )
+        else:
+            action_scale = config_action_scale
+            max_motor_velocity = config_max_motor_velocity
 
         return cls(
             ActionMapperConfig(

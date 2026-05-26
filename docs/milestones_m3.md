@@ -36,4 +36,24 @@ This is the first policy mode expected to produce dynamic motor targets. Stable 
 
 ## M3.6: Policy debug logging
 
-Next recommended milestone: log raw action, command vector, phase vector, motor targets, and reset events to MCAP for analysis.
+Add ONNX-policy-specific runtime log payloads for closed-loop fall debugging:
+
+```text
+/soridormi/policy_action
+/soridormi/policy_debug
+/soridormi/policy_observation_stats
+```
+
+`inspect_latest_log.sh` should now show these topics and print a compact latest policy snapshot.
+
+This milestone does not attempt to tune walking yet. It makes repeated falls diagnosable.
+
+## M3.7 Policy log analysis
+
+Status: added.
+
+Adds `soridormi_runtime.analyze_policy_log` and
+`scripts/analyze_latest_policy_log.sh` to summarize policy debug MCAP/JSONL logs,
+detect robot-time reset cycles, and report action/motor/observation statistics.
+Use this before tuning walking parameters after repeated falls.
+

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import time
+from typing import Any
 
 from rich.console import Console
 
@@ -51,6 +52,17 @@ def make_controller():
     )
 
 
+def _controller_policy_log_payload(controller: object) -> dict[str, Any]:
+    getter = getattr(controller, "get_policy_log_payload", None)
+    if not callable(getter):
+        return {}
+
+    payload = getter()
+    if not isinstance(payload, dict):
+        return {}
+    return payload
+
+
 def main() -> None:
     hz = float(os.environ.get("CONTROL_HZ", "50"))
     dt = 1.0 / hz
@@ -79,12 +91,16 @@ def main() -> None:
             state = robot.read_state()
             command = controller.compute(state)
             robot.send_motor_command(command)
+            policy_log_payload = _controller_policy_log_payload(controller)
             runtime_logger.log_step(
                 step_index=step_index,
                 state=state,
                 command=command,
                 mode=mode,
                 backend=backend,
+                policy_action=policy_log_payload.get("policy_action"),
+                policy_debug=policy_log_payload.get("policy_debug"),
+                policy_observation_stats=policy_log_payload.get("policy_observation_stats"),
             )
 
             console.print(

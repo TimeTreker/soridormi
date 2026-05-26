@@ -36,6 +36,20 @@ def resolve_policy_path(path: str | os.PathLike[str] | None = None) -> Path:
     return Path(explicit) if explicit else DEFAULT_POLICY_PATH
 
 
+def _array_stats(name: str, values: np.ndarray) -> dict[str, object]:
+    arr = np.asarray(values, dtype=np.float32)
+    return {
+        "name": name,
+        "shape": list(arr.shape),
+        "dtype": str(arr.dtype),
+        "min": float(arr.min()) if arr.size else 0.0,
+        "max": float(arr.max()) if arr.size else 0.0,
+        "mean": float(arr.mean()) if arr.size else 0.0,
+        "std": float(arr.std()) if arr.size else 0.0,
+        "l2_norm": float(np.linalg.norm(arr)) if arr.size else 0.0,
+    }
+
+
 class OnnxPolicy:
     """Persistent ONNX policy wrapper.
 
@@ -79,6 +93,10 @@ class OnnxPolicy:
 
         self.input_name = self._single_input_name()
         self.output_name = self._first_output_name()
+        self.last_observation: np.ndarray | None = None
+        self.last_observation_stats: dict[str, object] | None = None
+        self.last_action: np.ndarray | None = None
+        self.last_action_stats: dict[str, object] | None = None
 
     def _single_input_name(self) -> str:
         inputs = self.session.get_inputs()
@@ -116,6 +134,9 @@ class OnnxPolicy:
                 f"Policy observation must have shape {self.OBS_BATCH_SHAPE}, got {obs.shape}"
             )
 
+        self.last_observation = obs.copy()
+        self.last_observation_stats = _array_stats("observation", obs)
+
         outputs = self.session.run([self.output_name], {self.input_name: obs})
         if len(outputs) != 1:
             raise RuntimeError(f"Expected one ONNX output, got {len(outputs)}")
@@ -127,8 +148,16 @@ class OnnxPolicy:
         if action.shape != (self.ACTION_SIZE,):
             raise RuntimeError(f"Policy action must have shape ({self.ACTION_SIZE},), got {action.shape}")
 
+        self.last_action = action.copy()
+        self.last_action_stats = _array_stats("action", action)
         self.observation_builder.update_action_history(action)
         return action
+
+    def get_observation_stats(self) -> dict[str, object] | None:
+        return None if self.last_observation_stats is None else dict(self.last_observation_stats)
+
+    def get_action_stats(self) -> dict[str, object] | None:
+        return None if self.last_action_stats is None else dict(self.last_action_stats)
 
     def describe(self) -> dict[str, Any]:
         inputs = self.session.get_inputs()

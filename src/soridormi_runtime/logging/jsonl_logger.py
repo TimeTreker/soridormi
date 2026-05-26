@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from soridormi_api import MotorCommand, RobotState
 
-from .base import default_log_dir, model_to_json_dict, now_ns
+from .base import default_log_dir, json_safe, model_to_json_dict, now_ns
 
 
 class JsonlRuntimeLogger:
@@ -37,12 +38,15 @@ class JsonlRuntimeLogger:
         command: MotorCommand,
         mode: str,
         backend: str,
+        policy_action: list[float] | None = None,
+        policy_debug: dict[str, Any] | None = None,
+        policy_observation_stats: dict[str, Any] | None = None,
     ) -> None:
         if step_index % self.every_n != 0:
             return
 
         timestamp_ns = now_ns()
-        payload = {
+        payload: dict[str, Any] = {
             "type": "runtime_step",
             "step_index": step_index,
             "time_wall_ns": timestamp_ns,
@@ -53,6 +57,14 @@ class JsonlRuntimeLogger:
             "state": model_to_json_dict(state),
             "command": model_to_json_dict(command),
         }
+
+        if policy_action is not None:
+            payload["policy_action"] = json_safe(policy_action)
+        if policy_debug is not None:
+            payload["policy_debug"] = json_safe(policy_debug)
+        if policy_observation_stats is not None:
+            payload["policy_observation_stats"] = json_safe(policy_observation_stats)
+
         self._stream.write(json.dumps(payload, separators=(",", ":")) + "\n")
         self._stream.flush()
 
