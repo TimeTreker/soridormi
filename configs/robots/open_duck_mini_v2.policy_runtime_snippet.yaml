@@ -1,0 +1,12 @@
+# Optional policy runtime settings for configs/robots/open_duck_mini_v2.yaml.
+# These are read by PolicyActionMapper; environment variables override the
+# most important values during experiments.
+
+action_mapping:
+  action_scale: 0.25
+  max_motor_velocity: 5.24
+  speed_limit_enabled: true
+  clip_to_limits: true
+  kp_default: 10.0
+  kd_default: 0.5
+  torque_default: 0.0

@@ -42,9 +42,6 @@ class OnnxPolicy:
     This class loads the ONNX Runtime session once, owns an ObservationBuilder,
     keeps policy action history, and returns one 14-dimensional action vector
     per RobotState.
-
-    It intentionally does not convert actions to MotorCommand. That mapping is
-    handled later by the M3.3 action-to-command layer.
     """
 
     ACTION_SIZE = 14
@@ -98,6 +95,18 @@ class OnnxPolicy:
     @property
     def joint_names(self) -> list[str]:
         return list(self.observation_builder.config.joint_names)
+
+    def set_command_vector(self, command: list[float] | tuple[float, ...] | np.ndarray) -> None:
+        self.observation_builder.set_command(command)
+
+    def set_imitation_phase(self, imitation_phase: list[float] | tuple[float, ...] | np.ndarray) -> None:
+        self.observation_builder.set_imitation_phase(imitation_phase)
+
+    def set_motor_targets_by_name(self, targets_by_name: dict[str, float]) -> None:
+        self.observation_builder.set_motor_targets_by_name(targets_by_name)
+
+    def set_motor_targets(self, joint_names: list[str], positions: list[float] | np.ndarray) -> None:
+        self.observation_builder.set_motor_targets(joint_names, positions)
 
     def compute_action(self, state: RobotState) -> np.ndarray:
         obs = self.observation_builder.build_batch(state)

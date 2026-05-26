@@ -44,7 +44,7 @@ def load_default_pose_positions(
     return {str(name): float(value) for name, value in positions.items()}
 
 
-def _array(values: list[float] | tuple[float, ...], size: int, name: str) -> np.ndarray:
+def _array(values: list[float] | tuple[float, ...] | np.ndarray, size: int, name: str) -> np.ndarray:
     arr = np.asarray(values, dtype=np.float32)
     if arr.shape != (size,):
         raise ValueError(f"{name} must have shape ({size},), got {arr.shape}")
@@ -190,13 +190,19 @@ class ObservationBuilder:
         self.last_last_action = self.last_action.copy()
         self.last_action = action_arr.copy()
 
-    def set_motor_targets_by_name(self, targets_by_name: dict[str, float]) -> None:
-        """Update motor target values used in future observations.
+    def set_command(self, command: list[float] | tuple[float, ...] | np.ndarray) -> None:
+        self.config.command = [float(x) for x in _array(command, 7, "command").tolist()]
 
-        The ONNX observation includes the most recent motor targets. M3.3's
-        action mapper produces these targets from the policy action vector.
-        Keeping this setter here avoids coupling OnnxPolicy to MotorCommand.
-        """
+    def set_imitation_phase(self, imitation_phase: list[float] | tuple[float, ...] | np.ndarray) -> None:
+        self.config.imitation_phase = [
+            float(x) for x in _array(imitation_phase, 2, "imitation_phase").tolist()
+        ]
+
+    def set_feet_contacts(self, feet_contacts: list[float] | tuple[float, ...] | np.ndarray) -> None:
+        self.config.feet_contacts = [float(x) for x in _array(feet_contacts, 2, "feet_contacts").tolist()]
+
+    def set_motor_targets_by_name(self, targets_by_name: dict[str, float]) -> None:
+        """Update motor target values used in future observations."""
         clean_targets = {str(name): float(value) for name, value in targets_by_name.items()}
         self.config.motor_targets_by_name.update(clean_targets)
 

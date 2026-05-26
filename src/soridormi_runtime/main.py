@@ -10,6 +10,7 @@ from .backends.sim import SimRobot
 from .controller import HoldPositionController
 from .joint_sweep_controller import JointSweepController
 from .logging import make_runtime_logger_from_env
+from .onnx_policy_controller import OnnxPolicyController
 from .standing_controller import StandingPoseController
 
 console = Console()
@@ -41,9 +42,12 @@ def make_controller():
     if mode in {"joint_sweep", "sweep", "joint-test", "joint_test"}:
         return JointSweepController()
 
+    if mode in {"onnx_policy", "policy", "walk_policy", "walking_policy"}:
+        return OnnxPolicyController()
+
     raise ValueError(
         f"Unknown SORIDORMI_RUNTIME_MODE={mode!r}. "
-        "Use one of: hold, stand, joint_sweep."
+        "Use one of: hold, stand, joint_sweep, onnx_policy."
     )
 
 
@@ -61,6 +65,8 @@ def main() -> None:
     console.print(f"[green]Soridormi runtime loop starting at {hz:.1f} Hz[/green]")
     console.print(f"Backend: {backend}")
     console.print(f"Runtime mode: {mode}")
+    if hasattr(controller, "describe"):
+        console.print(f"Controller: {controller.describe()}")
     if runtime_logger.path is not None:
         console.print(f"Runtime log: {runtime_logger.path}")
 

@@ -1,32 +1,39 @@
 # M3 Milestones
 
-## M3.0 ONNX inspection
+## M3.0: ONNX policy inspection
 
-- Inspect ONNX inputs and outputs.
-- Verify dummy inference.
+Inspect `BEST_WALK_ONNX_2.onnx`, verify input and output shapes, and run dummy inference.
 
-## M3.1 Observation builder
+## M3.1: Observation builder
 
-- Convert `RobotState` to `[1, 101]` ONNX observation.
+Build the 101-dimensional observation vector expected by the Open Duck Mini v2 ONNX policy.
 
-## M3.2 Persistent ONNX policy wrapper
+## M3.2: Persistent ONNX policy wrapper
 
-- Load policy once.
-- Maintain action history through `ObservationBuilder`.
-- Return 14D action vectors.
+Load the ONNX model once and run repeated inference with action history.
 
-## M3.3 Action-to-MotorCommand mapper
+## M3.3: Action-to-MotorCommand mapper
 
-- Convert 14D policy action to motor target positions.
-- Use `default_pose + action_scale * action`.
-- Emit Soridormi `MotorCommand`.
-- Keep observation `motor_targets` up to date.
+Convert the 14D policy output into Soridormi `MotorCommand` targets.
 
-## M3.4 Experimental ONNX runtime mode
+## M3.4: Experimental ONNX policy runtime mode
 
-- Add `SORIDORMI_RUNTIME_MODE=onnx_policy`.
-- Test first in fixed-base or zero-gravity debug mode.
+Add explicit opt-in runtime mode:
 
-## M3.5 Normal MuJoCo policy test
+```bash
+SORIDORMI_RUNTIME_MODE=onnx_policy
+```
 
-- Run with viewer, auto-reset, and MCAP logging.
+## M3.5: Command, phase, and speed limiting
+
+Add dynamic command vector, gait phase oscillator, and motor target speed limiting:
+
+```bash
+./scripts/run_onnx_walk_runtime.sh
+```
+
+This is the first policy mode expected to produce dynamic motor targets. Stable walking is not required yet.
+
+## M3.6: Policy debug logging
+
+Next recommended milestone: log raw action, command vector, phase vector, motor targets, and reset events to MCAP for analysis.
