@@ -7,6 +7,7 @@ import numpy as np
 
 from soridormi_api import MotorCommand, RobotState
 from soridormi_runtime.action_mapper import PolicyActionMapper
+from soridormi_runtime.action_postprocessor import ActionPostprocessor
 from soridormi_runtime.onnx_policy import OnnxPolicy, resolve_policy_path
 from soridormi_runtime.policy_command import GaitPhaseGenerator, PolicyCommand
 
@@ -84,12 +85,15 @@ class OnnxPolicyController:
         )
         self.command = command or PolicyCommand.from_env()
         self.phase_generator = phase_generator or GaitPhaseGenerator.from_env()
+        self.action_postprocessor = ActionPostprocessor.from_env()
 
         self.step_count = 0
+        self.last_raw_action: np.ndarray | None = None
         self.last_action: np.ndarray | None = None
         self.last_command: MotorCommand | None = None
         self.last_phase: list[float] = [0.0, 0.0]
         self.last_policy_debug: dict[str, Any] | None = None
+        self.last_policy_observation: list[float] | None = None
         self.last_policy_observation_stats: dict[str, Any] | None = None
         self.last_robot_time: float | None = None
         self.last_sim_time_rewind_reset = False
@@ -114,12 +118,14 @@ class OnnxPolicyController:
         self._set_policy_command(command_vector)
         self._set_policy_phase(phase_vector)
 
-        action = np.asarray(self.policy.compute_action(state), dtype=np.float32)
+        raw_action = np.asarray(self.policy.compute_action(state), dtype=np.float32)
 
-        if action.shape == (1, 14):
-            action = action.reshape(14)
-        if action.shape != (14,):
-            raise RuntimeError(f"ONNX policy action must have shape (14,), got {action.shape}")
+        if raw_action.shape == (1, 14):
+            raw_action = raw_action.reshape(14)
+        if raw_action.shape != (14,):
+            raise RuntimeError(f"ONNX policy action must have shape (14,), got {raw_action.shape}")
+
+        action = self.action_postprocessor.apply(raw_action, self._joint_names_for_action(state))
 
         try:
             command = self.mapper.action_to_command(action, state=state, dt=self.dt)
@@ -131,8 +137,10 @@ class OnnxPolicyController:
             command = self.mapper.action_to_command(action, state=state)
         self._set_policy_motor_targets(command)
 
+        self.last_raw_action = raw_action.copy()
         self.last_action = action.copy()
         self.last_command = command
+        self.last_policy_observation = self._read_policy_observation()
         self.last_policy_observation_stats = self._read_policy_observation_stats()
         self.last_policy_debug = self._build_policy_debug(
             step_count=current_step,
@@ -140,6 +148,7 @@ class OnnxPolicyController:
             command=command,
             command_vector=command_vector,
             phase_vector=phase_vector,
+            raw_action=raw_action,
             action=action,
         )
         self.step_count += 1
@@ -151,9 +160,15 @@ class OnnxPolicyController:
         if not self.bootstrap_policy_defaults_from_state or self.policy_defaults_bootstrapped:
             return
 
+        source_values = state.actuator_ctrl
+        if source_values is not None and len(source_values) == len(state.joints.names):
+            values = source_values
+        else:
+            values = state.joints.positions
+
         defaults = {
             str(name): float(value)
-            for name, value in zip(state.joints.names, state.joints.positions)
+            for name, value in zip(state.joints.names, values)
         }
         self.bootstrapped_defaults = dict(defaults)
 
@@ -204,6 +219,7 @@ class OnnxPolicyController:
                     method()
                     break
 
+        self.last_raw_action = None
         self.last_action = None
         self.last_command = None
         self.last_phase = [0.0, 0.0]
@@ -239,6 +255,22 @@ class OnnxPolicyController:
             return dict(stats)
         return None
 
+    def _read_policy_observation(self) -> list[float] | None:
+        getter = getattr(self.policy, "get_observation", None)
+        if callable(getter):
+            observation = getter()
+            if observation is not None:
+                return [float(x) for x in observation]
+
+        observation = getattr(self.policy, "last_observation", None)
+        if observation is None:
+            return None
+        if hasattr(observation, "reshape"):
+            return [float(x) for x in observation.reshape(-1).tolist()]
+        if isinstance(observation, (list, tuple)):
+            return [float(x) for x in observation]
+        return None
+
     def _build_policy_debug(
         self,
         *,
@@ -247,8 +279,10 @@ class OnnxPolicyController:
         command: MotorCommand,
         command_vector: list[float],
         phase_vector: list[float],
+        raw_action: np.ndarray,
         action: np.ndarray,
     ) -> dict[str, Any]:
+        raw_action_arr = np.asarray(raw_action, dtype=np.float32).reshape(14)
         action_arr = np.asarray(action, dtype=np.float32).reshape(14)
         motor_targets = np.asarray(command.positions, dtype=np.float32)
         joint_positions = np.asarray(state.joints.positions, dtype=np.float32)
@@ -262,6 +296,9 @@ class OnnxPolicyController:
             "dt": float(self.dt),
             "sim_time_rewind_reset": bool(self.last_sim_time_rewind_reset),
             "policy_defaults_bootstrapped": bool(self.policy_defaults_bootstrapped),
+            "bootstrap_source": "actuator_ctrl"
+            if state.actuator_ctrl is not None and len(state.actuator_ctrl) == len(state.joints.names)
+            else "joint_positions",
             "bootstrapped_default_count": int(len(self.bootstrapped_defaults)),
             "command_scale": float(self.last_command_scale),
             "command": [float(x) for x in command_vector],
@@ -269,10 +306,25 @@ class OnnxPolicyController:
             "feet_contacts": None
             if feet_contacts is None
             else [float(x) for x in feet_contacts],
+            "raw_action_min": float(raw_action_arr.min()),
+            "raw_action_max": float(raw_action_arr.max()),
+            "raw_action_mean": float(raw_action_arr.mean()),
+            "raw_action_std": float(raw_action_arr.std()),
             "action_min": float(action_arr.min()),
             "action_max": float(action_arr.max()),
             "action_mean": float(action_arr.mean()),
             "action_std": float(action_arr.std()),
+            "action_postprocessor": self.action_postprocessor.describe(),
+            "action_postprocessor_input_stats": self.action_postprocessor.last_input_stats,
+            "action_postprocessor_output_stats": self.action_postprocessor.last_output_stats,
+            "action_postprocessor_joint_gains": self.action_postprocessor.last_joint_gains,
+            "leg_action_abs_max": self._group_action_abs_max(action_arr, {
+                "left_hip_yaw", "left_hip_roll", "left_hip_pitch", "left_knee", "left_ankle",
+                "right_hip_yaw", "right_hip_roll", "right_hip_pitch", "right_knee", "right_ankle",
+            }),
+            "head_action_abs_max": self._group_action_abs_max(action_arr, {
+                "neck_pitch", "head_pitch", "head_yaw", "head_roll",
+            }),
             "motor_target_min": float(motor_targets.min()) if motor_targets.size else 0.0,
             "motor_target_max": float(motor_targets.max()) if motor_targets.size else 0.0,
             "motor_target_mean": float(motor_targets.mean()) if motor_targets.size else 0.0,
@@ -284,6 +336,27 @@ class OnnxPolicyController:
             "max_motor_velocity": self._mapper_config_float("max_motor_velocity"),
             "speed_limit_enabled": self._mapper_config_bool("speed_limit_enabled"),
         }
+
+    def _joint_names_for_action(self, state: RobotState) -> list[str]:
+        config = getattr(self.mapper, "config", None)
+        joint_names = getattr(config, "joint_names", None)
+        if isinstance(joint_names, list) and len(joint_names) == 14:
+            return [str(name) for name in joint_names]
+        if len(state.joints.names) == 14:
+            return [str(name) for name in state.joints.names]
+        return [f"joint_{i}" for i in range(14)]
+
+    def _group_action_abs_max(self, action: np.ndarray, names: set[str]) -> float:
+        joint_names = self._joint_names_for_action_name_only()
+        values = [abs(float(v)) for name, v in zip(joint_names, action) if name in names]
+        return max(values) if values else 0.0
+
+    def _joint_names_for_action_name_only(self) -> list[str]:
+        config = getattr(self.mapper, "config", None)
+        joint_names = getattr(config, "joint_names", None)
+        if isinstance(joint_names, list) and len(joint_names) == 14:
+            return [str(name) for name in joint_names]
+        return [f"joint_{i}" for i in range(14)]
 
     def _mapper_config_float(self, name: str) -> float | None:
         config = getattr(self.mapper, "config", None)
@@ -299,9 +372,13 @@ class OnnxPolicyController:
 
     def get_policy_log_payload(self) -> dict[str, Any]:
         return {
+            "policy_raw_action": None
+            if self.last_raw_action is None
+            else [float(x) for x in self.last_raw_action.tolist()],
             "policy_action": None
             if self.last_action is None
             else [float(x) for x in self.last_action.tolist()],
+            "policy_observation": self.last_policy_observation,
             "policy_debug": self.last_policy_debug,
             "policy_observation_stats": self.last_policy_observation_stats,
         }
@@ -319,4 +396,5 @@ class OnnxPolicyController:
             "bootstrap_policy_defaults_from_state": self.bootstrap_policy_defaults_from_state,
             "policy_defaults_bootstrapped": self.policy_defaults_bootstrapped,
             "command_ramp_seconds": self.command_ramp_seconds,
+            "action_postprocessor": self.action_postprocessor.describe(),
         }

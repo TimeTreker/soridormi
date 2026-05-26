@@ -9,6 +9,7 @@ from typing import Any
 
 POLICY_TOPICS = {
     "/soridormi/policy_action",
+    "/soridormi/policy_observation",
     "/soridormi/policy_debug",
     "/soridormi/policy_observation_stats",
 }
@@ -49,6 +50,16 @@ def _compact_policy_snapshot(payload: dict[str, Any]) -> dict[str, Any]:
                 "min": min(action) if action else None,
                 "max": max(action) if action else None,
                 "first_values": action[:5],
+            }
+
+    if "observation" in payload:
+        observation = payload["observation"]
+        if isinstance(observation, list):
+            return {
+                "shape": [len(observation)],
+                "min": min(observation) if observation else None,
+                "max": max(observation) if observation else None,
+                "first_values": observation[:8],
             }
 
     return payload

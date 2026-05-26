@@ -92,9 +92,11 @@ def test_step_phase_advances_once_per_compute() -> None:
     p1 = gen.advance_and_as_list()
     p2 = gen.advance_and_as_list()
 
-    assert math.isclose(p0[0], 1.0, abs_tol=1e-6)
-    assert math.isclose(p0[1], 0.0, abs_tol=1e-6)
-    assert abs(p1[0]) < 1e-6
-    assert math.isclose(p1[1], 1.0, abs_tol=1e-6)
-    assert math.isclose(p2[0], -1.0, abs_tol=1e-6)
-    assert abs(p2[1]) < 1e-6
+    # Official Open Duck increments imitation_i before building the
+    # observation, so the first policy phase is 1 / period, not 0 / period.
+    assert abs(p0[0]) < 1e-6
+    assert math.isclose(p0[1], 1.0, abs_tol=1e-6)
+    assert math.isclose(p1[0], -1.0, abs_tol=1e-6)
+    assert abs(p1[1]) < 1e-6
+    assert abs(p2[0]) < 1e-6
+    assert math.isclose(p2[1], -1.0, abs_tol=1e-6)

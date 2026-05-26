@@ -64,6 +64,7 @@ def test_policy_profile_loads_env_contract(tmp_path: Path) -> None:
     assert env["SORIDORMI_COMMAND_Y"] == "-0.01"
     assert env["SORIDORMI_COMMAND_YAW"] == "0.02"
     assert env["SORIDORMI_ACTION_SCALE"] == "0.25"
+    assert env["SORIDORMI_PHASE_REFERENCE_DATA"].endswith("polynomial_coefficients.pkl")
     assert env["SORIDORMI_RUNTIME_LOG_PREFIX"] == "unit_policy"
 
 

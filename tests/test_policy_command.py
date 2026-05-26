@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import pickle
 
 from soridormi_runtime.policy_command import GaitPhaseGenerator, PolicyCommand
 
@@ -27,3 +28,36 @@ def test_gait_phase_generator_vector() -> None:
     assert math.isclose(float(v0[1]), 0.0, abs_tol=1e-6)
     assert abs(float(v_quarter[0])) < 1e-6
     assert math.isclose(float(v_quarter[1]), 1.0, abs_tol=1e-6)
+
+def test_gait_phase_generator_loads_open_duck_period_from_reference_data(tmp_path, monkeypatch) -> None:
+    reference = tmp_path / "polynomial_coefficients.pkl"
+    payload = {
+        "0.0_0.0_0.0": {
+            "period": 2.0,
+            "fps": 30,
+            "frame_offsets": [],
+            "startend_double_support_ratio": 0.0,
+            "coefficients": {},
+        }
+    }
+    with reference.open("wb") as f:
+        pickle.dump(payload, f)
+
+    monkeypatch.setenv("SORIDORMI_PHASE_MODE", "step")
+    monkeypatch.setenv("SORIDORMI_PHASE_PERIOD_STEPS", "auto")
+    monkeypatch.setenv("SORIDORMI_PHASE_REFERENCE_DATA", str(reference))
+
+    gen = GaitPhaseGenerator.from_env()
+
+    assert gen.period_steps == 60
+    assert gen.period_source == "reference_data"
+
+
+def test_step_phase_matches_official_advance_before_observation() -> None:
+    gen = GaitPhaseGenerator(mode="step", period_steps=4, step_increment=1.0)
+
+    first = gen.advance_and_as_list()
+
+    assert abs(first[0]) < 1e-6
+    assert math.isclose(first[1], 1.0, abs_tol=1e-6)
+

@@ -50,4 +50,16 @@ class RobotApiServer:
                 return ApiResponse(ok=False, message="send_command requires command")
             self.backend.apply_command(request.command)
             return ApiResponse(ok=True, message="command accepted")
+        if request.kind == "step_command":
+            if request.command is None:
+                return ApiResponse(ok=False, message="step_command requires command")
+            self.backend.apply_command(request.command)
+            self.backend.step()
+            return ApiResponse(ok=True, state=self.backend.get_state())
+        if request.kind == "reset":
+            resetter = getattr(self.backend, "reset", None)
+            if not callable(resetter):
+                return ApiResponse(ok=False, message="backend does not support reset")
+            resetter()
+            return ApiResponse(ok=True, message="backend reset")
         return ApiResponse(ok=False, message=f"unknown request kind: {request.kind}")

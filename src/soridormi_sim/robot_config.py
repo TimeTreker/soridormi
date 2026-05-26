@@ -169,6 +169,8 @@ class FootContactObservationConfig(BaseModel):
     left_geoms: list[str] = Field(default_factory=lambda: ["left_foot_bottom_tpu"])
     right_geoms: list[str] = Field(default_factory=lambda: ["right_foot_bottom_tpu"])
     ground_geoms: list[str] = Field(default_factory=lambda: ["floor"])
+    left_site: str = "left_foot"
+    right_site: str = "right_foot"
 
 
 class PolicyObservationConfig(BaseModel):

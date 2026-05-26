@@ -78,7 +78,9 @@ class RuntimeLogger(Protocol):
         command: MotorCommand,
         mode: str,
         backend: str,
+        policy_raw_action: list[float] | None = None,
         policy_action: list[float] | None = None,
+        policy_observation: list[float] | None = None,
         policy_debug: dict[str, Any] | None = None,
         policy_observation_stats: dict[str, Any] | None = None,
     ) -> None:
@@ -99,7 +101,9 @@ class NullRuntimeLogger:
         command: MotorCommand,
         mode: str,
         backend: str,
+        policy_raw_action: list[float] | None = None,
         policy_action: list[float] | None = None,
+        policy_observation: list[float] | None = None,
         policy_debug: dict[str, Any] | None = None,
         policy_observation_stats: dict[str, Any] | None = None,
     ) -> None:

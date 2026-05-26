@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import math
 import os
+import pickle
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 
 
 TRUE_VALUES = {"1", "true", "yes", "on", "y"}
+DEFAULT_OPEN_DUCK_REFERENCE_DATA = Path(
+    "/workspaces/Open_Duck_Playground/playground/open_duck_mini_v2/data/polynomial_coefficients.pkl"
+)
+
 
 
 def env_float(name: str, default: float) -> float:
@@ -30,6 +37,91 @@ def env_int(name: str, default: int) -> int:
     if value is None or value.strip() == "":
         return default
     return int(value)
+
+
+def _env_text(name: str, default: str = "") -> str:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip()
+
+
+def _load_open_duck_reference_period_steps(path: str | os.PathLike[str] | None) -> int | None:
+    """Read Open Duck PolyReferenceMotion period_steps without importing JAX/Numpy code.
+
+    Official Open Duck phase uses:
+
+        imitation_i += phase_frequency_factor
+        imitation_i %= PRM.nb_steps_in_period
+        phase = [cos(imitation_i / PRM.nb_steps_in_period * 2π),
+                 sin(imitation_i / PRM.nb_steps_in_period * 2π)]
+
+    PRM.nb_steps_in_period is computed as int(period * fps) from the
+    polynomial_coefficients.pkl file. Loading those two scalar fields directly
+    keeps Soridormi runtime lightweight and avoids importing the full training
+    package just to get the phase period.
+    """
+
+    if path is None or str(path).strip() == "":
+        return None
+
+    reference_path = Path(path)
+    if not reference_path.exists():
+        return None
+
+    with reference_path.open("rb") as f:
+        payload: Any = pickle.load(f)
+
+    if not isinstance(payload, dict) or not payload:
+        return None
+
+    first = next(iter(payload.values()))
+    if not isinstance(first, dict):
+        return None
+
+    period = first.get("period")
+    fps = first.get("fps")
+    if period is None or fps is None:
+        return None
+
+    steps = int(float(period) * float(fps))
+    return steps if steps > 0 else None
+
+
+def _resolve_phase_period_steps(
+    raw_value: str,
+    reference_data: str | os.PathLike[str] | None,
+    *,
+    require_reference_data: bool = False,
+) -> tuple[int, str]:
+    text = str(raw_value or "").strip().lower()
+    wants_reference = text in {"", "auto", "reference", "open_duck", "0"}
+
+    if wants_reference:
+        loaded = _load_open_duck_reference_period_steps(reference_data)
+        if loaded is not None:
+            return loaded, "reference_data"
+        if require_reference_data:
+            raise FileNotFoundError(
+                "Open Duck phase period was requested from reference data, but Soridormi could not "
+                f"load it from {reference_data!r}. Make sure the runtime container mounts "
+                "./workspace/Open_Duck_Playground at /workspaces/Open_Duck_Playground, or set "
+                "SORIDORMI_PHASE_PERIOD_STEPS explicitly."
+            )
+        return 50, "fallback_50"
+
+    steps = int(float(text))
+    if steps <= 0:
+        loaded = _load_open_duck_reference_period_steps(reference_data)
+        if loaded is not None:
+            return loaded, "reference_data"
+        if require_reference_data:
+            raise FileNotFoundError(
+                "Open Duck phase period was requested from reference data, but Soridormi could not "
+                f"load it from {reference_data!r}."
+            )
+        return 50, "fallback_50"
+    return steps, "env"
 
 
 @dataclass
@@ -116,6 +208,9 @@ class GaitPhaseGenerator:
     period_steps: int = 50
     step_increment: float = 1.0
     step_index: float = 0.0
+    reference_data: str = ""
+    period_source: str = "default"
+    require_reference_data: bool = False
 
     @classmethod
     def from_env(cls) -> GaitPhaseGenerator:
@@ -125,7 +220,17 @@ class GaitPhaseGenerator:
         frequency_hz = env_float("SORIDORMI_PHASE_FREQUENCY", 0.0)
         enabled = env_bool("SORIDORMI_PHASE_ENABLED", True)
         phase_offset = env_float("SORIDORMI_PHASE_OFFSET", 0.0)
-        period_steps = max(1, env_int("SORIDORMI_PHASE_PERIOD_STEPS", 50))
+        reference_data = _env_text(
+            "SORIDORMI_PHASE_REFERENCE_DATA",
+            str(DEFAULT_OPEN_DUCK_REFERENCE_DATA),
+        )
+        raw_period_steps = _env_text("SORIDORMI_PHASE_PERIOD_STEPS", "auto")
+        require_reference_data = env_bool("SORIDORMI_PHASE_REQUIRE_REFERENCE_DATA", False)
+        period_steps, period_source = _resolve_phase_period_steps(
+            raw_period_steps,
+            reference_data,
+            require_reference_data=require_reference_data,
+        )
         step_increment = env_float("SORIDORMI_PHASE_STEP_INCREMENT", 1.0)
         return cls(
             frequency_hz=frequency_hz,
@@ -134,6 +239,9 @@ class GaitPhaseGenerator:
             mode=mode,
             period_steps=period_steps,
             step_increment=step_increment,
+            reference_data=reference_data,
+            period_source=period_source,
+            require_reference_data=require_reference_data,
         )
 
     def reset(self, now: float | None = None) -> None:
@@ -167,9 +275,12 @@ class GaitPhaseGenerator:
         return [float(x) for x in self.vector(now).tolist()]
 
     def advance_and_as_list(self) -> list[float]:
-        values = self.as_list()
-        self.advance()
-        return values
+        # Official Open Duck increments imitation_i before building the policy
+        # observation for a policy step. Matching that order removes a one-step
+        # phase lag relative to the reference runner.
+        if self.enabled and self.mode == "step":
+            self.advance()
+        return self.as_list()
 
     def describe(self) -> dict[str, float | bool | str]:
         return {
@@ -180,4 +291,7 @@ class GaitPhaseGenerator:
             "period_steps": int(self.period_steps),
             "step_increment": float(self.step_increment),
             "step_index": float(self.step_index),
+            "reference_data": str(self.reference_data),
+            "period_source": str(self.period_source),
+            "require_reference_data": bool(self.require_reference_data),
         }

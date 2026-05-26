@@ -235,6 +235,7 @@ class OfficialForwardRunner:
         )
         self.mjinfer.commands = config.command.as_list()
         self.records: list[dict[str, Any]] = []
+        self.trace_records: list[dict[str, Any]] = []
 
     def run(self) -> dict[str, Any]:
         import mujoco
@@ -252,6 +253,57 @@ class OfficialForwardRunner:
                 return self._run_loop(viewer=viewer)
 
         return self._run_loop(viewer=None)
+
+    def _actuator_joint_positions(self) -> list[float]:
+        values: list[float] = []
+        for i in range(int(self.mjinfer.model.nu)):
+            joint_id = int(self.mjinfer.model.actuator_trnid[i][0])
+            qpos_addr = int(self.mjinfer.model.jnt_qposadr[joint_id])
+            values.append(float(self.mjinfer.data.qpos[qpos_addr]))
+        return values
+
+    def _actuator_joint_velocities(self) -> list[float]:
+        values: list[float] = []
+        for i in range(int(self.mjinfer.model.nu)):
+            joint_id = int(self.mjinfer.model.actuator_trnid[i][0])
+            qvel_addr = int(self.mjinfer.model.jnt_dofadr[joint_id])
+            values.append(float(self.mjinfer.data.qvel[qvel_addr]))
+        return values
+
+    def _base_quat_wxyz(self) -> list[float]:
+        base = self.mjinfer.get_floating_base_qpos(self.mjinfer.data.qpos)
+        return [float(x) for x in base[3:7]]
+
+    def _append_trace_record(
+        self,
+        *,
+        policy_steps: int,
+        obs: np.ndarray,
+        action: np.ndarray,
+        motor_targets: np.ndarray,
+        contacts: list[float],
+        base: list[float],
+    ) -> None:
+        self.trace_records.append(
+            {
+                "source": "official_open_duck",
+                "step_index": int(policy_steps - 1),
+                "policy_step": int(policy_steps),
+                "sim_time": float(self.mjinfer.data.time),
+                "robot_time": float(self.mjinfer.data.time),
+                "observation": [float(x) for x in np.asarray(obs, dtype=float).reshape(-1)],
+                "action": [float(x) for x in np.asarray(action, dtype=float).reshape(-1)],
+                "motor_targets": [float(x) for x in np.asarray(motor_targets, dtype=float).reshape(-1)],
+                "joint_positions": self._actuator_joint_positions(),
+                "joint_velocities": self._actuator_joint_velocities(),
+                "contacts": [float(x) for x in contacts],
+                "phase": [float(x) for x in self.mjinfer.imitation_phase],
+                "command": [float(x) for x in self.mjinfer.commands],
+                "base_position_xyz": [float(x) for x in base],
+                "base_quat_wxyz": self._base_quat_wxyz(),
+                "default_actuator": [float(x) for x in np.asarray(self.mjinfer.default_actuator, dtype=float).reshape(-1)],
+            }
+        )
 
     def _run_loop(self, viewer: Any | None) -> dict[str, Any]:
         import mujoco
@@ -325,6 +377,14 @@ class OfficialForwardRunner:
                 motor_target_values.extend([float(x) for x in self.mjinfer.motor_targets])
                 contact_values.extend(contacts)
                 base_positions.append(base)
+                self._append_trace_record(
+                    policy_steps=policy_steps,
+                    obs=obs,
+                    action=action,
+                    motor_targets=self.mjinfer.motor_targets,
+                    contacts=contacts,
+                    base=base,
+                )
                 self.records.append(
                     {
                         "policy_step": policy_steps,
@@ -385,6 +445,7 @@ class OfficialForwardRunner:
             "base_position_stats": _vector_stats(base_positions),
             "first_records": self.records[:5],
             "last_records": self.records[-5:],
+            "trace_records": len(self.trace_records),
         }
         return summary
 
@@ -458,11 +519,25 @@ def write_summary(summary: dict[str, Any], output_dir: Path, prefix: str) -> Pat
     return path
 
 
+def write_trace_jsonl(records: list[dict[str, Any]], output_dir: Path, prefix: str) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    path = output_dir / f"{prefix}_{timestamp}.trace.jsonl"
+    with path.open("w", encoding="utf-8") as f:
+        for record in records:
+            f.write(json.dumps(record, separators=(",", ":")) + "\n")
+    latest = output_dir / "latest_official_baseline.trace.jsonl"
+    latest.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    return path
+
+
 def print_summary(summary: dict[str, Any], path: Path) -> None:
     dx, dy, dz = summary["base_displacement_xyz"]
     print("Official Open Duck baseline finished")
     print("====================================")
     print(f"Summary: {path}")
+    if summary.get("trace_jsonl"):
+        print(f"Trace: {summary['trace_jsonl']}")
     print(f"Command: {summary['command']}")
     print(f"Policy steps: {summary['policy_steps']}")
     print(f"Sim time: {summary['sim_time_seconds']:.3f} s")
@@ -485,6 +560,13 @@ def main() -> None:
     config = config_from_args(args)
     runner = OfficialForwardRunner(config)
     summary = runner.run()
+    trace_path = write_trace_jsonl(
+        runner.trace_records,
+        config.output_dir,
+        f"{config.summary_prefix}_trace",
+    )
+    summary["trace_jsonl"] = str(trace_path)
+    summary["latest_trace_jsonl"] = str(config.output_dir / "latest_official_baseline.trace.jsonl")
     path = write_summary(summary, config.output_dir, config.summary_prefix)
     print_summary(summary, path)
 

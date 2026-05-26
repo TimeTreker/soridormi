@@ -172,9 +172,22 @@ class OnnxPolicy:
             )
 
     def bootstrap_defaults_from_state(self, state: RobotState) -> dict[str, float]:
+        """Bootstrap default_actuator/motor_targets from backend metadata.
+
+        In MuJoCo official-compatibility mode the simulator exposes data.ctrl
+        from model.keyframe("home").ctrl as state.actuator_ctrl. That is the
+        closest match to Open Duck's `default_actuator`. Fall back to joint qpos
+        for non-MuJoCo or older backends.
+        """
+        source_values = state.actuator_ctrl
+        if source_values is not None and len(source_values) == len(state.joints.names):
+            values = source_values
+        else:
+            values = state.joints.positions
+
         defaults = {
             str(name): float(value)
-            for name, value in zip(state.joints.names, state.joints.positions)
+            for name, value in zip(state.joints.names, values)
             if name in self.joint_names
         }
         self.set_default_positions_by_name(defaults)
@@ -219,6 +232,11 @@ class OnnxPolicy:
         self.last_action_stats = _array_stats("action", action)
         self.observation_builder.update_action_history(action)
         return action
+
+    def get_observation(self) -> list[float] | None:
+        if self.last_observation is None:
+            return None
+        return [float(x) for x in np.asarray(self.last_observation, dtype=np.float32).reshape(-1)]
 
     def get_observation_stats(self) -> dict[str, object] | None:
         return None if self.last_observation_stats is None else dict(self.last_observation_stats)

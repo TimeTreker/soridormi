@@ -39,6 +39,22 @@ class RobotApiClient:
         if not response.ok:
             raise RuntimeError(response.message)
 
+    def step_motor_command(self, command: MotorCommand) -> RobotState:
+        """Apply command, advance exactly one backend API step, and return state.
+
+        This is the simulator-side synchronous stepping primitive used for
+        official Open Duck parity. It removes host/runtime scheduling jitter from
+        the policy loop while preserving the same RobotState/MotorCommand API.
+        """
+        response = self._request(ApiRequest(kind="step_command", command=command))
+        if response.state is None:
+            raise RuntimeError("server returned no RobotState after step_command")
+        return response.state
+
+    def reset(self) -> str:
+        response = self._request(ApiRequest(kind="reset"))
+        return response.message
+
     def _request(self, request: ApiRequest) -> ApiResponse:
         self._socket.send_json(request.model_dump(mode="json"))
         raw = self._socket.recv()

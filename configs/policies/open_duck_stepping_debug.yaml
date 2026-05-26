@@ -1,6 +1,6 @@
-# Soridormi M4.2 policy profile.
-name: open_duck_forward
-description: Open Duck Mini v2 pretrained ONNX forward policy experiment.
+# Soridormi M4.3 policy profile.
+name: open_duck_stepping_debug
+description: ONNX forward policy with leg-action boost and head damping to test whether feet can unload/step.
 
 model:
   path: /workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx
@@ -26,7 +26,7 @@ command:
   head_pitch: 0.0
   head_yaw: 0.0
   head_roll: 0.0
-  ramp_seconds: 0.0
+  ramp_seconds: 0.5
 
 phase:
   mode: step
@@ -41,6 +41,22 @@ phase:
 action_mapping:
   action_scale: 0.25
   max_motor_velocity: 5.24
+
+# This is still ONNX policy control. The postprocessor only changes runtime
+# compatibility gains so we can determine whether the pretrained policy is
+# producing useful leg actions that were previously too small compared with
+# head/body wiggle.
+action_postprocess:
+  enabled: true
+  mode: locomotion_boost
+  leg_gain: 1.8
+  head_gain: 0.0
+  hip_yaw_gain: 1.0
+  hip_roll_gain: 1.0
+  hip_pitch_gain: 1.2
+  knee_gain: 1.2
+  ankle_gain: 1.0
+  clip_abs: 2.0
 
 observation:
   accel_bias_xyz: [1.3, 0.0, 0.0]
@@ -61,4 +77,4 @@ logging:
   enabled: true
   format: mcap
   every_n: 1
-  prefix: policy_open_duck_forward
+  prefix: policy_open_duck_stepping_debug

@@ -50,6 +50,20 @@ _STATUS_SCHEMA = {
     },
 }
 
+_POLICY_RAW_ACTION_SCHEMA = {
+    "type": "object",
+    "additionalProperties": True,
+    "properties": {
+        "type": {"const": "policy_raw_action"},
+        "step_index": {"type": "integer"},
+        "time_wall_ns": {"type": "integer"},
+        "robot_time": {"type": "number"},
+        "mode": {"type": "string"},
+        "backend": {"type": "string"},
+        "action": {"type": "array", "items": {"type": "number"}},
+    },
+}
+
 _POLICY_ACTION_SCHEMA = {
     "type": "object",
     "additionalProperties": True,
@@ -61,6 +75,20 @@ _POLICY_ACTION_SCHEMA = {
         "mode": {"type": "string"},
         "backend": {"type": "string"},
         "action": {"type": "array", "items": {"type": "number"}},
+    },
+}
+
+_POLICY_OBSERVATION_SCHEMA = {
+    "type": "object",
+    "additionalProperties": True,
+    "properties": {
+        "type": {"const": "policy_observation"},
+        "step_index": {"type": "integer"},
+        "time_wall_ns": {"type": "integer"},
+        "robot_time": {"type": "number"},
+        "mode": {"type": "string"},
+        "backend": {"type": "string"},
+        "observation": {"type": "array", "items": {"type": "number"}},
     },
 }
 
@@ -142,10 +170,20 @@ class McapRuntimeLogger:
             encoding="jsonschema",
             data=json.dumps(_STATUS_SCHEMA).encode("utf-8"),
         )
+        policy_raw_action_schema_id = self._writer.register_schema(
+            name="soridormi.PolicyRawActionLog",
+            encoding="jsonschema",
+            data=json.dumps(_POLICY_RAW_ACTION_SCHEMA).encode("utf-8"),
+        )
         policy_action_schema_id = self._writer.register_schema(
             name="soridormi.PolicyActionLog",
             encoding="jsonschema",
             data=json.dumps(_POLICY_ACTION_SCHEMA).encode("utf-8"),
+        )
+        policy_observation_schema_id = self._writer.register_schema(
+            name="soridormi.PolicyObservationLog",
+            encoding="jsonschema",
+            data=json.dumps(_POLICY_OBSERVATION_SCHEMA).encode("utf-8"),
         )
         policy_debug_schema_id = self._writer.register_schema(
             name="soridormi.PolicyDebugLog",
@@ -173,10 +211,20 @@ class McapRuntimeLogger:
             message_encoding="json",
             schema_id=status_schema_id,
         )
+        self._policy_raw_action_channel = self._writer.register_channel(
+            topic="/soridormi/policy_raw_action",
+            message_encoding="json",
+            schema_id=policy_raw_action_schema_id,
+        )
         self._policy_action_channel = self._writer.register_channel(
             topic="/soridormi/policy_action",
             message_encoding="json",
             schema_id=policy_action_schema_id,
+        )
+        self._policy_observation_channel = self._writer.register_channel(
+            topic="/soridormi/policy_observation",
+            message_encoding="json",
+            schema_id=policy_observation_schema_id,
         )
         self._policy_debug_channel = self._writer.register_channel(
             topic="/soridormi/policy_debug",
@@ -216,7 +264,9 @@ class McapRuntimeLogger:
         command: MotorCommand,
         mode: str,
         backend: str,
+        policy_raw_action: list[float] | None = None,
         policy_action: list[float] | None = None,
+        policy_observation: list[float] | None = None,
         policy_debug: dict[str, Any] | None = None,
         policy_observation_stats: dict[str, Any] | None = None,
     ) -> None:
@@ -247,6 +297,17 @@ class McapRuntimeLogger:
         self._add_json(self._state_channel, timestamp_ns, state_payload)
         self._add_json(self._command_channel, timestamp_ns, command_payload)
 
+        if policy_raw_action is not None:
+            self._add_json(
+                self._policy_raw_action_channel,
+                timestamp_ns,
+                {
+                    **base_payload,
+                    "type": "policy_raw_action",
+                    "action": json_safe(policy_raw_action),
+                },
+            )
+
         if policy_action is not None:
             self._add_json(
                 self._policy_action_channel,
@@ -255,6 +316,17 @@ class McapRuntimeLogger:
                     **base_payload,
                     "type": "policy_action",
                     "action": json_safe(policy_action),
+                },
+            )
+
+        if policy_observation is not None:
+            self._add_json(
+                self._policy_observation_channel,
+                timestamp_ns,
+                {
+                    **base_payload,
+                    "type": "policy_observation",
+                    "observation": json_safe(policy_observation),
                 },
             )
 

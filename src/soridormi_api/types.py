@@ -45,6 +45,15 @@ class RobotState(BaseModel):
     # can leave it unset until state estimation is available.
     base_position_xyz: list[float] | None = None
     base_quat_wxyz: list[float] | None = None
+    # Optional [left, right] foot world positions, each [x, y, z].
+    # MuJoCo fills this for stepping diagnostics. Real hardware can leave it
+    # unset until kinematics/state estimation is available.
+    feet_position_xyz: list[list[float]] | None = None
+    # Optional actuator control vector in the backend's actuator order.
+    # MuJoCo fills this with data.ctrl, which lets the runtime bootstrap the
+    # policy's default_actuator/motor_targets from model.keyframe("home").ctrl
+    # instead of guessing from joint qpos. Hardware backends can leave it unset.
+    actuator_ctrl: list[float] | None = None
 
     @field_validator("feet_contacts")
     @classmethod
@@ -67,6 +76,28 @@ class RobotState(BaseModel):
             raise ValueError("base_quat_wxyz must contain exactly [w, x, y, z]")
         return value
 
+    @field_validator("feet_position_xyz")
+    @classmethod
+    def _feet_position_shape(
+        cls,
+        value: list[list[float]] | None,
+    ) -> list[list[float]] | None:
+        if value is None:
+            return value
+        if len(value) != 2:
+            raise ValueError("feet_position_xyz must contain exactly [left_xyz, right_xyz]")
+        for item in value:
+            if len(item) != 3:
+                raise ValueError("each feet_position_xyz item must contain exactly [x, y, z]")
+        return value
+
+    @field_validator("actuator_ctrl")
+    @classmethod
+    def _actuator_ctrl_non_empty(cls, value: list[float] | None) -> list[float] | None:
+        if value is not None and len(value) == 0:
+            raise ValueError("actuator_ctrl must be unset or contain at least one value")
+        return value
+
 
 class MotorCommand(BaseModel):
     names: list[str]
@@ -78,7 +109,7 @@ class MotorCommand(BaseModel):
 
 
 class ApiRequest(BaseModel):
-    kind: Literal["ping", "get_state", "send_command"]
+    kind: Literal["ping", "get_state", "send_command", "step_command", "reset"]
     command: MotorCommand | None = None
 
 

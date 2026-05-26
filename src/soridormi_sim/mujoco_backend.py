@@ -66,10 +66,20 @@ class FakeMujocoBackend:
             ),
             imu=IMUState(accel_xyz=list(self.config.imu.accel_xyz_default)),
             feet_contacts=[0.0, 0.0],
+            feet_position_xyz=None,
+            actuator_ctrl=list(self.positions),
         )
 
     def apply_command(self, command: MotorCommand) -> None:
         self.last_command = command
+
+    def reset(self) -> None:
+        self.start_time = time.monotonic()
+        n = len(self.joint_names)
+        self.positions = [0.0] * n
+        self.velocities = [0.0] * n
+        self.torques = [0.0] * n
+        self.last_command = None
 
 
 class MujocoBackend:
@@ -94,10 +104,33 @@ class MujocoBackend:
         if not self.model_path.exists():
             raise FileNotFoundError(f"MuJoCo model XML not found: {self.model_path}")
 
+        self.official_reset_sequence = env_flag(
+            "SORIDORMI_MUJOCO_OFFICIAL_RESET_SEQUENCE",
+            default=False,
+        )
+        self.official_sensor_mode = env_flag(
+            "SORIDORMI_MUJOCO_OFFICIAL_SENSOR_MODE",
+            default=False,
+        )
+        self.official_contact_mode = env_flag(
+            "SORIDORMI_MUJOCO_OFFICIAL_CONTACT_MODE",
+            default=False,
+        )
+
         self.model = mujoco.MjModel.from_xml_path(str(self.model_path))
+        # Official Open Duck inference forces 2 ms MuJoCo steps. Keep this as
+        # an opt-in compatibility mode so generic robot configs remain generic.
+        if self.official_reset_sequence:
+            self.model.opt.timestep = 0.002
         self.data = mujoco.MjData(self.model)
         self.last_command: MotorCommand | None = None
         self._original_gravity = np.array(self.model.opt.gravity, dtype=float)
+        self.use_home_keyframe = env_flag(
+            "SORIDORMI_MUJOCO_USE_HOME_KEYFRAME",
+            default=False,
+        )
+        self.home_keyframe_name = "home"
+        self.last_reset_used_home_keyframe = False
 
         self.actuator_names = self._load_and_validate_actuator_names()
         self.joint_ids = self._load_actuator_joint_ids()
@@ -109,10 +142,13 @@ class MujocoBackend:
         self.gyro_sensor_id = self._sensor_id("gyro")
         self.accelerometer_sensor_id = self._sensor_id("accelerometer")
 
+        self._apply_home_keyframe_if_enabled()
         self._apply_configured_reset_pose()
         self._apply_startup_debug_options()
-        self._initialize_ctrl_from_current_qpos()
-        mujoco.mj_forward(self.model, self.data)
+        if not self.last_reset_used_home_keyframe:
+            self._initialize_ctrl_from_current_qpos()
+        if not self.official_reset_sequence:
+            mujoco.mj_forward(self.model, self.data)
 
         self.fixed_base_enabled = env_flag(
             self.config.debug.fixed_base.enabled_env,
@@ -154,6 +190,12 @@ class MujocoBackend:
         print(f"MuJoCo timestep: {self.model.opt.timestep}")
         print(f"API step substeps: {self.substeps_per_api_step}")
         print(f"Actuators: {self.actuator_names}")
+        if self.official_reset_sequence:
+            print("Official Open Duck reset sequence enabled.")
+        if self.official_sensor_mode:
+            print("Official Open Duck sensor mode enabled.")
+        if self.official_contact_mode:
+            print("Official Open Duck body-contact mode enabled.")
 
     def reset(self) -> None:
         """Reset MuJoCo data to the configured reset_pose.
@@ -162,10 +204,13 @@ class MujocoBackend:
         sending commands while the simulation returns to a known safe pose.
         """
         self.mujoco.mj_resetData(self.model, self.data)
+        self._apply_home_keyframe_if_enabled()
         self._apply_configured_reset_pose()
         self._apply_startup_debug_options()
-        self._initialize_ctrl_from_current_qpos()
-        self.mujoco.mj_forward(self.model, self.data)
+        if not self.last_reset_used_home_keyframe:
+            self._initialize_ctrl_from_current_qpos()
+        if not self.official_reset_sequence:
+            self.mujoco.mj_forward(self.model, self.data)
         self.last_command = None
         self.reset_count += 1
 
@@ -174,6 +219,64 @@ class MujocoBackend:
         if hasattr(self, "fixed_base_qpos_slices"):
             self.fixed_base_qpos_slices = self._capture_fixed_base_qpos_slices()
 
+    def _apply_home_keyframe_if_enabled(self) -> None:
+        """Apply MuJoCo keyframe("home") qpos and ctrl like official Open Duck.
+
+        In official-compatibility mode we intentionally reproduce the upstream
+        startup/reset sequence more closely:
+
+          1. run one mj_step from fresh mjData/reset data,
+          2. copy keyframe("home").qpos into data.qpos,
+          3. copy keyframe("home").ctrl into data.ctrl,
+          4. do not zero qvel here.
+
+        The small-looking details matter because the pretrained walking policy
+        consumes IMU sensors and contact state; changing the startup/reset sensor
+        state can make Soridormi diverge from the official runner even when the
+        ONNX model and motor targets are nearly identical.
+        """
+        self.last_reset_used_home_keyframe = False
+        if not self.use_home_keyframe:
+            return
+
+        key_id = self._keyframe_id(self.home_keyframe_name)
+        if key_id < 0:
+            raise ValueError(
+                f"SORIDORMI_MUJOCO_USE_HOME_KEYFRAME=1 but MuJoCo keyframe "
+                f"{self.home_keyframe_name!r} was not found in {self.model_path}"
+            )
+
+        if self.official_reset_sequence:
+            # This mirrors MJInferBase.__init__ before it applies home qpos/ctrl.
+            # It advances sensors/data.time by one 2 ms step from reset/default
+            # data, exactly like the official Open Duck inference base class.
+            self.mujoco.mj_step(self.model, self.data)
+
+        self.data.qpos[:] = np.asarray(self.model.key_qpos[key_id], dtype=float)
+        if self.model.nu:
+            self.data.ctrl[:] = np.asarray(self.model.key_ctrl[key_id], dtype=float)
+
+        if self.model.nv and not self.official_reset_sequence:
+            self.data.qvel[:] = 0.0
+
+        self.last_reset_used_home_keyframe = True
+        if self.official_reset_sequence:
+            print(
+                f"Applied official MuJoCo keyframe '{self.home_keyframe_name}' "
+                "qpos/ctrl with Open Duck reset sequence."
+            )
+        else:
+            print(f"Applied MuJoCo keyframe '{self.home_keyframe_name}' qpos/ctrl.")
+
+    def _keyframe_id(self, name: str) -> int:
+        return int(
+            self.mujoco.mj_name2id(
+                self.model,
+                self.mujoco.mjtObj.mjOBJ_KEY,
+                name,
+            )
+        )
+
     def _apply_configured_reset_pose(self) -> None:
         """Apply optional reset_pose from the robot config.
 
@@ -181,6 +284,13 @@ class MujocoBackend:
         mj_forward() call. It makes simulation startup repeatable and lets us
         tune reset/default poses from YAML instead of changing backend code.
         """
+        if self.last_reset_used_home_keyframe and env_flag(
+            "SORIDORMI_MUJOCO_HOME_KEYFRAME_OVERRIDES_RESET_POSE",
+            default=True,
+        ):
+            print("Skipping configured reset_pose because MuJoCo home keyframe is active.")
+            return
+
         reset_pose = self.config.reset_pose
         if reset_pose is None:
             return
@@ -392,8 +502,10 @@ class MujocoBackend:
             ),
             imu=self._read_base_imu(),
             feet_contacts=self._read_feet_contacts(),
+            feet_position_xyz=self._read_feet_positions(),
             base_position_xyz=self._slice(self.data.qpos, self.config.base.qpos_xyz_slice),
             base_quat_wxyz=self._slice(self.data.qpos, self.config.base.qpos_quat_wxyz_slice),
+            actuator_ctrl=[float(x) for x in self.data.ctrl[: self.model.nu]],
         )
 
     def apply_command(self, command: MotorCommand) -> None:
@@ -433,18 +545,28 @@ class MujocoBackend:
 
     def _read_base_imu(self) -> IMUState:
         base = self.config.base
-        return IMUState(
-            quat_wxyz=self._slice(self.data.qpos, base.qpos_quat_wxyz_slice),
-            gyro_xyz=self._read_sensor_or_qvel(
+        gyro_fallback = self._slice(self.data.qvel, base.qvel_angular_slice)
+        accel_fallback = list(self.config.imu.accel_xyz_default)
+
+        if self.official_sensor_mode:
+            gyro = self._read_required_sensor(self.gyro_sensor_id, 3, "gyro")
+            accel = self._read_required_sensor(self.accelerometer_sensor_id, 3, "accelerometer")
+        else:
+            gyro = self._read_sensor_or_qvel(
                 sensor_id=self.gyro_sensor_id,
                 expected_size=3,
-                fallback=self._slice(self.data.qvel, base.qvel_angular_slice),
-            ),
-            accel_xyz=self._read_sensor_or_qvel(
+                fallback=gyro_fallback,
+            )
+            accel = self._read_sensor_or_qvel(
                 sensor_id=self.accelerometer_sensor_id,
                 expected_size=3,
-                fallback=list(self.config.imu.accel_xyz_default),
-            ),
+                fallback=accel_fallback,
+            )
+
+        return IMUState(
+            quat_wxyz=self._slice(self.data.qpos, base.qpos_quat_wxyz_slice),
+            gyro_xyz=gyro,
+            accel_xyz=accel,
         )
 
     def _sensor_id(self, name: str) -> int:
@@ -473,17 +595,75 @@ class MujocoBackend:
         values = self.data.sensordata[addr : addr + expected_size]
         return [float(x) for x in values]
 
+    def _read_required_sensor(
+        self,
+        sensor_id: int,
+        expected_size: int,
+        sensor_name: str,
+    ) -> list[float]:
+        if sensor_id < 0:
+            raise RuntimeError(
+                f"Official sensor mode requires MuJoCo sensor {sensor_name!r}, "
+                f"but it was not found in {self.model_path}"
+            )
+
+        addr = int(self.model.sensor_adr[sensor_id])
+        dim = int(self.model.sensor_dim[sensor_id])
+        if dim < expected_size:
+            raise RuntimeError(
+                f"MuJoCo sensor {sensor_name!r} has dim={dim}, "
+                f"expected at least {expected_size}"
+            )
+
+        values = self.data.sensordata[addr : addr + expected_size]
+        return [float(x) for x in values]
+
     def _read_feet_contacts(self) -> list[float]:
         contact = self.config.policy_observation.foot_contact
         left = self._check_named_body_contact(contact.left_body, contact.ground_body)
         right = self._check_named_body_contact(contact.right_body, contact.ground_body)
 
-        if not left:
-            left = self._check_named_geom_contact(contact.left_geoms, contact.ground_geoms)
-        if not right:
-            right = self._check_named_geom_contact(contact.right_geoms, contact.ground_geoms)
+        # The official Open Duck inference uses body contact only:
+        #   foot_assembly vs floor, foot_assembly_2 vs floor.
+        # Keep geom fallback for non-official/generic configs, but disable it
+        # in official mode so Soridormi's contact observation is bit-for-bit
+        # closer to upstream.
+        if not self.official_contact_mode:
+            if not left:
+                left = self._check_named_geom_contact(contact.left_geoms, contact.ground_geoms)
+            if not right:
+                right = self._check_named_geom_contact(contact.right_geoms, contact.ground_geoms)
 
         return [1.0 if left else 0.0, 1.0 if right else 0.0]
+
+    def _read_feet_positions(self) -> list[list[float]] | None:
+        contact = self.config.policy_observation.foot_contact
+
+        # Backward compatibility: older M4.0/M4.3 configs/models did not have
+        # left_site/right_site fields. Fall back to geom positions in that case.
+        left_site = getattr(contact, "left_site", "")
+        right_site = getattr(contact, "right_site", "")
+
+        left = self._read_site_or_geom_position(left_site, contact.left_geoms)
+        right = self._read_site_or_geom_position(right_site, contact.right_geoms)
+        if left is None or right is None:
+            return None
+        return [left, right]
+
+    def _read_site_or_geom_position(
+        self,
+        site_name: str,
+        fallback_geoms: list[str],
+    ) -> list[float] | None:
+        site_id = self._site_id(site_name) if site_name else -1
+        if site_id >= 0:
+            return [float(x) for x in self.data.site_xpos[site_id]]
+
+        for geom_name in fallback_geoms:
+            geom_id = self._geom_id(geom_name)
+            if geom_id >= 0:
+                return [float(x) for x in self.data.geom_xpos[geom_id]]
+        return None
 
     def _body_id(self, name: str) -> int:
         return int(
@@ -499,6 +679,15 @@ class MujocoBackend:
             self.mujoco.mj_name2id(
                 self.model,
                 self.mujoco.mjtObj.mjOBJ_GEOM,
+                name,
+            )
+        )
+
+    def _site_id(self, name: str) -> int:
+        return int(
+            self.mujoco.mj_name2id(
+                self.model,
+                self.mujoco.mjtObj.mjOBJ_SITE,
                 name,
             )
         )

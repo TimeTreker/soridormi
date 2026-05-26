@@ -38,7 +38,9 @@ class JsonlRuntimeLogger:
         command: MotorCommand,
         mode: str,
         backend: str,
+        policy_raw_action: list[float] | None = None,
         policy_action: list[float] | None = None,
+        policy_observation: list[float] | None = None,
         policy_debug: dict[str, Any] | None = None,
         policy_observation_stats: dict[str, Any] | None = None,
     ) -> None:
@@ -58,8 +60,12 @@ class JsonlRuntimeLogger:
             "command": model_to_json_dict(command),
         }
 
+        if policy_raw_action is not None:
+            payload["policy_raw_action"] = json_safe(policy_raw_action)
         if policy_action is not None:
             payload["policy_action"] = json_safe(policy_action)
+        if policy_observation is not None:
+            payload["policy_observation"] = json_safe(policy_observation)
         if policy_debug is not None:
             payload["policy_debug"] = json_safe(policy_debug)
         if policy_observation_stats is not None:
