@@ -23,9 +23,9 @@ Milestone checklist:
 
 Current status:
 
-- Baseline/replay/ONNX parity are good.
-- Soridormi closed-loop still diverges after step 0.
-- M4.13 should implement exact loop-order parity and first divergence diagnostics.
+- M4 closed-loop parity work is validated through the first-divergence analyzer.
+- Official and Soridormi compared policy traces match for the checked window at strict thresholds after fixing policy-default/motor-target aliasing.
+- Next work moves to M5: model replacement interface hardening.
 
 ## M5: Model replacement interface
 
