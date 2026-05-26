@@ -1,29 +1,63 @@
-# M3 Policy Inference Roadmap
+# M3 Milestones
 
-## M3.0 ONNX model inspection
+## M3.0 ONNX policy inspection
 
-Load the Open Duck Mini ONNX policy, print input/output metadata, and run one dummy inference.
+Status: implemented.
+
+Goal:
+
+```text
+load BEST_WALK_ONNX_2.onnx
+inspect input/output names and shapes
+run dummy inference
+```
 
 ## M3.1 Observation builder
 
-Convert `RobotState` into the exact observation tensor expected by the policy.
+Status: implemented by this update.
 
-## M3.2 Action mapper
+Goal:
 
-Convert the ONNX output/action tensor into a safe `MotorCommand`.
+```text
+RobotState -> 101D Open Duck ONNX observation
+observation -> ONNX inference -> 14D action
+```
 
-## M3.3 Runtime policy mode
+This does not yet control the robot.
 
-Add:
+## M3.2 Policy wrapper
 
-```bash
+Next target.
+
+Goal:
+
+```text
+persistent ONNX Runtime session
+action history updates
+provider reporting
+MCAP logging of observation/action
+```
+
+## M3.3 Action to MotorCommand mapper
+
+Goal:
+
+```text
+action[14] -> default_pose + action * action_scale -> MotorCommand
+```
+
+## M3.4 onnx_policy runtime mode
+
+Goal:
+
+```text
 SORIDORMI_RUNTIME_MODE=onnx_policy
 ```
 
-## M3.4 Policy logging
+## M3.5 MuJoCo policy smoke test
 
-Record policy observations and actions into MCAP logs.
+Goal:
 
-## M3.5 Policy simulation test
-
-Run policy mode in MuJoCo with viewer and auto-reset enabled.
+```text
+run policy with viewer, auto-reset, and MCAP logging
+```
