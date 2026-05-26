@@ -1,0 +1,87 @@
+# M2.7 default_pose tuning examples.
+#
+# Do not include this file from the program directly. Copy one block into
+# configs/robots/open_duck_mini_v2.yaml under:
+#
+#   default_pose:
+#     positions:
+#
+# Tune only default_pose during M2.7. Leave reset_pose unchanged.
+
+# Conservative pose
+default_pose_conservative:
+  positions:
+    left_hip_yaw: 0.0
+    left_hip_roll: 0.0
+    left_hip_pitch: -0.05
+    left_knee: 0.10
+    left_ankle: -0.05
+
+    neck_pitch: 0.0
+    head_pitch: 0.0
+    head_yaw: 0.0
+    head_roll: 0.0
+
+    right_hip_yaw: 0.0
+    right_hip_roll: 0.0
+    right_hip_pitch: 0.05
+    right_knee: -0.10
+    right_ankle: 0.05
+
+  gains:
+    kp_default: 10.0
+    kd_default: 0.5
+
+  torque_default: 0.0
+
+# Medium pose
+default_pose_medium:
+  positions:
+    left_hip_yaw: 0.0
+    left_hip_roll: 0.0
+    left_hip_pitch: -0.10
+    left_knee: 0.20
+    left_ankle: -0.10
+
+    neck_pitch: 0.0
+    head_pitch: 0.0
+    head_yaw: 0.0
+    head_roll: 0.0
+
+    right_hip_yaw: 0.0
+    right_hip_roll: 0.0
+    right_hip_pitch: 0.10
+    right_knee: -0.20
+    right_ankle: 0.10
+
+  gains:
+    kp_default: 10.0
+    kd_default: 0.5
+
+  torque_default: 0.0
+
+# Stronger crouch candidate
+default_pose_crouch_candidate:
+  positions:
+    left_hip_yaw: 0.0
+    left_hip_roll: 0.0
+    left_hip_pitch: -0.15
+    left_knee: 0.30
+    left_ankle: -0.15
+
+    neck_pitch: 0.0
+    head_pitch: 0.0
+    head_yaw: 0.0
+    head_roll: 0.0
+
+    right_hip_yaw: 0.0
+    right_hip_roll: 0.0
+    right_hip_pitch: 0.15
+    right_knee: -0.30
+    right_ankle: 0.15
+
+  gains:
+    kp_default: 10.0
+    kd_default: 0.5
+
+  torque_default: 0.0
