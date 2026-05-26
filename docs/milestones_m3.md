@@ -1,32 +1,32 @@
-# M3 Policy Inference Milestones
+# M3 Milestones
 
 ## M3.0 ONNX inspection
 
-- Inspect ONNX model inputs/outputs.
-- Confirm dummy inference works.
+- Inspect ONNX inputs and outputs.
+- Verify dummy inference.
 
 ## M3.1 Observation builder
 
-- Convert `RobotState` to `obs` with shape `[1, 101]`.
-- Keep policy action history.
+- Convert `RobotState` to `[1, 101]` ONNX observation.
 
 ## M3.2 Persistent ONNX policy wrapper
 
-- Load ONNX session once.
-- Prefer CUDAExecutionProvider when available.
-- Build observation from `RobotState`.
-- Return `continuous_actions` as shape `[14]`.
-- Do not control motors yet.
+- Load policy once.
+- Maintain action history through `ObservationBuilder`.
+- Return 14D action vectors.
 
-## M3.3 Action-to-command mapper
+## M3.3 Action-to-MotorCommand mapper
 
-- Convert 14 policy actions into `MotorCommand` position targets.
-- Apply action scale and limits.
+- Convert 14D policy action to motor target positions.
+- Use `default_pose + action_scale * action`.
+- Emit Soridormi `MotorCommand`.
+- Keep observation `motor_targets` up to date.
 
-## M3.4 `onnx_policy` runtime mode
+## M3.4 Experimental ONNX runtime mode
 
-- Run full `RobotState -> obs -> ONNX -> action -> MotorCommand` loop in simulation.
+- Add `SORIDORMI_RUNTIME_MODE=onnx_policy`.
+- Test first in fixed-base or zero-gravity debug mode.
 
-## M3.5 Policy evaluation in MuJoCo
+## M3.5 Normal MuJoCo policy test
 
 - Run with viewer, auto-reset, and MCAP logging.

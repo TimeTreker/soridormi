@@ -190,6 +190,26 @@ class ObservationBuilder:
         self.last_last_action = self.last_action.copy()
         self.last_action = action_arr.copy()
 
+    def set_motor_targets_by_name(self, targets_by_name: dict[str, float]) -> None:
+        """Update motor target values used in future observations.
+
+        The ONNX observation includes the most recent motor targets. M3.3's
+        action mapper produces these targets from the policy action vector.
+        Keeping this setter here avoids coupling OnnxPolicy to MotorCommand.
+        """
+        clean_targets = {str(name): float(value) for name, value in targets_by_name.items()}
+        self.config.motor_targets_by_name.update(clean_targets)
+
+    def set_motor_targets(self, joint_names: list[str], positions: list[float] | np.ndarray) -> None:
+        positions_arr = np.asarray(positions, dtype=np.float32)
+        if positions_arr.shape != (len(joint_names),):
+            raise ValueError(
+                f"positions must have shape ({len(joint_names)},), got {positions_arr.shape}"
+            )
+        self.set_motor_targets_by_name(
+            {name: float(value) for name, value in zip(joint_names, positions_arr)}
+        )
+
 
 def _load_actuator_names_from_config(path: Path) -> list[str]:
     if not path.exists():

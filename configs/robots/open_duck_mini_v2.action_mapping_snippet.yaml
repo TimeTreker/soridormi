@@ -1,0 +1,9 @@
+# Optional snippet for configs/robots/open_duck_mini_v2.yaml.
+# M3.3 uses these values to convert ONNX policy actions to MotorCommand targets.
+
+action_mapping:
+  action_scale: 0.25
+  kp_default: 10.0
+  kd_default: 0.5
+  torque_default: 0.0
+  clip_to_limits: true
