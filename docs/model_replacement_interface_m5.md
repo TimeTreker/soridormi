@@ -31,6 +31,79 @@ It fails if the profile's declared model IO shape is incompatible with the
 runtime observation/action sizes, or if an optional declared joint order does not
 match the robot contract.
 
+
+## M5.2 profile/model preflight gate
+
+`check_policy_model.sh --profile NAME` is the runtime preflight gate for model
+replacement. It now validates two layers before a policy is run:
+
+1. the static Soridormi contract exported by `policy_contract.py`; and
+2. the actual ONNX file input/output metadata.
+
+This means a profile fails fast if it declares an observation size, action size,
+model IO shape, dtype, or optional joint order that does not match Soridormi's
+runtime interface, even before MuJoCo or the runtime loop start.
+
+Run the gate directly:
+
+```bash
+./scripts/check_policy_model.sh --profile open_duck_forward
+```
+
+Use JSON output for CI or release automation:
+
+```bash
+./scripts/check_policy_model.sh --profile open_duck_forward --json
+```
+
+`run_policy_experiment.sh PROFILE` already calls this gate unless
+`SORIDORMI_SKIP_POLICY_CHECK=1` is set. Keep the skip flag for emergency local
+debugging only; replacement models should pass the preflight gate before runtime.
+
+
+## M5.3 ONNX execution providers
+
+Soridormi now uses one ONNX provider selection path for both runtime inference and
+`check_policy_model.sh`. By default it prefers CUDA when ONNX Runtime reports
+`CUDAExecutionProvider`, then keeps CPU as a fallback:
+
+```text
+CUDAExecutionProvider,CPUExecutionProvider
+```
+
+TensorRT is intentionally not selected by default even when available because it
+can introduce engine-build/cache behavior during policy-debug runs. Request it
+explicitly when you want to experiment with it.
+
+Check which providers are available and active for a profile:
+
+```bash
+./scripts/check_policy_model.sh --profile open_duck_forward
+```
+
+Force a provider order:
+
+```bash
+SORIDORMI_ONNX_PROVIDERS=CUDAExecutionProvider,CPUExecutionProvider \
+  ./scripts/check_policy_model.sh --profile open_duck_forward
+```
+
+Require GPU preflight failure if CUDA is not actually selected/activated:
+
+```bash
+./scripts/check_policy_model.sh \
+  --profile open_duck_forward \
+  --require-provider CUDAExecutionProvider
+```
+
+For CPU-only debugging:
+
+```bash
+./scripts/check_policy_model.sh --profile open_duck_forward --cpu
+# or
+SORIDORMI_USE_CUDA_PROVIDER=0 ./scripts/run_policy_experiment.sh open_duck_forward
+```
+
 ## Runtime contract
 
 Current Open Duck-compatible replacement models must use:

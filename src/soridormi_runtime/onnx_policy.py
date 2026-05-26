@@ -9,6 +9,7 @@ import onnxruntime as ort
 
 from soridormi_api import RobotState
 from soridormi_runtime.observation_builder import ObservationBuilder
+from soridormi_runtime.onnx_providers import resolve_onnx_providers, verify_active_providers
 
 
 DEFAULT_POLICY_PATH = Path("/workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx")
@@ -16,19 +17,10 @@ DEFAULT_POLICY_PATH = Path("/workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx")
 
 def choose_onnx_providers(prefer_cuda: bool = True) -> list[str]:
     """Choose ONNX Runtime providers for Soridormi policy inference."""
-    available = ort.get_available_providers()
-    providers: list[str] = []
-
-    if prefer_cuda and "CUDAExecutionProvider" in available:
-        providers.append("CUDAExecutionProvider")
-
-    if "CPUExecutionProvider" in available:
-        providers.append("CPUExecutionProvider")
-
-    if not providers:
-        raise RuntimeError(f"No supported ONNX Runtime providers found: {available}")
-
-    return providers
+    selection = resolve_onnx_providers(ort.get_available_providers(), prefer_cuda=prefer_cuda)
+    if not selection.ok:
+        raise RuntimeError("; ".join(selection.errors))
+    return selection.providers
 
 
 def resolve_policy_path(path: str | os.PathLike[str] | None = None) -> Path:
@@ -79,7 +71,17 @@ class OnnxPolicy:
             }
 
         self.policy_path = resolve_policy_path(policy_path)
-        self.providers = list(providers) if providers is not None else choose_onnx_providers(prefer_cuda)
+        if providers is not None:
+            self.providers = list(providers)
+            provider_selection_errors: list[str] = []
+            requested_providers = list(providers)
+        else:
+            provider_selection = resolve_onnx_providers(ort.get_available_providers(), prefer_cuda=prefer_cuda)
+            self.providers = provider_selection.providers
+            provider_selection_errors = list(provider_selection.errors)
+            requested_providers = provider_selection.requested
+        if provider_selection_errors:
+            raise RuntimeError("; ".join(provider_selection_errors))
         self.observation_builder = observation_builder or ObservationBuilder.from_robot_config(
             path=robot_config_path
         )
@@ -93,6 +95,15 @@ class OnnxPolicy:
         else:
             self.session = session_factory(str(self.policy_path), providers=self.providers)
 
+        active_providers = self._active_session_providers()
+        provider_errors = verify_active_providers(
+            active_providers,
+            requested=requested_providers,
+        )
+        if provider_errors:
+            raise RuntimeError("; ".join(provider_errors))
+        self.providers = active_providers or self.providers
+
         self.input_name = self._select_input_name(self.expected_input_name)
         self.output_name = self._select_output_name(self.expected_output_name)
         self._validate_io_contract_from_env()
@@ -100,6 +111,12 @@ class OnnxPolicy:
         self.last_observation_stats: dict[str, object] | None = None
         self.last_action: np.ndarray | None = None
         self.last_action_stats: dict[str, object] | None = None
+
+    def _active_session_providers(self) -> list[str]:
+        getter = getattr(self.session, "get_providers", None)
+        if callable(getter):
+            return [str(provider) for provider in getter()]
+        return list(self.providers)
 
     def _select_input_name(self, expected_name: str | None = None) -> str:
         inputs = self.session.get_inputs()

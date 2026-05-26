@@ -25,7 +25,9 @@ Current status:
 
 - M4 closed-loop parity work is validated through the first-divergence analyzer.
 - Official and Soridormi compared policy traces match for the checked window at strict thresholds after fixing policy-default/motor-target aliasing.
-- Next work moves to M5: model replacement interface hardening.
+- M5.1 exports the static model replacement contract.
+- M5.2 makes `check_policy_model.sh --profile NAME` a combined static-contract plus ONNX-file preflight gate.
+- M5.3 centralizes ONNX Runtime execution provider selection and adds CUDA/provider preflight enforcement.
 
 ## M5: Model replacement interface
 
@@ -35,7 +37,7 @@ Expected features:
 
 - `configs/policies/*.yaml` as source of truth.
 - Model path, input/output names, shapes, action scale, max motor velocity, phase config externalized.
-- `check_policy_model.sh --profile NAME` validates model contract.
+- `check_policy_model.sh --profile NAME` validates model contract and active ONNX execution providers.
 - `run_policy_experiment.sh PROFILE` runs the selected policy.
 - Observation/action contract documented.
 - Multiple profiles supported.
