@@ -7,7 +7,6 @@ from pathlib import Path
 import numpy as np
 
 from soridormi_api import IMUState, JointState, MotorCommand, RobotState
-
 from .mujoco_viewer import MujocoViewerHandle, env_flag
 from .robot_config import RobotConfig, load_robot_config
 
@@ -16,8 +15,8 @@ from .robot_config import RobotConfig, load_robot_config
 class FakeMujocoBackend:
     """Safe starter backend for API testing.
 
-    The fake backend can also be config-driven, so API tests and fake sim use the
-    same joint names as the real robot model.
+    The fake backend can also be config-driven, so API tests and fake sim use
+    the same joint names as the real robot model.
     """
 
     config: RobotConfig = field(default_factory=load_robot_config)
@@ -74,8 +73,8 @@ class FakeMujocoBackend:
 class MujocoBackend:
     """Config-driven MuJoCo backend.
 
-    Robot-specific details live in configs/robots/*.yaml. This backend should stay
-    generic so changing robot models does not require changing Python code.
+    Robot-specific details live in configs/robots/*.yaml. This backend should
+    stay generic so changing robot models does not require changing Python code.
     """
 
     def __init__(
@@ -103,7 +102,6 @@ class MujocoBackend:
         self.joint_names = [self._joint_name(joint_id) for joint_id in self.joint_ids]
         self.qpos_addrs = [int(self.model.jnt_qposadr[joint_id]) for joint_id in self.joint_ids]
         self.qvel_addrs = [int(self.model.jnt_dofadr[joint_id]) for joint_id in self.joint_ids]
-
         self.ctrl_min = np.array(self.model.actuator_ctrlrange[:, 0], dtype=float)
         self.ctrl_max = np.array(self.model.actuator_ctrlrange[:, 1], dtype=float)
 
@@ -111,6 +109,17 @@ class MujocoBackend:
         self._apply_startup_debug_options()
         self._initialize_ctrl_from_current_qpos()
         mujoco.mj_forward(self.model, self.data)
+
+        self.fixed_base_enabled = env_flag(
+            self.config.debug.fixed_base.enabled_env,
+            default=False,
+        )
+        self.fixed_base_qpos_slices = self._capture_fixed_base_qpos_slices()
+        if self.fixed_base_enabled:
+            print(
+                "MuJoCo fixed-base debug mode enabled via "
+                f"{self.config.debug.fixed_base.enabled_env}=1"
+            )
 
         self.viewer = MujocoViewerHandle(
             model=self.model,
@@ -168,6 +177,42 @@ class MujocoBackend:
             self.model.opt.gravity[:] = 0.0
             print(f"MuJoCo zero-gravity debug mode enabled via {zero_gravity_env}=1")
 
+    def _capture_fixed_base_qpos_slices(self) -> dict[str, np.ndarray]:
+        base = self.config.base
+        xyz_start, xyz_stop = base.qpos_xyz_slice
+        quat_start, quat_stop = base.qpos_quat_wxyz_slice
+        lin_start, lin_stop = base.qvel_linear_slice
+        ang_start, ang_stop = base.qvel_angular_slice
+
+        return {
+            "qpos_xyz": np.array(self.data.qpos[xyz_start:xyz_stop], dtype=float),
+            "qpos_quat_wxyz": np.array(self.data.qpos[quat_start:quat_stop], dtype=float),
+            "qvel_linear": np.array(self.data.qvel[lin_start:lin_stop], dtype=float),
+            "qvel_angular": np.array(self.data.qvel[ang_start:ang_stop], dtype=float),
+        }
+
+    def _enforce_fixed_base_debug(self) -> None:
+        """Hold the floating base at its reset/start pose.
+
+        This is intentionally a debug-only mode. It is useful for inspecting
+        joint pose, actuator directions, and default-pose tuning while gravity
+        remains enabled, but it should not be used as a realistic dynamics mode.
+        """
+        if not self.fixed_base_enabled:
+            return
+
+        base = self.config.base
+        xyz_start, xyz_stop = base.qpos_xyz_slice
+        quat_start, quat_stop = base.qpos_quat_wxyz_slice
+        lin_start, lin_stop = base.qvel_linear_slice
+        ang_start, ang_stop = base.qvel_angular_slice
+
+        self.data.qpos[xyz_start:xyz_stop] = self.fixed_base_qpos_slices["qpos_xyz"]
+        self.data.qpos[quat_start:quat_stop] = self.fixed_base_qpos_slices["qpos_quat_wxyz"]
+        self.data.qvel[lin_start:lin_stop] = 0.0
+        self.data.qvel[ang_start:ang_stop] = 0.0
+        self.mujoco.mj_forward(self.model, self.data)
+
     def _initialize_ctrl_from_current_qpos(self) -> None:
         """Initialize actuator controls to the model's current joint pose.
 
@@ -177,10 +222,12 @@ class MujocoBackend:
         """
         for actuator_index, qpos_addr in enumerate(self.qpos_addrs):
             target = float(self.data.qpos[qpos_addr])
+
             if self.config.control.clip_to_ctrlrange:
                 target = float(
                     np.clip(target, self.ctrl_min[actuator_index], self.ctrl_max[actuator_index])
                 )
+
             self.data.ctrl[actuator_index] = target
 
     def _load_and_validate_actuator_names(self) -> list[str]:
@@ -196,6 +243,7 @@ class MujocoBackend:
         expected = self.config.actuator_names
         missing = [name for name in expected if name not in model_names]
         extra = [name for name in model_names if name not in expected]
+
         if missing or extra:
             raise ValueError(
                 "MuJoCo actuator names do not match robot config. "
@@ -209,6 +257,7 @@ class MujocoBackend:
                 "Config actuator order must match MuJoCo actuator order for now. "
                 f"model_names={model_names}, expected={expected}"
             )
+
         return model_names
 
     def _load_actuator_joint_ids(self) -> list[int]:
@@ -234,6 +283,7 @@ class MujocoBackend:
 
         for _ in range(self.substeps_per_api_step):
             self.mujoco.mj_step(self.model, self.data)
+            self._enforce_fixed_base_debug()
 
         if self.config.viewer.sync_every_api_step:
             self.viewer.sync()
@@ -274,10 +324,12 @@ class MujocoBackend:
                 continue
 
             target = float(command_values[actuator_name])
+
             if self.config.control.clip_to_ctrlrange:
                 target = float(
                     np.clip(target, self.ctrl_min[actuator_index], self.ctrl_max[actuator_index])
                 )
+
             self.data.ctrl[actuator_index] = target
 
     def close(self) -> None:

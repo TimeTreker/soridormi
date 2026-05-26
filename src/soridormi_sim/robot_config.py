@@ -74,8 +74,19 @@ class ZeroGravityDebugConfig(BaseModel):
     enabled_env: str = "SORIDORMI_MUJOCO_ZERO_GRAVITY"
 
 
+class FixedBaseDebugConfig(BaseModel):
+    """Debug-only option for keeping the floating base fixed.
+
+    This is not physically realistic. It is meant for visually checking joint
+    signs, default poses, and command mapping while gravity remains enabled.
+    """
+
+    enabled_env: str = "SORIDORMI_MUJOCO_FIXED_BASE"
+
+
 class DebugConfig(BaseModel):
     zero_gravity: ZeroGravityDebugConfig = Field(default_factory=ZeroGravityDebugConfig)
+    fixed_base: FixedBaseDebugConfig = Field(default_factory=FixedBaseDebugConfig)
 
 
 class ResetBasePoseConfig(BaseModel):
@@ -116,8 +127,8 @@ class DefaultPoseGainsConfig(BaseModel):
 class DefaultPoseConfig(BaseModel):
     """Optional runtime default pose config.
 
-    The runtime standing controller still reads this directly from YAML for now,
-    but validating it here catches malformed robot config files earlier.
+    The runtime standing controller still reads this directly from YAML for
+    now, but validating it here catches malformed robot config files earlier.
     """
 
     positions: dict[str, float] = Field(default_factory=dict)
@@ -163,6 +174,7 @@ def resolve_robot_config_path(path: str | os.PathLike[str] | None = None) -> Pat
 
 def load_robot_config(path: str | os.PathLike[str] | None = None) -> RobotConfig:
     config_path = resolve_robot_config_path(path)
+
     if not config_path.exists():
         raise FileNotFoundError(
             f"Robot config file not found: {config_path}. "

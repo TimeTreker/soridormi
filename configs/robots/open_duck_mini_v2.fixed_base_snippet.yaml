@@ -1,0 +1,9 @@
+# Optional debug snippet for configs/robots/open_duck_mini_v2.yaml.
+# Merge this under the existing top-level config if you want explicit names.
+# The defaults are the same, so this snippet is optional.
+
+debug:
+  zero_gravity:
+    enabled_env: SORIDORMI_MUJOCO_ZERO_GRAVITY
+  fixed_base:
+    enabled_env: SORIDORMI_MUJOCO_FIXED_BASE
