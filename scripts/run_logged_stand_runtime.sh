@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+SORIDORMI_RUNTIME_LOG=${SORIDORMI_RUNTIME_LOG:-1} \
+SORIDORMI_RUNTIME_LOG_FORMAT=${SORIDORMI_RUNTIME_LOG_FORMAT:-mcap} \
+SORIDORMI_RUNTIME_LOG_DIR=${SORIDORMI_RUNTIME_LOG_DIR:-/data/logs} \
+SORIDORMI_RUNTIME_MODE=${SORIDORMI_RUNTIME_MODE:-stand} \
+./scripts/run_runtime_loop.sh

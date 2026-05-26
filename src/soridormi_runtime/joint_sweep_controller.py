@@ -6,7 +6,6 @@ import time
 
 from soridormi_api import MotorCommand, RobotState
 
-
 TRUE_VALUES = {"1", "true", "yes", "on", "y"}
 
 
@@ -25,15 +24,7 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 
 class JointSweepController:
-    """Sweep one actuator at a time for visual joint-direction validation.
-
-    The controller records the first observed joint pose, holds all joints near
-    that pose, and applies a smooth sine offset to one selected joint.
-
-    Useful with:
-      SORIDORMI_MUJOCO_ZERO_GRAVITY=1
-      SORIDORMI_MUJOCO_VIEWER=1
-    """
+    """Sweep one actuator at a time for visual joint-direction validation."""
 
     def __init__(self) -> None:
         self.amplitude = _env_float("SORIDORMI_JOINT_SWEEP_AMPLITUDE", 0.20)
@@ -54,8 +45,7 @@ class JointSweepController:
 
         if self.initial_positions_by_name is None:
             self.initial_positions_by_name = {
-                name: float(pos)
-                for name, pos in zip(state.joints.names, state.joints.positions)
+                name: float(pos) for name, pos in zip(state.joints.names, state.joints.positions)
             }
             self.joint_names = names
             print(f"Joint sweep initialized with {n} joints:")
@@ -76,7 +66,6 @@ class JointSweepController:
 
         joint_index = int(elapsed // segment_seconds)
         joint_index = max(0, min(joint_index, len(self.joint_names) - 1))
-
         segment_t = elapsed - joint_index * segment_seconds
         active_joint = self.joint_names[joint_index]
 
@@ -84,7 +73,6 @@ class JointSweepController:
             self._last_printed_joint_index = joint_index
             print(f"\nSweeping joint {joint_index:02d}: {active_joint}")
 
-        # First hold briefly at neutral, then sweep smoothly.
         if segment_t < self.hold_seconds:
             offset = 0.0
         else:
@@ -92,14 +80,9 @@ class JointSweepController:
             offset = self.amplitude * math.sin(2.0 * math.pi * phase)
 
         target_positions: list[float] = []
-
         for i, name in enumerate(names):
             base = self.initial_positions_by_name.get(name, float(state.joints.positions[i]))
-
-            if name == active_joint:
-                target_positions.append(base + offset)
-            else:
-                target_positions.append(base)
+            target_positions.append(base + offset if name == active_joint else base)
 
         return MotorCommand(
             names=names,

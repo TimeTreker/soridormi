@@ -10,6 +10,7 @@ dependencies = [
     "pyzmq>=25",
     "rich>=13",
     "PyYAML>=6",
+    "mcap>=1.2",
 ]
 
 [project.optional-dependencies]
