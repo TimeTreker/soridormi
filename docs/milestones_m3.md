@@ -57,3 +57,21 @@ Adds `soridormi_runtime.analyze_policy_log` and
 detect robot-time reset cycles, and report action/motor/observation statistics.
 Use this before tuning walking parameters after repeated falls.
 
+## M3.8 Policy tuning profiles and log comparison
+
+Status: added repeatable ONNX policy tuning profiles and comparison tooling.
+
+Goals:
+
+- Run named policy profiles instead of hand-editing multiple env vars.
+- Give each runtime log a profile-specific prefix.
+- Compare MCAP/JSONL logs by reset cycles, survival duration, action stats, and runtime settings.
+
+Main commands:
+
+```bash
+./scripts/list_policy_tuning_profiles.sh
+./scripts/run_onnx_profile_runtime.sh crawl_safe
+./scripts/compare_policy_logs.sh
+```
+

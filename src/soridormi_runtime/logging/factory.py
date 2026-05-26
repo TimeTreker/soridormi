@@ -13,16 +13,17 @@ def make_runtime_logger_from_env(*, mode: str, backend: str) -> RuntimeLogger:
     log_format = os.environ.get("SORIDORMI_RUNTIME_LOG_FORMAT", "mcap").strip().lower()
     log_dir = default_log_dir()
     every_n = env_int("SORIDORMI_RUNTIME_LOG_EVERY_N", 1)
+    prefix = os.environ.get("SORIDORMI_RUNTIME_LOG_PREFIX", "runtime").strip() or "runtime"
 
     if log_format == "jsonl":
-        logger = JsonlRuntimeLogger(log_dir=log_dir, every_n=every_n)
+        logger = JsonlRuntimeLogger(log_dir=log_dir, every_n=every_n, prefix=prefix)
         print(f"Soridormi JSONL runtime logger: {logger.path}")
         return logger
 
     if log_format == "mcap":
         from .mcap_logger import McapRuntimeLogger
 
-        logger = McapRuntimeLogger(log_dir=log_dir, every_n=every_n, mode=mode, backend=backend)
+        logger = McapRuntimeLogger(log_dir=log_dir, every_n=every_n, prefix=prefix, mode=mode, backend=backend)
         print(f"Soridormi MCAP runtime logger: {logger.path}")
         return logger
 
