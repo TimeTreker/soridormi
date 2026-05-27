@@ -160,3 +160,21 @@ Adds an explicit offline promotion gate after the M6.8 leaderboard. The command 
 ./scripts/promote_policy_candidate.sh data/policy_candidate_leaderboards/latest \
   --target-profile promoted_linear_bc
 ```
+
+
+### M6.10 - Bounded policy rollout smoke harness
+
+Status: implemented.
+
+Adds finite runtime rollout controls (`SORIDORMI_MAX_STEPS` and `SORIDORMI_MAX_SECONDS`) plus `run_policy_rollout_smoke.sh`, a preflighted wrapper for running promoted/replacement profiles against an already-running simulator without needing manual Ctrl-C. This keeps M6 candidate validation bounded and scriptable before longer MuJoCo trials.
+
+```bash
+./scripts/run_policy_rollout_smoke.sh promoted_linear_bc \
+  --steps 500 \
+  --require-provider CUDAExecutionProvider
+```
+
+
+### M6.11: bounded rollout acceptance
+
+Adds `accept_policy_rollout.sh` / `soridormi_runtime.rollout_acceptance` to convert bounded rollout logs into pass/fail JSON and Markdown reports with thresholds for policy record count, duration, resets, action magnitude, joint magnitude, and optional base displacement.

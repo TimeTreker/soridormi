@@ -5,6 +5,7 @@ ARG USER_ID=1000
 ARG GROUP_ID=1000
 ARG USERNAME=chromie
 ARG RUNTIME_EXTRA=runtime-gpu
+ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
@@ -70,6 +71,9 @@ WORKDIR /app
 RUN uv venv --python python3 /opt/venvs/runtime \
     && uv pip install --python /opt/venvs/runtime/bin/python --upgrade pip setuptools wheel \
     && uv pip install --python /opt/venvs/runtime/bin/python -e "/app[${RUNTIME_EXTRA},dev]" \
+    && if printf ',%s,' "${RUNTIME_EXTRA}" | grep -q ',training,'; then \
+        uv pip install --python /opt/venvs/runtime/bin/python torch --index-url "${PYTORCH_INDEX_URL}"; \
+    fi \
     && touch /opt/venvs/runtime/.soridormi_runtime_image_env
 
 RUN echo 'alias runtime="source /opt/venvs/runtime/bin/activate"' >> ~/.bashrc \

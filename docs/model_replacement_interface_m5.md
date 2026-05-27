@@ -511,3 +511,23 @@ After ranking evaluated candidates with `rank_policy_candidates.sh`, promote the
 ```
 
 The promotion command reads `candidate_leaderboard.json`, selects the best promotable candidate by default, copies the source profile YAML, updates its `name`, `description`, logging prefix, and promotion metadata, validates the promoted 101D/14D policy contract, and writes a JSON/Markdown promotion record under `data/policy_promotions/`. It refuses non-promotable candidates unless `--allow-non-promotable` is passed.
+
+
+## M6.10 bounded rollout smoke
+
+After a profile is promoted, run a finite smoke rollout instead of an open-ended runtime loop:
+
+```bash
+SORIDORMI_SIM_BACKEND=mujoco ./scripts/run_sim_server.sh
+
+./scripts/run_policy_rollout_smoke.sh promoted_linear_bc \
+  --steps 500 \
+  --require-provider CUDAExecutionProvider
+```
+
+The wrapper performs the normal policy model preflight, exports `SORIDORMI_MAX_STEPS` / `SORIDORMI_MAX_SECONDS`, and then delegates to `run_policy_experiment.sh`. The simulator still runs separately.
+
+
+### M6.11: bounded rollout acceptance
+
+Adds `accept_policy_rollout.sh` / `soridormi_runtime.rollout_acceptance` to convert bounded rollout logs into pass/fail JSON and Markdown reports with thresholds for policy record count, duration, resets, action magnitude, joint magnitude, and optional base displacement.

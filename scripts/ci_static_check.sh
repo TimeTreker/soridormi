@@ -148,6 +148,15 @@ python -m soridormi_runtime.promote_policy_candidate "${tmpdir}/candidate_leader
   --robot-config "${robot_config}" \
   --json >/dev/null
 
+echo "Checking bounded rollout smoke wrapper..."
+./scripts/run_policy_rollout_smoke.sh --help >/dev/null
+./scripts/accept_policy_rollout.sh --help >/dev/null
+python -m soridormi_runtime.rollout_acceptance "${tmpdir}/runtime_training_smoke.jsonl" \
+  --output-dir "${tmpdir}/rollout_acceptance" \
+  --min-policy-records 2 \
+  --min-robot-duration 0.01 \
+  --json >/dev/null
+
 if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
   echo "Running M5 unit tests..."
   pytest -q \
@@ -169,5 +178,7 @@ if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
     tests/test_linear_behavior_clone_policy_m65.py \
     tests/test_evaluate_policy_profile_m66.py \
     tests/test_policy_candidate_leaderboard_m68.py \
-    tests/test_promote_policy_candidate_m69.py
+    tests/test_promote_policy_candidate_m69.py \
+    tests/test_runtime_limits_m610.py \
+    tests/test_rollout_acceptance_m611.py
 fi

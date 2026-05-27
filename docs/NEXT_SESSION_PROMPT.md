@@ -54,3 +54,13 @@ Use `./scripts/create_linear_bc_profile.sh NAME --model data/training_runs/.../l
 Use `./scripts/evaluate_policy_profile.sh PROFILE PREPARED_DATASET` after creating a runtime profile. It evaluates ONNX or `linear_behavior_clone` policies against prepared train/val/test supervised splits, writes `evaluation.json` and `evaluation_report.md`, optionally writes prediction JSONL files, and supports threshold flags such as `--max-test-mae` for offline acceptance before MuJoCo rollout.
 
 M6.8 added `rank_policy_candidates.sh`, an offline leaderboard for evaluated replacement-policy candidates. Use it after `run_training_pipeline.sh` to rank multiple candidates and fail when no candidate satisfies promotion thresholds. M6.9 added `promote_policy_candidate.sh`, which turns a promotable leaderboard candidate into a named runtime profile YAML and writes auditable promotion records without launching simulation.
+
+
+## Latest status: M6.10 bounded rollout smoke
+
+Runtime can now stop automatically using `SORIDORMI_MAX_STEPS` or `SORIDORMI_MAX_SECONDS`. Use `./scripts/run_policy_rollout_smoke.sh PROFILE --steps N` after starting the simulator to run finite replacement-policy smoke trials.
+
+
+### M6.11: bounded rollout acceptance
+
+Adds `accept_policy_rollout.sh` / `soridormi_runtime.rollout_acceptance` to convert bounded rollout logs into pass/fail JSON and Markdown reports with thresholds for policy record count, duration, resets, action magnitude, joint magnitude, and optional base displacement.

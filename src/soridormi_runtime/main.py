@@ -13,6 +13,7 @@ from .joint_sweep_controller import JointSweepController
 from .logging import make_runtime_logger_from_env
 from .onnx_policy_controller import OnnxPolicyController
 from .standing_controller import StandingPoseController
+from .runtime_limits import runtime_limit_reached, runtime_limits_from_env
 
 console = Console()
 
@@ -88,6 +89,7 @@ def main() -> None:
     backend = os.environ.get("SORIDORMI_BACKEND", "sim")
     mode = os.environ.get("SORIDORMI_RUNTIME_MODE", "hold")
     sync_step = _env_bool("SORIDORMI_SIM_SYNC_STEP", default=False)
+    limits = runtime_limits_from_env()
 
     robot = make_robot()
     if _env_bool("SORIDORMI_RESET_AT_START", default=False):
@@ -111,7 +113,12 @@ def main() -> None:
         console.print("Simulator synchronous step mode: enabled")
 
     step_index = 0
+    loop_started_at = time.monotonic()
     state = robot.read_state() if sync_step else None
+    if limits.max_steps is not None:
+        console.print(f"Runtime max steps: {limits.max_steps}")
+    if limits.max_seconds is not None:
+        console.print(f"Runtime max seconds: {limits.max_seconds:.3f}")
 
     try:
         while True:
@@ -151,7 +158,11 @@ def main() -> None:
                 state = next_state
 
             step_index += 1
-            elapsed = time.monotonic() - start
+            now = time.monotonic()
+            if runtime_limit_reached(completed_steps=step_index, started_at=loop_started_at, now=now, limits=limits):
+                console.print(f"\n[green]Runtime limit reached after {step_index} steps.[/green]")
+                break
+            elapsed = now - start
             time.sleep(max(0.0, dt - elapsed))
     except KeyboardInterrupt:
         console.print("\n[yellow]Runtime loop stopped by user.[/yellow]")

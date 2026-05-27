@@ -20,6 +20,14 @@ runtime = [
 runtime-gpu = [
     "onnxruntime-gpu>=1.20",
 ]
+
+training = [
+    # PyTorch itself is installed from the selected CUDA wheel index by
+    # docker/runtime/Dockerfile when RUNTIME_EXTRA contains "training".
+    # Keeping it out of this extra avoids accidentally installing a CPU
+    # or mismatched CUDA wheel from the default index.
+    "onnx>=1.16",
+]
 sim = [
     "mujoco>=3.1",
     # Required for the official Open Duck Playground baseline runner.

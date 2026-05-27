@@ -6,6 +6,7 @@ services:
       args:
         BASE_IMAGE: ${RUNTIME_DEV_BASE:-nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04}
         RUNTIME_EXTRA: ${RUNTIME_DEV_EXTRA:-runtime-gpu}
+        PYTORCH_INDEX_URL: ${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu128}
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
         USERNAME: ${CONTAINER_USER:-chromie}
@@ -81,6 +82,8 @@ services:
       SORIDORMI_COMMAND_RAMP_SECONDS: ${SORIDORMI_COMMAND_RAMP_SECONDS:-0.0}
       SORIDORMI_RESET_AT_START: ${SORIDORMI_RESET_AT_START:-0}
       SORIDORMI_SIM_SYNC_STEP: ${SORIDORMI_SIM_SYNC_STEP:-0}
+      SORIDORMI_MAX_STEPS: ${SORIDORMI_MAX_STEPS:-0}
+      SORIDORMI_MAX_SECONDS: ${SORIDORMI_MAX_SECONDS:-0}
     volumes:
       - ./src:/app/src
       - ./configs:/app/configs:${SORIDORMI_CONFIGS_MOUNT_MODE:-ro}
