@@ -301,6 +301,51 @@ acceptance_report.md
 The acceptance gate still does not start MuJoCo. It is the last cheap preflight
 before running `run_policy_experiment.sh PROFILE`.
 
+
+## M5.9 replacement package and verifier
+
+Use the package workflow when a replacement profile is ready to move between
+machines, releases, or review sessions. It wraps the M5.8 acceptance artifacts
+and the profile YAML into a deterministic handoff tarball with file hashes. The
+ONNX model is not embedded by default, so source-only packages remain small.
+
+```bash
+./scripts/package_policy_profile.sh my_replacement
+```
+
+Packages are written under `data/policy_packages/` by default when using the
+Docker wrapper and have the suffix `.policy.tar.gz`. Each package contains:
+
+```text
+profile.yaml
+package_manifest.json
+artifacts/contract.json
+artifacts/manifest.json
+artifacts/profile_suite.json
+artifacts/acceptance.json
+artifacts/acceptance_report.md
+```
+
+Verify a package before sharing or importing it into another checkout:
+
+```bash
+./scripts/verify_policy_package.sh data/policy_packages/my_replacement_*.policy.tar.gz
+```
+
+For release packages where the ONNX file should travel with the profile, embed
+and require the model artifact:
+
+```bash
+./scripts/package_policy_profile.sh my_replacement \
+  --include-model \
+  --require-model \
+  --check-model \
+  --require-provider CUDAExecutionProvider
+```
+
+The verifier checks the package manifest, required files, file sizes, and SHA256
+hashes. It does not run MuJoCo or execute the policy.
+
 ## Runtime contract
 
 Current Open Duck-compatible replacement models must use:

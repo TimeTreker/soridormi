@@ -76,6 +76,11 @@ python -m soridormi_runtime.validate_policy_profiles "${tmpdir}/ci_replacement.y
 python -m soridormi_runtime.policy_manifest "${tmpdir}/ci_replacement.yaml" --robot-config "${robot_config}" --json >/dev/null
 python -m soridormi_runtime.policy_acceptance "${tmpdir}/ci_replacement.yaml" --robot-config "${robot_config}" --profile-only --output-dir "${tmpdir}/acceptance" --json >/dev/null
 
+echo "Checking replacement-policy package workflow..."
+python -m soridormi_runtime.policy_package package "${tmpdir}/ci_replacement.yaml"   --robot-config "${robot_config}"   --output-dir "${tmpdir}/packages"   --json >/dev/null
+package_path="$(find "${tmpdir}/packages" -name '*.policy.tar.gz' -print -quit)"
+python -m soridormi_runtime.policy_package verify "${package_path}" --json >/dev/null
+
 if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
   echo "Running M5 unit tests..."
   pytest -q \
@@ -86,5 +91,5 @@ if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
     tests/test_create_policy_profile_m54.py \
     tests/test_validate_policy_profiles_m55.py \
     tests/test_ci_static_check_m56.py \
-    tests/test_policy_manifest_m57.py
+    tests/test_policy_manifest_m57.py     tests/test_policy_acceptance_m58.py     tests/test_policy_package_m59.py
 fi

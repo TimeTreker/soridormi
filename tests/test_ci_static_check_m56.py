@@ -32,3 +32,4 @@ def test_ci_static_check_script_smoke_without_pytest() -> None:
     assert "Validating policy profile suite" in result.stdout
     assert "Exporting canonical policy manifest" in result.stdout
     assert "Checking replacement-profile scaffold workflow" in result.stdout
+    assert "Checking replacement-policy package workflow" in result.stdout
