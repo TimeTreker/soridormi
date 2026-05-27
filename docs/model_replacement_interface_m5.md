@@ -499,3 +499,15 @@ After one or more M6 training pipelines have produced evaluation artifacts, rank
 ```
 
 The leaderboard scans `evaluation.json` files, ranks promotable candidates by test MAE/RMSE, and writes `candidate_leaderboard.json` plus `candidate_leaderboard.md`. This is a selection/reporting gate only; it does not edit policy YAML, install packages, or run MuJoCo.
+
+## M6.9 policy candidate promotion
+
+After ranking evaluated candidates with `rank_policy_candidates.sh`, promote the best candidate to a named runtime profile without launching simulation:
+
+```bash
+./scripts/promote_policy_candidate.sh data/policy_candidate_leaderboards/latest \
+  --target-profile promoted_linear_bc \
+  --force
+```
+
+The promotion command reads `candidate_leaderboard.json`, selects the best promotable candidate by default, copies the source profile YAML, updates its `name`, `description`, logging prefix, and promotion metadata, validates the promoted 101D/14D policy contract, and writes a JSON/Markdown promotion record under `data/policy_promotions/`. It refuses non-promotable candidates unless `--allow-non-promotable` is passed.

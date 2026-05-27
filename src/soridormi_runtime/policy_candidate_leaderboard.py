@@ -46,6 +46,7 @@ class CandidateSummary:
     output_dir: str | None
     ok: bool
     promotable: bool
+    profile_path: str | None = None
     model_kind: str | None = None
     model_path: str | None = None
     model_sha256: str | None = None
@@ -157,6 +158,7 @@ def _candidate_from_evaluation(path: Path, payload: dict[str, Any], thresholds: 
         output_dir=str(payload.get("output_dir")) if payload.get("output_dir") is not None else None,
         ok=ok,
         promotable=ok and not threshold_errors,
+        profile_path=str(payload.get("profile_path")) if payload.get("profile_path") is not None else None,
         model_kind=str(payload.get("model_kind")) if payload.get("model_kind") is not None else None,
         model_path=str(payload.get("model_path")) if payload.get("model_path") is not None else None,
         model_sha256=str(payload.get("model_sha256")) if payload.get("model_sha256") is not None else None,

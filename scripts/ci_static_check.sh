@@ -141,6 +141,12 @@ python -m soridormi_runtime.policy_candidate_leaderboard "${tmpdir}/policy_evalu
   --max-test-mae 1.0 \
   --require-promotable \
   --json >/dev/null
+python -m soridormi_runtime.promote_policy_candidate "${tmpdir}/candidate_leaderboard" \
+  --target-profile ci_promoted_linear_bc \
+  --output-dir "${tmpdir}/promoted_profiles" \
+  --records-dir "${tmpdir}/policy_promotions" \
+  --robot-config "${robot_config}" \
+  --json >/dev/null
 
 if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
   echo "Running M5 unit tests..."
@@ -162,5 +168,6 @@ if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
     tests/test_train_behavior_clone_m64.py \
     tests/test_linear_behavior_clone_policy_m65.py \
     tests/test_evaluate_policy_profile_m66.py \
-    tests/test_policy_candidate_leaderboard_m68.py
+    tests/test_policy_candidate_leaderboard_m68.py \
+    tests/test_promote_policy_candidate_m69.py
 fi

@@ -149,3 +149,14 @@ Adds an offline candidate-ranking gate after training/evaluation. The command sc
   --max-test-mae 0.05 \
   --require-promotable
 ```
+
+### M6.9 - Policy candidate promotion
+
+Status: implemented.
+
+Adds an explicit offline promotion gate after the M6.8 leaderboard. The command promotes a selected leaderboard candidate into a named runtime profile YAML, writes auditable promotion records, validates the promoted policy contract, and does not launch MuJoCo or modify backend behavior.
+
+```bash
+./scripts/promote_policy_candidate.sh data/policy_candidate_leaderboards/latest \
+  --target-profile promoted_linear_bc
+```

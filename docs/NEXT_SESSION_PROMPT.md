@@ -53,4 +53,4 @@ Use `./scripts/create_linear_bc_profile.sh NAME --model data/training_runs/.../l
 
 Use `./scripts/evaluate_policy_profile.sh PROFILE PREPARED_DATASET` after creating a runtime profile. It evaluates ONNX or `linear_behavior_clone` policies against prepared train/val/test supervised splits, writes `evaluation.json` and `evaluation_report.md`, optionally writes prediction JSONL files, and supports threshold flags such as `--max-test-mae` for offline acceptance before MuJoCo rollout.
 
-M6.8 added `rank_policy_candidates.sh`, an offline leaderboard for evaluated replacement-policy candidates. Use it after `run_training_pipeline.sh` to rank multiple candidates and fail when no candidate satisfies promotion thresholds.
+M6.8 added `rank_policy_candidates.sh`, an offline leaderboard for evaluated replacement-policy candidates. Use it after `run_training_pipeline.sh` to rank multiple candidates and fail when no candidate satisfies promotion thresholds. M6.9 added `promote_policy_candidate.sh`, which turns a promotable leaderboard candidate into a named runtime profile YAML and writes auditable promotion records without launching simulation.
