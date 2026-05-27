@@ -441,3 +441,7 @@ The command writes a JSONL dataset under `data/training_datasets/` by default, p
 ## M6 dataset preparation handoff
 
 After accepting and packaging a replacement profile, M6 training data can be exported from runtime logs with `./scripts/export_training_dataset.sh` and prepared with `./scripts/prepare_training_dataset.sh`. The preparation step validates the 101D observation and 14D action vectors, checks finite numeric values, and writes deterministic train/val/test split files plus `prepared_manifest.json`.
+
+## M6.4 behavior cloning baseline trainer
+
+Use `./scripts/train_behavior_clone.sh PREPARED_DATASET` after dataset preparation and summarization. The trainer fits a deterministic linear ridge-regression behavior-cloning baseline from normalized observations to normalized actions, then saves a NumPy `.npz` artifact plus metrics/report files. This gives M6 a reproducible offline learning smoke test before adding heavier neural training or ONNX export.

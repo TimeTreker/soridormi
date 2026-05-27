@@ -123,3 +123,7 @@ Adds `./scripts/prepare_training_dataset.sh DATASET.jsonl`, which validates supe
 ## M6.3 training dataset statistics/normalization
 
 Adds `./scripts/summarize_training_dataset.sh PREPARED_DATASET`, which reads a prepared train/val/test dataset directory or `prepared_manifest.json`, validates split files, writes `dataset_stats.json`, writes train-split normalization statistics to `normalization.json`, and emits a Markdown report. Normalization is computed from the train split only so downstream training and ONNX export can reference a deterministic preprocessing artifact.
+
+## M6.4 behavior cloning baseline trainer
+
+Adds `./scripts/train_behavior_clone.sh PREPARED_DATASET`, a deterministic NumPy ridge-regression behavior-cloning baseline. It consumes M6.2 prepared splits plus M6.3 normalization artifacts and writes `linear_behavior_clone.npz`, `train_metrics.json`, and `train_report.md`. This is an offline sanity baseline for data plumbing; it does not alter runtime control or claim to replace full RL training.

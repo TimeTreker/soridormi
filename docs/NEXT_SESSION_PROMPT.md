@@ -40,3 +40,7 @@ Use `./scripts/prepare_training_dataset.sh DATASET.jsonl` after exporting superv
 ## M6.3 training dataset statistics/normalization
 
 Use `./scripts/summarize_training_dataset.sh PREPARED_DATASET` after `prepare_training_dataset.sh`. It computes split-level observation/action statistics, train-only normalization vectors, SHA256 metadata, and a Markdown report. This is still offline training data plumbing; do not alter runtime/backend behavior.
+
+## M6.4 behavior cloning baseline trainer
+
+Use `./scripts/train_behavior_clone.sh PREPARED_DATASET` after `summarize_training_dataset.sh`. It trains a deterministic NumPy linear behavior-cloning baseline and writes model/metrics/report artifacts. Keep this as an offline training-pipeline smoke test; do not change runtime/backend behavior unless trace evidence requires it.
