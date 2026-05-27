@@ -59,6 +59,9 @@ python -m soridormi_runtime.policy_contract open_duck_forward --robot-config "${
 echo "Validating policy profile suite..."
 python -m soridormi_runtime.validate_policy_profiles --robot-config "${robot_config}"
 
+echo "Exporting canonical policy manifest..."
+python -m soridormi_runtime.policy_manifest open_duck_forward --robot-config "${robot_config}" --json >/dev/null
+
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "${tmpdir}"' EXIT
 
@@ -70,6 +73,8 @@ python -m soridormi_runtime.create_policy_profile ci_replacement \
   --output "${tmpdir}/ci_replacement.yaml" \
   --robot-config "${robot_config}"
 python -m soridormi_runtime.validate_policy_profiles "${tmpdir}/ci_replacement.yaml" --robot-config "${robot_config}"
+python -m soridormi_runtime.policy_manifest "${tmpdir}/ci_replacement.yaml" --robot-config "${robot_config}" --json >/dev/null
+python -m soridormi_runtime.policy_acceptance "${tmpdir}/ci_replacement.yaml" --robot-config "${robot_config}" --profile-only --output-dir "${tmpdir}/acceptance" --json >/dev/null
 
 if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
   echo "Running M5 unit tests..."
@@ -80,5 +85,6 @@ if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
     tests/test_onnx_providers_m53.py \
     tests/test_create_policy_profile_m54.py \
     tests/test_validate_policy_profiles_m55.py \
-    tests/test_ci_static_check_m56.py
+    tests/test_ci_static_check_m56.py \
+    tests/test_policy_manifest_m57.py
 fi

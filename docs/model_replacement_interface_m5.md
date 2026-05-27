@@ -228,6 +228,79 @@ local and CI profile checks use the same entrypoint. Full ONNX/provider checks
 remain a local or release preflight because model artifacts and GPU providers are
 not guaranteed in the default static CI environment.
 
+
+## M5.7 replacement manifest export
+
+Use the manifest exporter when you want a reproducible record of a policy
+replacement profile before sharing, releasing, or running longer experiments:
+
+```bash
+./scripts/export_policy_manifest.sh open_duck_forward
+```
+
+For machine-readable output suitable for release artifacts:
+
+```bash
+./scripts/export_policy_manifest.sh open_duck_forward --json
+```
+
+The default mode is static and CI-friendly. It includes the selected profile, the
+runtime observation/action contract, the declared model path, and a SHA256 hash
+when the ONNX file is mounted. Missing model files are warnings by default so the
+command can still describe profiles in source-only environments.
+
+For release or GPU preflight, require the model file and load the ONNX metadata:
+
+```bash
+./scripts/export_policy_manifest.sh my_replacement \
+  --require-model \
+  --check-model \
+  --require-provider CUDAExecutionProvider \
+  --json > data/my_replacement.manifest.json
+```
+
+Use `--no-hash` for quick local checks of very large model files when the exact
+artifact hash is not needed.
+
+
+
+## M5.8 acceptance gate
+
+Use the acceptance gate when a replacement profile is ready for handoff from
+configuration work to simulation/runtime experiments. It bundles the static
+contract, replacement manifest, profile-suite validation, and a Markdown report
+into one timestamped artifact directory.
+
+Static acceptance does not require the ONNX file to be mounted:
+
+```bash
+./scripts/accept_policy_profile.sh my_replacement
+```
+
+Release/GPU acceptance can require the model artifact and enforce provider
+selection:
+
+```bash
+./scripts/accept_policy_profile.sh my_replacement \
+  --check-model \
+  --require-model \
+  --require-provider CUDAExecutionProvider
+```
+
+Artifacts are written under `data/policy_acceptance/` by default when using the
+Docker wrapper:
+
+```text
+contract.json
+manifest.json
+profile_suite.json
+acceptance.json
+acceptance_report.md
+```
+
+The acceptance gate still does not start MuJoCo. It is the last cheap preflight
+before running `run_policy_experiment.sh PROFILE`.
+
 ## Runtime contract
 
 Current Open Duck-compatible replacement models must use:

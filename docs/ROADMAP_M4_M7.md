@@ -29,8 +29,10 @@ Current status:
 - M5.2 makes `check_policy_model.sh --profile NAME` a combined static-contract plus ONNX-file preflight gate.
 - M5.3 centralizes ONNX Runtime execution provider selection and adds CUDA/provider preflight enforcement.
 - M5.4 adds a profile scaffolder for drop-in replacement ONNX profiles.
+- M5.5-M5.8 add suite validation, CI/static checks, manifest export, and an acceptance artifact gate.
 - M5.5 adds a policy profile-suite validator for static CI checks and optional ONNX/provider preflight.
 - M5.6 adds a shared local/GitHub CI static-check gate for replacement profile workflows.
+- M5.7 adds a replacement manifest exporter with profile, contract, optional ONNX check, and model SHA256 metadata.
 
 ## M5: Model replacement interface
 
@@ -44,8 +46,10 @@ Expected features:
 - `run_policy_experiment.sh PROFILE` runs the selected policy.
 - Observation/action contract documented.
 - Multiple profiles supported.
+- Replacement profiles can be accepted into a reproducible contract/manifest/report bundle before runtime.
 - Suite-level profile validation available for CI and release preflights.
 - Local and GitHub CI static-check entrypoint exercises contract export, profile validation, scaffolding, and M5 unit tests.
+- Replacement manifest export records profile/contract/model artifact metadata for handoff and release preflights.
 
 ## M6: Training pipeline
 
