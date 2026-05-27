@@ -15,7 +15,7 @@ Please first read these project-local files:
 Context summary:
 Soridormi is a sim-to-real Open Duck Mini v2 engineering platform. M4 made the official Open Duck ONNX walking policy reproducible through Soridormi's own runtime. Official Open Duck baseline walks forward. Official motor-target replay through Soridormi backend matches official trajectory exactly. Soridormi ONNX wrapper reproduces official actions exactly when given official observations. M4.13 added first-divergence diagnostics and fixed a policy-default/motor-target aliasing bug; official and Soridormi compared traces now match for the checked window at strict thresholds.
 
-Please continue with M5: model replacement interface. Do not train a new model yet. M5.1 added static observation/action contract export, M5.2 made `check_policy_model.sh --profile NAME` validate both the static runtime contract and the actual ONNX IO metadata before runtime, M5.3 centralized ONNX Runtime provider selection so CUDA/CPU/TensorRT choices can be inspected and enforced by preflight checks, and M5.4 added a profile scaffolder for drop-in replacement ONNX profiles, M5.5 added a suite validator for all policy profiles with optional ONNX/provider checks, M5.6 added a shared local/GitHub CI static-check gate for replacement profile workflows, M5.7 added a replacement manifest exporter for reproducible profile/model handoffs, M5.8 added acceptance artifact bundles, and M5.9 added verifiable policy package tarballs for handoff/release. Continue hardening compatible ONNX replacement workflows while preserving the same runtime/API/backend invariants.
+Please continue with M5: model replacement interface. Do not train a new model yet. M5.1 added static observation/action contract export, M5.2 made `check_policy_model.sh --profile NAME` validate both the static runtime contract and the actual ONNX IO metadata before runtime, M5.3 centralized ONNX Runtime provider selection so CUDA/CPU/TensorRT choices can be inspected and enforced by preflight checks, and M5.4 added a profile scaffolder for drop-in replacement ONNX profiles, M5.5 added a suite validator for all policy profiles with optional ONNX/provider checks, M5.6 added a shared local/GitHub CI static-check gate for replacement profile workflows, M5.7 added a replacement manifest exporter for reproducible profile/model handoffs, M5.8 added acceptance artifact bundles, and M5.9 added verifiable policy package tarballs for handoff/release. M5.10 added policy package install/restore, M5.11 added package inventory/indexing, and M6.1 started the training pipeline with a runtime-log-to-supervised-dataset exporter. Continue toward M6 training data/reward/export workflows while preserving the same runtime/API/backend invariants.
 ```
 
 
@@ -26,3 +26,8 @@ Adds `./scripts/install_policy_package.sh PACKAGE.policy.tar.gz`, the inverse of
 ## M5.11 policy package index
 
 Adds `./scripts/list_policy_packages.sh` and `python -m soridormi_runtime.policy_package index` to list generated package tarballs with verification status, profile names, model inclusion, timestamps, and SHA256 digests.
+
+
+## M6.1 training dataset export
+
+Adds `./scripts/export_training_dataset.sh LOG...` and `python -m soridormi_runtime.training_dataset` to export Soridormi runtime `.jsonl`/`.mcap` logs into supervised policy datasets with observation/action samples and a manifest.

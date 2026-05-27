@@ -87,6 +87,38 @@ python -m soridormi_runtime.policy_package install "${package_path}" \
   --runtime-model-prefix /tmp/installed_models \
   --json >/dev/null
 
+
+echo "Checking M6 training dataset export smoke workflow..."
+SORIDORMI_TMPDIR="${tmpdir}" python - <<'PY_DATASET'
+import json
+import os
+from pathlib import Path
+root = Path(os.environ["SORIDORMI_TMPDIR"])
+log = root / "runtime_training_smoke.jsonl"
+observation = [0.0] * 101
+action = [0.0] * 14
+payloads = []
+for step in range(2):
+    payloads.append({
+        "type": "runtime_step",
+        "step_index": step,
+        "time_wall_ns": 1_000_000_000 + step * 20_000_000,
+        "robot_time": step * 0.02,
+        "mode": "onnx_policy",
+        "backend": "sim",
+        "state": {"joints": {"names": ["j0"], "positions": [0.1 * step], "velocities": [0.0]}},
+        "command": {"names": ["j0"], "positions": [0.0]},
+        "policy_observation": observation,
+        "policy_action": action,
+        "policy_debug": {"command": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]},
+    })
+log.write_text("\n".join(json.dumps(payload) for payload in payloads) + "\n", encoding="utf-8")
+PY_DATASET
+python -m soridormi_runtime.training_dataset "${tmpdir}/runtime_training_smoke.jsonl" \
+  --output "${tmpdir}/training_dataset.jsonl" \
+  --manifest "${tmpdir}/training_dataset.manifest.json" \
+  --json >/dev/null
+
 if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
   echo "Running M5 unit tests..."
   pytest -q \
@@ -97,5 +129,9 @@ if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
     tests/test_create_policy_profile_m54.py \
     tests/test_validate_policy_profiles_m55.py \
     tests/test_ci_static_check_m56.py \
-    tests/test_policy_manifest_m57.py     tests/test_policy_acceptance_m58.py     tests/test_policy_package_m59.py
+    tests/test_policy_manifest_m57.py \
+    tests/test_policy_acceptance_m58.py \
+    tests/test_policy_package_m59.py \
+    tests/test_policy_package_index_m511.py \
+    tests/test_training_dataset_m61.py
 fi

@@ -35,6 +35,8 @@ Current status:
 - M5.7 adds a replacement manifest exporter with profile, contract, optional ONNX check, and model SHA256 metadata.
 - M5.8 adds an acceptance artifact gate for contract/manifest/profile-suite reports.
 - M5.9 adds a policy package exporter and verifier for handoff/release tarballs.
+- M5.10-M5.11 complete package install/restore and package inventory/index workflows.
+- M6.1 starts the training pipeline by exporting supervised observation/action datasets from Soridormi runtime logs.
 
 ## M5: Model replacement interface
 
@@ -57,6 +59,10 @@ Expected features:
 ## M6: Training pipeline
 
 Goal: train new policies and run them through the same runtime.
+
+Current status:
+
+- M6.1 adds `./scripts/export_training_dataset.sh`, which converts Soridormi JSONL/MCAP runtime logs into supervised `observation -> action` JSONL datasets plus a manifest.
 
 Expected features:
 
@@ -101,3 +107,8 @@ Adds `./scripts/install_policy_package.sh PACKAGE.policy.tar.gz`, the inverse of
 ## M5.11 policy package index
 
 Adds `./scripts/list_policy_packages.sh`, which scans generated replacement-policy packages, verifies package hashes by default, and reports profile name, model inclusion, timestamp, and package digest for install/release workflows.
+
+
+## M6.1 training dataset export
+
+Adds `./scripts/export_training_dataset.sh LOG...`, which reads Soridormi runtime `.jsonl` or `.mcap` logs and writes a supervised `soridormi.policy_supervision.v1` dataset under `/data/training_datasets` by default. Each sample preserves the 101D policy observation, 14D policy action, raw action when logged, motor command, compact state summary, next-state summary, policy command, and debug metadata. A sidecar manifest records source logs, sample count, skipped records, expected vector sizes, and dataset SHA256.

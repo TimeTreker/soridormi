@@ -425,3 +425,14 @@ Adds `./scripts/install_policy_package.sh PACKAGE.policy.tar.gz`, the inverse of
 ## M5.11 policy package index
 
 Adds `./scripts/list_policy_packages.sh`, which scans `data/policy_packages/*.policy.tar.gz`, reads package manifests, verifies package hashes by default, and prints an install-ready package inventory. Use `--json` for automation and `--no-verify` when a fast manifest-only scan is enough.
+
+
+## M6.1 training dataset export
+
+Accepted and packaged replacement models are still runtime artifacts. M6 begins converting runtime experience into training artifacts. Use:
+
+```bash
+./scripts/export_training_dataset.sh data/logs/policy_open_duck_forward_*.mcap
+```
+
+The command writes a JSONL dataset under `data/training_datasets/` by default, plus a `.manifest.json` sidecar. Each sample uses schema `soridormi.policy_supervision.v1` and contains the logged policy observation, policy action, optional raw action, motor command, compact robot state, next-state summary, policy command, and policy debug metadata. The exporter validates the 101D observation and 14D action sizes so incompatible logs fail before training.
