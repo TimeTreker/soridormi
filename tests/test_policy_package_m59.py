@@ -182,3 +182,84 @@ def test_package_policy_profile_fails_when_required_model_missing(tmp_path: Path
 
     assert not result.ok
     assert any("Model artifact not found" in error for error in result.errors)
+
+
+def test_install_policy_package_writes_profile_and_embedded_model(tmp_path: Path) -> None:
+    robot_config = tmp_path / "robot.yaml"
+    model = tmp_path / "replacement.onnx"
+    model.write_bytes(b"installable model bytes")
+    profile = tmp_path / "profile.yaml"
+    write_robot_config(robot_config)
+    write_profile(profile, name="install_profile", model_path=str(model))
+
+    package = package_policy_profile(
+        profile,
+        robot_config_path=robot_config,
+        output_dir=tmp_path / "packages",
+        include_model=True,
+        require_model=True,
+    )
+    assert package.ok
+
+    from soridormi_runtime.policy_package import install_policy_package
+
+    result = install_policy_package(
+        package.package_path,
+        profile_dir=tmp_path / "installed_profiles",
+        model_dir=tmp_path / "installed_models",
+        runtime_model_prefix="/runtime/models",
+    )
+
+    assert result.ok
+    installed_profile = Path(result.profile_path or "")
+    installed_model = tmp_path / "installed_models" / "install_profile" / "replacement.onnx"
+    assert installed_profile.is_file()
+    assert installed_model.read_bytes() == b"installable model bytes"
+    payload = json.loads(json.dumps(__import__("yaml").safe_load(installed_profile.read_text(encoding="utf-8"))))
+    assert payload["model"]["path"] == "/runtime/models/install_profile/replacement.onnx"
+
+
+def test_install_policy_package_refuses_to_overwrite_without_force(tmp_path: Path) -> None:
+    robot_config = tmp_path / "robot.yaml"
+    profile = tmp_path / "profile.yaml"
+    write_robot_config(robot_config)
+    write_profile(profile, name="overwrite_profile")
+    package = package_policy_profile(profile, robot_config_path=robot_config, output_dir=tmp_path / "packages")
+    assert package.ok
+
+    from soridormi_runtime.policy_package import install_policy_package
+
+    profile_dir = tmp_path / "installed_profiles"
+    first = install_policy_package(package.package_path, profile_dir=profile_dir, model_dir=tmp_path / "models")
+    assert first.ok
+    second = install_policy_package(package.package_path, profile_dir=profile_dir, model_dir=tmp_path / "models")
+    assert not second.ok
+    assert any("already exists" in error for error in second.errors)
+    forced = install_policy_package(package.package_path, profile_dir=profile_dir, model_dir=tmp_path / "models", force=True)
+    assert forced.ok
+
+
+def test_install_policy_package_rejects_tampered_package(tmp_path: Path) -> None:
+    robot_config = tmp_path / "robot.yaml"
+    profile = tmp_path / "profile.yaml"
+    write_robot_config(robot_config)
+    write_profile(profile, name="install_tamper_profile")
+    package = package_policy_profile(profile, robot_config_path=robot_config, output_dir=tmp_path / "packages")
+    assert package.ok
+
+    unpacked = tmp_path / "unpacked"
+    unpacked.mkdir()
+    with tarfile.open(package.package_path, "r:gz") as tar:
+        tar.extractall(unpacked, filter="data")
+    (unpacked / "profile.yaml").write_text("name: changed\n", encoding="utf-8")
+    tampered = tmp_path / "tampered.policy.tar.gz"
+    with tarfile.open(tampered, "w:gz") as tar:
+        for path in sorted(unpacked.rglob("*")):
+            if path.is_file():
+                tar.add(path, arcname=path.relative_to(unpacked).as_posix())
+
+    from soridormi_runtime.policy_package import install_policy_package
+
+    result = install_policy_package(tampered, profile_dir=tmp_path / "profiles", model_dir=tmp_path / "models")
+    assert not result.ok
+    assert any("sha256 mismatch" in error for error in result.errors)

@@ -85,6 +85,7 @@ services:
       - ./src:/app/src
       - ./configs:/app/configs:${SORIDORMI_CONFIGS_MOUNT_MODE:-ro}
       - ./tests:/app/tests:ro
+      - ./scripts:/app/scripts:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
       - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
       - ./workspace/Open_Duck_Mini_Runtime:/workspaces/Open_Duck_Mini_Runtime
@@ -142,6 +143,7 @@ services:
       - ./src:/app/src
       - ./configs:/app/configs:${SORIDORMI_CONFIGS_MOUNT_MODE:-ro}
       - ./tests:/app/tests:ro
+      - ./scripts:/app/scripts:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
       - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
       - ./workspace/Open_Duck_Playground:/workspaces/Open_Duck_Playground

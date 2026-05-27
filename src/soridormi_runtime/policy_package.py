@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from soridormi_runtime.onnx_providers import parse_provider_csv
 from soridormi_runtime.policy_acceptance import accept_policy_profile
 from soridormi_runtime.policy_profiles import PolicyProfile
@@ -43,6 +45,18 @@ class PolicyPackageVerificationResult:
     package_version: int | None
     profile_name: str | None
     files_checked: int
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class PolicyPackageInstallResult:
+    ok: bool
+    package_path: str
+    profile_name: str | None
+    profile_path: str | None
+    model_path: str | None = None
+    verified: bool = False
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -320,6 +334,211 @@ def verify_policy_package(package_path: str | Path) -> PolicyPackageVerification
         )
 
 
+def _safe_extract_policy_package(package_path: Path, root: Path) -> tuple[dict[str, Any] | None, list[str], list[str]]:
+    errors: list[str] = []
+    warnings: list[str] = []
+    try:
+        with tarfile.open(package_path, "r:gz") as tar:
+            for member in tar.getmembers():
+                member_path = root / member.name
+                if not member_path.resolve().is_relative_to(root.resolve()):
+                    errors.append(f"Unsafe archive member path: {member.name}")
+            if errors:
+                return None, errors, warnings
+            tar.extractall(root, filter="data")
+    except Exception as exc:
+        return None, [f"Failed to read policy package: {exc!r}"], warnings
+
+    manifest_path = root / "package_manifest.json"
+    if not manifest_path.exists():
+        return None, ["Package is missing package_manifest.json"], warnings
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return None, [f"Failed to parse package_manifest.json: {exc!r}"], warnings
+    return manifest, errors, warnings
+
+
+def _load_profile_payload(path: Path) -> dict[str, Any]:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Package profile.yaml must be a YAML mapping: {path}")
+    return payload
+
+
+def _dump_profile_payload(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(payload, sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+
+def install_policy_package(
+    package_path: str | Path,
+    *,
+    profile_dir: str | Path = "configs/policies",
+    model_dir: str | Path = "data/policy_models",
+    runtime_model_prefix: str | None = "/data/policy_models",
+    install_model: bool = True,
+    verify: bool = True,
+    force: bool = False,
+) -> PolicyPackageInstallResult:
+    """Install a verified replacement-policy package into this checkout.
+
+    The installer is the inverse of :func:`package_policy_profile`: it restores
+    ``profile.yaml`` into ``configs/policies/<name>.yaml`` and, when the package
+    embeds a model, copies that model into ``data/policy_models/<name>/``.  The
+    installed profile's ``model.path`` is rewritten to the runtime-visible model
+    path so Docker-based commands can load it immediately.
+    """
+    archive = Path(package_path).expanduser()
+    errors: list[str] = []
+    warnings: list[str] = []
+    if not archive.exists():
+        return PolicyPackageInstallResult(
+            ok=False,
+            package_path=str(archive),
+            profile_name=None,
+            profile_path=None,
+            verified=False,
+            errors=[f"Policy package not found: {archive}"],
+            warnings=[],
+        )
+
+    verified_ok = False
+    if verify:
+        verification = verify_policy_package(archive)
+        verified_ok = verification.ok
+        errors.extend(verification.errors)
+        warnings.extend(verification.warnings)
+        if not verification.ok:
+            return PolicyPackageInstallResult(
+                ok=False,
+                package_path=str(archive),
+                profile_name=verification.profile_name,
+                profile_path=None,
+                verified=False,
+                errors=errors,
+                warnings=warnings,
+            )
+
+    with tempfile.TemporaryDirectory(prefix="soridormi_policy_install_") as tmp:
+        root = Path(tmp)
+        manifest, extract_errors, extract_warnings = _safe_extract_policy_package(archive, root)
+        errors.extend(extract_errors)
+        warnings.extend(extract_warnings)
+        if errors or manifest is None:
+            return PolicyPackageInstallResult(
+                ok=False,
+                package_path=str(archive),
+                profile_name=None,
+                profile_path=None,
+                verified=verified_ok,
+                errors=errors,
+                warnings=warnings,
+            )
+
+        profile_yaml = root / "profile.yaml"
+        if not profile_yaml.exists():
+            errors.append("Package is missing profile.yaml")
+            return PolicyPackageInstallResult(
+                ok=False,
+                package_path=str(archive),
+                profile_name=manifest.get("profile_name"),
+                profile_path=None,
+                verified=verified_ok,
+                errors=errors,
+                warnings=warnings,
+            )
+
+        try:
+            payload = _load_profile_payload(profile_yaml)
+        except Exception as exc:
+            errors.append(f"Failed to load packaged profile.yaml: {exc!r}")
+            return PolicyPackageInstallResult(
+                ok=False,
+                package_path=str(archive),
+                profile_name=manifest.get("profile_name"),
+                profile_path=None,
+                verified=verified_ok,
+                errors=errors,
+                warnings=warnings,
+            )
+
+        profile_name = str(payload.get("name") or manifest.get("profile_name") or Path(archive).stem)
+        target_profile = Path(profile_dir).expanduser() / f"{_slug(profile_name)}.yaml"
+        if target_profile.exists() and not force:
+            errors.append(f"Policy profile already exists: {target_profile}; use --force to replace it")
+            return PolicyPackageInstallResult(
+                ok=False,
+                package_path=str(archive),
+                profile_name=profile_name,
+                profile_path=str(target_profile),
+                verified=verified_ok,
+                errors=errors,
+                warnings=warnings,
+            )
+
+        installed_model_path: Path | None = None
+        runtime_model_path: str | None = None
+        model_artifact = manifest.get("model_artifact") if isinstance(manifest, dict) else None
+        packaged_model_rel = None
+        if isinstance(model_artifact, dict):
+            packaged_model_rel = model_artifact.get("packaged_path")
+
+        if install_model and packaged_model_rel:
+            source_model = root / str(packaged_model_rel)
+            if source_model.exists():
+                model_root = Path(model_dir).expanduser() / _slug(profile_name)
+                model_root.mkdir(parents=True, exist_ok=True)
+                installed_model_path = model_root / source_model.name
+                if installed_model_path.exists() and not force:
+                    errors.append(f"Model artifact already exists: {installed_model_path}; use --force to replace it")
+                    return PolicyPackageInstallResult(
+                        ok=False,
+                        package_path=str(archive),
+                        profile_name=profile_name,
+                        profile_path=str(target_profile),
+                        model_path=str(installed_model_path),
+                        verified=verified_ok,
+                        errors=errors,
+                        warnings=warnings,
+                    )
+                shutil.copy2(source_model, installed_model_path)
+                if runtime_model_prefix:
+                    runtime_model_path = f"{runtime_model_prefix.rstrip('/')}/{_slug(profile_name)}/{source_model.name}"
+                else:
+                    runtime_model_path = str(installed_model_path)
+                model_payload = payload.setdefault("model", {})
+                if not isinstance(model_payload, dict):
+                    errors.append("Installed profile has non-mapping model section")
+                    return PolicyPackageInstallResult(
+                        ok=False,
+                        package_path=str(archive),
+                        profile_name=profile_name,
+                        profile_path=str(target_profile),
+                        model_path=str(installed_model_path),
+                        verified=verified_ok,
+                        errors=errors,
+                        warnings=warnings,
+                    )
+                model_payload["path"] = runtime_model_path
+            else:
+                warnings.append(f"Package manifest references missing model artifact: {packaged_model_rel}")
+        elif install_model:
+            warnings.append("Package does not embed a model; installed profile keeps its declared model.path")
+
+        _dump_profile_payload(target_profile, payload)
+        return PolicyPackageInstallResult(
+            ok=not errors,
+            package_path=str(archive),
+            profile_name=profile_name,
+            profile_path=str(target_profile),
+            model_path=runtime_model_path or (str(installed_model_path) if installed_model_path is not None else None),
+            verified=verified_ok,
+            errors=errors,
+            warnings=warnings,
+        )
+
+
 def print_package_summary(result: PolicyPackageResult) -> None:
     print("Soridormi policy package")
     print("=========================")
@@ -344,6 +563,26 @@ def print_verification_summary(result: PolicyPackageVerificationResult) -> None:
     print(f"Package: {result.package_path}")
     print(f"Profile: {result.profile_name or '<unknown>'}")
     print(f"Files checked: {result.files_checked}")
+    if result.warnings:
+        print("Warnings:")
+        for warning in result.warnings:
+            print(f"  - {warning}")
+    if result.errors:
+        print("Errors:")
+        for error in result.errors:
+            print(f"  - {error}")
+    print("Result:", "OK" if result.ok else "FAILED")
+
+
+def print_install_summary(result: PolicyPackageInstallResult) -> None:
+    print("Soridormi policy package install")
+    print("=================================")
+    print(f"Package: {result.package_path}")
+    print(f"Profile: {result.profile_name or '<unknown>'}")
+    print(f"Profile path: {result.profile_path or '<not installed>'}")
+    if result.model_path:
+        print(f"Model path: {result.model_path}")
+    print(f"Verified: {'yes' if result.verified else 'no'}")
     if result.warnings:
         print("Warnings:")
         for warning in result.warnings:
@@ -395,6 +634,16 @@ def main() -> None:
     verify.add_argument("package", help="Path to .policy.tar.gz")
     verify.add_argument("--json", action="store_true", help="Print machine-readable JSON")
 
+    install = subparsers.add_parser("install", help="Install a generated policy package into this checkout")
+    install.add_argument("package", help="Path to .policy.tar.gz")
+    install.add_argument("--profile-dir", default="configs/policies", help="Destination directory for installed profile YAML")
+    install.add_argument("--model-dir", default="data/policy_models", help="Destination directory for embedded ONNX models")
+    install.add_argument("--runtime-model-prefix", default="/data/policy_models", help="Runtime-visible prefix written into model.path")
+    install.add_argument("--no-install-model", action="store_true", help="Do not copy embedded model bytes or rewrite model.path")
+    install.add_argument("--no-verify", action="store_true", help="Skip package verification before install")
+    install.add_argument("--force", action="store_true", help="Overwrite existing profile/model files")
+    install.add_argument("--json", action="store_true", help="Print machine-readable JSON")
+
     args = parser.parse_args()
     if args.command == "package":
         result = _package_main(args)
@@ -410,6 +659,22 @@ def main() -> None:
             print(json.dumps(asdict(result), indent=2, sort_keys=True))
         else:
             print_verification_summary(result)
+        if not result.ok:
+            raise SystemExit(1)
+    elif args.command == "install":
+        result = install_policy_package(
+            args.package,
+            profile_dir=args.profile_dir,
+            model_dir=args.model_dir,
+            runtime_model_prefix=args.runtime_model_prefix,
+            install_model=not args.no_install_model,
+            verify=not args.no_verify,
+            force=args.force,
+        )
+        if args.json:
+            print(json.dumps(asdict(result), indent=2, sort_keys=True))
+        else:
+            print_install_summary(result)
         if not result.ok:
             raise SystemExit(1)
     else:

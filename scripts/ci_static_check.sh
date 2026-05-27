@@ -80,6 +80,11 @@ echo "Checking replacement-policy package workflow..."
 python -m soridormi_runtime.policy_package package "${tmpdir}/ci_replacement.yaml"   --robot-config "${robot_config}"   --output-dir "${tmpdir}/packages"   --json >/dev/null
 package_path="$(find "${tmpdir}/packages" -name '*.policy.tar.gz' -print -quit)"
 python -m soridormi_runtime.policy_package verify "${package_path}" --json >/dev/null
+python -m soridormi_runtime.policy_package install "${package_path}" \
+  --profile-dir "${tmpdir}/installed_profiles" \
+  --model-dir "${tmpdir}/installed_models" \
+  --runtime-model-prefix /tmp/installed_models \
+  --json >/dev/null
 
 if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
   echo "Running M5 unit tests..."
