@@ -61,6 +61,32 @@ class PolicyPackageInstallResult:
     warnings: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class PolicyPackageIndexEntry:
+    package_path: str
+    size_bytes: int
+    sha256: str
+    ok: bool
+    profile_name: str | None = None
+    package_version: int | None = None
+    generated_at_utc: str | None = None
+    include_model: bool | None = None
+    model_artifact_path: str | None = None
+    files_checked: int = 0
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class PolicyPackageIndexResult:
+    ok: bool
+    directory: str
+    pattern: str
+    packages: list[PolicyPackageIndexEntry]
+    errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
 def _utc_stamp() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).strftime("%Y%m%dT%H%M%SZ")
 
@@ -226,6 +252,94 @@ def package_policy_profile(
             errors=errors,
             warnings=warnings,
         )
+
+
+def _read_policy_package_manifest(package_path: Path) -> tuple[dict[str, Any] | None, list[str], list[str]]:
+    with tempfile.TemporaryDirectory(prefix="soridormi_policy_index_") as tmp:
+        return _safe_extract_policy_package(package_path, Path(tmp))
+
+
+def _index_entry_for_package(path: Path, *, verify: bool) -> PolicyPackageIndexEntry:
+    errors: list[str] = []
+    warnings: list[str] = []
+    size_bytes = path.stat().st_size if path.exists() else 0
+    digest = _sha256_file(path) if path.exists() else ""
+
+    manifest, manifest_errors, manifest_warnings = _read_policy_package_manifest(path) if path.exists() else (None, [f"Policy package not found: {path}"], [])
+    errors.extend(manifest_errors)
+    warnings.extend(manifest_warnings)
+
+    verification: PolicyPackageVerificationResult | None = None
+    if verify and path.exists():
+        verification = verify_policy_package(path)
+        errors.extend(verification.errors)
+        warnings.extend(verification.warnings)
+
+    profile_name = manifest.get("profile_name") if manifest else None
+    package_version = manifest.get("package_version") if manifest else None
+    generated_at_utc = manifest.get("generated_at_utc") if manifest else None
+    include_model = manifest.get("include_model") if manifest else None
+    model_artifact = manifest.get("model_artifact") if manifest else None
+    model_artifact_path = model_artifact.get("packaged_path") if isinstance(model_artifact, dict) else None
+    files_checked = verification.files_checked if verification is not None else 0
+    ok = not errors if verification is None else verification.ok
+
+    return PolicyPackageIndexEntry(
+        package_path=str(path),
+        size_bytes=size_bytes,
+        sha256=digest,
+        ok=ok,
+        profile_name=profile_name,
+        package_version=package_version,
+        generated_at_utc=generated_at_utc,
+        include_model=include_model,
+        model_artifact_path=model_artifact_path,
+        files_checked=files_checked,
+        errors=errors,
+        warnings=warnings,
+    )
+
+
+def index_policy_packages(
+    directory: str | Path = "data/policy_packages",
+    *,
+    pattern: str = "*.policy.tar.gz",
+    verify: bool = True,
+) -> PolicyPackageIndexResult:
+    root = Path(directory).expanduser()
+    errors: list[str] = []
+    warnings: list[str] = []
+    if not root.exists():
+        return PolicyPackageIndexResult(
+            ok=True,
+            directory=str(root),
+            pattern=pattern,
+            packages=[],
+            errors=[],
+            warnings=[f"Package directory does not exist: {root}"],
+        )
+    if not root.is_dir():
+        return PolicyPackageIndexResult(
+            ok=False,
+            directory=str(root),
+            pattern=pattern,
+            packages=[],
+            errors=[f"Package path is not a directory: {root}"],
+            warnings=[],
+        )
+
+    paths = sorted(root.glob(pattern), key=lambda item: (item.stat().st_mtime, item.name), reverse=True)
+    packages = [_index_entry_for_package(path, verify=verify) for path in paths if path.is_file()]
+    if any(not item.ok for item in packages):
+        errors.append("One or more policy packages failed verification")
+    return PolicyPackageIndexResult(
+        ok=not errors,
+        directory=str(root),
+        pattern=pattern,
+        packages=packages,
+        errors=errors,
+        warnings=warnings,
+    )
 
 
 def verify_policy_package(package_path: str | Path) -> PolicyPackageVerificationResult:
@@ -594,6 +708,38 @@ def print_install_summary(result: PolicyPackageInstallResult) -> None:
     print("Result:", "OK" if result.ok else "FAILED")
 
 
+def print_index_summary(result: PolicyPackageIndexResult) -> None:
+    print("Soridormi policy package index")
+    print("===============================")
+    print(f"Directory: {result.directory}")
+    print(f"Pattern: {result.pattern}")
+    print(f"Packages: {len(result.packages)}")
+    for item in result.packages:
+        status = "OK" if item.ok else "FAILED"
+        profile = item.profile_name or "<unknown>"
+        model = "model" if item.include_model else "no-model"
+        print(f"- {profile}: {status} ({model})")
+        print(f"  package: {item.package_path}")
+        print(f"  sha256: {item.sha256}")
+        if item.generated_at_utc:
+            print(f"  generated: {item.generated_at_utc}")
+        if item.model_artifact_path:
+            print(f"  model artifact: {item.model_artifact_path}")
+        for warning in item.warnings:
+            print(f"  warning: {warning}")
+        for error in item.errors:
+            print(f"  error: {error}")
+    if result.warnings:
+        print("Warnings:")
+        for warning in result.warnings:
+            print(f"  - {warning}")
+    if result.errors:
+        print("Errors:")
+        for error in result.errors:
+            print(f"  - {error}")
+    print("Result:", "OK" if result.ok else "FAILED")
+
+
 def _package_main(args: argparse.Namespace) -> PolicyPackageResult:
     return package_policy_profile(
         args.profile,
@@ -634,6 +780,12 @@ def main() -> None:
     verify.add_argument("package", help="Path to .policy.tar.gz")
     verify.add_argument("--json", action="store_true", help="Print machine-readable JSON")
 
+    index = subparsers.add_parser("index", help="List and optionally verify generated policy packages")
+    index.add_argument("--directory", default="data/policy_packages", help="Directory containing .policy.tar.gz files")
+    index.add_argument("--pattern", default="*.policy.tar.gz", help="Glob pattern to scan inside --directory")
+    index.add_argument("--no-verify", action="store_true", help="Read package manifests without verifying file hashes")
+    index.add_argument("--json", action="store_true", help="Print machine-readable JSON")
+
     install = subparsers.add_parser("install", help="Install a generated policy package into this checkout")
     install.add_argument("package", help="Path to .policy.tar.gz")
     install.add_argument("--profile-dir", default="configs/policies", help="Destination directory for installed profile YAML")
@@ -659,6 +811,14 @@ def main() -> None:
             print(json.dumps(asdict(result), indent=2, sort_keys=True))
         else:
             print_verification_summary(result)
+        if not result.ok:
+            raise SystemExit(1)
+    elif args.command == "index":
+        result = index_policy_packages(args.directory, pattern=args.pattern, verify=not args.no_verify)
+        if args.json:
+            print(json.dumps(asdict(result), indent=2, sort_keys=True))
+        else:
+            print_index_summary(result)
         if not result.ok:
             raise SystemExit(1)
     elif args.command == "install":

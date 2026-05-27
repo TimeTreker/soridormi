@@ -421,3 +421,7 @@ truth for actuator order. If present, it must exactly match the runtime order.
 ## M5.10 policy package install/restore
 
 Adds `./scripts/install_policy_package.sh PACKAGE.policy.tar.gz`, the inverse of the M5.9 package command. It verifies the tarball, restores `profile.yaml` into `configs/policies/`, optionally copies embedded ONNX model bytes into `data/policy_models/<profile>/`, and rewrites `model.path` to the runtime-visible `/data/policy_models/...` location. Use `--force` to overwrite an existing installed profile/model.
+
+## M5.11 policy package index
+
+Adds `./scripts/list_policy_packages.sh`, which scans `data/policy_packages/*.policy.tar.gz`, reads package manifests, verifies package hashes by default, and prints an install-ready package inventory. Use `--json` for automation and `--no-verify` when a fast manifest-only scan is enough.

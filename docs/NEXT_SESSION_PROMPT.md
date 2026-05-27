@@ -22,3 +22,7 @@ Please continue with M5: model replacement interface. Do not train a new model y
 ## M5.10 policy package install/restore
 
 Adds `./scripts/install_policy_package.sh PACKAGE.policy.tar.gz`, the inverse of the M5.9 package command. It verifies the tarball, restores `profile.yaml` into `configs/policies/`, optionally copies embedded ONNX model bytes into `data/policy_models/<profile>/`, and rewrites `model.path` to the runtime-visible `/data/policy_models/...` location. Use `--force` to overwrite an existing installed profile/model.
+
+## M5.11 policy package index
+
+Adds `./scripts/list_policy_packages.sh` and `python -m soridormi_runtime.policy_package index` to list generated package tarballs with verification status, profile names, model inclusion, timestamps, and SHA256 digests.
