@@ -1,0 +1,85 @@
+name: test_replacement
+description: Test replacement profile
+model:
+  path: /workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx
+  input_name: obs
+  output_name: continuous_actions
+  input_shape:
+  - 1
+  - 101
+  output_shape:
+  - 1
+  - 14
+  input_type: tensor(float)
+  output_type: tensor(float)
+runtime:
+  mode: onnx_policy
+  backend: sim
+  control_hz: 50
+  reset_at_start: true
+  sync_step: true
+command:
+  x: 0.15
+  y: 0.0
+  yaw: 0.0
+  neck_pitch: 0.0
+  head_pitch: 0.0
+  head_yaw: 0.0
+  head_roll: 0.0
+  ramp_seconds: 0.0
+phase:
+  mode: step
+  frequency: 1.0
+  period_steps: auto
+  reference_data: /workspaces/Open_Duck_Playground/playground/open_duck_mini_v2/data/polynomial_coefficients.pkl
+  require_reference_data: true
+  step_increment: 1.0
+  enabled: true
+  offset: 0.0
+action_mapping:
+  action_scale: 0.25
+  max_motor_velocity: 5.24
+observation:
+  accel_bias_xyz:
+  - 1.3
+  - 0.0
+  - 0.0
+  use_state_feet_contacts: true
+  bootstrap_policy_defaults_from_state: true
+simulator:
+  backend: mujoco
+  use_home_keyframe: true
+  home_keyframe_overrides_reset_pose: true
+  official_reset_sequence: true
+  official_sensor_mode: true
+  official_contact_mode: true
+  auto_reset: true
+  viewer: true
+logging:
+  enabled: true
+  format: mcap
+  every_n: 1
+  prefix: policy_test_replacement
+metadata:
+  format_version: 1
+  policy_family: open_duck_mini_v2
+  derived_from_profile: open_duck_forward
+  generated_by: soridormi_m5_profile_scaffold
+contract:
+  observation_size: 101
+  action_size: 14
+  joint_names:
+  - left_hip_yaw
+  - left_hip_roll
+  - left_hip_pitch
+  - left_knee
+  - left_ankle
+  - neck_pitch
+  - head_pitch
+  - head_yaw
+  - head_roll
+  - right_hip_yaw
+  - right_hip_roll
+  - right_hip_pitch
+  - right_knee
+  - right_ankle

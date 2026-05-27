@@ -131,6 +131,11 @@ The scaffolder does not load the ONNX model. This is intentional: profile
 creation is a static YAML operation, while `check_policy_model.sh` remains the
 preflight gate for actual ONNX metadata and provider selection.
 
+Implementation note: most Soridormi Docker commands mount `/app/configs` as
+read-only. `create_policy_profile.sh` is the exception; it temporarily asks
+Compose to mount `./configs` read-write so the generated YAML lands back in the
+host repo under `configs/policies/`.
+
 Useful options:
 
 ```bash
@@ -152,6 +157,43 @@ Useful options:
   --input-shape '[1, 101]' \
   --output-shape '[1, 14]'
 ```
+
+
+## M5.5 profile-suite validation
+
+Use the suite validator before committing or running replacement experiments. By
+default it scans every profile under `configs/policies/` and performs the static
+contract checks from M5.1 without loading ONNX models:
+
+```bash
+./scripts/validate_policy_profiles.sh
+```
+
+For machine-readable output:
+
+```bash
+./scripts/validate_policy_profiles.sh --json
+```
+
+To validate only selected profiles:
+
+```bash
+./scripts/validate_policy_profiles.sh open_duck_forward my_replacement
+```
+
+For local/GPU preflight, also load each ONNX file and enforce provider selection:
+
+```bash
+./scripts/validate_policy_profiles.sh \
+  --check-models \
+  --require-provider CUDAExecutionProvider
+```
+
+The default static mode is intentionally CI-friendly: it catches bad profile YAML,
+contract drift, shape mismatches, duplicate profile names, and joint-order
+metadata problems even when the external ONNX artifact is not mounted. Use
+`--check-models` in runtime containers or release jobs where model files are
+available.
 
 ## Runtime contract
 

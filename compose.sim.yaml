@@ -83,7 +83,7 @@ services:
       SORIDORMI_SIM_SYNC_STEP: ${SORIDORMI_SIM_SYNC_STEP:-0}
     volumes:
       - ./src:/app/src
-      - ./configs:/app/configs:ro
+      - ./configs:/app/configs:${SORIDORMI_CONFIGS_MOUNT_MODE:-ro}
       - ./tests:/app/tests:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
       - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
@@ -140,7 +140,7 @@ services:
       PYTHONUNBUFFERED: "1"
     volumes:
       - ./src:/app/src
-      - ./configs:/app/configs:ro
+      - ./configs:/app/configs:${SORIDORMI_CONFIGS_MOUNT_MODE:-ro}
       - ./tests:/app/tests:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
       - ./workspace/Open_Duck_Mini:/workspaces/Open_Duck_Mini
