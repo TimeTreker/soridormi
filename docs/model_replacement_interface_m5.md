@@ -195,6 +195,39 @@ metadata problems even when the external ONNX artifact is not mounted. Use
 `--check-models` in runtime containers or release jobs where model files are
 available.
 
+
+## M5.6 CI static-check gate
+
+Use the local CI static-check script before opening a PR or pushing profile
+changes:
+
+```bash
+./scripts/ci_static_check.sh
+```
+
+When Docker Compose is available, the script runs inside the runtime container by
+default so host Python does not need project dependencies such as NumPy or
+ONNX Runtime. Set `SORIDORMI_CI_STATIC_CHECK_USE_DOCKER=0` to force host mode,
+which is useful in GitHub Actions after `python -m pip install -e '.[dev]'`.
+
+The script intentionally stays artifact-free. It does not load ONNX model files
+and does not start MuJoCo. It validates the canonical profile contract, validates
+all policy profiles statically, creates a temporary replacement profile through
+the M5.4 scaffolder, validates that generated profile, and runs the M5 unit test
+set.
+
+For a fast smoke run that skips pytest while still exercising the profile and
+scaffolder commands:
+
+```bash
+SORIDORMI_CI_SKIP_PYTEST=1 ./scripts/ci_static_check.sh
+```
+
+GitHub Actions runs this same script in `.github/workflows/static-check.yml`, so
+local and CI profile checks use the same entrypoint. Full ONNX/provider checks
+remain a local or release preflight because model artifacts and GPU providers are
+not guaranteed in the default static CI environment.
+
 ## Runtime contract
 
 Current Open Duck-compatible replacement models must use:

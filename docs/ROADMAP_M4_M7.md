@@ -30,6 +30,7 @@ Current status:
 - M5.3 centralizes ONNX Runtime execution provider selection and adds CUDA/provider preflight enforcement.
 - M5.4 adds a profile scaffolder for drop-in replacement ONNX profiles.
 - M5.5 adds a policy profile-suite validator for static CI checks and optional ONNX/provider preflight.
+- M5.6 adds a shared local/GitHub CI static-check gate for replacement profile workflows.
 
 ## M5: Model replacement interface
 
@@ -44,6 +45,7 @@ Expected features:
 - Observation/action contract documented.
 - Multiple profiles supported.
 - Suite-level profile validation available for CI and release preflights.
+- Local and GitHub CI static-check entrypoint exercises contract export, profile validation, scaffolding, and M5 unit tests.
 
 ## M6: Training pipeline
 
