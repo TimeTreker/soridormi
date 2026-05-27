@@ -63,6 +63,7 @@ Goal: train new policies and run them through the same runtime.
 Current status:
 
 - M6.1 adds `./scripts/export_training_dataset.sh`, which converts Soridormi JSONL/MCAP runtime logs into supervised `observation -> action` JSONL datasets plus a manifest.
+- M6.2 adds `./scripts/prepare_training_dataset.sh`, which validates exported datasets and writes deterministic train/val/test splits plus a preparation manifest.
 
 Expected features:
 
@@ -112,3 +113,8 @@ Adds `./scripts/list_policy_packages.sh`, which scans generated replacement-poli
 ## M6.1 training dataset export
 
 Adds `./scripts/export_training_dataset.sh LOG...`, which reads Soridormi runtime `.jsonl` or `.mcap` logs and writes a supervised `soridormi.policy_supervision.v1` dataset under `/data/training_datasets` by default. Each sample preserves the 101D policy observation, 14D policy action, raw action when logged, motor command, compact state summary, next-state summary, policy command, and debug metadata. A sidecar manifest records source logs, sample count, skipped records, expected vector sizes, and dataset SHA256.
+
+
+## M6.2 training dataset validation/splitting
+
+Adds `./scripts/prepare_training_dataset.sh DATASET.jsonl`, which validates supervised policy datasets before training and writes deterministic `train.jsonl`, `val.jsonl`, and `test.jsonl` splits. The validation gate checks sample type/schema, 101D observations, 14D actions/raw actions, finite numeric values, optional next-state requirements, and split-ratio consistency. A `prepared_manifest.json` records counts, ratios, seed, paths, and SHA256 hashes for every split.

@@ -436,3 +436,8 @@ Accepted and packaged replacement models are still runtime artifacts. M6 begins 
 ```
 
 The command writes a JSONL dataset under `data/training_datasets/` by default, plus a `.manifest.json` sidecar. Each sample uses schema `soridormi.policy_supervision.v1` and contains the logged policy observation, policy action, optional raw action, motor command, compact robot state, next-state summary, policy command, and policy debug metadata. The exporter validates the 101D observation and 14D action sizes so incompatible logs fail before training.
+
+
+## M6 dataset preparation handoff
+
+After accepting and packaging a replacement profile, M6 training data can be exported from runtime logs with `./scripts/export_training_dataset.sh` and prepared with `./scripts/prepare_training_dataset.sh`. The preparation step validates the 101D observation and 14D action vectors, checks finite numeric values, and writes deterministic train/val/test split files plus `prepared_manifest.json`.
