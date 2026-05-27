@@ -136,6 +136,11 @@ python -m soridormi_runtime.create_linear_bc_profile ci_linear_bc \
 python -m soridormi_runtime.policy_contract "${tmpdir}/ci_linear_bc.yaml" --robot-config "${robot_config}" --validate-only
 python -m soridormi_runtime.check_policy_model --profile "${tmpdir}/ci_linear_bc.yaml" --robot-config "${robot_config}" --json >/dev/null
 python -m soridormi_runtime.evaluate_policy_profile "${tmpdir}/ci_linear_bc.yaml" "${tmpdir}/prepared_training_dataset"   --output-dir "${tmpdir}/policy_evaluation"   --splits train,val,test   --max-samples-per-split 2   --json >/dev/null
+python -m soridormi_runtime.policy_candidate_leaderboard "${tmpdir}/policy_evaluation" \
+  --output-dir "${tmpdir}/candidate_leaderboard" \
+  --max-test-mae 1.0 \
+  --require-promotable \
+  --json >/dev/null
 
 if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
   echo "Running M5 unit tests..."
@@ -156,5 +161,6 @@ if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
     tests/test_training_dataset_stats_m63.py \
     tests/test_train_behavior_clone_m64.py \
     tests/test_linear_behavior_clone_policy_m65.py \
-    tests/test_evaluate_policy_profile_m66.py
+    tests/test_evaluate_policy_profile_m66.py \
+    tests/test_policy_candidate_leaderboard_m68.py
 fi

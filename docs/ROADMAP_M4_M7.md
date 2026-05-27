@@ -137,3 +137,15 @@ Adds a lightweight runtime path for the M6 linear behavior-cloning baseline. `li
 Status: implemented.
 
 Adds `evaluate_policy_profile.sh`, which compares a runtime policy profile against prepared supervised train/val/test splits and produces JSON/Markdown reports plus optional prediction JSONL artifacts. This gives replacement policies an offline acceptance step before simulation rollout.
+
+### M6.8 - Policy candidate leaderboard
+
+Status: implemented.
+
+Adds an offline candidate-ranking gate after training/evaluation. The command scans `evaluation.json` artifacts, ranks candidates by held-out test metrics, applies optional promotion thresholds, and writes JSON/Markdown leaderboard artifacts. It does not modify runtime profiles or launch simulation.
+
+```bash
+./scripts/rank_policy_candidates.sh data/training_pipelines \
+  --max-test-mae 0.05 \
+  --require-promotable
+```

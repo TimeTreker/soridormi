@@ -486,3 +486,16 @@ After a policy has a runtime profile, evaluate it against a prepared supervised 
 ```
 
 The evaluator supports `linear_behavior_clone` NPZ profiles and ONNX profiles. It writes `evaluation.json`, `evaluation_report.md`, and optional `predictions_<split>.jsonl` files. Threshold flags such as `--max-val-mae`, `--max-test-mae`, `--max-test-rmse`, and `--max-test-max-abs-error` make it usable as an offline acceptance gate.
+
+## M6.8 policy candidate leaderboard
+
+After one or more M6 training pipelines have produced evaluation artifacts, rank candidate profiles offline:
+
+```bash
+./scripts/rank_policy_candidates.sh data/training_pipelines \
+  --max-test-mae 0.05 \
+  --max-test-rmse 0.08 \
+  --require-promotable
+```
+
+The leaderboard scans `evaluation.json` files, ranks promotable candidates by test MAE/RMSE, and writes `candidate_leaderboard.json` plus `candidate_leaderboard.md`. This is a selection/reporting gate only; it does not edit policy YAML, install packages, or run MuJoCo.
