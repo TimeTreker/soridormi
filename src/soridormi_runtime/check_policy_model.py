@@ -41,14 +41,26 @@ class PolicyCheckResult:
     required_providers: list[str] | None = None
 
 
+def _is_dynamic_onnx_dim(value: Any) -> bool:
+    if value in {None, "", "?", -1}:
+        return True
+    return isinstance(value, str) and not value.strip().lstrip("+-").isdigit()
+
+
 def _shape_matches(actual: list[Any], expected: list[Any]) -> bool:
     if len(actual) != len(expected):
         return False
-    for a, e in zip(actual, expected):
+    for index, (a, e) in enumerate(zip(actual, expected)):
         if e in {None, "", "?", -1}:
             continue
-        if a in {None, "", "?"}:
-            continue
+        if _is_dynamic_onnx_dim(a):
+            # ONNX exporters commonly emit symbolic batch names such as
+            # "batch". Soridormi's runtime contract still sends batch size 1,
+            # so allow a dynamic first dimension when the expected batch is 1
+            # while keeping feature/action dimensions strict.
+            if index == 0 and str(e) == "1":
+                continue
+            return False
         if str(a) != str(e):
             return False
     return True
