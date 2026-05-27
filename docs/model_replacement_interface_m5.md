@@ -472,3 +472,17 @@ model:
 ```
 
 The runtime uses the same `OnnxPolicyController` control loop, but `SORIDORMI_POLICY_BACKEND=linear_behavior_clone` selects `LinearBehaviorClonePolicy` instead of ONNX Runtime. This keeps the controller/action-mapper/logging path identical while allowing fast sanity rollouts of offline-trained baseline artifacts.
+
+## M6.6 offline policy evaluation
+
+After a policy has a runtime profile, evaluate it against a prepared supervised dataset before launching MuJoCo:
+
+```bash
+./scripts/evaluate_policy_profile.sh linear_bc_open_duck \
+  data/training_datasets/open_duck_forward_prepared \
+  --output-dir data/training_evaluations/linear_bc_open_duck \
+  --write-predictions \
+  --max-test-mae 0.05
+```
+
+The evaluator supports `linear_behavior_clone` NPZ profiles and ONNX profiles. It writes `evaluation.json`, `evaluation_report.md`, and optional `predictions_<split>.jsonl` files. Threshold flags such as `--max-val-mae`, `--max-test-mae`, `--max-test-rmse`, and `--max-test-max-abs-error` make it usable as an offline acceptance gate.

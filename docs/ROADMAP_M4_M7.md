@@ -131,3 +131,9 @@ Adds `./scripts/train_behavior_clone.sh PREPARED_DATASET`, a deterministic NumPy
 ## M6.5 linear behavior-clone runtime profile
 
 Adds a lightweight runtime path for the M6 linear behavior-cloning baseline. `linear_behavior_clone.npz` artifacts can now be validated, wrapped by `LinearBehaviorClonePolicy`, and scaffolded into profiles with `./scripts/create_linear_bc_profile.sh`. The profile uses `model.kind: linear_behavior_clone` and the same 101D observation / 14D action contract, action postprocessing, motor target mapping, logging, command, and phase plumbing as the ONNX policy controller. This is a deployment smoke test for learned artifacts; full ONNX/neural export remains a later M6 step.
+
+### M6.6 Offline policy evaluation gate
+
+Status: implemented.
+
+Adds `evaluate_policy_profile.sh`, which compares a runtime policy profile against prepared supervised train/val/test splits and produces JSON/Markdown reports plus optional prediction JSONL artifacts. This gives replacement policies an offline acceptance step before simulation rollout.

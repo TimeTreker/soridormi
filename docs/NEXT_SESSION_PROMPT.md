@@ -48,3 +48,7 @@ Use `./scripts/train_behavior_clone.sh PREPARED_DATASET` after `summarize_traini
 M6.5 linear behavior-clone runtime profile
 
 Use `./scripts/create_linear_bc_profile.sh NAME --model data/training_runs/.../linear_behavior_clone.npz --template open_duck_forward` to scaffold a runtime profile for the baseline NPZ artifact. The generated profile uses `model.kind: linear_behavior_clone`, and the policy controller selects `LinearBehaviorClonePolicy` through `SORIDORMI_POLICY_BACKEND`. This is a rollout smoke-test path for offline training artifacts; full neural/ONNX export remains later M6 work.
+
+## M6.6 offline policy evaluation
+
+Use `./scripts/evaluate_policy_profile.sh PROFILE PREPARED_DATASET` after creating a runtime profile. It evaluates ONNX or `linear_behavior_clone` policies against prepared train/val/test supervised splits, writes `evaluation.json` and `evaluation_report.md`, optionally writes prediction JSONL files, and supports threshold flags such as `--max-test-mae` for offline acceptance before MuJoCo rollout.
