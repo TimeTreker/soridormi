@@ -204,6 +204,7 @@ def build_policy_contract(
         "reference_data": _mapping(policy_profile.payload.get("phase")).get("reference_data"),
     }
     model_payload = {
+        "kind": getattr(model, "kind", "onnx"),
         "path": model.path,
         "input_name": model.input_name,
         "output_name": model.output_name,

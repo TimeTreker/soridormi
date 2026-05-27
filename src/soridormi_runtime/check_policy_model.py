@@ -11,6 +11,7 @@ try:
 except Exception:  # pragma: no cover - depends on optional runtime dependency
     ort = None  # type: ignore[assignment]
 
+from soridormi_runtime.linear_behavior_clone_policy import load_linear_behavior_clone_model
 from soridormi_runtime.onnx_providers import parse_provider_csv, resolve_onnx_providers, verify_active_providers
 from soridormi_runtime.policy_contract import build_policy_contract
 from soridormi_runtime.policy_profiles import PolicyProfile
@@ -183,6 +184,45 @@ def check_policy_model(
     )
 
 
+def check_linear_behavior_clone_model(
+    policy_path: str | Path,
+    *,
+    expected_input_name: str = "obs",
+    expected_output_name: str = "continuous_actions",
+    expected_input_shape: list[Any] | None = None,
+    expected_output_shape: list[Any] | None = None,
+    require_providers: list[str] | str | None = None,
+) -> PolicyCheckResult:
+    path = Path(policy_path)
+    required = parse_provider_csv(require_providers)
+    model = load_linear_behavior_clone_model(path)
+    errors = list(model.errors)
+    warnings = list(model.warnings)
+    if required:
+        warnings.append("ONNX execution provider requirements are ignored for linear_behavior_clone NPZ models")
+    input_shape = [1, model.observation_size]
+    output_shape = [1, model.action_size]
+    if expected_input_shape is not None and not _shape_matches(input_shape, list(expected_input_shape)):
+        errors.append(f"Input shape mismatch: expected {expected_input_shape}, got {input_shape}")
+    if expected_output_shape is not None and not _shape_matches(output_shape, list(expected_output_shape)):
+        errors.append(f"Output shape mismatch: expected {expected_output_shape}, got {output_shape}")
+    return PolicyCheckResult(
+        not errors,
+        str(path),
+        [],
+        expected_input_name,
+        input_shape,
+        "tensor(float)",
+        expected_output_name,
+        output_shape,
+        "tensor(float)",
+        errors,
+        warnings,
+        requested_providers=[],
+        required_providers=required,
+    )
+
+
 def check_profile_model(
     profile: PolicyProfile,
     model_path_override: str | Path | None = None,
@@ -202,18 +242,29 @@ def check_profile_model(
     """
     contract = build_policy_contract(profile, robot_config_path=robot_config_path)
     model = profile.model
-    model_result = check_policy_model(
-        model_path_override or model.path,
-        expected_input_name=model.input_name,
-        expected_output_name=model.output_name,
-        expected_input_shape=model.input_shape,
-        expected_output_shape=model.output_shape,
-        expected_input_type=model.input_type,
-        expected_output_type=model.output_type,
-        providers=providers,
-        require_providers=require_providers,
-        prefer_cuda=prefer_cuda,
-    )
+    model_kind = str(getattr(model, "kind", "onnx")).strip().lower().replace("-", "_")
+    if model_kind in {"linear", "linear_npz", "linear_behavior_clone", "behavior_clone_linear"}:
+        model_result = check_linear_behavior_clone_model(
+            model_path_override or model.path,
+            expected_input_name=model.input_name,
+            expected_output_name=model.output_name,
+            expected_input_shape=model.input_shape,
+            expected_output_shape=model.output_shape,
+            require_providers=require_providers,
+        )
+    else:
+        model_result = check_policy_model(
+            model_path_override or model.path,
+            expected_input_name=model.input_name,
+            expected_output_name=model.output_name,
+            expected_input_shape=model.input_shape,
+            expected_output_shape=model.output_shape,
+            expected_input_type=model.input_type,
+            expected_output_type=model.output_type,
+            providers=providers,
+            require_providers=require_providers,
+            prefer_cuda=prefer_cuda,
+        )
     errors = [*contract.errors, *model_result.errors]
     warnings = [*contract.warnings, *model_result.warnings]
     return replace(

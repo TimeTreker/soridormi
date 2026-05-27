@@ -127,3 +127,7 @@ Adds `./scripts/summarize_training_dataset.sh PREPARED_DATASET`, which reads a p
 ## M6.4 behavior cloning baseline trainer
 
 Adds `./scripts/train_behavior_clone.sh PREPARED_DATASET`, a deterministic NumPy ridge-regression behavior-cloning baseline. It consumes M6.2 prepared splits plus M6.3 normalization artifacts and writes `linear_behavior_clone.npz`, `train_metrics.json`, and `train_report.md`. This is an offline sanity baseline for data plumbing; it does not alter runtime control or claim to replace full RL training.
+
+## M6.5 linear behavior-clone runtime profile
+
+Adds a lightweight runtime path for the M6 linear behavior-cloning baseline. `linear_behavior_clone.npz` artifacts can now be validated, wrapped by `LinearBehaviorClonePolicy`, and scaffolded into profiles with `./scripts/create_linear_bc_profile.sh`. The profile uses `model.kind: linear_behavior_clone` and the same 101D observation / 14D action contract, action postprocessing, motor target mapping, logging, command, and phase plumbing as the ONNX policy controller. This is a deployment smoke test for learned artifacts; full ONNX/neural export remains a later M6 step.

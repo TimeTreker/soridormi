@@ -127,6 +127,14 @@ python -m soridormi_runtime.training_dataset_stats "${tmpdir}/prepared_training_
 python -m soridormi_runtime.train_behavior_clone "${tmpdir}/prepared_training_dataset" \
   --output-dir "${tmpdir}/behavior_clone_baseline" \
   --json >/dev/null
+python -m soridormi_runtime.create_linear_bc_profile ci_linear_bc \
+  --model "${tmpdir}/behavior_clone_baseline/linear_behavior_clone.npz" \
+  --template open_duck_forward \
+  --description "CI linear behavior-clone profile" \
+  --output "${tmpdir}/ci_linear_bc.yaml" \
+  --robot-config "${robot_config}" >/dev/null
+python -m soridormi_runtime.policy_contract "${tmpdir}/ci_linear_bc.yaml" --robot-config "${robot_config}" --validate-only
+python -m soridormi_runtime.check_policy_model --profile "${tmpdir}/ci_linear_bc.yaml" --robot-config "${robot_config}" --json >/dev/null
 
 if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
   echo "Running M5 unit tests..."
@@ -145,5 +153,6 @@ if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
     tests/test_training_dataset_m61.py \
     tests/test_training_dataset_prepare_m62.py \
     tests/test_training_dataset_stats_m63.py \
-    tests/test_train_behavior_clone_m64.py
+    tests/test_train_behavior_clone_m64.py \
+    tests/test_linear_behavior_clone_policy_m65.py
 fi

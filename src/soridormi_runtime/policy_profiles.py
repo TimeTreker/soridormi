@@ -90,6 +90,7 @@ def resolve_policy_profile_path(profile: str | os.PathLike[str] | None = None) -
 @dataclass(frozen=True)
 class PolicyModelSpec:
     path: str
+    kind: str = "onnx"
     input_name: str = "obs"
     output_name: str = "continuous_actions"
     input_shape: list[Any] = field(default_factory=lambda: [1, 101])
@@ -116,6 +117,7 @@ class PolicyProfile:
             raise ValueError("policy profile model.path is required")
         model = PolicyModelSpec(
             path=str(model_path),
+            kind=str(model_payload.get("kind", "onnx")),
             input_name=str(model_payload.get("input_name", "obs")),
             output_name=str(model_payload.get("output_name", "continuous_actions")),
             input_shape=list(model_payload.get("input_shape", [1, 101])),
@@ -148,6 +150,8 @@ class PolicyProfile:
             "SORIDORMI_POLICY_PROFILE": self.name,
             "SORIDORMI_POLICY_PROFILE_FILE": str(self.path),
             "SORIDORMI_POLICY_PATH": self.model.path,
+            "SORIDORMI_POLICY_BACKEND": self.model.kind,
+            "SORIDORMI_POLICY_KIND": self.model.kind,
             "SORIDORMI_POLICY_INPUT_NAME": self.model.input_name,
             "SORIDORMI_POLICY_OUTPUT_NAME": self.model.output_name,
             "SORIDORMI_POLICY_EXPECTED_INPUT_SHAPE": _shape_to_env(self.model.input_shape),
@@ -259,6 +263,7 @@ def main() -> None:
         print(f"{profile.name}: {profile.description}")
         print(f"  file: {profile.path}")
         print(f"  model: {profile.model.path}")
+        print(f"  model kind: {profile.model.kind}")
         print(f"  input: {profile.model.input_name} {profile.model.input_shape} {profile.model.input_type}")
         print(f"  output: {profile.model.output_name} {profile.model.output_shape} {profile.model.output_type}")
 

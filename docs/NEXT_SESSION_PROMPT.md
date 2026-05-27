@@ -43,4 +43,8 @@ Use `./scripts/summarize_training_dataset.sh PREPARED_DATASET` after `prepare_tr
 
 ## M6.4 behavior cloning baseline trainer
 
-Use `./scripts/train_behavior_clone.sh PREPARED_DATASET` after `summarize_training_dataset.sh`. It trains a deterministic NumPy linear behavior-cloning baseline and writes model/metrics/report artifacts. Keep this as an offline training-pipeline smoke test; do not change runtime/backend behavior unless trace evidence requires it.
+Use `./scripts/train_behavior_clone.sh PREPARED_DATASET` after `summarize_training_dataset.sh`. It trains a deterministic NumPy linear behavior-cloning baseline and writes model/metrics/report artifacts.
+
+M6.5 linear behavior-clone runtime profile
+
+Use `./scripts/create_linear_bc_profile.sh NAME --model data/training_runs/.../linear_behavior_clone.npz --template open_duck_forward` to scaffold a runtime profile for the baseline NPZ artifact. The generated profile uses `model.kind: linear_behavior_clone`, and the policy controller selects `LinearBehaviorClonePolicy` through `SORIDORMI_POLICY_BACKEND`. This is a rollout smoke-test path for offline training artifacts; full neural/ONNX export remains later M6 work.

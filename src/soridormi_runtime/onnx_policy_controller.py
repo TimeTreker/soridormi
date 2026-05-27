@@ -8,7 +8,8 @@ import numpy as np
 from soridormi_api import MotorCommand, RobotState
 from soridormi_runtime.action_mapper import PolicyActionMapper
 from soridormi_runtime.action_postprocessor import ActionPostprocessor
-from soridormi_runtime.onnx_policy import OnnxPolicy, resolve_policy_path
+from soridormi_runtime.onnx_policy import resolve_policy_path
+from soridormi_runtime.policy_factory import make_runtime_policy
 from soridormi_runtime.policy_command import GaitPhaseGenerator, PolicyCommand
 
 
@@ -75,7 +76,7 @@ class OnnxPolicyController:
         self.control_hz = float(control_hz or os.environ.get("CONTROL_HZ", "50"))
         self.dt = 1.0 / self.control_hz
 
-        self.policy: PolicyLike = policy or OnnxPolicy(
+        self.policy: PolicyLike = policy or make_runtime_policy(
             policy_path=self.policy_path,
             robot_config_path=self.robot_config_path,
         )

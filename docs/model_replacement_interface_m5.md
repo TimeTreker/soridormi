@@ -445,3 +445,30 @@ After accepting and packaging a replacement profile, M6 training data can be exp
 ## M6.4 behavior cloning baseline trainer
 
 Use `./scripts/train_behavior_clone.sh PREPARED_DATASET` after dataset preparation and summarization. The trainer fits a deterministic linear ridge-regression behavior-cloning baseline from normalized observations to normalized actions, then saves a NumPy `.npz` artifact plus metrics/report files. This gives M6 a reproducible offline learning smoke test before adding heavier neural training or ONNX export.
+
+## M6.5 linear behavior-clone baseline profiles
+
+M6.4 writes a deterministic NumPy baseline at `linear_behavior_clone.npz`. M6.5 adds a temporary runtime-compatible profile path for that artifact:
+
+```bash
+./scripts/create_linear_bc_profile.sh linear_bc_open_duck \
+  --model data/training_runs/open_duck_forward_linear_bc/linear_behavior_clone.npz \
+  --template open_duck_forward \
+  --description "Linear BC smoke-test policy"
+
+./scripts/export_policy_contract.sh linear_bc_open_duck
+./scripts/check_policy_model.sh --profile linear_bc_open_duck
+./scripts/run_policy_experiment.sh linear_bc_open_duck
+```
+
+The generated YAML sets:
+
+```yaml
+model:
+  kind: linear_behavior_clone
+  path: /data/.../linear_behavior_clone.npz
+  input_shape: [1, 101]
+  output_shape: [1, 14]
+```
+
+The runtime uses the same `OnnxPolicyController` control loop, but `SORIDORMI_POLICY_BACKEND=linear_behavior_clone` selects `LinearBehaviorClonePolicy` instead of ONNX Runtime. This keeps the controller/action-mapper/logging path identical while allowing fast sanity rollouts of offline-trained baseline artifacts.
