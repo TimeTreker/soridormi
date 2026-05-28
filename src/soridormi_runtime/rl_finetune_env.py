@@ -16,6 +16,7 @@ from soridormi_runtime.action_postprocessor import ActionPostprocessor
 from soridormi_runtime.backends.sim import SimRobot
 from soridormi_runtime.policy_command import GaitPhaseGenerator, PolicyCommand
 from soridormi_runtime.policy_profiles import PolicyProfile
+from soridormi_runtime.walking_reward import WalkingRewardConfig, compute_walking_reward
 
 
 ACTION_SIZE = 14
@@ -117,6 +118,7 @@ class RlFineTuneRunResult:
     steps_completed: int
     residual_config: dict[str, Any]
     output_path: str | None
+    reward_config: dict[str, Any] | None = None
     transitions: list[dict[str, Any]] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -157,6 +159,7 @@ class RlFineTuneEnv:
         command: PolicyCommand | None = None,
         phase_generator: GaitPhaseGenerator | None = None,
         residual_config: ResidualActionConfig | None = None,
+        reward_config: WalkingRewardConfig | None = None,
         control_hz: float | None = None,
         host: str = "127.0.0.1",
         port: int = 5555,
@@ -168,6 +171,8 @@ class RlFineTuneEnv:
         self.dt = 1.0 / self.control_hz
         self.robot = robot or SimRobot(host=host, port=port)
         self.residual_config = residual_config or ResidualActionConfig()
+        self.reward_config = reward_config or WalkingRewardConfig()
+        self.previous_final_action: np.ndarray | None = None
         self.reset_on_start = bool(reset_on_start)
         self.step_index = 0
         self.current_state: RobotState | None = None
@@ -202,6 +207,7 @@ class RlFineTuneEnv:
         if callable(resetter):
             resetter()
         self.current_state = self.robot.read_state()
+        self.previous_final_action = None
         return self.current_state
 
     def step(self, residual_action: np.ndarray | list[float] | None = None) -> RlFineTuneStep:
@@ -222,6 +228,21 @@ class RlFineTuneEnv:
             setter(command.names, command.positions)
 
         next_state = self.robot.step_motor_command(command)
+        metrics = _transition_metrics(state, next_state, command)
+        reward = compute_walking_reward(
+            state,
+            next_state,
+            command=self.command,
+            motor_command=command,
+            final_action=final_action,
+            residual_action=residual_applied,
+            previous_final_action=self.previous_final_action,
+            config=self.reward_config,
+        )
+        metrics["reward"] = float(reward.reward)
+        metrics["reward_terms"] = dict(reward.terms)
+        metrics["reward_diagnostics"] = dict(reward.diagnostics)
+        metrics["terminated"] = bool(reward.terminated)
         transition = RlFineTuneStep(
             step_index=self.step_index,
             state_time=float(state.time),
@@ -230,10 +251,11 @@ class RlFineTuneEnv:
             residual_action=_float_list(residual_applied),
             final_action=_float_list(final_action),
             motor_command=_motor_command_summary(command),
-            metrics=_transition_metrics(state, next_state, command),
+            metrics=metrics,
             state_before=_state_summary(state),
             state_after=_state_summary(next_state),
         )
+        self.previous_final_action = final_action.copy()
         self.current_state = next_state
         self.step_index += 1
         return transition
@@ -270,6 +292,7 @@ def run_zero_residual_smoke(
     steps: int,
     residual_config: ResidualActionConfig,
     output_path: Path | None,
+    reward_config: WalkingRewardConfig | None = None,
     host: str = "127.0.0.1",
     port: int = 5555,
     reset_on_start: bool = True,
@@ -279,6 +302,7 @@ def run_zero_residual_smoke(
         host=host,
         port=port,
         residual_config=residual_config,
+        reward_config=reward_config,
         reset_on_start=reset_on_start,
     )
     transitions: list[dict[str, Any]] = []
@@ -296,6 +320,7 @@ def run_zero_residual_smoke(
         steps_requested=int(steps),
         steps_completed=len(transitions),
         residual_config=asdict(residual_config),
+        reward_config=asdict(reward_config or WalkingRewardConfig()),
         output_path=str(output_path) if output_path is not None else None,
         transitions=transitions,
         errors=errors,
@@ -367,6 +392,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--host", default=os.environ.get("SIM_HOST", "127.0.0.1"), help="Simulator API host")
     parser.add_argument("--port", type=int, default=int(os.environ.get("SIM_PORT", "5555")), help="Simulator API port")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT, help="JSON output path")
+    parser.add_argument("--target-height", type=float, default=0.30, help="Nominal base height for reward shaping")
+    parser.add_argument("--fall-height", type=float, default=0.14, help="Base height below which reward terminates")
+    parser.add_argument("--min-upright", type=float, default=0.65, help="Minimum upright score before reward terminates")
+    parser.add_argument("--forward-velocity-sigma", type=float, default=0.20, help="Velocity tracking sigma for commanded x velocity")
     parser.add_argument("--no-reset", action="store_true", help="Do not call simulator reset before stepping")
     parser.add_argument("--dry-run", action="store_true", help="Print resolved config without connecting to simulator")
     return parser
@@ -381,6 +410,12 @@ def main() -> None:
         residual_clip_abs=args.residual_clip_abs,
         final_action_clip_abs=final_clip,
     )
+    reward_config = WalkingRewardConfig(
+        target_height=args.target_height,
+        fall_height=args.fall_height,
+        min_upright=args.min_upright,
+        forward_velocity_sigma=args.forward_velocity_sigma,
+    )
 
     if args.dry_run:
         payload = {
@@ -391,6 +426,7 @@ def main() -> None:
             "output": str(args.output),
             "reset_on_start": not args.no_reset,
             "residual_config": asdict(residual_config),
+            "reward_config": asdict(reward_config),
         }
         print(json.dumps(payload, indent=2, sort_keys=True))
         return
@@ -399,6 +435,7 @@ def main() -> None:
         profile=args.profile,
         steps=args.steps,
         residual_config=residual_config,
+        reward_config=reward_config,
         output_path=args.output,
         host=args.host,
         port=args.port,
