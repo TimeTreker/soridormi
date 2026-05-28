@@ -297,13 +297,26 @@ def _parse_shape_env(name: str) -> list[object] | None:
 def _shape_matches(actual: list[object], expected: list[object]) -> bool:
     if len(actual) != len(expected):
         return False
-    for a, e in zip(actual, expected):
+
+    for index, (a, e) in enumerate(zip(actual, expected)):
+        # Expected None means caller explicitly allows any dimension.
         if e is None:
             continue
+
+        # ONNX Runtime may report dynamic dimensions as None, "?", "", or a
+        # symbolic name such as "batch". Soridormi always feeds a batch of 1 at
+        # runtime, so a symbolic first dimension is compatible with expected 1.
         if a in {None, "", "?"}:
             continue
+
+        if index == 0 and isinstance(a, str):
+            stripped = a.strip()
+            if stripped and not stripped.lstrip("-").isdigit():
+                continue
+
         if str(a) != str(e):
             return False
+
     return True
 
 
