@@ -141,6 +141,7 @@ class PolicyProfile:
         observation = _mapping(self.payload.get("observation"))
         simulator = _mapping(self.payload.get("simulator"))
         postprocess = _mapping(self.payload.get("action_postprocess"))
+        residual = _mapping(self.payload.get("residual_policy"))
         logging = _mapping(self.payload.get("logging"))
         accel_bias = observation.get("accel_bias_xyz", [1.3, 0.0, 0.0])
         if not isinstance(accel_bias, (list, tuple)) or len(accel_bias) != 3:
@@ -194,6 +195,10 @@ class PolicyProfile:
             "SORIDORMI_KNEE_ACTION_GAIN": _fmt(postprocess.get("knee_gain", 1.0)),
             "SORIDORMI_ANKLE_ACTION_GAIN": _fmt(postprocess.get("ankle_gain", 1.0)),
             "SORIDORMI_ACTION_CLIP_ABS": _fmt(postprocess.get("clip_abs", 0.0)),
+            "SORIDORMI_RESIDUAL_TEACHER_PROFILE": str(residual.get("teacher_profile", "open_duck_forward")),
+            "SORIDORMI_RESIDUAL_SCALE": _fmt(residual.get("residual_scale", 0.05)),
+            "SORIDORMI_RESIDUAL_CLIP_ABS": _fmt(residual.get("residual_clip_abs", 1.0)),
+            "SORIDORMI_RESIDUAL_FINAL_ACTION_CLIP_ABS": _fmt(residual.get("final_action_clip_abs", 0.0)),
             "SORIDORMI_POLICY_ACCEL_BIAS_X": _fmt(accel_bias[0]),
             "SORIDORMI_POLICY_ACCEL_BIAS_Y": _fmt(accel_bias[1]),
             "SORIDORMI_POLICY_ACCEL_BIAS_Z": _fmt(accel_bias[2]),

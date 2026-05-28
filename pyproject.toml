@@ -27,6 +27,7 @@ training = [
     # Keeping it out of this extra avoids accidentally installing a CPU
     # or mismatched CUDA wheel from the default index.
     "onnx>=1.16",
+    "onnxscript>=0.1.0",
 ]
 sim = [
     "mujoco>=3.1",

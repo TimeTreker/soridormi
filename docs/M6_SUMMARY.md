@@ -211,6 +211,74 @@ Typical command:
   --force-promote
 ```
 
+
+### M6.17: MuJoCo RL fine-tuning environment
+
+Soridormi can now step a residual fine-tuning environment through the same RobotState/MotorCommand API used by the runtime:
+
+```text
+teacher policy action + bounded residual action
+→ action mapper
+→ synchronous MuJoCo step
+→ transition metrics
+```
+
+Typical smoke command:
+
+```bash
+./scripts/run_rl_finetune_env.sh   --profile open_duck_forward   --steps 20   --residual-scale 0.05
+```
+
+### M6.18: walking-quality reward
+
+The RL environment now computes a walking reward with velocity tracking, upright/height stability, yaw/lateral penalties, action smoothness penalties, residual magnitude penalty, and fall termination.
+
+This is the objective used to improve beyond the teacher rather than only clone it.
+
+### M6.19: residual policy training on top of the default policy
+
+Soridormi can train a conservative residual policy on top of the default teacher policy. The first implementation uses a bounded 14D residual-bias optimizer, which is intentionally safe and simple:
+
+```text
+final_action = teacher_action + residual_scale * clip(residual_policy(obs))
+```
+
+Typical command:
+
+```bash
+./scripts/train_residual_policy.sh open_duck_forward   --output-dir data/rl_finetune/residual_open_duck   --profile-name residual_open_duck   --iterations 5   --population 16   --steps-per-episode 300   --residual-scale 0.05   --force-profile
+```
+
+### M6.20: residual ONNX export and runtime deployment
+
+The residual policy is exported as ONNX and deployed through a `model.kind: residual_onnx` runtime profile. The runtime wrapper keeps the teacher policy in the loop and applies the learned residual before normal action mapping.
+
+Expected artifacts:
+
+```text
+data/rl_finetune/residual_open_duck/residual_policy.pt
+data/rl_finetune/residual_open_duck/residual_policy.onnx
+configs/policies/residual_open_duck.yaml
+```
+
+### M6.21: default-vs-fine-tuned rollout comparison
+
+A residual/fine-tuned profile can be compared against the default teacher in bounded MuJoCo rollouts:
+
+```bash
+./scripts/run_residual_finetune_comparison.sh residual_open_duck   --teacher-profile open_duck_forward   --steps 1000   --require-provider CUDAExecutionProvider
+```
+
+This closes the sim-side improvement loop:
+
+```text
+teacher baseline
+→ residual fine-tuning reward
+→ residual ONNX policy
+→ bounded rollout
+→ rollout comparison against teacher
+```
+
 ## Current M6 exit criteria
 
 M6 is complete when the repo can do the following from data and code already in the project:
@@ -225,9 +293,13 @@ compare candidate rollout against teacher rollout
 diagnose failure
 relabel candidate states with teacher policy
 retrain and promote a better candidate
+build a residual RL fine-tuning environment
+score walking quality with a reward function
+train and export a residual ONNX policy
+compare default vs fine-tuned rollout behavior
 ```
 
-That loop is now implemented.
+That loop is now implemented as a project backbone. The residual policy optimizer is still a conservative first version; future work can replace it with PPO/SAC/recurrent residual actors without changing the deployment boundary.
 
 ## Lessons from M6
 
@@ -235,7 +307,8 @@ That loop is now implemented.
 2. The policy slot is `obs[101] -> action[14]`; do not confuse it with torque control.
 3. More helper scripts are not the project backbone. The backbone is train, deploy, roll out, compare, improve.
 4. DAgger-style relabeling is the natural next improvement once a cloned policy drifts from teacher states.
-5. M7 should not wait for a perfect learned policy; hardware backend work can start while M6 candidates continue improving in sim.
+5. Residual RL is the first path that can improve beyond the teacher instead of only cloning it.
+6. M7 should not wait for a perfect learned policy; hardware backend work can start while M6 candidates continue improving in sim.
 
 ## Recommended next milestone
 

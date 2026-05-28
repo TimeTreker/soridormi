@@ -6,10 +6,12 @@ from typing import Any
 
 from soridormi_runtime.linear_behavior_clone_policy import LinearBehaviorClonePolicy
 from soridormi_runtime.onnx_policy import OnnxPolicy
+from soridormi_runtime.residual_policy import ResidualOnnxPolicy
 
 
 ONNX_BACKENDS = {"", "onnx", "onnxruntime", "onnx_policy"}
 LINEAR_BACKENDS = {"linear", "linear_npz", "linear_behavior_clone", "behavior_clone_linear"}
+RESIDUAL_ONNX_BACKENDS = {"residual", "residual_onnx", "residual_policy", "teacher_residual"}
 
 
 def normalize_policy_backend(value: str | None) -> str:
@@ -18,8 +20,10 @@ def normalize_policy_backend(value: str | None) -> str:
         return "onnx"
     if text in LINEAR_BACKENDS:
         return "linear_behavior_clone"
+    if text in RESIDUAL_ONNX_BACKENDS:
+        return "residual_onnx"
     raise ValueError(
-        f"Unknown SORIDORMI_POLICY_BACKEND={value!r}. Use one of: onnx, linear_behavior_clone."
+        f"Unknown SORIDORMI_POLICY_BACKEND={value!r}. Use one of: onnx, linear_behavior_clone, residual_onnx."
     )
 
 
@@ -39,4 +43,6 @@ def make_runtime_policy(
         return OnnxPolicy(policy_path=policy_path, robot_config_path=robot_config_path)
     if backend == "linear_behavior_clone":
         return LinearBehaviorClonePolicy(policy_path=policy_path, robot_config_path=robot_config_path)
+    if backend == "residual_onnx":
+        return ResidualOnnxPolicy(policy_path=policy_path, robot_config_path=robot_config_path)
     raise AssertionError(f"unhandled policy backend: {backend}")

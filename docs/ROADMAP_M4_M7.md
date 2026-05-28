@@ -178,3 +178,18 @@ Adds finite runtime rollout controls (`SORIDORMI_MAX_STEPS` and `SORIDORMI_MAX_S
 ### M6.11: bounded rollout acceptance
 
 Adds `accept_policy_rollout.sh` / `soridormi_runtime.rollout_acceptance` to convert bounded rollout logs into pass/fail JSON and Markdown reports with thresholds for policy record count, duration, resets, action magnitude, joint magnitude, and optional base displacement.
+
+
+## M6.17-M6.21: residual RL fine-tuning loop
+
+M6 continues past imitation learning with a conservative residual RL path:
+
+```text
+M6.17 MuJoCo RL fine-tuning environment
+M6.18 walking-quality reward
+M6.19 residual policy training on top of default teacher
+M6.20 residual ONNX export/runtime profile
+M6.21 default-vs-fine-tuned rollout comparison
+```
+
+This is the first mechanism intended to improve beyond the default policy rather than only clone it.
