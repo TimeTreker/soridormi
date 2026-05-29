@@ -6,6 +6,7 @@ M6 has built most of the **simulation learning backbone**:
 
 - policy observation/action contract: `obs[101] -> action[14]`
 - teacher behavior-cloning data path
+- leakage-safe grouped train/val/test split path
 - neural behavior-clone ONNX export path
 - MuJoCo rollout comparison path
 - RL fine-tuning environment path
@@ -13,6 +14,10 @@ M6 has built most of the **simulation learning backbone**:
 - residual-policy fine-tuning path
 
 But a simulation milestone is only complete when the final candidate has been trained, exported, run, and compared against the default policy in MuJoCo.
+
+## Immediate correction
+
+Do not move to hardware walking yet. The next work item is the sim training loop: collect teacher-policy rollouts from MuJoCo, train a behavior-clone or residual candidate, export it, and compare it against the default policy in simulation. See `docs/M6_SIM_TRAINING_LOOP.md`.
 
 ## Completion definition
 

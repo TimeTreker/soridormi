@@ -39,6 +39,12 @@ class PolicyLike(Protocol):
     def bootstrap_defaults_from_state(self, state: RobotState) -> dict[str, float]:
         ...
 
+    def reset_state(self) -> None:
+        ...
+
+    def get_observation(self) -> list[float] | None:
+        ...
+
 
 class MapperLike(Protocol):
     def action_to_command(
@@ -101,6 +107,7 @@ class RlFineTuneStep:
     step_index: int
     state_time: float
     next_state_time: float
+    observation: list[float] | None
     teacher_action: list[float]
     residual_action: list[float]
     final_action: list[float]
@@ -206,6 +213,9 @@ class RlFineTuneEnv:
         resetter = getattr(self.mapper, "reset_targets", None)
         if callable(resetter):
             resetter()
+        policy_resetter = getattr(self.policy, "reset_state", None)
+        if callable(policy_resetter):
+            policy_resetter()
         self.current_state = self.robot.read_state()
         self.previous_final_action = None
         return self.current_state
@@ -216,6 +226,7 @@ class RlFineTuneEnv:
 
         self._set_policy_inputs()
         teacher_action = _action_array(self.policy.compute_action(state), "teacher_action")
+        observation = _policy_observation(self.policy)
         teacher_action = _action_array(
             self.postprocessor.apply(teacher_action, list(state.joints.names)),
             "teacher_action",
@@ -247,6 +258,7 @@ class RlFineTuneEnv:
             step_index=self.step_index,
             state_time=float(state.time),
             next_state_time=float(next_state.time),
+            observation=observation,
             teacher_action=_float_list(teacher_action),
             residual_action=_float_list(residual_applied),
             final_action=_float_list(final_action),
@@ -329,6 +341,25 @@ def run_zero_residual_smoke(
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(json.dumps(asdict(result), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return result
+
+
+def _policy_observation(policy: Any) -> list[float] | None:
+    getter = getattr(policy, "get_observation", None)
+    observation: Any = None
+    if callable(getter):
+        observation = getter()
+    if observation is None:
+        observation = getattr(policy, "last_observation", None)
+    if observation is None:
+        return None
+    arr = np.asarray(observation, dtype=np.float32)
+    if arr.shape == (1, 101):
+        arr = arr.reshape(101)
+    if arr.shape != (101,):
+        raise ValueError(f"policy observation must have shape (101,) or (1, 101), got {arr.shape}")
+    if not np.all(np.isfinite(arr)):
+        raise ValueError("policy observation must contain only finite values")
+    return [float(x) for x in arr.tolist()]
 
 
 def _action_array(values: np.ndarray | list[float], name: str) -> np.ndarray:

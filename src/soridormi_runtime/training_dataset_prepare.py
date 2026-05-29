@@ -41,6 +41,7 @@ class DatasetSplitInfo:
     path: str
     sample_count: int
     sha256: str | None = None
+    group_count: int | None = None
 
 
 @dataclass
@@ -58,6 +59,8 @@ class DatasetPrepareResult:
     seed: int
     shuffle: bool
     ratios: dict[str, float]
+    split_group_field: str | None = None
+    split_group_counts: dict[str, int] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -223,6 +226,33 @@ def _sample_key(sample: dict[str, Any], index: int) -> str:
     return f"{source_log}|{step_index}|{robot_time}|{index}"
 
 
+def _sample_group_key(sample: dict[str, Any], index: int, split_group_field: str | None) -> str:
+    """Return the leakage boundary used for scenario/rollout splits.
+
+    A supervised walking dataset contains highly correlated neighboring
+    timesteps. Random sample-level splitting can therefore put timestep N in
+    train and N+1 in validation, making validation look much better than true
+    closed-loop generalization. Use this key to keep whole rollouts/scenarios in
+    one split.
+    """
+
+    if not split_group_field:
+        return _sample_key(sample, index)
+    if split_group_field in {"source_log", "rollout"}:
+        value = sample.get("source_log")
+    elif split_group_field in {"scenario", "scenario_id"}:
+        value = sample.get("scenario_id", sample.get("source_log"))
+    elif split_group_field in {"episode", "episode_id"}:
+        scenario = sample.get("scenario_id", sample.get("source_log", ""))
+        episode = sample.get("episode_index", sample.get("episode_id", ""))
+        value = f"{scenario}|episode:{episode}"
+    else:
+        value = sample.get(split_group_field)
+    if value is None or value == "":
+        return _sample_key(sample, index)
+    return str(value)
+
+
 def _ordered_samples(samples: list[dict[str, Any]], *, seed: int, shuffle: bool) -> list[dict[str, Any]]:
     indexed = list(enumerate(samples))
     if shuffle:
@@ -230,6 +260,56 @@ def _ordered_samples(samples: list[dict[str, Any]], *, seed: int, shuffle: bool)
             key=lambda pair: hashlib.sha256(f"{seed}|{_sample_key(pair[1], pair[0])}".encode("utf-8")).hexdigest()
         )
     return [sample for _index, sample in indexed]
+
+
+def _split_samples_by_group(
+    samples: list[dict[str, Any]],
+    *,
+    seed: int,
+    shuffle: bool,
+    train_ratio: float,
+    val_ratio: float,
+    split_group_field: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], dict[str, int], list[str]]:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    first_index: dict[str, int] = {}
+    for index, sample in enumerate(samples):
+        key = _sample_group_key(sample, index, split_group_field)
+        groups.setdefault(key, []).append(sample)
+        first_index.setdefault(key, index)
+
+    group_keys = list(groups)
+    if shuffle:
+        group_keys.sort(key=lambda key: hashlib.sha256(f"{seed}|group|{key}".encode("utf-8")).hexdigest())
+    else:
+        group_keys.sort(key=lambda key: first_index[key])
+
+    train_group_count, val_group_count, test_group_count = _split_counts(len(group_keys), train_ratio, val_ratio)
+    train_keys = set(group_keys[:train_group_count])
+    val_keys = set(group_keys[train_group_count : train_group_count + val_group_count])
+    test_keys = set(group_keys[train_group_count + val_group_count : train_group_count + val_group_count + test_group_count])
+
+    def collect(keys: set[str]) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for key in group_keys:
+            if key in keys:
+                out.extend(groups[key])
+        return out
+
+    warnings: list[str] = []
+    if len(group_keys) < 3 and (val_ratio > 0 or (1.0 - train_ratio - val_ratio) > 0):
+        warnings.append(
+            f"Only {len(group_keys)} split group(s) found for {split_group_field!r}; "
+            "validation/test splits may be empty. Collect more independent rollouts/scenarios."
+        )
+
+    return (
+        collect(train_keys),
+        collect(val_keys),
+        collect(test_keys),
+        {"train": len(train_keys), "val": len(val_keys), "test": len(test_keys)},
+        warnings,
+    )
 
 
 def _validate_ratios(train_ratio: float, val_ratio: float, test_ratio: float) -> list[str]:
@@ -275,6 +355,7 @@ def split_training_dataset(
     observation_size: int = DEFAULT_OBSERVATION_SIZE,
     action_size: int = DEFAULT_ACTION_SIZE,
     require_next_state: bool = False,
+    split_group_field: str | None = None,
 ) -> DatasetPrepareResult:
     input_path = Path(dataset_path)
     output = Path(output_dir) if output_dir is not None else Path("/data/training_datasets/prepared") / input_path.stem
@@ -297,6 +378,7 @@ def split_training_dataset(
             seed=seed,
             shuffle=shuffle,
             ratios={"train": train_ratio, "val": val_ratio, "test": test_ratio},
+            split_group_field=split_group_field,
             errors=ratio_errors,
         )
 
@@ -306,11 +388,23 @@ def split_training_dataset(
         action_size=action_size,
         require_next_state=require_next_state,
     )
-    ordered = _ordered_samples(samples, seed=seed, shuffle=shuffle)
-    train_count, val_count, test_count = _split_counts(len(ordered), train_ratio, val_ratio)
-    train_samples = ordered[:train_count]
-    val_samples = ordered[train_count : train_count + val_count]
-    test_samples = ordered[train_count + val_count : train_count + val_count + test_count]
+    split_group_counts = {"train": 0, "val": 0, "test": 0}
+    split_warnings: list[str] = []
+    if split_group_field:
+        train_samples, val_samples, test_samples, split_group_counts, split_warnings = _split_samples_by_group(
+            samples,
+            seed=seed,
+            shuffle=shuffle,
+            train_ratio=train_ratio,
+            val_ratio=val_ratio,
+            split_group_field=split_group_field,
+        )
+    else:
+        ordered = _ordered_samples(samples, seed=seed, shuffle=shuffle)
+        train_count, val_count, test_count = _split_counts(len(ordered), train_ratio, val_ratio)
+        train_samples = ordered[:train_count]
+        val_samples = ordered[train_count : train_count + val_count]
+        test_samples = ordered[train_count + val_count : train_count + val_count + test_count]
 
     split_paths = {
         "train": output / "train.jsonl",
@@ -327,23 +421,26 @@ def split_training_dataset(
             path=str(split_paths["train"]),
             sample_count=len(train_samples),
             sha256=sha256_file(split_paths["train"]),
+            group_count=split_group_counts["train"] if split_group_field else None,
         ),
         "val": DatasetSplitInfo(
             name="val",
             path=str(split_paths["val"]),
             sample_count=len(val_samples),
             sha256=sha256_file(split_paths["val"]),
+            group_count=split_group_counts["val"] if split_group_field else None,
         ),
         "test": DatasetSplitInfo(
             name="test",
             path=str(split_paths["test"]),
             sample_count=len(test_samples),
             sha256=sha256_file(split_paths["test"]),
+            group_count=split_group_counts["test"] if split_group_field else None,
         ),
     }
 
     errors = list(validation.errors)
-    warnings = list(validation.warnings)
+    warnings = list(validation.warnings) + split_warnings
     if validation.valid_sample_count == 0 and not errors:
         errors.append("No valid samples were found")
 
@@ -362,6 +459,8 @@ def split_training_dataset(
         seed=seed,
         shuffle=shuffle,
         ratios={"train": train_ratio, "val": val_ratio, "test": test_ratio},
+        split_group_field=split_group_field,
+        split_group_counts=split_group_counts,
         errors=errors,
         warnings=warnings,
     )
@@ -380,6 +479,8 @@ def split_training_dataset(
         "seed": seed,
         "shuffle": shuffle,
         "ratios": result.ratios,
+        "split_group_field": result.split_group_field,
+        "split_group_counts": result.split_group_counts,
         "splits": {
             "train": asdict(result.train),
             "val": asdict(result.val),
@@ -404,7 +505,10 @@ def print_prepare_summary(result: DatasetPrepareResult) -> None:
     print(f"Invalid samples: {result.invalid_sample_count}")
     print("Splits:")
     for split in (result.train, result.val, result.test):
-        print(f"  {split.name}: {split.sample_count} -> {split.path}")
+        group_suffix = f" ({split.group_count} groups)" if split.group_count is not None else ""
+        print(f"  {split.name}: {split.sample_count}{group_suffix} -> {split.path}")
+    if result.split_group_field:
+        print(f"Split group field: {result.split_group_field}")
     if result.warnings:
         print("Warnings:")
         for warning in result.warnings[:20]:
@@ -428,6 +532,14 @@ def main() -> None:
     parser.add_argument("--observation-size", type=int, default=DEFAULT_OBSERVATION_SIZE)
     parser.add_argument("--action-size", type=int, default=DEFAULT_ACTION_SIZE)
     parser.add_argument("--require-next-state", action="store_true")
+    parser.add_argument(
+        "--split-group-field",
+        default=None,
+        help=(
+            "Keep all samples with the same group in one split to avoid timestep leakage. "
+            "Useful values: source_log, rollout, scenario_id, episode_id."
+        ),
+    )
     parser.add_argument("--json", action="store_true", help="Print machine-readable result JSON")
     args = parser.parse_args()
 
@@ -442,6 +554,7 @@ def main() -> None:
         observation_size=args.observation_size,
         action_size=args.action_size,
         require_next_state=args.require_next_state,
+        split_group_field=args.split_group_field,
     )
     if args.json:
         print(json.dumps(asdict(result), indent=2, sort_keys=True))

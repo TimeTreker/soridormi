@@ -125,3 +125,45 @@ def test_split_training_dataset_rejects_bad_ratios(tmp_path: Path) -> None:
 
     assert not result.ok
     assert any("sum to 1.0" in error for error in result.errors)
+
+
+def test_split_training_dataset_can_split_by_rollout_group_without_leakage(tmp_path: Path) -> None:
+    dataset = tmp_path / "dataset.jsonl"
+    rows = []
+    for rollout in range(5):
+        for step in range(3):
+            sample = _sample(rollout * 10 + step)
+            sample["source_log"] = f"rollout_{rollout}.jsonl"
+            sample["scenario_id"] = f"scenario_{rollout % 2}"
+            rows.append(sample)
+    _write_jsonl(dataset, rows)
+
+    result = split_training_dataset(
+        dataset,
+        output_dir=tmp_path / "prepared_grouped",
+        train_ratio=0.6,
+        val_ratio=0.2,
+        test_ratio=0.2,
+        seed=7,
+        split_group_field="source_log",
+    )
+
+    assert result.ok
+    assert result.split_group_field == "source_log"
+    assert result.split_group_counts == {"train": 3, "val": 1, "test": 1}
+    assert result.train.sample_count == 9
+    assert result.val.sample_count == 3
+    assert result.test.sample_count == 3
+
+    split_sources = {}
+    for split in (result.train, result.val, result.test):
+        rows = [json.loads(line) for line in Path(split.path).read_text(encoding="utf-8").splitlines()]
+        split_sources[split.name] = {row["source_log"] for row in rows}
+
+    assert split_sources["train"].isdisjoint(split_sources["val"])
+    assert split_sources["train"].isdisjoint(split_sources["test"])
+    assert split_sources["val"].isdisjoint(split_sources["test"])
+
+    manifest = json.loads(Path(result.manifest_path).read_text(encoding="utf-8"))
+    assert manifest["split_group_field"] == "source_log"
+    assert manifest["splits"]["train"]["group_count"] == 3

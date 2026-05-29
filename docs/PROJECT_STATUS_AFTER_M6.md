@@ -5,13 +5,13 @@
 ```text
 M4: official policy parity in Soridormi — complete for checked trace window
 M5: model replacement interface and packaging — complete enough
-M6: sim-side policy learning loop — complete enough for forward-walk case
-M7: hardware bridge — next focus
+M6: sim-side policy learning loop — not complete until a trained candidate is validated in MuJoCo
+M7: hardware bridge — blocked for walking until the M6 training/comparison gate passes
 ```
 
 ## M6 outcome
 
-Soridormi now has a full sim-side policy-improvement loop:
+Soridormi has most of the sim-side policy-improvement backbone, but this should not be treated as a finished training result yet:
 
 ```text
 teacher/default policy
@@ -24,7 +24,7 @@ teacher/default policy
 → default-vs-residual MuJoCo comparison
 ```
 
-The successful forward-walk comparison showed the residual policy completed the same 1000-step rollout as the default policy with zero resets and improved measured forward/lateral metrics.
+The practical next result should be produced from a fresh teacher-dataset or residual-RL run, followed by ONNX/profile validation and a default-vs-candidate MuJoCo rollout comparison. The direct teacher collection path is documented in `docs/M6_SIM_TRAINING_LOOP.md`.
 
 ## Remaining M6 work that can continue in parallel
 
