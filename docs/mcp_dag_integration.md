@@ -51,3 +51,28 @@ A safe short-motion DAG should follow this shape:
 
 `stop` and `emergency_stop` may preempt any running motion task. Raw motor,
 joint, and torque APIs must remain outside LLM-visible manifests.
+
+## Local dry-run tool shim
+
+Soridormi now includes a small in-process MCP-style tool service:
+
+```python
+from soridormi_runtime.mcp.local_tools import SoridormiLocalToolService
+```
+
+It implements the robot-body tools declared in the manifest, but motion execution
+is dry-run only. It validates bounded velocity commands, creates short-lived plan
+IDs, and refuses execution after an emergency stop. It never sends motor, joint,
+or torque commands.
+
+A CLI wrapper is available for smoke tests and future adapter work:
+
+```bash
+PYTHONPATH=src python -m soridormi_runtime.mcp.call_tool soridormi.robot.get_status
+PYTHONPATH=src python -m soridormi_runtime.mcp.call_tool \
+  soridormi.motion.create_plan \
+  --args-json '{"commands":[{"vx":0.08,"vy":0.0,"yaw":0.0,"duration_s":1.0}]}'
+```
+
+This is not the final MCP server. It is the robot-side tool core that a future
+stdio or HTTP MCP server should wrap.

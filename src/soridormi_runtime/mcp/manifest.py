@@ -154,7 +154,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
         agent_id="soridormi.robot",
         display_name="Soridormi Robot State Agent",
         description="Read-only Soridormi robot status, mode, and battery state.",
-        transport=TransportSpec(kind="stdio", command="python", args=["-m", "soridormi_runtime.mcp.server"]),
+        transport=TransportSpec(kind="local_cli", command="python", args=["-m", "soridormi_runtime.mcp.call_tool"]),
         status=AgentStatus(available=True, details={"mode": mode}),
         tags=["soridormi", "robot", "state"],
         tools=[
@@ -223,7 +223,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
         agent_id="soridormi.motion",
         display_name="Soridormi Motion Agent",
         description="Create and execute short velocity-command motion plans. Does not expose raw motor commands.",
-        transport=TransportSpec(kind="stdio", command="python", args=["-m", "soridormi_runtime.mcp.server"]),
+        transport=TransportSpec(kind="local_cli", command="python", args=["-m", "soridormi_runtime.mcp.call_tool"]),
         status=AgentStatus(available=True, details={"mode": mode}),
         tags=["soridormi", "motion", "robot"],
         tools=[
@@ -306,7 +306,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
         agent_id="soridormi.safety",
         display_name="Soridormi Safety Agent",
         description="Soridormi safety validation, motion monitoring, and emergency stop capabilities.",
-        transport=TransportSpec(kind="stdio", command="python", args=["-m", "soridormi_runtime.mcp.server"]),
+        transport=TransportSpec(kind="local_cli", command="python", args=["-m", "soridormi_runtime.mcp.call_tool"]),
         status=AgentStatus(available=True, details={"mode": mode}),
         tags=["soridormi", "safety"],
         tools=[
