@@ -47,6 +47,101 @@ class HoldStepRange:
         return {"minimum": int(self.minimum), "maximum": int(self.maximum)}
 
 
+
+@dataclass
+class CommandCoverageStats:
+    count: int = 0
+    vx_min: float | None = None
+    vx_max: float | None = None
+    vy_min: float | None = None
+    vy_max: float | None = None
+    yaw_min: float | None = None
+    yaw_max: float | None = None
+    vx_sum: float = 0.0
+    vy_sum: float = 0.0
+    yaw_sum: float = 0.0
+    stop_like_count: int = 0
+
+    def add(self, command: PolicyCommand) -> None:
+        vx = float(command.x_velocity)
+        vy = float(command.y_velocity)
+        yaw = float(command.yaw_velocity)
+        self.count += 1
+        self.vx_min = vx if self.vx_min is None else min(self.vx_min, vx)
+        self.vx_max = vx if self.vx_max is None else max(self.vx_max, vx)
+        self.vy_min = vy if self.vy_min is None else min(self.vy_min, vy)
+        self.vy_max = vy if self.vy_max is None else max(self.vy_max, vy)
+        self.yaw_min = yaw if self.yaw_min is None else min(self.yaw_min, yaw)
+        self.yaw_max = yaw if self.yaw_max is None else max(self.yaw_max, yaw)
+        self.vx_sum += vx
+        self.vy_sum += vy
+        self.yaw_sum += yaw
+        if abs(vx) < 1e-6 and abs(vy) < 1e-6 and abs(yaw) < 1e-6:
+            self.stop_like_count += 1
+
+    def describe(self) -> dict[str, Any]:
+        if self.count <= 0:
+            return {
+                "count": 0,
+                "vx": {},
+                "vy": {},
+                "yaw": {},
+                "stop_like_count": 0,
+                "stop_like_ratio": 0.0,
+            }
+        count = float(self.count)
+        return {
+            "count": int(self.count),
+            "vx": {
+                "minimum": float(self.vx_min if self.vx_min is not None else 0.0),
+                "maximum": float(self.vx_max if self.vx_max is not None else 0.0),
+                "mean": float(self.vx_sum / count),
+            },
+            "vy": {
+                "minimum": float(self.vy_min if self.vy_min is not None else 0.0),
+                "maximum": float(self.vy_max if self.vy_max is not None else 0.0),
+                "mean": float(self.vy_sum / count),
+            },
+            "yaw": {
+                "minimum": float(self.yaw_min if self.yaw_min is not None else 0.0),
+                "maximum": float(self.yaw_max if self.yaw_max is not None else 0.0),
+                "mean": float(self.yaw_sum / count),
+            },
+            "stop_like_count": int(self.stop_like_count),
+            "stop_like_ratio": float(self.stop_like_count / count),
+        }
+
+
+def interpolate_command(start: PolicyCommand, target: PolicyCommand, alpha: float) -> PolicyCommand:
+    clamped = min(1.0, max(0.0, float(alpha)))
+
+    def blend(a: float, b: float) -> float:
+        return float(a + (b - a) * clamped)
+
+    return PolicyCommand(
+        x_velocity=blend(start.x_velocity, target.x_velocity),
+        y_velocity=blend(start.y_velocity, target.y_velocity),
+        yaw_velocity=blend(start.yaw_velocity, target.yaw_velocity),
+        neck_pitch=blend(start.neck_pitch, target.neck_pitch),
+        head_pitch=blend(start.head_pitch, target.head_pitch),
+        head_yaw=blend(start.head_yaw, target.head_yaw),
+        head_roll=blend(start.head_roll, target.head_roll),
+    )
+
+
+def ramped_segment_command(
+    *,
+    previous_command: PolicyCommand,
+    target_command: PolicyCommand,
+    segment_step_index: int,
+    ramp_steps: int,
+) -> tuple[PolicyCommand, float]:
+    if ramp_steps <= 0:
+        return target_command, 1.0
+    alpha = min(1.0, float(int(segment_step_index) + 1) / float(max(1, int(ramp_steps))))
+    return interpolate_command(previous_command, target_command, alpha), alpha
+
+
 @dataclass(frozen=True)
 class RandomCommandSegment:
     segment_index: int
@@ -91,7 +186,9 @@ class RandomTeacherDatasetCollectResult:
     yaw_range: dict[str, float] = field(default_factory=dict)
     command_hold_steps: dict[str, int] = field(default_factory=dict)
     stop_probability: float = 0.0
+    command_ramp_steps: int = 0
     segment_count: int = 0
+    command_coverage: dict[str, Any] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -188,6 +285,7 @@ def collect_random_teacher_dataset(
     yaw_range: CommandRange = CommandRange(-0.20, 0.20),
     command_hold_steps: HoldStepRange = HoldStepRange(80, 250),
     stop_probability: float = 0.10,
+    command_ramp_steps: int = 20,
     seed: int = 123,
     reward_config: WalkingRewardConfig | None = None,
     host: str = "127.0.0.1",
@@ -200,9 +298,11 @@ def collect_random_teacher_dataset(
 
     Unlike ``teacher_dataset_collect.collect_teacher_dataset``, this collector
     changes the policy command several times inside each episode. This is the
-    M6B data path for command-conditioned free walking: one rollout contains
-    stand, stop, turn, curve, lateral, forward, and backward command changes
-    sampled from conservative ranges.
+    M6B data path for continuous command-conditioned free walking: one rollout
+    contains stand, stop, turn, curve, lateral, forward, and backward command
+    changes sampled from conservative ranges. By default, command changes are
+    ramped over a short number of control steps so the BC dataset contains
+    smooth speed transitions instead of only abrupt step commands.
     """
 
     output = Path(output_path)
@@ -219,6 +319,7 @@ def collect_random_teacher_dataset(
     skipped_steps = 0
     terminated_episodes = 0
     segment_count = 0
+    coverage = CommandCoverageStats()
     global_step_index = 0
 
     with output.open("w", encoding="utf-8") as f:
@@ -258,10 +359,18 @@ def collect_random_teacher_dataset(
                     errors.append(f"episode {episode_index}: reset failed: {exc!r}")
                     break
 
+                previous_command = PolicyCommand()
                 for segment in schedule:
-                    setattr(env, "command", segment.command)
                     for segment_step_index in range(segment.hold_steps):
                         episode_step_index = int(segment.start_step) + int(segment_step_index)
+                        applied_command, ramp_alpha = ramped_segment_command(
+                            previous_command=previous_command,
+                            target_command=segment.command,
+                            segment_step_index=segment_step_index,
+                            ramp_steps=command_ramp_steps,
+                        )
+                        setattr(env, "command", applied_command)
+                        coverage.add(applied_command)
                         try:
                             transition = env.step(None)
                         except Exception as exc:
@@ -278,7 +387,7 @@ def collect_random_teacher_dataset(
                             episode_step_index=episode_step_index,
                             global_step_index=global_step_index,
                             transition=transition,
-                            command_vector=segment.command.as_list(),
+                            command_vector=applied_command.as_list(),
                         )
                         global_step_index += 1
                         if sample is None:
@@ -299,6 +408,9 @@ def collect_random_teacher_dataset(
                                     "command_segment_step_index": int(segment_step_index),
                                     "command_segment_start_step": int(segment.start_step),
                                     "command_segment_hold_steps": int(segment.hold_steps),
+                                    "command_ramp_steps": int(max(0, command_ramp_steps)),
+                                    "command_ramp_alpha": float(ramp_alpha),
+                                    "policy_command_target": segment.command.as_list(),
                                     "command_schedule_seed": int(seed),
                                 }
                             )
@@ -308,6 +420,9 @@ def collect_random_teacher_dataset(
                                     {
                                         "collector": "soridormi_runtime.random_teacher_dataset_collect",
                                         "command_segment": segment.describe(),
+                                        "applied_command": applied_command.describe(),
+                                        "target_command": segment.command.describe(),
+                                        "command_ramp_alpha": float(ramp_alpha),
                                     }
                                 )
                             f.write(json.dumps(sample, separators=(",", ":"), sort_keys=True) + "\n")
@@ -319,6 +434,7 @@ def collect_random_teacher_dataset(
                             if stop_on_terminated:
                                 break
                     else:
+                        previous_command = segment.command
                         continue
                     break
 
@@ -343,7 +459,9 @@ def collect_random_teacher_dataset(
         yaw_range=yaw_range.describe(),
         command_hold_steps=command_hold_steps.describe(),
         stop_probability=float(stop_probability),
+        command_ramp_steps=int(max(0, command_ramp_steps)),
         segment_count=segment_count,
+        command_coverage=coverage.describe(),
         errors=errors,
         warnings=warnings,
     )
@@ -365,6 +483,18 @@ def _print_summary(result: RandomTeacherDatasetCollectResult) -> None:
     print(f"Episodes: {result.episodes_requested}")
     print(f"Steps per episode: {result.steps_per_episode}")
     print(f"Segments: {result.segment_count}")
+    print(f"Command ramp steps: {result.command_ramp_steps}")
+    if result.command_coverage:
+        coverage = result.command_coverage
+        vx = coverage.get("vx", {})
+        vy = coverage.get("vy", {})
+        yaw = coverage.get("yaw", {})
+        print(
+            "Applied command coverage: "
+            f"vx=[{vx.get('minimum', 0.0):.3f},{vx.get('maximum', 0.0):.3f}] "
+            f"vy=[{vy.get('minimum', 0.0):.3f},{vy.get('maximum', 0.0):.3f}] "
+            f"yaw=[{yaw.get('minimum', 0.0):.3f},{yaw.get('maximum', 0.0):.3f}]"
+        )
     print(f"Samples: {result.sample_count}")
     print(f"Skipped steps: {result.skipped_steps}")
     print(f"Terminated episodes: {result.terminated_episodes}")
@@ -423,6 +553,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--vy-range", default="-0.03,0.03", help="MIN,MAX random lateral velocity range")
     parser.add_argument("--yaw-range", default="-0.20,0.20", help="MIN,MAX random yaw velocity range")
     parser.add_argument("--command-hold-steps", default="80,250", help="MIN,MAX steps per command segment")
+    parser.add_argument(
+        "--command-ramp-steps",
+        type=int,
+        default=20,
+        help="control steps used to ramp from the previous command to each new target command",
+    )
     parser.add_argument("--stop-probability", type=float, default=0.10)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--target-height", type=float, default=0.30)
@@ -455,6 +591,7 @@ def main(argv: list[str] | None = None) -> int:
         yaw_range=_parse_range(args.yaw_range, name="--yaw-range"),
         command_hold_steps=_parse_hold_range(args.command_hold_steps),
         stop_probability=args.stop_probability,
+        command_ramp_steps=max(0, int(args.command_ramp_steps)),
         seed=args.seed,
         reward_config=reward_config,
         host=args.host,

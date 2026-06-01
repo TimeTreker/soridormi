@@ -275,6 +275,18 @@ nod_yes or shake_no
 
 Everything else may remain declared but unavailable until its controller and validation exist.
 
+## Skill parameters and policy context
+
+The skill manifest is the human/agent-facing vocabulary, but executable locomotion skills should lower to structured policy context rather than hard-coded gait names. For example, `walk_velocity` should carry continuous velocity parameters, while future terrain/obstacle skills may add clearance, stride, terrain, and obstacle fields:
+
+```text
+skill_id + desired_command + task_context + environment_context -> policy input context
+```
+
+Semantic aliases such as `slow`, `normal`, `fast`, `careful`, or `high_clearance` may be useful at the UI or planner layer, but they must resolve to bounded numeric/context fields before reaching the low-level policy. Soridormi should reject unsupported context combinations the same way it rejects unsupported skills.
+
+See `docs/SORIDORMI_POLICY_CONTEXT_CONTRACT.md` for the policy input contract.
+
 ## Relationship to BC, residual, and RL
 
 Behavior cloning can copy an existing teacher skill. It cannot invent a better skill than the teacher. If the teacher drags its feet, BC will likely drag its feet too.

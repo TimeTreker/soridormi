@@ -15,6 +15,23 @@ MuJoCo sim server
 ```
 
 
+## Policy context contract
+
+The training target is a context-conditioned policy, not a single fixed-speed walking demo. The long-term contract is documented in:
+
+```text
+docs/SORIDORMI_POLICY_CONTEXT_CONTRACT.md
+```
+
+Near-term M6 remains simple: robot observation plus continuous velocity command should produce the 14D action. Future stages should add task context and environment context without changing the safety boundary:
+
+```text
+robot_state + desired_command + task_context + environment_context + short_history -> action_14d
+```
+
+Teacher data should therefore record more than observation/action pairs whenever possible. Keep `scenario_id`, rollout grouping, applied/target commands, command ramp metadata, terrain labels, and future skill/task labels so BC, closed-loop evaluation, and residual/RL can debug failures by scenario rather than by file name.
+
+
 ## 0. Current priority: evaluate commanded walking first
 
 The current main branch already has teacher collection, command-grid arguments, grouped dataset splitting, neural BC export, rollout comparison, residual policy scaffolding, and walking reward code. The next Soridormi milestone is therefore not another interface layer; it is proving command-conditioned walking in MuJoCo.
@@ -112,13 +129,14 @@ In another terminal:
   --vy-range -0.03,0.03 \
   --yaw-range -0.20,0.20 \
   --command-hold-steps 80,250 \
+  --command-ramp-steps 20 \
   --backend mujoco \
   --no-viewer
 ```
 
-Negative range values are valid in either shell style, so both `--vx-range -0.03,0.15` and `--vx-range=-0.03,0.15` are supported.
+Negative range values are valid in either shell style, so both `--vx-range -0.03,0.15` and `--vx-range=-0.03,0.15` are supported. The collector ramps each new target command over `--command-ramp-steps` control steps by default. Keep this nonzero for continuous-speed BC datasets, because the robot should learn smooth speed changes such as slow -> normal -> fast -> stop, not only abrupt command jumps. Use `--command-ramp-steps 0` only for explicit step-response debugging.
 
-Use `--viewer` only when the simulator terminal was started with `./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer`. The collector records command segment metadata so later training/evaluation can distinguish fixed-command grids from random command-transition data.
+Use `--viewer` only when the simulator terminal was started with `./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer`. The collector records both the applied command and the target command plus command segment/ramp metadata so later training/evaluation can distinguish fixed-command grids from random continuous command-transition data.
 
 ## 3. Train a teacher behavior-clone policy
 

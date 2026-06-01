@@ -9,7 +9,9 @@ from soridormi_runtime.random_teacher_dataset_collect import (
     _normalize_negative_range_args,
     collect_random_teacher_dataset,
     generate_random_command_schedule,
+    ramped_segment_command,
 )
+from soridormi_runtime.policy_command import PolicyCommand
 from soridormi_runtime.rl_finetune_env import RlFineTuneStep
 from soridormi_runtime.training_dataset_prepare import load_and_validate_dataset
 
@@ -47,6 +49,47 @@ class FakeRandomTeacherEnv:
             state_after={"time": 0.02 * (idx + 1)},
         )
 
+
+
+
+def test_ramped_segment_command_interpolates_velocity_commands() -> None:
+    start = PolicyCommand(x_velocity=0.0, y_velocity=0.0, yaw_velocity=0.0)
+    target = PolicyCommand(x_velocity=0.2, y_velocity=-0.04, yaw_velocity=0.3)
+
+    first, alpha_first = ramped_segment_command(
+        previous_command=start,
+        target_command=target,
+        segment_step_index=0,
+        ramp_steps=4,
+    )
+    last, alpha_last = ramped_segment_command(
+        previous_command=start,
+        target_command=target,
+        segment_step_index=3,
+        ramp_steps=4,
+    )
+
+    assert alpha_first == 0.25
+    assert first.x_velocity == 0.05
+    assert first.y_velocity == -0.01
+    assert first.yaw_velocity == 0.075
+    assert alpha_last == 1.0
+    assert last.x_velocity == target.x_velocity
+    assert last.y_velocity == target.y_velocity
+    assert last.yaw_velocity == target.yaw_velocity
+
+
+def test_ramped_segment_command_can_be_disabled() -> None:
+    target = PolicyCommand(x_velocity=0.2)
+    command, alpha = ramped_segment_command(
+        previous_command=PolicyCommand(),
+        target_command=target,
+        segment_step_index=0,
+        ramp_steps=0,
+    )
+
+    assert alpha == 1.0
+    assert command.x_velocity == target.x_velocity
 
 def test_generate_random_command_schedule_is_seeded_and_covers_episode() -> None:
     import numpy as np
@@ -86,6 +129,7 @@ def test_collect_random_teacher_dataset_writes_segment_metadata(tmp_path: Path) 
         yaw_range=CommandRange(-0.20, 0.20),
         command_hold_steps=HoldStepRange(3, 4),
         stop_probability=0.0,
+        command_ramp_steps=2,
         seed=7,
         env_factory=FakeRandomTeacherEnv,
     )
@@ -104,6 +148,9 @@ def test_collect_random_teacher_dataset_writes_segment_metadata(tmp_path: Path) 
     assert "command_segment_index" in rows[0]
     assert "command_segment_id" in rows[0]
     assert "command_segment_hold_steps" in rows[0]
+    assert rows[0]["command_ramp_steps"] == 2
+    assert 0.0 <= rows[0]["command_ramp_alpha"] <= 1.0
+    assert "policy_command_target" in rows[0]
     assert rows[-1]["rollout_id"].endswith("episode_1")
 
     unique_commands = {tuple(row["policy_command"][:3]) for row in rows}
@@ -125,6 +172,7 @@ def test_collect_random_teacher_dataset_manifest_records_ranges(tmp_path: Path) 
         vy_range=CommandRange(-0.01, 0.01),
         yaw_range=CommandRange(-0.2, 0.2),
         command_hold_steps=HoldStepRange(2, 3),
+        command_ramp_steps=2,
         seed=1234,
         env_factory=FakeRandomTeacherEnv,
     )
@@ -135,6 +183,9 @@ def test_collect_random_teacher_dataset_manifest_records_ranges(tmp_path: Path) 
     assert payload["seed"] == 1234
     assert payload["vx_range"] == {"minimum": 0.0, "maximum": 0.1}
     assert payload["command_hold_steps"] == {"minimum": 2, "maximum": 3}
+    assert payload["command_ramp_steps"] == 2
+    assert payload["command_coverage"]["count"] == result.sample_count
+    assert payload["command_coverage"]["vx"]["maximum"] <= 0.1
 
 
 
@@ -180,5 +231,6 @@ def test_collect_random_teacher_dataset_script_documents_mujoco_viewer_flags() -
     assert "--backend NAME" in proc.stdout
     assert "--viewer" in proc.stdout
     assert "--no-viewer" in proc.stdout
+    assert "--command-ramp-steps" in proc.stdout
     assert "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer" in proc.stdout
     assert "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer" in proc.stdout

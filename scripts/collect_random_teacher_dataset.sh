@@ -8,8 +8,9 @@ usage() {
 Usage: ./scripts/collect_random_teacher_dataset.sh [options]
 
 Collect behavior-cloning samples by rolling out the teacher policy under random
-piecewise velocity commands. Start the MuJoCo sim server separately before using
-this script.
+piecewise velocity commands. Command changes are ramped by default so the
+dataset covers continuous speed transitions instead of only abrupt jumps. Start
+the MuJoCo sim server separately before using this script.
 
 Common options:
   --profile NAME                 teacher profile (default: open_duck_forward)
@@ -20,6 +21,7 @@ Common options:
   --vy-range MIN,MAX             random lateral velocity range
   --yaw-range MIN,MAX            random yaw velocity range
   --command-hold-steps MIN,MAX   random command segment duration in control steps
+  --command-ramp-steps N         smooth command changes over N control steps (default: 20)
   --seed N                       deterministic random seed
 
 Negative ranges may be passed either as separate values or with '=':

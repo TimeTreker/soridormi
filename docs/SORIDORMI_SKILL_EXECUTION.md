@@ -52,6 +52,19 @@ Future skills such as `step_over_obstacle`, `sit_down`, `bow`, and `run` remain
 manifest-declared but are rejected by the dry-run registry until their controller
 and safety validation are added.
 
+## Policy input boundary
+
+Skill execution should not pass natural-language task descriptions to the low-level controller. A planner or skill router should translate user intent into bounded structured context first:
+
+```text
+skill_id
+desired velocity or target state
+task mode / gait style / clearance intent
+environment labels such as terrain or obstacle metadata
+```
+
+The current M7C/M7D implementation only lowers single-segment locomotion skills to velocity command overrides. Future skill execution should preserve the same boundary: validate manifest parameters, build policy context, then call the runtime policy that outputs the 14D action.
+
 ## Safety rules
 
 - Skill dry-run output is a high-level command plan, not motor targets.

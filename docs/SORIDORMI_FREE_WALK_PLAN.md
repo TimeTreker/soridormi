@@ -13,6 +13,14 @@ stop / cancel / emergency stop
 
 "Freely" does **not** mean unbounded motor control or raw torque control. It means the robot should be able to stand, stop, walk forward, turn, curve, and handle command changes within the policy's trained command envelope while preserving joint limits, fall detection, runtime limits, and rollout acceptance gates.
 
+The policy direction is context-conditioned control:
+
+```text
+robot_state + desired_command + task_context + environment_context + short_history -> action_14d
+```
+
+For M6, `desired_command` is continuous `vx_mps`, `vy_mps`, and `yaw_radps`. For later terrain and obstacle skills, task/environment context should include fields such as `skill_id`, gait style, target clearance, terrain type, obstacle distance, and obstacle height. See `docs/SORIDORMI_POLICY_CONTEXT_CONTRACT.md`.
+
 ## Current main-branch progress
 
 The current main branch already has the important simulation-learning pieces:
@@ -35,6 +43,7 @@ That means the next Soridormi milestone is **not** MCP, LLM routing, or hardware
 ```text
 M6A: Commanded free-walk evaluation in MuJoCo
 M6B: Command-distribution teacher data collection
+M6B.1: Continuous-speed teacher data with smooth command ramps and coverage reports
 M6C: Neural BC policy trained on command-grid/random-command data
 M6D: Teacher-vs-candidate closed-loop comparison across the command suite
 M6E: Residual policy improvement only after BC and evaluation are reliable
@@ -267,3 +276,16 @@ low-clearance swing step ratio
 warnings when median swing clearance is below target
 warnings when low-clearance swing steps are frequent
 ```
+
+
+## Continuous-speed teacher data rule
+
+The walking policy target is continuous command-conditioned locomotion, not a small set of named speeds. Teacher data should therefore sample velocity ranges and transitions:
+
+```text
+vx  in a conservative forward/backward range
+vy  in a conservative lateral range
+yaw in a conservative turn-rate range
+```
+
+Random teacher collection should ramp command changes over a short number of control steps by default. This teaches the BC model smooth changes such as slow -> normal -> fast -> stop and straight -> curve -> straight, which better matches future skill/navigation commands than abrupt fixed-speed jumps. Fixed command grids remain useful for repeatable evaluation, but training data should include varied continuous speed coverage.

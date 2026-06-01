@@ -29,6 +29,7 @@ Read these docs first:
 docs/SORIDORMI_FREE_WALK_PLAN.md
 docs/M6_SIM_STATUS.md
 docs/M6_SIM_TRAINING_LOOP.md
+docs/SORIDORMI_POLICY_CONTEXT_CONTRACT.md
 docs/PROJECT_STATUS_AFTER_M6.md
 docs/PATCH_DELIVERY_AND_VALIDATION.md
 ```
@@ -259,3 +260,17 @@ skills. `run_skill_in_sim.sh` must derive rollout steps from skill duration by
 default and must not pass wall-clock `--seconds` unless the user explicitly asks
 for it; CUDA/ONNX warm-up can otherwise consume the wall-clock budget and stop
 the skill after one simulator step.
+
+- Teacher data for walking should cover continuous varied speeds with smooth command ramps, not only a few typical fixed velocities.
+
+### Policy context contract
+
+Soridormi's policy direction is context-conditioned control, not a fixed-speed demo policy:
+
+```text
+robot_state + desired_command + task_context + environment_context + short_history -> action_14d
+```
+
+Near-term M6 should keep the model simple: robot observation plus continuous `vx_mps`, `vy_mps`, and `yaw_radps` command. Future stages may add bounded task context (`skill_id`, gait style, stride/clearance intent) and environment context (`terrain_type`, friction, obstacle distance/height, path curvature). Raw natural language belongs to Chromie/planning and must be converted to structured context before Soridormi's low-level policy runs.
+
+Training data variation is essential. Teacher data should cover continuous speed ranges, smooth command ramps, start/stop transitions, terrain/scenario variation, and held-out scenario IDs. BC copies the teacher distribution; use residual/RL only after evaluation shows where the teacher or BC policy needs improvement beyond the teacher, such as larger stride, higher clearance, rough-ground progress, obstacle crossing, or recovery.
