@@ -136,3 +136,18 @@ thermal / voltage checks
 operator checklist
 log everything
 ```
+
+## SOP-10: Patch delivery and validation
+
+Future LLM sessions must deliver plain `.patch` files unless the user asks for another format. The user normally downloads patches to `~/Downloads`, so user-facing commands should use that path.
+
+Every patch response must include:
+
+```text
+1. Patch integrity check: git apply --check ~/Downloads/<patch>.patch
+2. Functional validation: tests, CLI smoke checks, sim commands, or docs sanity checks that prove the patch behavior
+```
+
+For docs-only changes, functional validation is still required: check that the expected files/sections exist and that Markdown fences are balanced. For code changes, run the relevant unit tests and compile checks. For sim or training changes, separate local/unit validation from live MuJoCo validation.
+
+See `docs/PATCH_DELIVERY_AND_VALIDATION.md`.

@@ -24,19 +24,28 @@ Current next task: M4.13 exact official loop-order parity.
 
 ## Patch style
 
-When giving the user a zip:
+The user prefers plain git patch files, not zip archives. Assume downloaded patches live in `~/Downloads` unless the user says otherwise.
 
-- Include only involved/new/updated files, not the entire project.
-- Preserve directory structure under `soridormi/` so the user can run:
+When giving a patch, include:
 
 ```bash
-unzip update.zip -d /tmp/update
-rsync -av /tmp/update/soridormi/ ./
+cd /path/to/soridormi
+git apply --check ~/Downloads/<patch_name>.patch
+git apply ~/Downloads/<patch_name>.patch
 ```
 
-- Include tests when behavior changes.
-- Include docs when a milestone changes usage.
-- Mention whether Docker rebuild is needed.
+Every patch response must also include functional validation commands, not only `git apply --check`. Match validation to the patch scope:
+
+- docs-only: grep expected sections and check Markdown fences;
+- code: run relevant `pytest`, compile checks, and CLI smoke tests;
+- sim/training: provide local/unit checks plus live MuJoCo validation commands;
+- hardware: default to dry-run/read-only validation and state explicitly if no actuator command was sent.
+
+If a patch is incremental, state the required apply order. If a patch merges/replaces a previous patch, say that the user should apply only the merged patch.
+
+Include tests when behavior changes. Include docs when a milestone changes usage. Mention whether Docker rebuild is needed.
+
+See `docs/PATCH_DELIVERY_AND_VALIDATION.md`.
 
 ## Validation expectations
 

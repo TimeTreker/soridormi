@@ -4,7 +4,7 @@ This file is a compact handoff for starting a new LLM session on Soridormi.
 
 ## One-paragraph project summary
 
-Soridormi is a sim-to-real humanoid robot stack for Open Duck Mini v2. It separates runtime, simulator, and shared API so the same policy runtime can talk to MuJoCo now and real robot hardware later. The immediate goal is to make the official Open Duck ONNX walking policy run successfully through Soridormi's engineering runtime. After that, the project will support model replacement, training, and transfer to Jetson/real hardware.
+Soridormi is a sim-to-real humanoid robot stack for Open Duck Mini v2. It separates runtime, simulator, and shared API so the same policy runtime can talk to MuJoCo now and real robot hardware later. The current Soridormi-side objective is command-conditioned free walking in MuJoCo first: stop, stand, walk forward, turn, curve, tolerate conservative command switches, and compare teacher/candidate policies before any hardware walking.
 
 ## Current repository assumptions
 
@@ -18,72 +18,92 @@ Soridormi is a sim-to-real humanoid robot stack for Open Duck Mini v2. It separa
   - `Open_Duck_Mini`
   - `Open_Duck_Mini_Runtime`
   - `Open_Duck_Playground`
-- PC dev currently uses CUDA 12.8/cuDNN because ONNX Runtime GPU needed CUDA 12 libraries in this environment.
 
-## Latest known status
+## Latest known direction
 
-The project is in M4, trying to reproduce official Open Duck inference behavior inside Soridormi.
+Do not move directly to hardware walking, MCP execution, or Chromie orchestration as the next Soridormi milestone. The next Soridormi milestone is the M6 command-conditioned free-walk gate in MuJoCo.
 
-Already working:
+Read these docs first:
 
-- Docker sim/runtime stack.
-- MuJoCo backend with Open Duck Mini v2 model.
-- Official Open Duck baseline runner.
-- MCAP logging and trace analysis.
-- Policy profiles such as `open_duck_forward`.
-- Model checker for ONNX input/output contract.
-- Official-vs-Soridormi trace comparison.
-- Official motor-target replay.
-- Observation/action parity checker.
+```text
+docs/SORIDORMI_FREE_WALK_PLAN.md
+docs/M6_SIM_STATUS.md
+docs/M6_SIM_TRAINING_LOOP.md
+docs/PROJECT_STATUS_AFTER_M6.md
+docs/PATCH_DELIVERY_AND_VALIDATION.md
+```
 
-Important confirmed facts:
+## Current practical focus
 
-- Official Open Duck baseline using `BEST_WALK_ONNX_2.onnx` walks forward in the same Docker/MuJoCo environment.
-- Replaying official motor targets through Soridormi exactly reproduces official trajectory over the compared window.
-- Soridormi's ONNX wrapper reproduces official actions exactly when fed official observations.
-- Soridormi command and phase now match official trace exactly.
-- Soridormi policy run still moves much less forward than official; remaining mismatch is in closed-loop observation/history/timing, mainly IMU/contact/history divergence after the first step.
+Soridormi should prioritize:
 
-## Most recent metrics to remember
+```text
+M6A: commanded free-walk evaluation in MuJoCo
+M6B: command-distribution teacher data collection
+M6C: neural BC over command-grid/random-command data
+M6D: teacher-vs-candidate closed-loop comparison
+M6E: residual policy improvement if BC/evaluation are reliable
+M6F: sim acceptance gate
+M7: hardware read-only / dry-run bridge only after sim acceptance
+M8: Chromie/MCP/LLM orchestration later
+```
 
-After M4.8/M4.9/M4.12, comparison still looked approximately like:
+The core walking target is bounded high-level command control:
 
-- `phase mean_mae = 0.000000`
-- `command mean_mae = 0.000000`
-- observation mean MAE around `0.127`
-- action mean MAE around `0.134`
-- worst observation segments:
-  - `accelerometer_xyz`
-  - `gyro_xyz`
-  - `feet_contacts`
-  - `last_action` / `last_last_action`
-- official forward displacement over 100 compared policy steps: about `0.1708 m`
-- Soridormi forward displacement over same compared window: about `0.0385 m`
+```text
+vx: forward/backward velocity command
+vy: lateral velocity command
+yaw: turn-rate command
+stop / cancel / emergency stop
+```
 
-Parity checker also showed:
+"Freely" does not mean raw torque control or unbounded motor control. It means walking within the trained command envelope while preserving joint limits, fall detection, runtime limits, and rollout acceptance gates.
 
-- `official_obs_vs_official_action mean_mae = 0.0`
-- `soridormi_obs_vs_soridormi_action mean_mae = 0.0`
-- First step samples are nearly identical between official and Soridormi.
+## Architecture boundary
 
-Therefore the next work should focus on first divergence / loop order, not model/provider/backend.
+Soridormi owns robot capability and safety:
 
-## Next recommended milestone: M4.13
+```text
+simulation
+policy runtime
+training/evaluation
+action mapping
+RobotState / MotorCommand contract
+walking safety limits
+future hardware backend
+```
 
-Title: exact official loop-order parity and first-divergence analyzer.
+Chromie can later own user-facing orchestration:
 
-Goals:
+```text
+LLM routing
+ASR/TTS
+user confirmation
+global MCP registry
+multi-agent DAG planning
+```
 
-1. Add a first-divergence report for official-vs-Soridormi traces.
-2. Identify the first step and exact observation segment that diverges.
-3. Verify `last_action`, `motor_targets`, IMU, and contacts are sampled/updated in the same order as official.
-4. Port the exact official update order into Soridormi runtime if mismatch is found.
-5. Re-run official vs Soridormi comparison and target forward displacement.
+Do not let Chromie/MCP work imply that Soridormi's walking capability improved unless there is MuJoCo rollout evidence.
 
-Do not start M5/M6 training until Soridormi can reproduce the official walking policy well enough.
+## Patch delivery rule
+
+The user prefers plain `.patch` files and usually downloads them to:
+
+```bash
+~/Downloads
+```
+
+Every patch response must include both:
+
+```text
+1. Patch integrity check: git apply --check ~/Downloads/<patch>.patch
+2. Functional validation: commands that prove the behavior/docs/interface after applying
+```
+
+For docs-only patches, functional validation still means checking expected files/phrases and Markdown fences. For code patches, run relevant tests, compile checks, and CLI smoke tests. For sim/training patches, give both local/unit validation and live MuJoCo validation commands. Be explicit about anything not run.
 
 ## New-session prompt
 
 A good prompt to start the next session:
 
-> Please read `CLAUDE.md`, `LLM_CONTEXT.md`, and `docs/LLM_HANDOFF_M4.md` first. We are debugging Soridormi M4. The official Open Duck baseline walks forward, official motor-target replay in Soridormi matches exactly, ONNX wrapper parity is exact, phase/command match, but Soridormi closed-loop still diverges after step 0 with IMU/contact/history differences and weak forward displacement. Continue with M4.13: exact official loop-order parity and first-divergence analyzer. Do not switch to open-loop or training yet.
+> Please read `LLM_CONTEXT.md`, `docs/SORIDORMI_FREE_WALK_PLAN.md`, and `docs/PATCH_DELIVERY_AND_VALIDATION.md` first. We are focused on Soridormi only. The goal is Open Duck Mini v2 command-conditioned free walking in MuJoCo before hardware or Chromie/MCP orchestration. Continue with the next M6 free-walk simulation/evaluation task. If you provide a patch, make it a plain git patch and include both `git apply --check ~/Downloads/<patch>.patch` and functional validation commands.

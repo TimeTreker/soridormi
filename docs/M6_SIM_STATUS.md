@@ -1,6 +1,6 @@
 # M6 Simulation Status
 
-Current conclusion: **M6 is not finished as a proven walking-improvement result in simulation yet.**
+Current conclusion: **M6 is not finished as a proven command-conditioned free-walking result in simulation yet.**
 
 M6 has built most of the **simulation learning backbone**:
 
@@ -13,22 +13,23 @@ M6 has built most of the **simulation learning backbone**:
 - walking-quality reward function
 - residual-policy fine-tuning path
 
-But a simulation milestone is only complete when the final candidate has been trained, exported, run, and compared against the default policy in MuJoCo.
+But a simulation milestone is only complete when teacher and candidate policies have been run and compared across a command-conditioned free-walk suite in MuJoCo, not just one fixed forward command.
 
 ## Immediate correction
 
-Do not move to hardware walking yet. The next work item is the sim training loop: collect teacher-policy rollouts from MuJoCo, train a behavior-clone or residual candidate, export it, and compare it against the default policy in simulation. See `docs/M6_SIM_TRAINING_LOOP.md`.
+Do not move to hardware walking yet. The next work item is a commanded free-walk evaluation gate: run teacher/candidate policies across stop, forward, turn, curve, lateral, and command-switching scenarios, then use those results to decide what training data or residual fine-tuning is needed. See `docs/SORIDORMI_FREE_WALK_PLAN.md` and `docs/M6_SIM_TRAINING_LOOP.md`.
 
 ## Completion definition
 
 Call M6 complete only after all of the following are true:
 
-1. The default policy can run in MuJoCo through Soridormi.
-2. The residual fine-tuned policy exports to ONNX.
-3. The residual profile passes `check_policy_model.sh`.
-4. The residual profile runs in MuJoCo with bounded rollout.
-5. Default-vs-residual rollout comparison is generated.
-6. The residual policy is at least safe and stable, and ideally improves one or more walking metrics.
+1. The default/teacher policy can run in MuJoCo through Soridormi.
+2. A commanded free-walk evaluation suite covers stop, forward, turn, curve, lateral, and command-switching scenarios.
+3. Teacher rollouts produce a per-scenario report with survival time, termination reason, velocity tracking, drift, upright/height error, and action metrics.
+4. A neural BC or residual candidate exports to ONNX and passes `check_policy_model.sh`.
+5. The candidate runs in MuJoCo across the same command suite.
+6. Teacher-vs-candidate comparison is generated per scenario, not just as a single aggregate score.
+7. The candidate is accepted only if it is stable and safe across the suite and improves at least one chosen metric without regressions on critical safety metrics.
 
 ## Current practical status
 
@@ -70,3 +71,18 @@ The default policy is a baseline, not a perfect target.
 Behavior cloning can copy the teacher, but cannot reliably improve beyond it. Residual fine-tuning is the preferred next step:
 
 ```text
+teacher_action + bounded_residual -> final_action
+```
+
+## Current priority update
+
+Soridormi should prioritize locomotion quality before platform orchestration. MCP/LLM integration is useful later, but it does not make Open Duck Mini walk better by itself. The immediate Soridormi work is:
+
+```text
+commanded free-walk evaluation
+→ command-distribution teacher data
+→ neural BC closed-loop comparison
+→ residual fine-tuning if needed
+→ sim acceptance gate
+→ hardware bring-up only after sim acceptance
+```

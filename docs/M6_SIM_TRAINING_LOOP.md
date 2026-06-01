@@ -14,6 +14,24 @@ MuJoCo sim server
 → MuJoCo rollout comparison
 ```
 
+
+## 0. Current priority: evaluate commanded walking first
+
+The current main branch already has teacher collection, command-grid arguments, grouped dataset splitting, neural BC export, rollout comparison, residual policy scaffolding, and walking reward code. The next Soridormi milestone is therefore not another interface layer; it is proving command-conditioned walking in MuJoCo.
+
+Before collecting a large dataset, run or add a commanded-walk evaluation suite that measures the default teacher across:
+
+```text
+stop
+slow/medium/fast forward
+turn left/right in place
+forward curves left/right
+small lateral commands
+short command-switching sequences
+```
+
+Use the results to decide which command regions are safe for data collection and which need smaller ramps, shorter durations, or exclusion from the first BC dataset.
+
 ## 1. Start the simulator
 
 In one terminal:
@@ -56,8 +74,8 @@ You can collect a small command grid directly:
   --episodes 2 \
   --steps-per-episode 600 \
   --command-x-values 0.00,0.05,0.10,0.15 \
-  --command-y-values -0.03,0.00,0.03 \
-  --command-yaw-values -0.15,0.00,0.15
+  --command-y-values=-0.03,0.00,0.03 \
+  --command-yaw-values=-0.15,0.00,0.15
 ```
 
 Collect small grids first. Do not train from one perfect short rollout and expect robust walking.
@@ -87,7 +105,7 @@ For a small command-grid BC candidate, use comma-separated command values:
   --episodes 2 \
   --steps-per-episode 600 \
   --command-x-values 0.00,0.05,0.10,0.15 \
-  --command-yaw-values -0.15,0.00,0.15 \
+  --command-yaw-values=-0.15,0.00,0.15 \
   --split-group-field source_log \
   --force-profile
 ```
@@ -179,3 +197,10 @@ Do not start hardware walking until all of these pass:
 4. The candidate runs in MuJoCo for a bounded rollout.
 5. Default-vs-candidate comparison is generated.
 6. Residual RL candidate either improves metrics or is explicitly rejected.
+
+
+## Commanded free-walk acceptance before hardware
+
+Treat any candidate as experimental until it passes a command-suite rollout comparison. A candidate must survive fixed commands and conservative command-switching scenarios before hardware work resumes. A good first acceptance report should include per-scenario pass/fail, survival time, termination reason, displacement, velocity tracking, lateral drift, yaw tracking, upright/height error, and action smoothness.
+
+See `docs/SORIDORMI_FREE_WALK_PLAN.md` for the updated Soridormi-first roadmap.
