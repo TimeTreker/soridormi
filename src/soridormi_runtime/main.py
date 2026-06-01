@@ -14,6 +14,7 @@ from .logging import make_runtime_logger_from_env
 from .onnx_policy_controller import OnnxPolicyController
 from .standing_controller import StandingPoseController
 from .runtime_limits import runtime_limit_reached, runtime_limits_from_env
+from .sync_preroll import preroll_sync_simulator
 
 console = Console()
 
@@ -71,6 +72,13 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on", "y"}
 
 
+def _env_int(name: str, default: int = 0) -> int:
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return default
+    return int(value)
+
+
 def _step_command_and_get_state(robot: object, command: object):
     stepper = getattr(robot, "step_motor_command", None)
     if callable(stepper):
@@ -89,6 +97,7 @@ def main() -> None:
     backend = os.environ.get("SORIDORMI_BACKEND", "sim")
     mode = os.environ.get("SORIDORMI_RUNTIME_MODE", "hold")
     sync_step = _env_bool("SORIDORMI_SIM_SYNC_STEP", default=False)
+    sim_preroll_steps = max(0, _env_int("SORIDORMI_SIM_PREROLL_STEPS", default=0))
     limits = runtime_limits_from_env()
 
     robot = make_robot()
@@ -111,10 +120,14 @@ def main() -> None:
         console.print(f"Runtime log: {runtime_logger.path}")
     if sync_step:
         console.print("Simulator synchronous step mode: enabled")
+        if sim_preroll_steps:
+            console.print(f"Simulator sync pre-roll API steps: {sim_preroll_steps}")
 
     step_index = 0
     loop_started_at = time.monotonic()
     state = robot.read_state() if sync_step else None
+    if sync_step and state is not None and sim_preroll_steps:
+        state = preroll_sync_simulator(robot, state, sim_preroll_steps)
     if limits.max_steps is not None:
         console.print(f"Runtime max steps: {limits.max_steps}")
     if limits.max_seconds is not None:

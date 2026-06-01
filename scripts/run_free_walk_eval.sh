@@ -34,6 +34,9 @@ Options:
   --disable-action-bound
 
 Start the MuJoCo sim server in another terminal before running without --dry-run.
+Use the teacher/candidate profile's simulator compatibility settings for walking parity, e.g.:
+  ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
+  ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
 USAGE
 }
 

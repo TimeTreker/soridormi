@@ -137,13 +137,51 @@ A good prompt to start the next session:
 When giving Soridormi functional validation commands that require the simulator, start the simulator explicitly with the MuJoCo backend. The default should be headless/no-viewer:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --no-viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
 ```
 
 Also provide the viewer-enabled variant when a visual test is useful:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
+```
+
+If the robot may walk out of the initial frame, include the follow-camera variant:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
 ```
 
 Do not rely on an implicit simulator backend in future instructions.
+
+### M6B random teacher data collection
+
+Soridormi now includes an M6B random teacher dataset collector for command-conditioned free walking:
+
+```bash
+./scripts/collect_random_teacher_dataset.sh \
+  --profile open_duck_forward \
+  --output data/teacher_random_walk/dataset.jsonl \
+  --episodes 100 \
+  --steps-per-episode 800 \
+  --vx-range -0.03,0.15 \
+  --vy-range -0.03,0.03 \
+  --yaw-range -0.20,0.20 \
+  --command-hold-steps 80,250 \
+  --backend mujoco \
+  --no-viewer
+```
+
+Negative range values are valid in either shell style, so both `--vx-range -0.03,0.15` and `--vx-range=-0.03,0.15` are supported.
+
+Always provide a MuJoCo sim server command for live validation:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
+```
+
+The random collector changes `vx/vy/yaw` several times inside each episode and records command segment metadata. It is for walking/turning/stopping command transitions. Do not claim it teaches sit-down or stand-up unless a separate pose-transition teacher exists.
+
+- If official Open Duck baseline walks but `./scripts/run_policy_rollout_smoke.sh open_duck_forward` only wiggles, treat it as a Soridormi runtime parity bug, not a training/data problem. `open_duck_forward` should export `SORIDORMI_SIM_PREROLL_STEPS=1` so sync-step MuJoCo pre-rolls one API step before first policy inference.
+- For official-vs-Soridormi trace parity, force JSONL logging through the smoke wrapper with `--log-format jsonl --log-prefix parity_open_duck_forward --log-dir /data/logs`. Policy profiles may default to MCAP, so parity commands must not rely on `SORIDORMI_RUNTIME_LOG_FORMAT=jsonl` alone unless `run_policy_experiment.sh` preserves the override after profile resolution.

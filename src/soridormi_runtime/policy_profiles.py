@@ -164,6 +164,7 @@ class PolicyProfile:
             "CONTROL_HZ": _fmt(runtime.get("control_hz", 50)),
             "SORIDORMI_RESET_AT_START": _fmt(_as_bool(runtime.get("reset_at_start", False), False)),
             "SORIDORMI_SIM_SYNC_STEP": _fmt(_as_bool(runtime.get("sync_step", False), False)),
+            "SORIDORMI_SIM_PREROLL_STEPS": _fmt(_as_int(runtime.get("sim_preroll_steps", runtime.get("preroll_steps", 0)), 0)),
             "SORIDORMI_COMMAND_X": _fmt(command.get("x", 0.0)),
             "SORIDORMI_COMMAND_Y": _fmt(command.get("y", 0.0)),
             "SORIDORMI_COMMAND_YAW": _fmt(command.get("yaw", 0.0)),

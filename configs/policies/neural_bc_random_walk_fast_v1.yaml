@@ -1,29 +1,24 @@
-# Soridormi M4.2 policy profile.
-name: open_duck_forward
-description: Open Duck Mini v2 pretrained ONNX forward policy experiment.
-
+name: neural_bc_random_walk_fast_v1
+description: Neural behavior-cloning policy trained by Soridormi M6.12.
 model:
-  path: /workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx
+  path: /data/training_pipelines/neural_bc_random_walk_fast_v1/neural_bc/neural_behavior_clone.onnx
   input_name: obs
   output_name: continuous_actions
-  input_shape: [1, 101]
-  output_shape: [1, 14]
+  input_shape:
+  - 1
+  - 101
+  output_shape:
+  - 1
+  - 14
   input_type: tensor(float)
   output_type: tensor(float)
-
 runtime:
   mode: onnx_policy
   backend: sim
   control_hz: 50
   reset_at_start: true
   sync_step: true
-  # Official Open Duck MjInfer waits one policy-control interval (10 MuJoCo
-  # substeps) after applying the home keyframe before building the first policy
-  # observation. Soridormi pre-rolls one synchronous API step to match that
-  # startup timing and avoid feeding stale reset sensors/contacts into the ONNX
-  # policy on step 0.
   sim_preroll_steps: 1
-
 command:
   x: 0.15
   y: 0.0
@@ -33,7 +28,6 @@ command:
   head_yaw: 0.0
   head_roll: 0.0
   ramp_seconds: 0.0
-
 phase:
   mode: step
   frequency: 1.0
@@ -43,16 +37,16 @@ phase:
   step_increment: 1.0
   enabled: true
   offset: 0.0
-
 action_mapping:
   action_scale: 0.25
   max_motor_velocity: 5.24
-
 observation:
-  accel_bias_xyz: [1.3, 0.0, 0.0]
+  accel_bias_xyz:
+  - 1.3
+  - 0.0
+  - 0.0
   use_state_feet_contacts: true
   bootstrap_policy_defaults_from_state: true
-
 simulator:
   backend: mujoco
   use_home_keyframe: true
@@ -62,9 +56,31 @@ simulator:
   official_contact_mode: true
   auto_reset: true
   viewer: true
-
 logging:
   enabled: true
   format: mcap
   every_n: 1
-  prefix: policy_open_duck_forward
+  prefix: policy_neural_bc_random_walk_fast_v1
+metadata:
+  format_version: 1
+  policy_family: open_duck_mini_v2
+  derived_from_profile: open_duck_forward
+  generated_by: soridormi_m5_profile_scaffold
+contract:
+  observation_size: 101
+  action_size: 14
+  joint_names:
+  - left_hip_yaw
+  - left_hip_roll
+  - left_hip_pitch
+  - left_knee
+  - left_ankle
+  - neck_pitch
+  - head_pitch
+  - head_yaw
+  - head_roll
+  - right_hip_yaw
+  - right_hip_roll
+  - right_hip_pitch
+  - right_knee
+  - right_ankle

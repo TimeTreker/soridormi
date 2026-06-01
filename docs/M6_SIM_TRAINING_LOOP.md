@@ -37,13 +37,13 @@ Use the results to decide which command regions are safe for data collection and
 In one terminal, start the MuJoCo backend explicitly. The default functional-test mode is headless/no-viewer:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --no-viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
 ```
 
 For visual inspection, run the same backend with the passive viewer enabled:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
 ```
 
 Use the viewer only as an inspection aid; the headless MuJoCo command should remain the default validation command.
@@ -85,6 +85,40 @@ You can collect a small command grid directly:
 ```
 
 Collect small grids first. Do not train from one perfect short rollout and expect robust walking.
+
+### Random command-sequence collection
+
+For freer walking behavior, collect piecewise random command sequences after the fixed command suite passes. Keep the MuJoCo backend explicit and keep headless mode as the default functional test:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
+```
+
+Optional visual inspection:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
+```
+
+In another terminal:
+
+```bash
+./scripts/collect_random_teacher_dataset.sh \
+  --profile open_duck_forward \
+  --output data/teacher_random_walk/dataset.jsonl \
+  --episodes 100 \
+  --steps-per-episode 800 \
+  --vx-range -0.03,0.15 \
+  --vy-range -0.03,0.03 \
+  --yaw-range -0.20,0.20 \
+  --command-hold-steps 80,250 \
+  --backend mujoco \
+  --no-viewer
+```
+
+Negative range values are valid in either shell style, so both `--vx-range -0.03,0.15` and `--vx-range=-0.03,0.15` are supported.
+
+Use `--viewer` only when the simulator terminal was started with `./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer`. The collector records command segment metadata so later training/evaluation can distinguish fixed-command grids from random command-transition data.
 
 ## 3. Train a teacher behavior-clone policy
 

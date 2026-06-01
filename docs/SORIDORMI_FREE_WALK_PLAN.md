@@ -116,6 +116,11 @@ A candidate that only improves supervised MAE is not accepted unless it also sur
 5. Train neural BC on the command grid only after the teacher command suite is measured.
 6. Use residual fine-tuning only after teacher-vs-BC closed-loop comparison is reproducible.
 
+
+### Current blocker: official-vs-Soridormi runtime parity
+
+If `run_official_forward_baseline.sh` walks but `run_policy_rollout_smoke.sh open_duck_forward` only wiggles, stop all random teacher data collection. The ONNX model is good, but Soridormi's engineering path is not yet parity-compatible with the official `MjInfer` loop. See `docs/official_sync_preroll_m6_debug.md` for the sync pre-roll compatibility hook and the required MuJoCo validation commands.
+
 ## M6A free-walk evaluation entrypoint
 
 The first M6A implementation artifact is a conservative fixed-command evaluation suite:
@@ -135,13 +140,25 @@ The static validator is intentionally host-friendly: it should work even when Py
 Run the teacher-vs-candidate free-walk comparison with the MuJoCo backend already running. The default functional test should be headless/no-viewer:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --no-viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
 ```
 
 For visual inspection, start the same MuJoCo backend with the passive viewer explicitly enabled:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
+```
+
+If the duck walks out of the initial frame, use the viewer follow camera:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
+```
+
+Optional follow-camera tuning:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera --camera-distance 1.6 --camera-azimuth 135 --camera-elevation -20
 ```
 
 In another terminal:
@@ -157,6 +174,43 @@ Use `--dry-run` first when checking profiles and generated rollout commands:
 ```
 
 The wrapper delegates to the existing command-grid comparison path, so the output should include per-scenario teacher/candidate rollout comparisons plus a command-grid summary.
+
+
+## M6B random teacher data collection
+
+After the fixed-command M6A suite is measurable, collect teacher data from random piecewise velocity commands. This produces trajectories that include command transitions instead of one constant command per episode. Start the MuJoCo backend explicitly in another terminal; headless is the default functional-test mode:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
+```
+
+For visual inspection, use the same MuJoCo backend with the viewer enabled:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
+```
+
+Then collect a conservative random-command teacher dataset:
+
+```bash
+./scripts/collect_random_teacher_dataset.sh \
+  --profile open_duck_forward \
+  --output data/teacher_random_walk/dataset.jsonl \
+  --episodes 100 \
+  --steps-per-episode 800 \
+  --vx-range -0.03,0.15 \
+  --vy-range -0.03,0.03 \
+  --yaw-range -0.20,0.20 \
+  --command-hold-steps 80,250 \
+  --backend mujoco \
+  --no-viewer
+```
+
+Negative range values are valid in either shell style, so both `--vx-range -0.03,0.15` and `--vx-range=-0.03,0.15` are supported.
+
+The same script accepts `--viewer` as a hint matching the simulator terminal command, but it does not replace the separate simulator process. The output JSONL stores `scenario_id`, `rollout_id`, `command_segment_index`, `command_segment_id`, `command_segment_step_index`, and the active `policy_command` for each sample. Use grouped splits by `source_log` for smoke training and by `scenario_id` or held-out seeds when testing broader generalization.
+
+This collector should be used for walking, turning, stopping, small lateral motion, and command transitions. Do not include sit-down or stand-up motions until Soridormi has a separate pose-transition teacher or scripted pose-transition controller and an explicit task/mode conditioning contract.
 
 ## Hardware rule
 

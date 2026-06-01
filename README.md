@@ -176,13 +176,19 @@ SORIDORMI_SIM_BACKEND=fake
 For locomotion validation, start the real MuJoCo backend explicitly. The default functional-test command is headless/no-viewer:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --no-viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
 ```
 
 To watch MuJoCo visually, enable the passive viewer explicitly:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
+```
+
+For longer walking runs where the duck may leave the initial frame, enable the viewer follow camera:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
 ```
 
 To switch robot models later, add another YAML file under `configs/robots/` and change only `SORIDORMI_ROBOT_CONFIG`. The backend code should not hardcode robot-specific actuator names or model paths. Viewer settings also live in the robot config under `viewer:`.
@@ -211,7 +217,7 @@ The simulator Python environment is now built into the Docker image at `/opt/ven
 You can start it directly from the host:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --no-viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
 ```
 
 Or from inside the simulator container:
@@ -269,7 +275,7 @@ Enter simulator container:
 Run simulator server from host through Compose:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --no-viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
 ```
 
 Run runtime loop from host through Compose:

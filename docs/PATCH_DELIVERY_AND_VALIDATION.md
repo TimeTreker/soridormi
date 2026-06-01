@@ -85,13 +85,19 @@ PY
 For any patch that includes live simulator functional validation, the simulator command must explicitly use the MuJoCo backend. The default viewer mode is off/headless so tests can run unattended:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --no-viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
 ```
 
 When a patch benefits from visual inspection, also provide a viewer-enabled variant. This is not the default functional test, but it must be available in the command line so the user can watch the robot in MuJoCo:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --viewer
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
+```
+
+When the duck may move out of the initial frame, include the follow-camera variant for visual inspection:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
 ```
 
 Use `--viewer` only when the host has a working graphical session/X11 forwarding. If `DISPLAY` is missing, the script should warn rather than treating the missing viewer as a locomotion failure.

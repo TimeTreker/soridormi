@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from soridormi_api import IMUState, JointState, MotorCommand, RobotState
-from .mujoco_viewer import MujocoViewerHandle, env_flag
+from .mujoco_viewer import MujocoViewerHandle, env_flag, env_float
 from .robot_config import RobotConfig, load_robot_config
 
 
@@ -183,6 +183,10 @@ class MujocoBackend:
             enabled=env_flag(self.config.viewer.enabled_env, default=False),
             show_left_ui=self.config.viewer.show_left_ui,
             show_right_ui=self.config.viewer.show_right_ui,
+            follow_camera=env_flag("SORIDORMI_MUJOCO_FOLLOW_CAMERA", default=False),
+            camera_distance=env_float("SORIDORMI_MUJOCO_CAMERA_DISTANCE", 1.4),
+            camera_azimuth=env_float("SORIDORMI_MUJOCO_CAMERA_AZIMUTH", 135.0),
+            camera_elevation=env_float("SORIDORMI_MUJOCO_CAMERA_ELEVATION", -20.0),
         )
 
         print(f"Loaded robot config: {self.config.robot_name}")
