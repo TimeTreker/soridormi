@@ -234,3 +234,28 @@ Soridormi now exposes the M7 full skill universe through a host-side CLI. Use th
 ```
 
 The CLI is read-only. It validates `configs/skills/open_duck_mini_v2_skills.json`, filters available/planned/unsupported skills, and generates LLM-readable context. It does not execute robot behavior. Planned, future, and unsupported skills must not be described as executable.
+
+
+## M7C skill execution registry
+
+Soridormi now has a dry-run skill execution registry.  `./scripts/run_skill_dry_run.sh`
+can list currently executable sim skills and compile available locomotion skills such
+as `walk_velocity`, `turn_in_place`, `curve_walk`, and `sidestep` into high-level
+velocity command plans.  It does not move MuJoCo or hardware yet.  Future, planned,
+and unsupported skills must not be treated as executable.
+
+
+M7D adds a sim-only skill execution wrapper. Available locomotion skills can now
+be resolved to runtime command overrides and executed in MuJoCo with:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
+./scripts/run_skill_in_sim.sh walk_velocity --args '{"vx_mps":0.12,"duration_s":2.0}' --profile open_duck_forward --log-format jsonl
+```
+
+This is still not hardware execution. It only bridges skill vocabulary to the
+existing MuJoCo policy runtime, and currently supports single-segment velocity
+skills. `run_skill_in_sim.sh` must derive rollout steps from skill duration by
+default and must not pass wall-clock `--seconds` unless the user explicitly asks
+for it; CUDA/ONNX warm-up can otherwise consume the wall-clock budget and stop
+the skill after one simulator step.

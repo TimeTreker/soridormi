@@ -25,6 +25,10 @@ docker compose -f compose.sim.yaml run --rm runtime bash -lc '
   LOG_PREFIX_OVERRIDE="${SORIDORMI_RUNTIME_LOG_PREFIX_OVERRIDE:-}"
   LOG_DIR_OVERRIDE="${SORIDORMI_RUNTIME_LOG_DIR_OVERRIDE:-}"
   LOG_EVERY_N_OVERRIDE="${SORIDORMI_RUNTIME_LOG_EVERY_N_OVERRIDE:-}"
+  COMMAND_X_OVERRIDE="${SORIDORMI_COMMAND_X_OVERRIDE:-}"
+  COMMAND_Y_OVERRIDE="${SORIDORMI_COMMAND_Y_OVERRIDE:-}"
+  COMMAND_YAW_OVERRIDE="${SORIDORMI_COMMAND_YAW_OVERRIDE:-}"
+  COMMAND_RAMP_SECONDS_OVERRIDE="${SORIDORMI_COMMAND_RAMP_SECONDS_OVERRIDE:-}"
 
   echo "Resolving policy profile: ${PROFILE}"
   eval "$(python -m soridormi_runtime.policy_profiles "${PROFILE}" --shell)"
@@ -40,6 +44,18 @@ docker compose -f compose.sim.yaml run --rm runtime bash -lc '
   fi
   if [ -n "${LOG_EVERY_N_OVERRIDE}" ]; then
     export SORIDORMI_RUNTIME_LOG_EVERY_N="${LOG_EVERY_N_OVERRIDE}"
+  fi
+  if [ -n "${COMMAND_X_OVERRIDE}" ]; then
+    export SORIDORMI_COMMAND_X="${COMMAND_X_OVERRIDE}"
+  fi
+  if [ -n "${COMMAND_Y_OVERRIDE}" ]; then
+    export SORIDORMI_COMMAND_Y="${COMMAND_Y_OVERRIDE}"
+  fi
+  if [ -n "${COMMAND_YAW_OVERRIDE}" ]; then
+    export SORIDORMI_COMMAND_YAW="${COMMAND_YAW_OVERRIDE}"
+  fi
+  if [ -n "${COMMAND_RAMP_SECONDS_OVERRIDE}" ]; then
+    export SORIDORMI_COMMAND_RAMP_SECONDS="${COMMAND_RAMP_SECONDS_OVERRIDE}"
   fi
 
   echo "Policy: ${SORIDORMI_POLICY_PROFILE}"

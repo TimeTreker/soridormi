@@ -294,3 +294,18 @@ Recommended order:
 ## Out of scope for M7A
 
 M7A does not implement skill execution. It only defines the taxonomy and manifest so future code and future LLM/MCP sessions share the same vocabulary.
+
+
+## M7C dry-run skill execution registry
+
+M7C turns the manifest into a safe execution-facing registry without moving the robot.
+The registry resolves available simulation skills into high-level velocity command plans
+and rejects future or unsupported skills.  Use:
+
+```bash
+./scripts/run_skill_dry_run.sh --list
+./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":0.12,"duration_s":2.0}'
+```
+
+This is intentionally dry-run only.  MuJoCo execution, MCP exposure, and hardware
+execution must be added in later milestones after controller-specific validation.
