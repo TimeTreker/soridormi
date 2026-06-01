@@ -33,3 +33,20 @@ def test_motion_execute_requires_confirmation_and_monitoring() -> None:
 def test_restricted_tools_are_hidden_if_added() -> None:
     bundle = build_soridormi_capability_bundle()
     assert all(tool.safety_class != "restricted" or not tool.llm_visible for agent in bundle.agents for tool in agent.tools)
+
+
+def test_soridormi_bundle_includes_dag_contract_without_chromie_tools() -> None:
+    bundle = build_soridormi_capability_bundle(mode="sim")
+    contract = bundle.dag_contract
+    assert contract["source"] == "soridormi"
+    assert "soridormi.motion.execute_plan" in contract["physical_motion_tools"]
+    assert "chromie.ask_confirmation" in contract["host_required_tools"]
+    tool_names = {tool.name for agent in bundle.agents for tool in agent.tools}
+    assert "chromie.ask_confirmation" not in tool_names
+
+
+def test_dag_contract_recommends_monitoring_motion_execution() -> None:
+    bundle = build_soridormi_capability_bundle()
+    sequence = "\n".join(bundle.dag_contract["default_short_motion_sequence"])
+    assert "soridormi.safety.monitor_motion" in sequence
+    assert "soridormi.motion.execute_plan" in sequence

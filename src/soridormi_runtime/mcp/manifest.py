@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from .dag_contract import build_soridormi_dag_contract
+
 SafetyClass = Literal[
     "safe_read",
     "planning_only",
@@ -130,6 +132,7 @@ class CapabilityBundle(BaseModel):
     schema_version: str = "0.1"
     source: str = "soridormi"
     agents: list[AgentManifest] = Field(default_factory=list)
+    dag_contract: dict[str, Any] = Field(default_factory=dict)
 
 
 def _object_schema(properties: dict[str, Any], required: list[str] | None = None) -> dict[str, Any]:
@@ -339,4 +342,8 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
         ],
     )
 
-    return CapabilityBundle(source="soridormi", agents=[robot_agent, motion_agent, safety_agent])
+    return CapabilityBundle(
+        source="soridormi",
+        agents=[robot_agent, motion_agent, safety_agent],
+        dag_contract=build_soridormi_dag_contract(mode=mode),
+    )
