@@ -222,6 +222,40 @@ future_hardware_extension    requires hardware not present today
 composite                    composition of multiple Soridormi and external skills
 ```
 
+
+## M7B skill listing and validation CLI
+
+M7B turns the JSON skill universe into an inspectable runtime contract. It still does not execute skills. It only answers what Soridormi declares, what is currently available in simulation, and what remains future or unsupported.
+
+Use the host-side wrapper:
+
+```bash
+./scripts/list_skills.sh
+./scripts/list_skills.sh --validate-only
+./scripts/list_skills.sh --available
+./scripts/list_skills.sh --category social --include-unsupported
+./scripts/list_skills.sh --skill walk_velocity --json
+./scripts/list_skills.sh --llm-context --language zh
+```
+
+The same implementation is available as a Python module:
+
+```bash
+PYTHONPATH=src python -m soridormi_runtime.skill_manifest --validate-only
+PYTHONPATH=src python -m soridormi_runtime.skill_manifest --available --json
+```
+
+Validation checks include:
+
+- unique skill IDs;
+- declared status and execution vocabulary;
+- known implementation phases;
+- safe defaults with `hardware_enabled=false`;
+- parameter min/default/max sanity;
+- available skills must not require unsupported actuator groups.
+
+The `--llm-context` output is intentionally read-only context for future Chromie/MCP planners. It must not be interpreted as permission to execute planned or unsupported skills.
+
 ## First executable subset
 
 The first runtime implementation should target 6 to 8 safe simulation skills, not the full manifest.

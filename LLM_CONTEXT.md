@@ -220,3 +220,17 @@ For rough-ground visual testing, start MuJoCo with a generated small-stone scene
 ```
 
 Do not claim BC improves foot clearance beyond the teacher. BC copies the teacher. If foot clearance needs improvement beyond teacher behavior, measure it first, then use residual/RL with explicit clearance/scuff rewards.
+
+### M7 skill manifest CLI
+
+Soridormi now exposes the M7 full skill universe through a host-side CLI. Use this before implementing or invoking skills:
+
+```bash
+./scripts/list_skills.sh --validate-only
+./scripts/list_skills.sh --available
+./scripts/list_skills.sh --future
+./scripts/list_skills.sh --include-unsupported
+./scripts/list_skills.sh --llm-context --language zh
+```
+
+The CLI is read-only. It validates `configs/skills/open_duck_mini_v2_skills.json`, filters available/planned/unsupported skills, and generates LLM-readable context. It does not execute robot behavior. Planned, future, and unsupported skills must not be described as executable.
