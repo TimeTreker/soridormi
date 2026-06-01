@@ -25,6 +25,14 @@ Options:
   --camera-azimuth DEG  Follow-camera azimuth. default: 135
   --camera-elevation DEG
                         Follow-camera elevation. default: -20
+  --rough-ground        Generate a temporary MuJoCo scene with small stone boxes.
+  --no-rough-ground     Use the normal flat MuJoCo scene. default
+  --rough-stone-height M
+                        Approximate stone height in meters. default: 0.008
+  --rough-stone-count N
+                        Number of generated stones. default: 8
+  --rough-stone-radius M
+                        Approximate stone half-size/radius in meters. default: 0.018
   -h, --help            Show this help.
 
 Examples:
@@ -32,6 +40,7 @@ Examples:
   ./scripts/run_sim_server.sh --backend mujoco --viewer
   ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
   ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
+  ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera --rough-ground
 
 For policy parity/teacher rollout tests, start the simulator with the same
 policy profile used by the runtime so MuJoCo receives the profile's official
@@ -47,6 +56,10 @@ CAMERA_DISTANCE="${SORIDORMI_MUJOCO_CAMERA_DISTANCE:-1.4}"
 CAMERA_AZIMUTH="${SORIDORMI_MUJOCO_CAMERA_AZIMUTH:-135}"
 CAMERA_ELEVATION="${SORIDORMI_MUJOCO_CAMERA_ELEVATION:--20}"
 SIM_POLICY_PROFILE="${SORIDORMI_SIM_POLICY_PROFILE:-}"
+ROUGH_GROUND="${SORIDORMI_MUJOCO_ROUGH_GROUND:-0}"
+ROUGH_STONE_HEIGHT="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT:-0.008}"
+ROUGH_STONE_COUNT="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT:-8}"
+ROUGH_STONE_RADIUS="${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS:-0.018}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -84,6 +97,26 @@ while [ "$#" -gt 0 ]; do
       ;;
     --camera-elevation)
       CAMERA_ELEVATION="${2:?--camera-elevation requires a value}"
+      shift 2
+      ;;
+    --rough-ground)
+      ROUGH_GROUND="1"
+      shift
+      ;;
+    --no-rough-ground)
+      ROUGH_GROUND="0"
+      shift
+      ;;
+    --rough-stone-height)
+      ROUGH_STONE_HEIGHT="${2:?--rough-stone-height requires a value}"
+      shift 2
+      ;;
+    --rough-stone-count)
+      ROUGH_STONE_COUNT="${2:?--rough-stone-count requires a value}"
+      shift 2
+      ;;
+    --rough-stone-radius)
+      ROUGH_STONE_RADIUS="${2:?--rough-stone-radius requires a value}"
       shift 2
       ;;
     -h|--help)
@@ -154,12 +187,17 @@ export SORIDORMI_MUJOCO_CAMERA_DISTANCE="${CAMERA_DISTANCE}"
 export SORIDORMI_MUJOCO_CAMERA_AZIMUTH="${CAMERA_AZIMUTH}"
 export SORIDORMI_MUJOCO_CAMERA_ELEVATION="${CAMERA_ELEVATION}"
 export SORIDORMI_SIM_POLICY_PROFILE="${SIM_POLICY_PROFILE}"
+export SORIDORMI_MUJOCO_ROUGH_GROUND="${ROUGH_GROUND}"
+export SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT="${ROUGH_STONE_HEIGHT}"
+export SORIDORMI_MUJOCO_ROUGH_STONE_COUNT="${ROUGH_STONE_COUNT}"
+export SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS="${ROUGH_STONE_RADIUS}"
 
 echo "Soridormi simulator server"
 echo "=========================="
 echo "Backend: ${SORIDORMI_SIM_BACKEND}"
 echo "MuJoCo viewer: ${SORIDORMI_MUJOCO_VIEWER}"
 echo "MuJoCo follow camera: ${SORIDORMI_MUJOCO_FOLLOW_CAMERA}"
+echo "MuJoCo rough ground: ${SORIDORMI_MUJOCO_ROUGH_GROUND}"
 if [ "${SORIDORMI_MUJOCO_FOLLOW_CAMERA}" = "1" ]; then
   echo "MuJoCo follow camera params: distance=${SORIDORMI_MUJOCO_CAMERA_DISTANCE} azimuth=${SORIDORMI_MUJOCO_CAMERA_AZIMUTH} elevation=${SORIDORMI_MUJOCO_CAMERA_ELEVATION}"
 fi
@@ -177,6 +215,10 @@ docker compose -f compose.sim.yaml run --rm \
   -e SORIDORMI_MUJOCO_CAMERA_DISTANCE_OVERRIDE="${SORIDORMI_MUJOCO_CAMERA_DISTANCE}" \
   -e SORIDORMI_MUJOCO_CAMERA_AZIMUTH_OVERRIDE="${SORIDORMI_MUJOCO_CAMERA_AZIMUTH}" \
   -e SORIDORMI_MUJOCO_CAMERA_ELEVATION_OVERRIDE="${SORIDORMI_MUJOCO_CAMERA_ELEVATION}" \
+  -e SORIDORMI_MUJOCO_ROUGH_GROUND_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_GROUND}" \
+  -e SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT}" \
+  -e SORIDORMI_MUJOCO_ROUGH_STONE_COUNT_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT}" \
+  -e SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS}" \
   sim bash -lc '
     set -euo pipefail
     source /opt/venvs/sim/bin/activate
@@ -195,10 +237,33 @@ docker compose -f compose.sim.yaml run --rm \
     export SORIDORMI_MUJOCO_CAMERA_DISTANCE="${SORIDORMI_MUJOCO_CAMERA_DISTANCE_OVERRIDE:-1.4}"
     export SORIDORMI_MUJOCO_CAMERA_AZIMUTH="${SORIDORMI_MUJOCO_CAMERA_AZIMUTH_OVERRIDE:-135}"
     export SORIDORMI_MUJOCO_CAMERA_ELEVATION="${SORIDORMI_MUJOCO_CAMERA_ELEVATION_OVERRIDE:--20}"
+    export SORIDORMI_MUJOCO_ROUGH_GROUND="${SORIDORMI_MUJOCO_ROUGH_GROUND_OVERRIDE:-0}"
+    export SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT_OVERRIDE:-0.008}"
+    export SORIDORMI_MUJOCO_ROUGH_STONE_COUNT="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT_OVERRIDE:-8}"
+    export SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS="${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS_OVERRIDE:-0.018}"
+
+    if [ "${SORIDORMI_MUJOCO_ROUGH_GROUND}" = "1" ]; then
+      BASE_MODEL="${MUJOCO_MODEL_PATH:-}"
+      if [ -z "${BASE_MODEL}" ]; then
+        BASE_MODEL="$(python - <<'PYMODEL'
+from soridormi_sim.robot_config import load_robot_config
+print(load_robot_config().model.path)
+PYMODEL
+)"
+      fi
+      # Write the generated scene next to the original Open Duck XML. MuJoCo
+      # resolves mesh and texture paths relative to the top-level XML/compiler
+      # context, so writing the generated scene to /tmp can make included robot
+      # XML files look for meshes in the wrong directory.
+      ROUGH_MODEL="$(dirname "${BASE_MODEL}")/soridormi_rough_ground_scene.xml"
+      python -m soridormi_sim.rough_ground_scene         --base "${BASE_MODEL}"         --output "${ROUGH_MODEL}"         --stone-count "${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT}"         --stone-height "${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT}"         --stone-radius "${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS}"
+      export MUJOCO_MODEL_PATH="${ROUGH_MODEL}"
+    fi
 
     echo "Effective sim backend: ${SORIDORMI_SIM_BACKEND}"
     echo "Effective MuJoCo viewer: ${SORIDORMI_MUJOCO_VIEWER}"
     echo "Effective MuJoCo follow camera: ${SORIDORMI_MUJOCO_FOLLOW_CAMERA}"
+    echo "Effective MuJoCo rough ground: ${SORIDORMI_MUJOCO_ROUGH_GROUND}"
     if [ "${SORIDORMI_MUJOCO_FOLLOW_CAMERA}" = "1" ]; then
       echo "Effective MuJoCo camera params: distance=${SORIDORMI_MUJOCO_CAMERA_DISTANCE} azimuth=${SORIDORMI_MUJOCO_CAMERA_AZIMUTH} elevation=${SORIDORMI_MUJOCO_CAMERA_ELEVATION}"
     fi

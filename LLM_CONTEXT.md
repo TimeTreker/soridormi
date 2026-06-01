@@ -126,6 +126,25 @@ Every patch response must include both:
 
 For docs-only patches, functional validation still means checking expected files/phrases and Markdown fences. For code patches, run relevant tests, compile checks, and CLI smoke tests. For sim/training patches, give both local/unit validation and live MuJoCo validation commands. Be explicit about anything not run.
 
+
+### M7 skill platform direction
+
+Soridormi should evolve from a walking-policy runner into a skill-based robot body platform. The current M7 design decision is to define the full desired skill universe first, then land implementations one by one. The machine-readable manifest is:
+
+```text
+configs/skills/open_duck_mini_v2_skills.json
+```
+
+Read the companion doc:
+
+```text
+docs/SORIDORMI_SKILL_TAXONOMY.md
+```
+
+The current Open Duck Mini v2 action/actuator contract has legs plus head/neck joints, but no arm/hand actuators. Therefore `wave_hand`, `point_direction`, and `high_five` may be declared as desired future interaction skills, but they must be marked `unsupported_current_robot` and must not be exposed as executable until matching hardware/controller support exists. First social skills should use head/neck-safe gestures such as `look_direction`, `look_at_person`, `nod_yes`, `shake_no`, `bow`, and `express_attention`.
+
+The first executable M7 subset should remain small: roughly 6 to 8 safe MuJoCo skills such as `stand_idle`, `stop`, `walk_velocity`, `turn_in_place`, `curve_walk`, `sidestep`, `look_direction`, and `nod_yes`/`shake_no`. Other skills can be present in the manifest with `planned`, `future`, or `unsupported_current_robot` status.
+
 ## New-session prompt
 
 A good prompt to start the next session:
@@ -185,3 +204,19 @@ The random collector changes `vx/vy/yaw` several times inside each episode and r
 
 - If official Open Duck baseline walks but `./scripts/run_policy_rollout_smoke.sh open_duck_forward` only wiggles, treat it as a Soridormi runtime parity bug, not a training/data problem. `open_duck_forward` should export `SORIDORMI_SIM_PREROLL_STEPS=1` so sync-step MuJoCo pre-rolls one API step before first policy inference.
 - For official-vs-Soridormi trace parity, force JSONL logging through the smoke wrapper with `--log-format jsonl --log-prefix parity_open_duck_forward --log-dir /data/logs`. Policy profiles may default to MCAP, so parity commands must not rely on `SORIDORMI_RUNTIME_LOG_FORMAT=jsonl` alone unless `run_policy_experiment.sh` preserves the override after profile resolution.
+
+### M6C foot-clearance and rough-ground evaluation
+
+Soridormi now treats low swing-foot clearance as a measurable eval problem before residual/RL changes. Use JSONL runtime logs and `soridormi_runtime.foot_clearance_eval` to compute left/right min clearance, swing-foot p05/p50/mean clearance, and low-clearance swing ratios. The wrapper is:
+
+```bash
+./scripts/run_foot_clearance_eval.sh open_duck_forward --steps 1000
+```
+
+For rough-ground visual testing, start MuJoCo with a generated small-stone scene:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera --rough-ground
+```
+
+Do not claim BC improves foot clearance beyond the teacher. BC copies the teacher. If foot clearance needs improvement beyond teacher behavior, measure it first, then use residual/RL with explicit clearance/scuff rewards.

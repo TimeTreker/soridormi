@@ -215,3 +215,55 @@ This collector should be used for walking, turning, stopping, small lateral moti
 ## Hardware rule
 
 Do not start hardware walking from this milestone. Hardware work may only begin as read-only state, dry-run command validation, watchdog, emergency stop, and low-power single-joint tests. Walking hardware execution is blocked until commanded free-walk simulation acceptance exists.
+
+## M6C foot-clearance and rough-ground evaluation
+
+If the duck walks but its swing feet stay very close to the ground, do not change motor limits first. Measure clearance and rough-ground robustness before changing the policy. The M6C evaluation layer adds two tools:
+
+```text
+src/soridormi_runtime/foot_clearance_eval.py
+src/soridormi_sim/rough_ground_scene.py
+```
+
+Analyze a normal flat-ground rollout by starting MuJoCo with the official walking profile:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
+```
+
+Then run a foot-clearance rollout/report in another terminal:
+
+```bash
+./scripts/run_foot_clearance_eval.sh open_duck_forward --steps 1000
+```
+
+The report is written under:
+
+```text
+data/foot_clearance/open_duck_forward/foot_clearance_report.md
+```
+
+For small-stone testing, start the simulator with a generated rough-ground scene:
+
+```bash
+./scripts/run_sim_server.sh \
+  --backend mujoco \
+  --profile open_duck_forward \
+  --viewer \
+  --follow-camera \
+  --rough-ground \
+  --rough-stone-height 0.008 \
+  --rough-stone-count 8
+```
+
+Then run the same foot-clearance evaluation. Treat rough-ground testing as an evaluation gate first, not a training shortcut. If the teacher itself trips or scuffs on stones, behavior cloning will copy that limitation. Use residual/RL only after the flat-ground and rough-ground reports show exactly where the teacher or BC candidate lacks clearance.
+
+Important metrics:
+
+```text
+left/right min clearance
+left/right swing clearance p05/p50/mean
+low-clearance swing step ratio
+warnings when median swing clearance is below target
+warnings when low-clearance swing steps are frequent
+```

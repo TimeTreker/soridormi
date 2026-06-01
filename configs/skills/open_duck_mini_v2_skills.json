@@ -1,0 +1,1505 @@
+{
+  "schema_version": 1,
+  "robot": "open_duck_mini_v2",
+  "milestone": "M7_skill_platform",
+  "description": "Full Soridormi skill universe for Open Duck Mini v2. Skills are declared up front, but execution lands one-by-one through status and implementation phases. This manifest does not grant hardware execution.",
+  "strategy": {
+    "define_all_skills_first": true,
+    "land_implementation_incrementally": true,
+    "first_executable_subset_goal": "6_to_8_safe_sim_skills",
+    "notes": "A skill may be declared even when unavailable. Status, actuator requirements, and phase determine whether it can be executed."
+  },
+  "status_vocab": [
+    "available_sim",
+    "available_sim_experimental",
+    "planned",
+    "planned_wrapper",
+    "planned_external_target",
+    "future",
+    "future_pose_teacher",
+    "future_residual_rl",
+    "future_evaluation",
+    "future_perception",
+    "future_composite",
+    "unsupported_current_robot"
+  ],
+  "execution_vocab": [
+    "policy_velocity",
+    "skill_wrapper",
+    "scripted_keyframe",
+    "scripted_tracking",
+    "pose_transition",
+    "trajectory_policy",
+    "residual_policy",
+    "future_policy",
+    "future_hardware_extension",
+    "composite"
+  ],
+  "defaults": {
+    "sim_first": true,
+    "hardware_enabled": false,
+    "interruptible": true,
+    "fallback": "stop_and_stand"
+  },
+  "actuator_groups": {
+    "legs": {
+      "supported": true,
+      "actuators": [
+        "left_hip_yaw",
+        "left_hip_roll",
+        "left_hip_pitch",
+        "left_knee",
+        "left_ankle",
+        "right_hip_yaw",
+        "right_hip_roll",
+        "right_hip_pitch",
+        "right_knee",
+        "right_ankle"
+      ]
+    },
+    "head_neck": {
+      "supported": true,
+      "actuators": [
+        "neck_pitch",
+        "head_pitch",
+        "head_yaw",
+        "head_roll"
+      ]
+    },
+    "arms_hands": {
+      "supported": false,
+      "actuators": []
+    }
+  },
+  "implementation_phases": [
+    {
+      "id": "M7A_skill_manifest",
+      "goal": "Declare full skill universe and validate manifest."
+    },
+    {
+      "id": "M7B_skill_listing_validation",
+      "goal": "CLI/runtime listing, status filters, and schema validation."
+    },
+    {
+      "id": "M7C_locomotion_wrappers",
+      "goal": "Expose existing policy velocity skills through safe wrappers."
+    },
+    {
+      "id": "M7D_head_social",
+      "goal": "Implement head/neck social gestures in MuJoCo."
+    },
+    {
+      "id": "M7E_posture_transitions",
+      "goal": "Add scripted or teacher-driven sit/stand/crouch/recover."
+    },
+    {
+      "id": "M7F_obstacle_and_terrain",
+      "goal": "Trajectory tracking and obstacle-aware clearance via evaluation and residual/RL."
+    },
+    {
+      "id": "M7G_fast_locomotion",
+      "goal": "Fast walk/run after speed tracking is proven."
+    },
+    {
+      "id": "M7H_future_hardware_extensions",
+      "goal": "Arm/hand gestures only if matching hardware exists."
+    }
+  ],
+  "skills": [
+    {
+      "id": "stand_idle",
+      "category": "locomotion",
+      "display_name": "Stand Idle",
+      "description": "Hold a stable standing posture with zero velocity command.",
+      "status": "available_sim",
+      "execution": "policy_velocity",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {},
+      "preconditions": [
+        "not_fallen",
+        "sim_or_dry_run"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "safety_stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "zero_command_stability",
+        "fall_rate",
+        "base_drift"
+      ]
+    },
+    {
+      "id": "stop",
+      "category": "locomotion",
+      "display_name": "Stop",
+      "description": "Cancel active locomotion and command zero velocity.",
+      "status": "available_sim",
+      "execution": "policy_velocity",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {},
+      "preconditions": [
+        "not_emergency_stopped"
+      ],
+      "required_actuator_groups": [
+        "legs"
+      ],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "safety_stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "stop_distance",
+        "post_stop_drift",
+        "fall_rate"
+      ]
+    },
+    {
+      "id": "walk_velocity",
+      "category": "locomotion",
+      "display_name": "Walk Velocity",
+      "description": "Track a bounded body velocity command vx, vy, and yaw.",
+      "status": "available_sim",
+      "execution": "policy_velocity",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {
+        "vx_mps": {
+          "min": -0.03,
+          "max": 0.25,
+          "default": 0.1
+        },
+        "vy_mps": {
+          "min": -0.03,
+          "max": 0.03,
+          "default": 0.0
+        },
+        "yaw_radps": {
+          "min": -0.2,
+          "max": 0.2,
+          "default": 0.0
+        },
+        "duration_s": {
+          "min": 0.5,
+          "max": 20.0,
+          "default": 2.0
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen",
+        "sim_or_dry_run"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "velocity_tracking",
+        "forward_progress_ratio",
+        "fall_rate",
+        "stuck_ratio"
+      ]
+    },
+    {
+      "id": "walk_forward",
+      "category": "locomotion",
+      "display_name": "Walk Forward",
+      "description": "Human-facing wrapper for walk_velocity with positive vx.",
+      "status": "planned_wrapper",
+      "execution": "skill_wrapper",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {
+        "speed": {
+          "enum": [
+            "slow",
+            "normal",
+            "fast_limited"
+          ],
+          "default": "normal"
+        },
+        "duration_s": {
+          "min": 0.5,
+          "max": 20.0,
+          "default": 2.0
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "forward_progress_ratio",
+        "velocity_tracking"
+      ],
+      "notes": "Wrapper should lower to walk_velocity(vx>0, vy=0, yaw=0)."
+    },
+    {
+      "id": "walk_backward",
+      "category": "locomotion",
+      "display_name": "Walk Backward",
+      "description": "Human-facing wrapper for walk_velocity with small negative vx.",
+      "status": "planned_wrapper",
+      "execution": "skill_wrapper",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {
+        "speed": {
+          "enum": [
+            "slow"
+          ],
+          "default": "slow"
+        },
+        "duration_s": {
+          "min": 0.5,
+          "max": 8.0,
+          "default": 1.5
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "backward_progress_ratio",
+        "fall_rate"
+      ],
+      "notes": "Keep conservative until backward commands are accepted in MuJoCo evaluation."
+    },
+    {
+      "id": "turn_in_place",
+      "category": "locomotion",
+      "display_name": "Turn In Place",
+      "description": "Rotate left or right with near-zero forward velocity.",
+      "status": "available_sim",
+      "execution": "policy_velocity",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {
+        "yaw_radps": {
+          "min": -0.2,
+          "max": 0.2,
+          "default": 0.12
+        },
+        "duration_s": {
+          "min": 0.5,
+          "max": 10.0,
+          "default": 2.0
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen",
+        "sim_or_dry_run"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "yaw_tracking",
+        "base_drift",
+        "fall_rate"
+      ]
+    },
+    {
+      "id": "turn_left",
+      "category": "locomotion",
+      "display_name": "Turn Left",
+      "description": "Human-facing wrapper for positive-yaw turn_in_place.",
+      "status": "planned_wrapper",
+      "execution": "skill_wrapper",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {
+        "angle_deg": {
+          "min": 5,
+          "max": 120,
+          "default": 45
+        },
+        "speed": {
+          "enum": [
+            "slow",
+            "normal"
+          ],
+          "default": "slow"
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "yaw_tracking",
+        "fall_rate"
+      ],
+      "notes": "Wrapper should lower to turn_in_place(yaw>0)."
+    },
+    {
+      "id": "turn_right",
+      "category": "locomotion",
+      "display_name": "Turn Right",
+      "description": "Human-facing wrapper for negative-yaw turn_in_place.",
+      "status": "planned_wrapper",
+      "execution": "skill_wrapper",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {
+        "angle_deg": {
+          "min": 5,
+          "max": 120,
+          "default": 45
+        },
+        "speed": {
+          "enum": [
+            "slow",
+            "normal"
+          ],
+          "default": "slow"
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "yaw_tracking",
+        "fall_rate"
+      ],
+      "notes": "Wrapper should lower to turn_in_place(yaw<0)."
+    },
+    {
+      "id": "curve_walk",
+      "category": "locomotion",
+      "display_name": "Curve Walk",
+      "description": "Walk forward while tracking a yaw command.",
+      "status": "available_sim",
+      "execution": "policy_velocity",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {
+        "vx_mps": {
+          "min": 0.03,
+          "max": 0.2,
+          "default": 0.08
+        },
+        "yaw_radps": {
+          "min": -0.2,
+          "max": 0.2,
+          "default": 0.1
+        },
+        "duration_s": {
+          "min": 0.5,
+          "max": 20.0,
+          "default": 3.0
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "trajectory_tracking",
+        "yaw_tracking",
+        "fall_rate",
+        "stuck_ratio"
+      ]
+    },
+    {
+      "id": "curve_left",
+      "category": "locomotion",
+      "display_name": "Curve Left",
+      "description": "Human-facing wrapper for forward walk with positive yaw.",
+      "status": "planned_wrapper",
+      "execution": "skill_wrapper",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {
+        "radius": {
+          "enum": [
+            "wide",
+            "normal"
+          ],
+          "default": "normal"
+        },
+        "duration_s": {
+          "min": 0.5,
+          "max": 20.0,
+          "default": 3.0
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "trajectory_tracking",
+        "yaw_tracking"
+      ]
+    },
+    {
+      "id": "curve_right",
+      "category": "locomotion",
+      "display_name": "Curve Right",
+      "description": "Human-facing wrapper for forward walk with negative yaw.",
+      "status": "planned_wrapper",
+      "execution": "skill_wrapper",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {
+        "radius": {
+          "enum": [
+            "wide",
+            "normal"
+          ],
+          "default": "normal"
+        },
+        "duration_s": {
+          "min": 0.5,
+          "max": 20.0,
+          "default": 3.0
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "trajectory_tracking",
+        "yaw_tracking"
+      ]
+    },
+    {
+      "id": "sidestep",
+      "category": "locomotion",
+      "display_name": "Sidestep",
+      "description": "Track a small lateral velocity command.",
+      "status": "available_sim_experimental",
+      "execution": "policy_velocity",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {
+        "vy_mps": {
+          "min": -0.03,
+          "max": 0.03,
+          "default": 0.02
+        },
+        "duration_s": {
+          "min": 0.5,
+          "max": 8.0,
+          "default": 2.0
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "lateral_tracking",
+        "yaw_drift",
+        "fall_rate"
+      ]
+    },
+    {
+      "id": "sidestep_left",
+      "category": "locomotion",
+      "display_name": "Sidestep Left",
+      "description": "Human-facing wrapper for positive lateral sidestep.",
+      "status": "planned_wrapper",
+      "execution": "skill_wrapper",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {
+        "distance_m": {
+          "min": 0.02,
+          "max": 0.3,
+          "default": 0.1
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "lateral_tracking"
+      ]
+    },
+    {
+      "id": "sidestep_right",
+      "category": "locomotion",
+      "display_name": "Sidestep Right",
+      "description": "Human-facing wrapper for negative lateral sidestep.",
+      "status": "planned_wrapper",
+      "execution": "skill_wrapper",
+      "implementation_phase": "M7C_locomotion_wrappers",
+      "parameters": {
+        "distance_m": {
+          "min": 0.02,
+          "max": 0.3,
+          "default": 0.1
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "lateral_tracking"
+      ]
+    },
+    {
+      "id": "trajectory_follow",
+      "category": "locomotion",
+      "display_name": "Trajectory Follow",
+      "description": "Follow a short body-frame trajectory composed of velocity or waypoint segments.",
+      "status": "future_evaluation",
+      "execution": "trajectory_policy",
+      "implementation_phase": "M7F_obstacle_and_terrain",
+      "parameters": {
+        "max_duration_s": {
+          "min": 1.0,
+          "max": 60.0,
+          "default": 10.0
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen",
+        "validated_trajectory"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "trajectory_tracking",
+        "progress_ratio",
+        "cross_track_error",
+        "stuck_ratio"
+      ],
+      "notes": "This is the correct target for interactive movement: not merely survive, but follow the requested trajectory."
+    },
+    {
+      "id": "step_over_obstacle",
+      "category": "locomotion",
+      "display_name": "Step Over Obstacle",
+      "description": "Track trajectory while lifting swing foot to clear a detected or specified obstacle.",
+      "status": "future_residual_rl",
+      "execution": "residual_policy",
+      "implementation_phase": "M7F_obstacle_and_terrain",
+      "parameters": {
+        "obstacle_height_m": {
+          "min": 0.005,
+          "max": 0.08,
+          "default": 0.02
+        },
+        "obstacle_distance_m": {
+          "min": 0.05,
+          "max": 1.0,
+          "default": 0.35
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen",
+        "terrain_features_available"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "obstacle_clearance",
+        "trajectory_progress",
+        "foot_scuff_count",
+        "fall_rate"
+      ],
+      "notes": "BC will copy the teacher. Improvement beyond teacher should use residual/RL with terrain features and clearance reward."
+    },
+    {
+      "id": "rough_ground_walk",
+      "category": "locomotion",
+      "display_name": "Rough Ground Walk",
+      "description": "Maintain trajectory progress on low rough terrain.",
+      "status": "future_residual_rl",
+      "execution": "residual_policy",
+      "implementation_phase": "M7F_obstacle_and_terrain",
+      "parameters": {
+        "max_stone_height_m": {
+          "min": 0.005,
+          "max": 0.08,
+          "default": 0.012
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "progress_ratio",
+        "stuck_ratio",
+        "fall_rate",
+        "low_clearance_ratio"
+      ]
+    },
+    {
+      "id": "run",
+      "category": "locomotion",
+      "display_name": "Run",
+      "description": "Fast locomotion beyond current walking envelope.",
+      "status": "future",
+      "execution": "future_policy",
+      "implementation_phase": "M7G_fast_locomotion",
+      "parameters": {
+        "vx_mps": {
+          "min": 0.25,
+          "max": 0.6,
+          "default": 0.3
+        }
+      },
+      "preconditions": [
+        "future_fast_policy_available"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": true,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "fast_velocity_tracking",
+        "fall_rate",
+        "thermal_margin"
+      ],
+      "notes": "Declared for roadmap only. Not executable until fast-walk/run policy is proven in MuJoCo."
+    },
+    {
+      "id": "sit_down",
+      "category": "posture",
+      "display_name": "Sit Down",
+      "description": "Transition from stable standing to sitting/rest pose.",
+      "status": "future_pose_teacher",
+      "execution": "pose_transition",
+      "implementation_phase": "M7E_posture_transitions",
+      "parameters": {
+        "duration_s": {
+          "min": 0.5,
+          "max": 8.0,
+          "default": 2.0
+        }
+      },
+      "preconditions": [
+        "sim_first",
+        "pose_teacher_available"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": true,
+        "requires_flat_ground": true,
+        "interruptible": true,
+        "fallback": "safety_stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "joint_limit_margin",
+        "base_stability",
+        "fall_rate"
+      ],
+      "notes": "Do not learn from walking-only teacher. Needs scripted pose/keyframe teacher, separate teacher policy, or future RL."
+    },
+    {
+      "id": "stand_up",
+      "category": "posture",
+      "display_name": "Stand Up",
+      "description": "Transition from sitting/rest pose to stable standing.",
+      "status": "future_pose_teacher",
+      "execution": "pose_transition",
+      "implementation_phase": "M7E_posture_transitions",
+      "parameters": {
+        "duration_s": {
+          "min": 0.5,
+          "max": 8.0,
+          "default": 2.0
+        }
+      },
+      "preconditions": [
+        "sim_first",
+        "pose_teacher_available"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": true,
+        "requires_not_walking": true,
+        "requires_flat_ground": true,
+        "interruptible": true,
+        "fallback": "safety_stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "joint_limit_margin",
+        "base_stability",
+        "fall_rate"
+      ],
+      "notes": "Do not learn from walking-only teacher. Needs scripted pose/keyframe teacher, separate teacher policy, or future RL."
+    },
+    {
+      "id": "crouch",
+      "category": "posture",
+      "display_name": "Crouch",
+      "description": "Lower the body height while maintaining balance.",
+      "status": "future_pose_teacher",
+      "execution": "pose_transition",
+      "implementation_phase": "M7E_posture_transitions",
+      "parameters": {
+        "duration_s": {
+          "min": 0.5,
+          "max": 8.0,
+          "default": 2.0
+        }
+      },
+      "preconditions": [
+        "sim_first",
+        "pose_teacher_available"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": true,
+        "requires_flat_ground": true,
+        "interruptible": true,
+        "fallback": "safety_stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "joint_limit_margin",
+        "base_stability",
+        "fall_rate"
+      ],
+      "notes": "Do not learn from walking-only teacher. Needs scripted pose/keyframe teacher, separate teacher policy, or future RL."
+    },
+    {
+      "id": "recover_stand",
+      "category": "posture",
+      "display_name": "Recover Stand",
+      "description": "Recover from a safe fallen/crouched pose to standing.",
+      "status": "future_pose_teacher",
+      "execution": "pose_transition",
+      "implementation_phase": "M7E_posture_transitions",
+      "parameters": {
+        "duration_s": {
+          "min": 0.5,
+          "max": 8.0,
+          "default": 2.0
+        }
+      },
+      "preconditions": [
+        "sim_first",
+        "pose_teacher_available"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": true,
+        "requires_flat_ground": true,
+        "interruptible": true,
+        "fallback": "safety_stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "joint_limit_margin",
+        "base_stability",
+        "fall_rate"
+      ],
+      "notes": "Do not learn from walking-only teacher. Needs scripted pose/keyframe teacher, separate teacher policy, or future RL."
+    },
+    {
+      "id": "balance_recover",
+      "category": "posture",
+      "display_name": "Balance Recover",
+      "description": "Small corrective recovery after disturbance without a full fall.",
+      "status": "future_pose_teacher",
+      "execution": "pose_transition",
+      "implementation_phase": "M7E_posture_transitions",
+      "parameters": {
+        "duration_s": {
+          "min": 0.5,
+          "max": 8.0,
+          "default": 2.0
+        }
+      },
+      "preconditions": [
+        "sim_first",
+        "pose_teacher_available"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": true,
+        "requires_flat_ground": true,
+        "interruptible": true,
+        "fallback": "safety_stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "joint_limit_margin",
+        "base_stability",
+        "fall_rate"
+      ],
+      "notes": "Do not learn from walking-only teacher. Needs scripted pose/keyframe teacher, separate teacher policy, or future RL."
+    },
+    {
+      "id": "look_direction",
+      "category": "social",
+      "display_name": "Look Direction",
+      "description": "Turn head/neck toward a specified yaw/pitch direction.",
+      "status": "planned",
+      "execution": "scripted_keyframe",
+      "implementation_phase": "M7D_head_social",
+      "parameters": {
+        "head_yaw_rad": {
+          "min": -0.6,
+          "max": 0.6,
+          "default": 0.0
+        },
+        "head_pitch_rad": {
+          "min": -0.35,
+          "max": 0.25,
+          "default": 0.0
+        },
+        "duration_s": {
+          "min": 0.2,
+          "max": 3.0,
+          "default": 1.0
+        }
+      },
+      "preconditions": [
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "neutral_head",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "joint_limit_margin",
+        "tracking_error"
+      ]
+    },
+    {
+      "id": "look_at_person",
+      "category": "social",
+      "display_name": "Look At Person",
+      "description": "Turn head/neck toward a person or target direction resolved by an external perception system.",
+      "status": "planned_external_target",
+      "execution": "scripted_keyframe",
+      "implementation_phase": "M7D_head_social",
+      "parameters": {
+        "target_ref": {
+          "type": "string",
+          "default": "person"
+        },
+        "duration_s": {
+          "min": 0.2,
+          "max": 3.0,
+          "default": 1.0
+        }
+      },
+      "preconditions": [
+        "target_direction_available",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "neutral_head",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "target_heading_error",
+        "joint_limit_margin"
+      ]
+    },
+    {
+      "id": "track_person",
+      "category": "social",
+      "display_name": "Track Person",
+      "description": "Continuously track a person with head/neck while body remains safe.",
+      "status": "future_perception",
+      "execution": "scripted_tracking",
+      "implementation_phase": "M7D_head_social",
+      "parameters": {
+        "max_duration_s": {
+          "min": 1.0,
+          "max": 30.0,
+          "default": 5.0
+        }
+      },
+      "preconditions": [
+        "perception_agent_available",
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "neutral_head",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "tracking_error",
+        "joint_limit_margin",
+        "lost_target_rate"
+      ]
+    },
+    {
+      "id": "nod_yes",
+      "category": "social",
+      "display_name": "Nod Yes",
+      "description": "Small repeated head pitch motion for yes/acknowledgement.",
+      "status": "planned",
+      "execution": "scripted_keyframe",
+      "implementation_phase": "M7D_head_social",
+      "parameters": {
+        "count": {
+          "min": 1,
+          "max": 3,
+          "default": 2
+        },
+        "amplitude": {
+          "enum": [
+            "small",
+            "medium"
+          ],
+          "default": "small"
+        }
+      },
+      "preconditions": [
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "neutral_head",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "joint_limit_margin",
+        "base_stability"
+      ]
+    },
+    {
+      "id": "shake_no",
+      "category": "social",
+      "display_name": "Shake No",
+      "description": "Small repeated head yaw motion for no/decline.",
+      "status": "planned",
+      "execution": "scripted_keyframe",
+      "implementation_phase": "M7D_head_social",
+      "parameters": {
+        "count": {
+          "min": 1,
+          "max": 3,
+          "default": 2
+        },
+        "amplitude": {
+          "enum": [
+            "small",
+            "medium"
+          ],
+          "default": "small"
+        }
+      },
+      "preconditions": [
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "neutral_head",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "joint_limit_margin",
+        "base_stability"
+      ]
+    },
+    {
+      "id": "bow",
+      "category": "social",
+      "display_name": "Bow",
+      "description": "Small safe bow-like gesture using head/neck and optionally body posture later.",
+      "status": "planned",
+      "execution": "scripted_keyframe",
+      "implementation_phase": "M7D_head_social",
+      "parameters": {
+        "depth": {
+          "enum": [
+            "small"
+          ],
+          "default": "small"
+        },
+        "duration_s": {
+          "min": 0.5,
+          "max": 3.0,
+          "default": 1.2
+        }
+      },
+      "preconditions": [
+        "standing",
+        "stable_balance",
+        "not_walking"
+      ],
+      "required_actuator_groups": [
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": true,
+        "requires_flat_ground": true,
+        "interruptible": true,
+        "fallback": "neutral_head",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "balance_stability",
+        "joint_limit_margin",
+        "base_drift"
+      ],
+      "notes": "First implementation should be shallow; no deep torso bow until posture control is proven."
+    },
+    {
+      "id": "greeting",
+      "category": "social",
+      "display_name": "Greeting",
+      "description": "Composite social behavior for greeting a person.",
+      "status": "future_composite",
+      "execution": "composite",
+      "implementation_phase": "M7D_head_social",
+      "parameters": {},
+      "preconditions": [
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "neutral_head",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "composition_trace",
+        "user_feedback"
+      ],
+      "notes": "Speech/TTS belongs outside Soridormi, for example Chromie. Soridormi only owns the body movement.",
+      "composition": [
+        "look_at_person",
+        "nod_yes",
+        "optional_external_speech"
+      ]
+    },
+    {
+      "id": "express_attention",
+      "category": "social",
+      "display_name": "Express Attention",
+      "description": "Small head/neck attention motion to show the robot is listening.",
+      "status": "planned",
+      "execution": "scripted_keyframe",
+      "implementation_phase": "M7D_head_social",
+      "parameters": {
+        "style": {
+          "enum": [
+            "neutral",
+            "curious"
+          ],
+          "default": "neutral"
+        }
+      },
+      "preconditions": [
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "neutral_head",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "joint_limit_margin"
+      ]
+    },
+    {
+      "id": "wave_hand",
+      "category": "hardware_extension",
+      "display_name": "Wave Hand",
+      "description": "Arm/hand wave greeting. Current Open Duck Mini v2 actuator map has no arm/hand actuators, so this is a future hardware-extension skill.",
+      "status": "unsupported_current_robot",
+      "execution": "future_hardware_extension",
+      "implementation_phase": "M7H_future_hardware_extensions",
+      "parameters": {},
+      "preconditions": [
+        "future_arm_actuators_available"
+      ],
+      "required_actuator_groups": [
+        "arms_hands"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": true,
+        "requires_flat_ground": true,
+        "interruptible": true,
+        "fallback": "arms_neutral",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "not_applicable_until_hardware_exists"
+      ],
+      "notes": "Declared so higher-level planners know the desired behavior exists conceptually, but Soridormi must reject it on the current robot."
+    },
+    {
+      "id": "point_direction",
+      "category": "hardware_extension",
+      "display_name": "Point Direction",
+      "description": "Point toward an object or direction. Requires arm/hand hardware not present in the current actuator map.",
+      "status": "unsupported_current_robot",
+      "execution": "future_hardware_extension",
+      "implementation_phase": "M7H_future_hardware_extensions",
+      "parameters": {},
+      "preconditions": [
+        "future_arm_actuators_available"
+      ],
+      "required_actuator_groups": [
+        "arms_hands"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": true,
+        "requires_flat_ground": true,
+        "interruptible": true,
+        "fallback": "arms_neutral",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "not_applicable_until_hardware_exists"
+      ],
+      "notes": "Declared so higher-level planners know the desired behavior exists conceptually, but Soridormi must reject it on the current robot."
+    },
+    {
+      "id": "high_five",
+      "category": "hardware_extension",
+      "display_name": "High Five",
+      "description": "Interactive arm/hand contact gesture. Requires future arm/hand hardware and contact safety.",
+      "status": "unsupported_current_robot",
+      "execution": "future_hardware_extension",
+      "implementation_phase": "M7H_future_hardware_extensions",
+      "parameters": {},
+      "preconditions": [
+        "future_arm_actuators_available"
+      ],
+      "required_actuator_groups": [
+        "arms_hands"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": true,
+        "requires_flat_ground": true,
+        "interruptible": true,
+        "fallback": "arms_neutral",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "not_applicable_until_hardware_exists"
+      ],
+      "notes": "Declared so higher-level planners know the desired behavior exists conceptually, but Soridormi must reject it on the current robot."
+    }
+  ]
+}
