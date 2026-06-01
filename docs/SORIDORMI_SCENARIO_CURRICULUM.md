@@ -97,6 +97,52 @@ Teacher data rows should eventually include:
 
 Coverage reports should group by `scenario_id`, `skill_id`, velocity/yaw buckets, terrain type, obstacle type, ramp name, and failure/stuck flags.
 
+
+## Scenario-aware teacher collection
+
+The random teacher collector can now attach a curriculum scenario to every JSONL row. When `--scenario` is supplied, the collector reads `configs/scenarios/open_duck_mini_v2_scenarios.json`, uses the scenario `vx_mps`, `vy_mps`, and `yaw_radps` ranges as defaults, and records structured context fields for future context-conditioned BC:
+
+- `scenario_id`, `scenario_status`, `scenario_family`, and `scenario_dataset_tags`
+- `skill_id` and `scenario_skills`
+- `task_context` and `environment_context`
+- `command_space`
+- `desired_command`, `applied_command`, `command_ramp_alpha`, and the actual collector `command_ramp_name`
+
+List configured scenarios without starting MuJoCo:
+
+```bash
+PYTHONPATH=src python -m soridormi_runtime.random_teacher_dataset_collect \
+  --list-scenarios \
+  --json | python -m json.tool
+```
+
+For a live MuJoCo collection run, start the simulator first:
+
+```bash
+./scripts/run_sim_server.sh \
+  --backend mujoco \
+  --profile open_duck_forward \
+  --viewer \
+  --follow-camera
+```
+
+Then collect scenario-aware teacher data from another terminal:
+
+```bash
+./scripts/collect_random_teacher_dataset.sh \
+  --backend mujoco \
+  --scenario flat_walk_varied_speed_v1 \
+  --profile open_duck_forward \
+  --episodes 4 \
+  --steps-per-episode 600 \
+  --command-ramp-steps 20 \
+  --seed 7 \
+  --output /data/training_datasets/flat_walk_varied_speed_v1.jsonl \
+  --json
+```
+
+`planned` scenarios are rejected by default so they cannot silently become accepted training sources. Use `--allow-planned-scenario` only when intentionally collecting metadata-only exploratory rows before MuJoCo evaluator promotion.
+
 ## Validation
 
 Use the patch-specific test first:

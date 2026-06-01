@@ -11,6 +11,14 @@ from typing import Any, Callable
 import numpy as np
 
 from soridormi_runtime.policy_command import PolicyCommand
+from soridormi_runtime.scenario_curriculum import (
+    DEFAULT_SCENARIO_MANIFEST,
+    ScenarioCurriculumError,
+    ScenarioDefinition,
+    get_scenario_definition,
+    list_scenarios,
+    validate_scenario_for_teacher_collection,
+)
 from soridormi_runtime.rl_finetune_env import ResidualActionConfig, RlFineTuneEnv
 from soridormi_runtime.teacher_dataset_collect import _manifest_path_for, _sample_from_step
 from soridormi_runtime.training_dataset import DATASET_SCHEMA_VERSION, sha256_file
@@ -189,6 +197,14 @@ class RandomTeacherDatasetCollectResult:
     command_ramp_steps: int = 0
     segment_count: int = 0
     command_coverage: dict[str, Any] = field(default_factory=dict)
+    scenario_id: str | None = None
+    scenario_status: str | None = None
+    scenario_family: str | None = None
+    skill_id: str | None = None
+    scenario_dataset_tags: list[str] = field(default_factory=list)
+    task_context: dict[str, Any] = field(default_factory=dict)
+    environment_context: dict[str, Any] = field(default_factory=dict)
+    command_space: dict[str, Any] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -293,6 +309,8 @@ def collect_random_teacher_dataset(
     stop_on_terminated: bool = True,
     reset_on_start: bool = True,
     env_factory: Callable[..., Any] | None = None,
+    scenario: ScenarioDefinition | None = None,
+    initial_warnings: list[str] | None = None,
 ) -> RandomTeacherDatasetCollectResult:
     """Collect teacher BC samples under random piecewise velocity commands.
 
@@ -314,13 +332,19 @@ def collect_random_teacher_dataset(
     rng = np.random.default_rng(int(seed))
     factory = env_factory or RlFineTuneEnv
     errors: list[str] = []
-    warnings: list[str] = []
+    warnings: list[str] = list(initial_warnings or [])
     sample_count = 0
     skipped_steps = 0
     terminated_episodes = 0
     segment_count = 0
     coverage = CommandCoverageStats()
     global_step_index = 0
+    scenario_metadata = scenario.dataset_metadata() if scenario is not None else {}
+    resolved_scenario_id = (
+        str(scenario_metadata.get("scenario_id"))
+        if scenario_metadata.get("scenario_id")
+        else f"{profile}:random_walk_seed_{int(seed)}"
+    )
 
     with output.open("w", encoding="utf-8") as f:
         try:
@@ -395,12 +419,16 @@ def collect_random_teacher_dataset(
                             if skip_reason is not None and len(warnings) < 50:
                                 warnings.append(skip_reason)
                         else:
-                            scenario_id = f"{profile}:random_walk_seed_{int(seed)}"
-                            rollout_id = f"{scenario_id}:episode_{episode_index}"
+                            rollout_id = f"{resolved_scenario_id}:episode_{episode_index}"
+                            command_ramp_name = (
+                                "linear_segment_ramp"
+                                if int(max(0, command_ramp_steps)) > 0
+                                else "instant_segment_hold"
+                            )
                             sample.update(
                                 {
                                     "source_log": f"live_teacher_random_rollout:{rollout_id}",
-                                    "scenario_id": scenario_id,
+                                    "scenario_id": resolved_scenario_id,
                                     "rollout_id": rollout_id,
                                     "mode": "teacher_policy_random_command_collection",
                                     "command_segment_index": int(segment.segment_index),
@@ -410,10 +438,16 @@ def collect_random_teacher_dataset(
                                     "command_segment_hold_steps": int(segment.hold_steps),
                                     "command_ramp_steps": int(max(0, command_ramp_steps)),
                                     "command_ramp_alpha": float(ramp_alpha),
+                                    "command_ramp_name": command_ramp_name,
                                     "policy_command_target": segment.command.as_list(),
+                                    "desired_command": segment.command.describe(),
+                                    "applied_command": applied_command.describe(),
                                     "command_schedule_seed": int(seed),
                                 }
                             )
+                            if scenario_metadata:
+                                sample.update(scenario_metadata)
+                                sample["scenario_id"] = resolved_scenario_id
                             sample.setdefault("policy_debug", {})
                             if isinstance(sample["policy_debug"], dict):
                                 sample["policy_debug"].update(
@@ -423,6 +457,7 @@ def collect_random_teacher_dataset(
                                         "applied_command": applied_command.describe(),
                                         "target_command": segment.command.describe(),
                                         "command_ramp_alpha": float(ramp_alpha),
+                                        "command_ramp_name": command_ramp_name,
                                     }
                                 )
                             f.write(json.dumps(sample, separators=(",", ":"), sort_keys=True) + "\n")
@@ -462,6 +497,14 @@ def collect_random_teacher_dataset(
         command_ramp_steps=int(max(0, command_ramp_steps)),
         segment_count=segment_count,
         command_coverage=coverage.describe(),
+        scenario_id=resolved_scenario_id if scenario is not None else None,
+        scenario_status=str(scenario_metadata.get("scenario_status")) if scenario_metadata else None,
+        scenario_family=str(scenario_metadata.get("scenario_family")) if scenario_metadata else None,
+        skill_id=str(scenario_metadata.get("skill_id")) if scenario_metadata.get("skill_id") else None,
+        scenario_dataset_tags=list(scenario_metadata.get("scenario_dataset_tags", [])),
+        task_context=dict(scenario_metadata.get("task_context", {})),
+        environment_context=dict(scenario_metadata.get("environment_context", {})),
+        command_space=dict(scenario_metadata.get("command_space", {})),
         errors=errors,
         warnings=warnings,
     )
@@ -484,6 +527,10 @@ def _print_summary(result: RandomTeacherDatasetCollectResult) -> None:
     print(f"Steps per episode: {result.steps_per_episode}")
     print(f"Segments: {result.segment_count}")
     print(f"Command ramp steps: {result.command_ramp_steps}")
+    if result.scenario_id:
+        print(f"Scenario: {result.scenario_id} ({result.scenario_status})")
+        if result.skill_id:
+            print(f"Skill: {result.skill_id}")
     if result.command_coverage:
         coverage = result.command_coverage
         vx = coverage.get("vx", {})
@@ -549,9 +596,34 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--steps-per-episode", type=int, default=1000)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=5555)
-    parser.add_argument("--vx-range", default="-0.03,0.15", help="MIN,MAX random forward velocity range")
-    parser.add_argument("--vy-range", default="-0.03,0.03", help="MIN,MAX random lateral velocity range")
-    parser.add_argument("--yaw-range", default="-0.20,0.20", help="MIN,MAX random yaw velocity range")
+    parser.add_argument("--scenario", default=None, help="Scenario id from the Soridormi scenario curriculum")
+    parser.add_argument(
+        "--scenario-manifest",
+        type=Path,
+        default=DEFAULT_SCENARIO_MANIFEST,
+        help="Path to configs/scenarios/open_duck_mini_v2_scenarios.json",
+    )
+    parser.add_argument(
+        "--allow-planned-scenario",
+        action="store_true",
+        help="Allow planned scenarios for metadata-only collection before MuJoCo eval promotion",
+    )
+    parser.add_argument("--list-scenarios", action="store_true", help="List known scenario ids and exit")
+    parser.add_argument(
+        "--vx-range",
+        default=None,
+        help="MIN,MAX random forward velocity range; defaults to scenario command_space or -0.03,0.15",
+    )
+    parser.add_argument(
+        "--vy-range",
+        default=None,
+        help="MIN,MAX random lateral velocity range; defaults to scenario command_space or -0.03,0.03",
+    )
+    parser.add_argument(
+        "--yaw-range",
+        default=None,
+        help="MIN,MAX random yaw velocity range; defaults to scenario command_space or -0.20,0.20",
+    )
     parser.add_argument("--command-hold-steps", default="80,250", help="MIN,MAX steps per command segment")
     parser.add_argument(
         "--command-ramp-steps",
@@ -571,9 +643,60 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _range_text_from_args(
+    *,
+    cli_value: str | None,
+    scenario: ScenarioDefinition | None,
+    scenario_field: str,
+    default: str,
+) -> str:
+    if cli_value is not None:
+        return cli_value
+    if scenario is not None:
+        return scenario.command_range_text(scenario_field)
+    return default
+
+
+def _print_scenario_list(scenario_manifest: Path, *, as_json: bool) -> None:
+    scenarios = list_scenarios(scenario_manifest)
+    payload = [
+        {
+            "id": item.id,
+            "title": item.title,
+            "status": item.status,
+            "family": item.family,
+            "priority": item.priority,
+            "skills": item.skills,
+        }
+        for item in scenarios
+    ]
+    if as_json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    for item in payload:
+        print(f"{item['id']}\t{item['status']}\t{item['family']}\t{','.join(item['skills'])}")
+
+
 def main(argv: list[str] | None = None) -> int:
     raw_argv = sys.argv[1:] if argv is None else list(argv)
     args = _build_parser().parse_args(_normalize_negative_range_args(raw_argv))
+    if args.list_scenarios:
+        _print_scenario_list(args.scenario_manifest, as_json=args.json)
+        return 0
+
+    scenario = None
+    scenario_warnings: list[str] = []
+    if args.scenario:
+        try:
+            scenario = get_scenario_definition(args.scenario, args.scenario_manifest)
+            scenario_warnings = validate_scenario_for_teacher_collection(
+                scenario,
+                allow_planned=args.allow_planned_scenario,
+            )
+        except ScenarioCurriculumError as exc:
+            print(f"Scenario error: {exc}", file=sys.stderr)
+            return 2
+
     reward_config = WalkingRewardConfig(
         target_height=args.target_height,
         fall_height=args.fall_height,
@@ -586,9 +709,33 @@ def main(argv: list[str] | None = None) -> int:
         manifest_path=args.manifest,
         episodes=args.episodes,
         steps_per_episode=args.steps_per_episode,
-        vx_range=_parse_range(args.vx_range, name="--vx-range"),
-        vy_range=_parse_range(args.vy_range, name="--vy-range"),
-        yaw_range=_parse_range(args.yaw_range, name="--yaw-range"),
+        vx_range=_parse_range(
+            _range_text_from_args(
+                cli_value=args.vx_range,
+                scenario=scenario,
+                scenario_field="vx_mps",
+                default="-0.03,0.15",
+            ),
+            name="--vx-range",
+        ),
+        vy_range=_parse_range(
+            _range_text_from_args(
+                cli_value=args.vy_range,
+                scenario=scenario,
+                scenario_field="vy_mps",
+                default="-0.03,0.03",
+            ),
+            name="--vy-range",
+        ),
+        yaw_range=_parse_range(
+            _range_text_from_args(
+                cli_value=args.yaw_range,
+                scenario=scenario,
+                scenario_field="yaw_radps",
+                default="-0.20,0.20",
+            ),
+            name="--yaw-range",
+        ),
         command_hold_steps=_parse_hold_range(args.command_hold_steps),
         stop_probability=args.stop_probability,
         command_ramp_steps=max(0, int(args.command_ramp_steps)),
@@ -598,6 +745,8 @@ def main(argv: list[str] | None = None) -> int:
         port=args.port,
         stop_on_terminated=not args.continue_after_terminated,
         reset_on_start=not args.no_reset,
+        scenario=scenario,
+        initial_warnings=scenario_warnings,
     )
     if args.json:
         print(json.dumps(asdict(result), indent=2, sort_keys=True))

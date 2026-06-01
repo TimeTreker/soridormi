@@ -23,6 +23,9 @@ Common options:
   --command-hold-steps MIN,MAX   random command segment duration in control steps
   --command-ramp-steps N         smooth command changes over N control steps (default: 20)
   --seed N                       deterministic random seed
+  --scenario ID                  use scenario curriculum command ranges/context
+  --list-scenarios               list configured scenarios and exit
+  --allow-planned-scenario       allow planned metadata-only scenario rows
 
 Negative ranges may be passed either as separate values or with '=':
   --vx-range -0.03,0.15
@@ -33,7 +36,7 @@ Negative ranges may be passed either as separate values or with '=':
 
 Sim server commands for walking teacher parity:
   ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
-  ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
+  ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
 USAGE
 }
 
@@ -86,7 +89,7 @@ MuJoCo viewer hint: ${viewer_enabled}
 
 Make sure the simulator is already running in another terminal with the same
 teacher profile compatibility flags, for example:
-  ./scripts/run_sim_server.sh --backend ${sim_backend} --profile open_duck_forward $(if [ "${viewer_enabled}" = "1" ]; then echo --viewer; else echo --no-viewer; fi)
+  ./scripts/run_sim_server.sh --backend ${sim_backend} --profile open_duck_forward $(if [ "${viewer_enabled}" = "1" ]; then echo --viewer --follow-camera; else echo --no-viewer; fi)
 EOF
 
 SORIDORMI_REPO_ROOT="$(pwd)"

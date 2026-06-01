@@ -7,11 +7,13 @@ from soridormi_runtime.random_teacher_dataset_collect import (
     CommandRange,
     HoldStepRange,
     _normalize_negative_range_args,
+    _range_text_from_args,
     collect_random_teacher_dataset,
     generate_random_command_schedule,
     ramped_segment_command,
 )
 from soridormi_runtime.policy_command import PolicyCommand
+from soridormi_runtime.scenario_curriculum import get_scenario_definition
 from soridormi_runtime.rl_finetune_env import RlFineTuneStep
 from soridormi_runtime.training_dataset_prepare import load_and_validate_dataset
 
@@ -189,6 +191,74 @@ def test_collect_random_teacher_dataset_manifest_records_ranges(tmp_path: Path) 
 
 
 
+
+def test_collect_random_teacher_dataset_writes_scenario_context_metadata(tmp_path: Path) -> None:
+    scenario = get_scenario_definition("flat_walk_varied_speed_v1")
+    output = tmp_path / "scenario_teacher.jsonl"
+    result = collect_random_teacher_dataset(
+        profile="teacher_profile",
+        output_path=output,
+        episodes=1,
+        steps_per_episode=8,
+        vx_range=CommandRange(*scenario.command_range("vx_mps")),
+        vy_range=CommandRange(*scenario.command_range("vy_mps")),
+        yaw_range=CommandRange(*scenario.command_range("yaw_radps")),
+        command_hold_steps=HoldStepRange(3, 4),
+        stop_probability=0.0,
+        command_ramp_steps=2,
+        seed=9,
+        env_factory=FakeRandomTeacherEnv,
+        scenario=scenario,
+    )
+
+    assert result.ok
+    assert result.scenario_id == "flat_walk_varied_speed_v1"
+    assert result.skill_id == "walk_velocity"
+    assert result.vx_range == {"minimum": -0.03, "maximum": 0.25}
+    assert result.scenario_status == "mujoco_registry_ready"
+
+    rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    assert rows
+    row = rows[0]
+    assert row["scenario_id"] == "flat_walk_varied_speed_v1"
+    assert row["scenario_status"] == "mujoco_registry_ready"
+    assert row["scenario_family"] == "locomotion_flat"
+    assert row["skill_id"] == "walk_velocity"
+    assert row["task_context"]["skill_family"] == "locomotion"
+    assert row["environment_context"]["terrain_type"] == "flat"
+    assert row["command_space"]["vx_mps"] == [-0.03, 0.25]
+    assert row["command_ramp_name"] == "linear_segment_ramp"
+    assert row["desired_command"] == row["policy_debug"]["target_command"]
+    assert row["applied_command"] == row["policy_debug"]["applied_command"]
+
+    manifest = json.loads(Path(result.manifest_path).read_text(encoding="utf-8"))
+    assert manifest["scenario_id"] == "flat_walk_varied_speed_v1"
+    assert manifest["skill_id"] == "walk_velocity"
+    assert manifest["task_context"]["skill_family"] == "locomotion"
+
+
+def test_scenario_range_defaults_are_used_when_cli_range_is_absent() -> None:
+    scenario = get_scenario_definition("flat_walk_varied_speed_v1")
+
+    assert (
+        _range_text_from_args(
+            cli_value=None,
+            scenario=scenario,
+            scenario_field="vx_mps",
+            default="-0.03,0.15",
+        )
+        == "-0.03,0.25"
+    )
+    assert (
+        _range_text_from_args(
+            cli_value="0.01,0.02",
+            scenario=scenario,
+            scenario_field="vx_mps",
+            default="-0.03,0.15",
+        )
+        == "0.01,0.02"
+    )
+
 def test_negative_range_args_accept_two_token_cli_form() -> None:
     normalized = _normalize_negative_range_args(
         [
@@ -232,5 +302,7 @@ def test_collect_random_teacher_dataset_script_documents_mujoco_viewer_flags() -
     assert "--viewer" in proc.stdout
     assert "--no-viewer" in proc.stdout
     assert "--command-ramp-steps" in proc.stdout
+    assert "--scenario ID" in proc.stdout
+    assert "--list-scenarios" in proc.stdout
     assert "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer" in proc.stdout
-    assert "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer" in proc.stdout
+    assert "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera" in proc.stdout
