@@ -34,13 +34,19 @@ Use the results to decide which command regions are safe for data collection and
 
 ## 1. Start the simulator
 
-In one terminal:
+In one terminal, start the MuJoCo backend explicitly. The default functional-test mode is headless/no-viewer:
 
 ```bash
-./scripts/run_sim_server.sh
+./scripts/run_sim_server.sh --backend mujoco --no-viewer
 ```
 
-Use the normal MuJoCo viewer/debug scripts if you need to inspect stability before collecting data.
+For visual inspection, run the same backend with the passive viewer enabled:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --viewer
+```
+
+Use the viewer only as an inspection aid; the headless MuJoCo command should remain the default validation command.
 
 ## 2. Collect teacher-policy data directly from sim
 

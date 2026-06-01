@@ -38,7 +38,7 @@ Every patch response must also include functional validation commands, not only 
 
 - docs-only: grep expected sections and check Markdown fences;
 - code: run relevant `pytest`, compile checks, and CLI smoke tests;
-- sim/training: provide local/unit checks plus live MuJoCo validation commands;
+- sim/training: provide local/unit checks plus live MuJoCo validation commands; start live sim with `./scripts/run_sim_server.sh --backend mujoco --no-viewer`, and include `./scripts/run_sim_server.sh --backend mujoco --viewer` as the optional visual inspection command when relevant;
 - hardware: default to dry-run/read-only validation and state explicitly if no actuator command was sent.
 
 If a patch is incremental, state the required apply order. If a patch merges/replaces a previous patch, say that the user should apply only the merged patch.
@@ -46,6 +46,8 @@ If a patch is incremental, state the required apply order. If a patch merges/rep
 Include tests when behavior changes. Include docs when a milestone changes usage. Mention whether Docker rebuild is needed.
 
 See `docs/PATCH_DELIVERY_AND_VALIDATION.md`.
+
+For live simulator functional tests, do not rely on an implicit backend. Use MuJoCo explicitly; the viewer is off by default, but the command-line must make `--viewer` available for visual inspection.
 
 ## Validation expectations
 

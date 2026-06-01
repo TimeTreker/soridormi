@@ -130,10 +130,18 @@ It covers stand/stop, slow and medium forward walking, small backward motion, ya
 PYTHONPATH=src python -m soridormi_runtime.free_walk_eval --suite configs/teacher_suites/open_duck_free_walk_eval_v1.yaml
 ```
 
-Run the teacher-vs-candidate free-walk comparison with MuJoCo already running:
+The static validator is intentionally host-friendly: it should work even when PyYAML is not installed, because this command often runs before the full runtime container or editable Python environment is rebuilt. Keep the suite syntax conservative if new scenarios are added.
+
+Run the teacher-vs-candidate free-walk comparison with the MuJoCo backend already running. The default functional test should be headless/no-viewer:
 
 ```bash
-./scripts/run_sim_server.sh
+./scripts/run_sim_server.sh --backend mujoco --no-viewer
+```
+
+For visual inspection, start the same MuJoCo backend with the passive viewer explicitly enabled:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --viewer
 ```
 
 In another terminal:

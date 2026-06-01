@@ -99,6 +99,8 @@ Validate it without MuJoCo:
 PYTHONPATH=src python -m soridormi_runtime.free_walk_eval --suite configs/teacher_suites/open_duck_free_walk_eval_v1.yaml
 ```
 
+This host-side static validator must not require PyYAML to be installed. `free_walk_eval` should keep a small fallback parser for the conservative M6A suite so basic validation works before the full runtime container or editable Python environment is rebuilt.
+
 Run the generated teacher-vs-candidate free-walk grid with:
 
 ```bash
@@ -129,3 +131,19 @@ For docs-only patches, functional validation still means checking expected files
 A good prompt to start the next session:
 
 > Please read `LLM_CONTEXT.md`, `docs/SORIDORMI_FREE_WALK_PLAN.md`, and `docs/PATCH_DELIVERY_AND_VALIDATION.md` first. We are focused on Soridormi only. The goal is Open Duck Mini v2 command-conditioned free walking in MuJoCo before hardware or Chromie/MCP orchestration. Continue with the next M6 free-walk simulation/evaluation task. If you provide a patch, make it a plain git patch and include both `git apply --check ~/Downloads/<patch>.patch` and functional validation commands.
+
+## Simulator validation command policy
+
+When giving Soridormi functional validation commands that require the simulator, start the simulator explicitly with the MuJoCo backend. The default should be headless/no-viewer:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --no-viewer
+```
+
+Also provide the viewer-enabled variant when a visual test is useful:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --viewer
+```
+
+Do not rely on an implicit simulator backend in future instructions.

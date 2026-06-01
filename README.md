@@ -166,25 +166,23 @@ The MuJoCo backend is config-driven. Robot/model-specific details live in:
 configs/robots/open_duck_mini_v2.yaml
 ```
 
-The default `.env` points the simulator to:
+The default `.env` still allows the safe fake backend for low-level API development:
 
 ```text
 SORIDORMI_ROBOT_CONFIG=/app/configs/robots/open_duck_mini_v2.yaml
 SORIDORMI_SIM_BACKEND=fake
 ```
 
-Use the fake backend for API development. Use the real MuJoCo backend with:
+For locomotion validation, start the real MuJoCo backend explicitly. The default functional-test command is headless/no-viewer:
 
 ```bash
-SORIDORMI_SIM_BACKEND=mujoco ./scripts/run_sim_server.sh
+./scripts/run_sim_server.sh --backend mujoco --no-viewer
 ```
 
-To open the MuJoCo passive viewer while the API server runs, enable the viewer environment flag:
+To watch MuJoCo visually, enable the passive viewer explicitly:
 
 ```bash
-SORIDORMI_SIM_BACKEND=mujoco \
-SORIDORMI_MUJOCO_VIEWER=1 \
-./scripts/run_sim_server.sh
+./scripts/run_sim_server.sh --backend mujoco --viewer
 ```
 
 To switch robot models later, add another YAML file under `configs/robots/` and change only `SORIDORMI_ROBOT_CONFIG`. The backend code should not hardcode robot-specific actuator names or model paths. Viewer settings also live in the robot config under `viewer:`.
@@ -213,7 +211,7 @@ The simulator Python environment is now built into the Docker image at `/opt/ven
 You can start it directly from the host:
 
 ```bash
-./scripts/run_sim_server.sh
+./scripts/run_sim_server.sh --backend mujoco --no-viewer
 ```
 
 Or from inside the simulator container:
@@ -223,7 +221,7 @@ sim
 python -m soridormi_sim.mujoco_server
 ```
 
-By default the server uses the safe fake backend so the API can be tested immediately. Set `SORIDORMI_SIM_BACKEND=mujoco` to use the config-driven real MuJoCo backend.
+The host wrapper defaults to the MuJoCo backend for locomotion validation. Use `--backend fake` only for low-level API development that does not need physics.
 
 ### 7. Start runtime container in another terminal
 
@@ -271,7 +269,7 @@ Enter simulator container:
 Run simulator server from host through Compose:
 
 ```bash
-./scripts/run_sim_server.sh
+./scripts/run_sim_server.sh --backend mujoco --no-viewer
 ```
 
 Run runtime loop from host through Compose:

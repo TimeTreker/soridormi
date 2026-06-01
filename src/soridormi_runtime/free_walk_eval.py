@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
-import yaml
 
 DEFAULT_FREE_WALK_SUITE = Path("configs/teacher_suites/open_duck_free_walk_eval_v1.yaml")
 DEFAULT_MAX_ABS_X = 0.12
@@ -49,8 +49,194 @@ class FreeWalkSuiteCheck:
         return asdict(self)
 
 
+def _strip_inline_comment(line: str) -> str:
+    """Remove unquoted YAML comments from a single line."""
+
+    in_single = False
+    in_double = False
+    for index, char in enumerate(line):
+        if char == "'" and not in_double:
+            in_single = not in_single
+        elif char == '"' and not in_single:
+            in_double = not in_double
+        elif char == "#" and not in_single and not in_double:
+            if index == 0 or line[index - 1].isspace():
+                return line[:index].rstrip()
+    return line.rstrip()
+
+
+def _scalar_from_yaml_subset(value: str) -> Any:
+    value = value.strip()
+    if value == "":
+        return ""
+    if value in {"null", "Null", "NULL", "~"}:
+        return None
+    if value in {"true", "True", "TRUE"}:
+        return True
+    if value in {"false", "False", "FALSE"}:
+        return False
+    if value.startswith("[") and value.endswith("]"):
+        inner = value[1:-1].strip()
+        if not inner:
+            return []
+        return [_scalar_from_yaml_subset(part.strip()) for part in inner.split(",")]
+    if (value.startswith("'") and value.endswith("'")) or (
+        value.startswith('"') and value.endswith('"')
+    ):
+        return value[1:-1]
+    try:
+        if any(char in value for char in (".", "e", "E")):
+            return float(value)
+        return int(value)
+    except ValueError:
+        return value
+
+
+def _collect_block_scalar(
+    lines: list[str], start_index: int, parent_indent: int, *, folded: bool
+) -> tuple[str, int]:
+    chunks: list[str] = []
+    index = start_index
+    while index < len(lines):
+        raw = lines[index]
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            index += 1
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        if indent <= parent_indent:
+            break
+        chunks.append(raw[indent:])
+        index += 1
+    if folded:
+        return " ".join(chunk.strip() for chunk in chunks).strip(), index
+    return "\n".join(chunks).rstrip(), index
+
+
+def _load_free_walk_yaml_subset(text: str) -> dict[str, Any]:
+    """Parse the small YAML subset used by the M6A free-walk suite.
+
+    PyYAML remains the preferred parser when installed. This fallback keeps
+    `free_walk_eval` usable on host machines that have not installed the full
+    Soridormi Python environment yet. It intentionally supports only the suite
+    shapes used for command-conditioned evaluation: top-level scalars, folded
+    block scalars, a `scenarios` list, inline scalar lists, and nested scalar
+    mappings such as `command`.
+    """
+
+    lines = text.splitlines()
+    payload: dict[str, Any] = {}
+    index = 0
+
+    while index < len(lines):
+        raw = lines[index]
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            index += 1
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        if indent != 0:
+            index += 1
+            continue
+        logical = _strip_inline_comment(raw)
+        if ":" not in logical:
+            index += 1
+            continue
+        key, value = logical.split(":", 1)
+        key = key.strip()
+        value = value.strip()
+
+        if key == "scenarios" and value == "":
+            scenarios: list[dict[str, Any]] = []
+            index += 1
+            while index < len(lines):
+                item_raw = lines[index]
+                item_stripped = item_raw.strip()
+                if not item_stripped or item_stripped.startswith("#"):
+                    index += 1
+                    continue
+                item_indent = len(item_raw) - len(item_raw.lstrip(" "))
+                if item_indent == 0:
+                    break
+                if item_indent != 2 or not item_stripped.startswith("- "):
+                    index += 1
+                    continue
+
+                scenario: dict[str, Any] = {}
+                first = _strip_inline_comment(item_stripped[2:])
+                if first:
+                    if ":" not in first:
+                        raise ValueError(f"unsupported scenario list item: {item_raw!r}")
+                    first_key, first_value = first.split(":", 1)
+                    scenario[first_key.strip()] = _scalar_from_yaml_subset(first_value.strip())
+                index += 1
+
+                while index < len(lines):
+                    child_raw = lines[index]
+                    child_stripped = child_raw.strip()
+                    if not child_stripped or child_stripped.startswith("#"):
+                        index += 1
+                        continue
+                    child_indent = len(child_raw) - len(child_raw.lstrip(" "))
+                    if child_indent <= 2:
+                        break
+                    logical_child = _strip_inline_comment(child_raw)
+                    if child_indent != 4 or ":" not in logical_child:
+                        index += 1
+                        continue
+                    child_key, child_value = logical_child.strip().split(":", 1)
+                    child_key = child_key.strip()
+                    child_value = child_value.strip()
+
+                    if child_value in {">-", ">", "|-", "|"}:
+                        folded = child_value.startswith(">")
+                        block, index = _collect_block_scalar(lines, index + 1, child_indent, folded=folded)
+                        scenario[child_key] = block
+                        continue
+                    if child_value == "":
+                        nested: dict[str, Any] = {}
+                        index += 1
+                        while index < len(lines):
+                            nested_raw = lines[index]
+                            nested_stripped = nested_raw.strip()
+                            if not nested_stripped or nested_stripped.startswith("#"):
+                                index += 1
+                                continue
+                            nested_indent = len(nested_raw) - len(nested_raw.lstrip(" "))
+                            if nested_indent <= child_indent:
+                                break
+                            nested_line = _strip_inline_comment(nested_raw)
+                            if nested_indent == child_indent + 2 and ":" in nested_line:
+                                nested_key, nested_value = nested_line.strip().split(":", 1)
+                                nested[nested_key.strip()] = _scalar_from_yaml_subset(nested_value.strip())
+                            index += 1
+                        scenario[child_key] = nested
+                        continue
+                    scenario[child_key] = _scalar_from_yaml_subset(child_value)
+                    index += 1
+
+                scenarios.append(scenario)
+            payload[key] = scenarios
+            continue
+
+        if value in {">-", ">", "|-", "|"}:
+            folded = value.startswith(">")
+            payload[key], index = _collect_block_scalar(lines, index + 1, indent, folded=folded)
+            continue
+        payload[key] = _scalar_from_yaml_subset(value)
+        index += 1
+
+    return payload
+
+
 def _load_yaml_mapping(path: Path) -> dict[str, Any]:
-    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    text = path.read_text(encoding="utf-8")
+    try:
+        yaml = importlib.import_module("yaml")
+    except ModuleNotFoundError:
+        payload = _load_free_walk_yaml_subset(text)
+    else:
+        payload = yaml.safe_load(text)
     if not isinstance(payload, dict):
         raise ValueError(f"YAML file must contain a mapping: {path}")
     return payload

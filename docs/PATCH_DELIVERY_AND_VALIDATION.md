@@ -79,6 +79,23 @@ for path in [Path("docs/<new_doc>.md")]:
 PY
 ````
 
+
+## MuJoCo backend and viewer requirements for sim validation
+
+For any patch that includes live simulator functional validation, the simulator command must explicitly use the MuJoCo backend. The default viewer mode is off/headless so tests can run unattended:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --no-viewer
+```
+
+When a patch benefits from visual inspection, also provide a viewer-enabled variant. This is not the default functional test, but it must be available in the command line so the user can watch the robot in MuJoCo:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --viewer
+```
+
+Use `--viewer` only when the host has a working graphical session/X11 forwarding. If `DISPLAY` is missing, the script should warn rather than treating the missing viewer as a locomotion failure.
+
 ## Be explicit about what was not validated
 
 If a command cannot be run in the sandbox, say so. Examples:

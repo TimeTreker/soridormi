@@ -5,9 +5,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-import yaml
-
-from soridormi_runtime.free_walk_eval import DEFAULT_FREE_WALK_SUITE, render_free_walk_suite_check, validate_free_walk_suite
+from soridormi_runtime.free_walk_eval import (
+    DEFAULT_FREE_WALK_SUITE,
+    render_free_walk_suite_check,
+    validate_free_walk_suite,
+)
 
 
 def test_default_free_walk_suite_is_bounded_and_covers_required_tags() -> None:
@@ -23,25 +25,45 @@ def test_default_free_walk_suite_is_bounded_and_covers_required_tags() -> None:
 
 
 def test_free_walk_suite_rejects_out_of_envelope_command(tmp_path: Path) -> None:
-    suite = {
-        "name": "bad_free_walk_suite",
-        "default_steps": 100,
-        "scenarios": [
-            {
-                "name": "too_fast",
-                "tags": ["free_walk", "stand", "forward", "backward", "yaw", "curve", "lateral"],
-                "steps": 100,
-                "command": {"x": 0.5, "y": 0.0, "yaw": 0.0},
-            }
-        ],
-    }
     path = tmp_path / "bad.yaml"
-    path.write_text(yaml.safe_dump(suite), encoding="utf-8")
+    path.write_text(
+        """name: bad_free_walk_suite
+default_steps: 100
+scenarios:
+  - name: too_fast
+    tags: [free_walk, stand, forward, backward, yaw, curve, lateral]
+    steps: 100
+    command:
+      x: 0.5
+      y: 0.0
+      yaw: 0.0
+""",
+        encoding="utf-8",
+    )
 
     result = validate_free_walk_suite(path)
 
     assert not result.ok
     assert any("max_abs_x" in error for error in result.errors)
+
+
+def test_free_walk_suite_validation_works_without_pyyaml(monkeypatch) -> None:
+    import importlib
+
+    real_import_module = importlib.import_module
+
+    def fake_import_module(name: str, package: str | None = None):
+        if name == "yaml":
+            raise ModuleNotFoundError("No module named 'yaml'")
+        return real_import_module(name, package)
+
+    monkeypatch.setattr(importlib, "import_module", fake_import_module)
+
+    result = validate_free_walk_suite(DEFAULT_FREE_WALK_SUITE)
+
+    assert result.ok, result.errors
+    assert result.suite_name == "open_duck_free_walk_eval_v1"
+    assert result.scenario_count >= 8
 
 
 def test_free_walk_suite_report_mentions_each_scenario() -> None:
