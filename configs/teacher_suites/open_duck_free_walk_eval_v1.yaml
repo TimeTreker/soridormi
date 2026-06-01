@@ -1,0 +1,113 @@
+# M6A commanded free-walk evaluation suite for Open Duck Mini v2.
+#
+# This suite is intentionally conservative. It is an evaluation gate, not a
+# maximum-speed demo. Keep commands inside the policy envelope until teacher and
+# candidate rollouts are stable across the whole suite.
+name: open_duck_free_walk_eval_v1
+description: >-
+  Conservative command-conditioned free-walk evaluation suite for MuJoCo. It
+  covers stand/stop, forward/backward, yaw-in-place, curved walking, and small
+  lateral commands before any hardware walking or LLM/MCP orchestration work.
+base_profile: configs/policies/open_duck_forward.yaml
+default_steps: 800
+default_require_provider: CUDAExecutionProvider
+scenarios:
+  - name: zero_stand
+    description: Zero command; the robot should stand or settle without drift.
+    tags: [free_walk, stand, stop]
+    steps: 500
+    command:
+      x: 0.0
+      y: 0.0
+      yaw: 0.0
+      ramp_seconds: 0.2
+
+  - name: forward_slow
+    description: Slow straight forward walking.
+    tags: [free_walk, walk, forward, slow]
+    steps: 800
+    command:
+      x: 0.05
+      y: 0.0
+      yaw: 0.0
+      ramp_seconds: 0.4
+
+  - name: forward_medium
+    description: Medium straight forward walking inside the initial acceptance envelope.
+    tags: [free_walk, walk, forward]
+    steps: 800
+    command:
+      x: 0.10
+      y: 0.0
+      yaw: 0.0
+      ramp_seconds: 0.4
+
+  - name: backward_slow
+    description: Small backward command to catch asymmetric instability.
+    tags: [free_walk, walk, backward]
+    steps: 600
+    command:
+      x: -0.03
+      y: 0.0
+      yaw: 0.0
+      ramp_seconds: 0.4
+
+  - name: turn_left_in_place
+    description: Conservative positive yaw command with zero forward velocity.
+    tags: [free_walk, turn, yaw, left]
+    steps: 700
+    command:
+      x: 0.0
+      y: 0.0
+      yaw: 0.15
+      ramp_seconds: 0.4
+
+  - name: turn_right_in_place
+    description: Conservative negative yaw command with zero forward velocity.
+    tags: [free_walk, turn, yaw, right]
+    steps: 700
+    command:
+      x: 0.0
+      y: 0.0
+      yaw: -0.15
+      ramp_seconds: 0.4
+
+  - name: forward_curve_left
+    description: Slow forward walking while turning left.
+    tags: [free_walk, walk, turn, curve, left]
+    steps: 800
+    command:
+      x: 0.08
+      y: 0.0
+      yaw: 0.12
+      ramp_seconds: 0.4
+
+  - name: forward_curve_right
+    description: Slow forward walking while turning right.
+    tags: [free_walk, walk, turn, curve, right]
+    steps: 800
+    command:
+      x: 0.08
+      y: 0.0
+      yaw: -0.12
+      ramp_seconds: 0.4
+
+  - name: lateral_left_small
+    description: Small positive lateral command.
+    tags: [free_walk, lateral, left]
+    steps: 600
+    command:
+      x: 0.0
+      y: 0.03
+      yaw: 0.0
+      ramp_seconds: 0.4
+
+  - name: lateral_right_small
+    description: Small negative lateral command.
+    tags: [free_walk, lateral, right]
+    steps: 600
+    command:
+      x: 0.0
+      y: -0.03
+      yaw: 0.0
+      ramp_seconds: 0.4

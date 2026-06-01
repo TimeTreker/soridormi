@@ -116,6 +116,40 @@ A candidate that only improves supervised MAE is not accepted unless it also sur
 5. Train neural BC on the command grid only after the teacher command suite is measured.
 6. Use residual fine-tuning only after teacher-vs-BC closed-loop comparison is reproducible.
 
+## M6A free-walk evaluation entrypoint
+
+The first M6A implementation artifact is a conservative fixed-command evaluation suite:
+
+```text
+configs/teacher_suites/open_duck_free_walk_eval_v1.yaml
+```
+
+It covers stand/stop, slow and medium forward walking, small backward motion, yaw-in-place, curved walking, and small lateral commands. Validate the suite without MuJoCo:
+
+```bash
+PYTHONPATH=src python -m soridormi_runtime.free_walk_eval --suite configs/teacher_suites/open_duck_free_walk_eval_v1.yaml
+```
+
+Run the teacher-vs-candidate free-walk comparison with MuJoCo already running:
+
+```bash
+./scripts/run_sim_server.sh
+```
+
+In another terminal:
+
+```bash
+./scripts/run_free_walk_eval.sh neural_bc_teacher_grid --force
+```
+
+Use `--dry-run` first when checking profiles and generated rollout commands:
+
+```bash
+./scripts/run_free_walk_eval.sh neural_bc_teacher_grid --dry-run --force
+```
+
+The wrapper delegates to the existing command-grid comparison path, so the output should include per-scenario teacher/candidate rollout comparisons plus a command-grid summary.
+
 ## Hardware rule
 
 Do not start hardware walking from this milestone. Hardware work may only begin as read-only state, dry-run command validation, watchdog, emergency stop, and low-power single-joint tests. Walking hardware execution is blocked until commanded free-walk simulation acceptance exists.

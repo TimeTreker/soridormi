@@ -17,7 +17,16 @@ But a simulation milestone is only complete when teacher and candidate policies 
 
 ## Immediate correction
 
-Do not move to hardware walking yet. The next work item is a commanded free-walk evaluation gate: run teacher/candidate policies across stop, forward, turn, curve, lateral, and command-switching scenarios, then use those results to decide what training data or residual fine-tuning is needed. See `docs/SORIDORMI_FREE_WALK_PLAN.md` and `docs/M6_SIM_TRAINING_LOOP.md`.
+Do not move to hardware walking yet. The next work item is a commanded free-walk evaluation gate: run teacher/candidate policies across stop, forward, turn, curve, lateral, and eventually command-switching scenarios, then use those results to decide what training data or residual fine-tuning is needed. See `docs/SORIDORMI_FREE_WALK_PLAN.md` and `docs/M6_SIM_TRAINING_LOOP.md`.
+
+The current M6A entrypoint is:
+
+```bash
+PYTHONPATH=src python -m soridormi_runtime.free_walk_eval --suite configs/teacher_suites/open_duck_free_walk_eval_v1.yaml
+./scripts/run_free_walk_eval.sh neural_bc_teacher_grid --dry-run --force
+```
+
+Remove `--dry-run` only when the MuJoCo sim server is already running and the candidate profile is ready for rollout comparison.
 
 ## Completion definition
 

@@ -85,6 +85,28 @@ multi-agent DAG planning
 
 Do not let Chromie/MCP work imply that Soridormi's walking capability improved unless there is MuJoCo rollout evidence.
 
+## M6A free-walk evaluation entrypoint
+
+The conservative M6A fixed-command evaluation suite is:
+
+```text
+configs/teacher_suites/open_duck_free_walk_eval_v1.yaml
+```
+
+Validate it without MuJoCo:
+
+```bash
+PYTHONPATH=src python -m soridormi_runtime.free_walk_eval --suite configs/teacher_suites/open_duck_free_walk_eval_v1.yaml
+```
+
+Run the generated teacher-vs-candidate free-walk grid with:
+
+```bash
+./scripts/run_free_walk_eval.sh neural_bc_teacher_grid --dry-run --force
+```
+
+Remove `--dry-run` only after the MuJoCo sim server is running.
+
 ## Patch delivery rule
 
 The user prefers plain `.patch` files and usually downloads them to:
