@@ -19,6 +19,7 @@ def test_registry_lists_manifest_backed_executable_skill_ids() -> None:
     assert registry.executable_skill_ids() == (
         "bow",
         "curve_walk",
+        "express_attention",
         "look_direction",
         "neutral_head",
         "nod_yes",

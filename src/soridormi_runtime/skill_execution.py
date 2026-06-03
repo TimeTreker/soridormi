@@ -446,6 +446,50 @@ def _plan_bow(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
     return _scripted_keyframe_plan(skill, parameters, profile, keyframes=keyframes, summary=summary)
 
 
+def _plan_express_attention(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+    skill_id = str(skill["id"])
+    style = str(parameters.get("style", "neutral") or "neutral")
+    if style == "neutral":
+        head_pitch = -0.07
+        head_yaw = 0.0
+    elif style == "curious":
+        head_pitch = -0.06
+        head_yaw = 0.14
+    else:
+        raise SkillExecutionError(f"unsupported attention style: {style!r}")
+    duration = float(parameters.get("duration_s", 4.0))
+    hold_fraction = float(parameters.get("hold_fraction", 0.45))
+    if not 0.0 <= hold_fraction <= 0.8:
+        raise SkillExecutionError("express_attention hold_fraction must be between 0.0 and 0.8")
+    settle_duration = duration * 0.15
+    hold_duration = duration * hold_fraction
+    move_duration = (duration - settle_duration - hold_duration) / 2.0
+    if move_duration <= 0.0:
+        raise SkillExecutionError("express_attention duration_s is too short for the requested hold_fraction")
+    keyframes = (
+        _head_keyframe(duration_s=settle_duration, label=f"{skill_id}_neutral_start"),
+        _head_keyframe(
+            head_pitch=head_pitch,
+            head_yaw=head_yaw,
+            duration_s=move_duration,
+            label=f"{skill_id}_{style}_focus",
+        ),
+        _head_keyframe(
+            head_pitch=head_pitch,
+            head_yaw=head_yaw,
+            duration_s=hold_duration if hold_duration > 0.0 else 1e-6,
+            label=f"{skill_id}_{style}_hold",
+        ),
+        _head_keyframe(duration_s=move_duration, label=f"{skill_id}_neutral_end"),
+    )
+    summary = (
+        f"Plan {skill_id}: {style} attention/listening cue over {duration:.2f}s "
+        f"(head_pitch={head_pitch:.3f} rad, head_yaw={head_yaw:.3f} rad) "
+        "using a scripted head-only trajectory."
+    )
+    return _scripted_keyframe_plan(skill, parameters, profile, keyframes=keyframes, summary=summary)
+
+
 BUILTIN_SKILL_PLANNERS: dict[str, SkillPlanner] = {
     "stand_idle": _plan_stand_idle,
     "stop": _plan_stop,
@@ -458,6 +502,7 @@ BUILTIN_SKILL_PLANNERS: dict[str, SkillPlanner] = {
     "nod_yes": _plan_nod_yes,
     "shake_no": _plan_shake_no,
     "bow": _plan_bow,
+    "express_attention": _plan_express_attention,
 }
 
 

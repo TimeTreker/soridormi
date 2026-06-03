@@ -1432,17 +1432,28 @@
       "id": "express_attention",
       "category": "social",
       "display_name": "Express Attention",
-      "description": "Small head/neck attention motion to show the robot is listening.",
-      "status": "planned",
+      "description": "Small head-only attention/listening gesture using a bounded neutral-home MuJoCo trajectory.",
+      "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
       "implementation_phase": "M7D_head_social",
       "parameters": {
         "style": {
+          "type": "string",
           "enum": [
             "neutral",
             "curious"
           ],
           "default": "neutral"
+        },
+        "duration_s": {
+          "min": 2.0,
+          "max": 10.0,
+          "default": 4.0
+        },
+        "hold_fraction": {
+          "min": 0.0,
+          "max": 0.8,
+          "default": 0.45
         }
       },
       "preconditions": [
@@ -1462,8 +1473,11 @@
         "hardware_enabled": false
       },
       "evaluation": [
-        "joint_limit_margin"
-      ]
+        "joint_limit_margin",
+        "tracking_error",
+        "base_stability"
+      ],
+      "notes": "M8J implementation is a subtle listening/attention cue. It does not use perception, speech, arms, hands, torso, or hardware."
     },
     {
       "id": "wave_hand",

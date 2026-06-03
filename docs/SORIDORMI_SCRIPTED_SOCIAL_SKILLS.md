@@ -1,7 +1,7 @@
 # Soridormi M8E scripted social skills
 
 M8E lands the first safe social skill for Open Duck Mini v2: `look_direction`.
-M8F expands the same safe path with `nod_yes` and `shake_no`. M8F.1 fixes
+M8F expands the same safe path with `nod_yes` and `shake_no`. M8J adds `express_attention` as a subtle listening/attention cue. M8F.1 fixes
 those repeated gestures so they are visible two-cycle motions rather than tiny
 near-neutral keyframes. M8F.2 makes repeated social gestures strict neutral-home
 axis gestures: pre-center the head, move only the intended axis, then return to
@@ -16,7 +16,8 @@ The following skills are promoted to `available_sim_experimental` in
 
 - `look_direction`: one bounded target pose for head yaw/pitch;
 - `nod_yes`: neutral start, repeated bounded down/up head-pitch keyframes, neutral end;
-- `shake_no`: neutral start, repeated bounded left/right head-yaw keyframes, neutral end.
+- `shake_no`: neutral start, repeated bounded left/right head-yaw keyframes, neutral end;
+- `express_attention`: neutral start, subtle listening/focus head pose, short hold, neutral end.
 
 The `look_direction` planner produces one bounded head/neck keyframe:
 
@@ -320,3 +321,51 @@ Second terminal:
 ```
 
 Use `neutral_head` as the fallback/home command if a bow test leaves the head in an unexpected pose.
+
+
+## M8J: express attention/listening cue
+
+`express_attention` is a subtle head-only social cue for “I am listening” or “I am paying attention.” It is intentionally not a perception skill: it does not track a person, consume camera input, or resolve a target. Higher-level layers can choose this skill when they want a body-language acknowledgement, while Soridormi only executes the bounded pose trajectory.
+
+The gesture is neutral-home and preserves all non-head actuator controls from the simulator:
+
+```text
+neutral_start -> attention_focus -> attention_hold -> neutral_end
+```
+
+Parameters:
+
+- `style=neutral`: small straight-ahead listening dip, approximately `head_pitch=-0.07 rad`;
+- `style=curious`: small listening dip plus slight yaw, approximately `head_pitch=-0.06 rad`, `head_yaw=0.14 rad`;
+- `duration_s`: 2.0 to 10.0 seconds, default 4.0;
+- `hold_fraction`: 0.0 to 0.8, default 0.45.
+
+Dry-run:
+
+```bash
+./scripts/run_scripted_social_skill_in_sim.sh express_attention \
+  --args '{"style":"curious","duration_s":4.0}' \
+  --backend mujoco \
+  --control-hz 50 \
+  --dry-run \
+  --json | python -m json.tool
+```
+
+Live MuJoCo:
+
+```bash
+./scripts/run_scripted_social_skill_in_sim.sh express_attention \
+  --args '{"style":"curious","duration_s":4.0}' \
+  --backend mujoco \
+  --control-hz 50
+```
+
+Acceptance gate:
+
+```bash
+./scripts/evaluate_scripted_social_skills.sh \
+  --skill express_attention \
+  --execute \
+  --backend mujoco \
+  --require-observed
+```

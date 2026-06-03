@@ -79,6 +79,15 @@ DEFAULT_ACCEPTANCE_CASES: tuple[ScriptedSocialAcceptanceCase, ...] = (
         max_command_abs_by_axis={"head_yaw": 1e-9, "head_roll": 1e-9},
         min_observed_range=0.12,
     ),
+    ScriptedSocialAcceptanceCase(
+        skill_id="express_attention",
+        args={"style": "curious", "duration_s": 4.0},
+        required_axis="head_yaw",
+        required_min=None,
+        required_max=0.12,
+        max_command_abs_by_axis={"neck_pitch": 1e-9, "head_roll": 1e-9},
+        min_observed_range=0.08,
+    ),
 )
 
 
@@ -279,7 +288,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--skill",
         action="append",
         dest="skills",
-        help="Skill id to evaluate; repeatable. Defaults to neutral_head, look_direction, nod_yes, shake_no, and bow.",
+        help="Skill id to evaluate; repeatable. Defaults to neutral_head, look_direction, nod_yes, shake_no, bow, and express_attention.",
     )
     parser.add_argument("--execute", action="store_true", help="Run against an already-running MuJoCo simulator.")
     parser.add_argument("--backend", default="mujoco", choices=["mujoco"], help="Execution backend.")

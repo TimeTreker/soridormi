@@ -1,7 +1,7 @@
 """Execute safe scripted head/neck social skills against a MuJoCo simulator.
 
 This module is intentionally narrow. It executes manifest-backed scripted
-keyframe plans such as ``neutral_head`` and ``look_direction`` by holding all non-head joints at the
+keyframe plans such as ``neutral_head``, ``look_direction``, and ``express_attention`` by holding all non-head joints at the
 simulator-reported positions while smoothly moving only the declared head/neck
 actuators. Hardware execution is not exposed here.
 """
@@ -24,12 +24,13 @@ from .skill_manifest import DEFAULT_SKILL_MANIFEST
 
 
 HEAD_JOINT_NAMES = ("neck_pitch", "head_pitch", "head_yaw", "head_roll")
-SUPPORTED_SCRIPTED_SKILLS = {"neutral_head", "look_direction", "nod_yes", "shake_no", "bow"}
-NEUTRAL_HOME_GESTURE_SKILLS = {"nod_yes", "shake_no", "bow"}
+SUPPORTED_SCRIPTED_SKILLS = {"neutral_head", "look_direction", "nod_yes", "shake_no", "bow", "express_attention"}
+NEUTRAL_HOME_GESTURE_SKILLS = {"nod_yes", "shake_no", "bow", "express_attention"}
 MOVING_HEAD_JOINTS_BY_SKILL: dict[str, set[str]] = {
     "nod_yes": {"head_pitch"},
     "shake_no": {"head_yaw"},
     "bow": {"neck_pitch", "head_pitch"},
+    "express_attention": {"head_pitch", "head_yaw"},
 }
 # Defaults are intentionally gentle for viewer validation. These scripted
 # social skills are pose trajectories, not twitch tests; callers can still
@@ -661,7 +662,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Execute safe scripted head/neck social skills against an already-running MuJoCo sim."
     )
-    parser.add_argument("skill", help="Scripted social skill id, e.g. neutral_head, look_direction, nod_yes, shake_no, or bow.")
+    parser.add_argument("skill", help="Scripted social skill id, e.g. neutral_head, look_direction, nod_yes, shake_no, bow, or express_attention.")
     parser.add_argument("--manifest", default=str(DEFAULT_SKILL_MANIFEST), help="Path to skill manifest JSON.")
     parser.add_argument("--args", default="{}", help="Skill parameter JSON object.")
     parser.add_argument("--backend", default="mujoco", choices=["mujoco"], help="Execution backend; hardware is not exposed.")

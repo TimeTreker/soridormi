@@ -156,3 +156,16 @@ Live MuJoCo validation:
   --backend mujoco \
   --require-observed
 ```
+
+
+## M8J express_attention gate
+
+M8J adds `express_attention` to the default scripted social acceptance suite. The dry-run gate checks that the planned trajectory contains the subtle attention yaw cue for `style=curious` while keeping unsupported/non-moving axes bounded. Live MuJoCo mode can additionally require observed head motion and base-height stability:
+
+```bash
+./scripts/evaluate_scripted_social_skills.sh \
+  --skill express_attention \
+  --execute \
+  --backend mujoco \
+  --require-observed
+```
