@@ -253,3 +253,70 @@ observed head ranges and base-height fall telemetry.
 ```
 
 See `docs/SORIDORMI_SCRIPTED_SOCIAL_ACCEPTANCE.md` for the full gate definition.
+
+
+## M8H neutral head fallback
+
+`neutral_head` is the explicit scripted fallback/home command for head/neck social skills. It plans a slow straight-ahead head pose trajectory and streams pose commands while preserving non-head actuator controls from the simulator. This keeps the fallback compatible with the stable MuJoCo posture controller instead of retargeting leg joints from transient qpos.
+
+Example:
+
+```bash
+./scripts/run_scripted_social_skill_in_sim.sh neutral_head \
+  --args '{"duration_s":3.0}' \
+  --backend mujoco \
+  --control-hz 50
+```
+
+`neutral_head` remains `available_sim_experimental` until it passes live acceptance gates together with `look_direction`, `nod_yes`, and `shake_no`.
+
+## M8I: gentle head/neck bow
+
+`bow` is now available as a MuJoCo-only experimental scripted social skill. It is intentionally **head/neck only**: the planner does not command torso, hips, knees, ankles, arms, or hands. This keeps the gesture inside the same stable trajectory path used by `nod_yes`, `shake_no`, and `neutral_head`.
+
+The gesture follows the same architecture that proved stable for `shake_no`:
+
+1. plan a bounded head-pose trajectory;
+2. stream one head/neck pose command per control step;
+3. preserve all non-head actuator controls from the simulator;
+4. return to neutral at the end.
+
+`bow` is a neutral-home pitch gesture:
+
+```text
+neutral_start -> bow_down -> bow_hold -> neutral_end
+```
+
+The small depth uses approximately `neck_pitch=-0.06 rad` and `head_pitch=-0.18 rad`. The medium depth uses approximately `neck_pitch=-0.10 rad` and `head_pitch=-0.26 rad`. Both keep `head_yaw=0` and `head_roll=0` throughout the command.
+
+Dry-run:
+
+```bash
+./scripts/run_scripted_social_skill_in_sim.sh bow \
+  --args '{"depth":"small","duration_s":5.0}' \
+  --backend mujoco \
+  --control-hz 50 \
+  --dry-run \
+  --json | python -m json.tool
+```
+
+Live MuJoCo:
+
+```bash
+./scripts/run_sim_server.sh \
+  --backend mujoco \
+  --profile open_duck_forward \
+  --viewer \
+  --follow-camera
+```
+
+Second terminal:
+
+```bash
+./scripts/run_scripted_social_skill_in_sim.sh bow \
+  --args '{"depth":"small","duration_s":5.0}' \
+  --backend mujoco \
+  --control-hz 50
+```
+
+Use `neutral_head` as the fallback/home command if a bow test leaves the head in an unexpected pose.

@@ -41,8 +41,16 @@ Examples:
     --args '{"count":2,"amplitude":"small","duration_s":4.0}' \
     --backend mujoco
 
+  ./scripts/run_scripted_social_skill_in_sim.sh neutral_head \
+    --args '{"duration_s":3.0}' \
+    --backend mujoco
+
   ./scripts/run_scripted_social_skill_in_sim.sh shake_no \
     --args '{"count":2,"amplitude":"small","duration_s":4.0}' \
+    --backend mujoco
+
+  ./scripts/run_scripted_social_skill_in_sim.sh bow \
+    --args '{"depth":"small","duration_s":5.0}' \
     --backend mujoco
 
 This wrapper intentionally runs inside compose.sim.yaml service runtime so host

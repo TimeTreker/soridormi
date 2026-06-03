@@ -1082,6 +1082,44 @@
       "notes": "Do not learn from walking-only teacher. Needs scripted pose/keyframe teacher, separate teacher policy, or future RL."
     },
     {
+      "id": "neutral_head",
+      "category": "social",
+      "display_name": "Neutral Head",
+      "description": "Slowly return supported head/neck joints to the neutral straight-ahead pose using a scripted MuJoCo trajectory.",
+      "status": "available_sim_experimental",
+      "execution": "scripted_keyframe",
+      "implementation_phase": "M7D_head_social",
+      "parameters": {
+        "duration_s": {
+          "min": 1.0,
+          "max": 10.0,
+          "default": 3.0
+        }
+      },
+      "preconditions": [
+        "not_fallen"
+      ],
+      "required_actuator_groups": [
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "neutral_head",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "joint_limit_margin",
+        "tracking_error",
+        "base_stability"
+      ],
+      "notes": "This is the explicit fallback/home command for scripted head social skills; it should preserve non-head actuator controls while homing only head_neck joints."
+    },
+    {
       "id": "look_direction",
       "category": "social",
       "display_name": "Look Direction",
@@ -1308,47 +1346,51 @@
       "id": "bow",
       "category": "social",
       "display_name": "Bow",
-      "description": "Small safe bow-like gesture using head/neck and optionally body posture later.",
-      "status": "planned",
+      "description": "Gentle head/neck-only bow gesture using a neutral-home scripted MuJoCo trajectory. No torso or leg bow is attempted.",
+      "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
       "implementation_phase": "M7D_head_social",
       "parameters": {
         "depth": {
           "enum": [
-            "small"
+            "small",
+            "medium"
           ],
           "default": "small"
         },
+        "hold_fraction": {
+          "min": 0.0,
+          "max": 0.8,
+          "default": 0.35
+        },
         "duration_s": {
-          "min": 0.5,
-          "max": 3.0,
-          "default": 1.2
+          "min": 2.0,
+          "max": 10.0,
+          "default": 5.0
         }
       },
       "preconditions": [
-        "standing",
-        "stable_balance",
-        "not_walking"
+        "not_fallen"
       ],
       "required_actuator_groups": [
         "head_neck"
       ],
       "safety": {
-        "requires_standing": true,
-        "requires_stable_balance": true,
-        "requires_not_walking": true,
-        "requires_flat_ground": true,
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
         "interruptible": true,
         "fallback": "neutral_head",
         "sim_first": true,
         "hardware_enabled": false
       },
       "evaluation": [
-        "balance_stability",
         "joint_limit_margin",
-        "base_drift"
+        "tracking_error",
+        "base_stability"
       ],
-      "notes": "First implementation should be shallow; no deep torso bow until posture control is proven."
+      "notes": "M8I implementation is intentionally head/neck only. Whole-body torso bow remains future work until posture control is validated."
     },
     {
       "id": "greeting",

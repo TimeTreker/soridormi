@@ -32,6 +32,7 @@ REQUIRED_SKILLS = {
     "crouch",
     "recover_stand",
     "balance_recover",
+    "neutral_head",
     "look_direction",
     "look_at_person",
     "track_person",
@@ -143,7 +144,7 @@ def test_first_available_subset_is_small_and_supported() -> None:
         for skill in skills.values()
         if skill["status"] in {"available_sim", "available_sim_experimental"}
     ]
-    assert 6 <= len(available) <= 10
+    assert 6 <= len(available) <= 12
 
     for skill in available:
         required = set(skill["required_actuator_groups"])
@@ -162,7 +163,7 @@ def test_arm_and_hand_social_skills_are_declared_but_unsupported() -> None:
 
 def test_head_social_skills_are_planned_without_arm_requirement() -> None:
     skills = _skills_by_id()
-    for skill_id in ["look_direction", "look_at_person", "nod_yes", "shake_no", "bow", "express_attention"]:
+    for skill_id in ["neutral_head", "look_direction", "look_at_person", "nod_yes", "shake_no", "bow", "express_attention"]:
         skill = skills[skill_id]
         assert skill["category"] == "social"
         assert set(skill["required_actuator_groups"]) <= SUPPORTED_ACTUATOR_GROUPS

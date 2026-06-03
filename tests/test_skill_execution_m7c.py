@@ -17,8 +17,10 @@ def _registry() -> SkillExecutionRegistry:
 def test_registry_lists_manifest_backed_executable_skill_ids() -> None:
     registry = _registry()
     assert registry.executable_skill_ids() == (
+        "bow",
         "curve_walk",
         "look_direction",
+        "neutral_head",
         "nod_yes",
         "shake_no",
         "sidestep",

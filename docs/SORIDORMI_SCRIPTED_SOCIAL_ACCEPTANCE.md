@@ -15,15 +15,16 @@ No hardware backend is exposed.
 
 ## Default acceptance cases
 
-The default gate checks three scripted social skills:
+The default gate checks the scripted social skills that are currently promoted for MuJoCo validation:
 
 | Skill | Gate |
 | --- | --- |
 | `look_direction` | Produces a bounded visible yaw target. |
 | `nod_yes` | Moves only `head_pitch`, reaches down/up ranges, and keeps yaw/roll/neck pitch neutral. |
 | `shake_no` | Moves only `head_yaw`, reaches left/right ranges, and keeps pitch/roll/neck pitch neutral. |
+| `bow` | Moves only `neck_pitch`/`head_pitch`, reaches a shallow down pose, holds briefly, and returns neutral. |
 
-For `nod_yes` and `shake_no`, non-moving axes must remain at zero in the
+For `nod_yes`, `shake_no`, and `bow`, non-moving axes must remain at zero in the
 commanded trajectory. This directly protects the behavior expectation that
 `shake_no` starts straight, turns left/right, and returns straight without adding
 a head-down motion.
@@ -112,4 +113,46 @@ PYTHONPATH=src pytest -q \
 python -m compileall -q src tests
 bash -n scripts/run_scripted_social_skill_in_sim.sh
 bash -n scripts/evaluate_scripted_social_skills.sh
+```
+
+
+## M8H neutral-home gate
+
+The acceptance suite now includes `neutral_head` because the social manifest uses it as the fallback for scripted head skills. In dry-run mode the gate verifies that the planned command remains at the neutral straight-ahead pose. In live MuJoCo mode it also reports base-height stability like the other social skills.
+
+Run the complete scripted social gate set after changing any head trajectory code:
+
+```bash
+./scripts/evaluate_scripted_social_skills.sh --json | python -m json.tool
+```
+
+For live validation, start MuJoCo first with the `open_duck_forward` profile and then run:
+
+```bash
+./scripts/evaluate_scripted_social_skills.sh \
+  --execute \
+  --backend mujoco \
+  --require-observed
+```
+
+## M8I bow acceptance gate
+
+The acceptance suite now includes `bow`. Dry-run acceptance verifies that `bow` commands a visible negative `head_pitch` range, allows only bounded `neck_pitch`/`head_pitch` motion, and keeps `head_yaw` and `head_roll` neutral. Live acceptance reuses the same base-height fall telemetry used for `nod_yes` and `shake_no`.
+
+Run only the bow gate:
+
+```bash
+./scripts/evaluate_scripted_social_skills.sh \
+  --skill bow \
+  --json | python -m json.tool
+```
+
+Live MuJoCo validation:
+
+```bash
+./scripts/evaluate_scripted_social_skills.sh \
+  --skill bow \
+  --execute \
+  --backend mujoco \
+  --require-observed
 ```

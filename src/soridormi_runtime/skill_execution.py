@@ -322,6 +322,17 @@ def _count_cycles(value: Any, *, minimum: int = 1, maximum: int = 8) -> int:
     return result
 
 
+def _plan_neutral_head(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+    skill_id = str(skill["id"])
+    duration = float(parameters.get("duration_s", 3.0))
+    keyframe = _head_keyframe(duration_s=duration, label=skill_id)
+    summary = (
+        f"Plan {skill_id}: return head/neck joints to neutral straight-ahead pose "
+        f"over {duration:.2f}s using a scripted head trajectory."
+    )
+    return _scripted_keyframe_plan(skill, parameters, profile, keyframes=(keyframe,), summary=summary)
+
+
 def _plan_look_direction(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
     skill_id = str(skill["id"])
     head_yaw = float(parameters.get("head_yaw_rad", 0.0))
@@ -377,6 +388,64 @@ def _plan_shake_no(skill: dict[str, Any], parameters: Mapping[str, Any], profile
     return _scripted_keyframe_plan(skill, parameters, profile, keyframes=keyframes, summary=summary)
 
 
+def _plan_bow(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+    skill_id = str(skill["id"])
+    depth = str(parameters.get("depth", "small") or "small")
+    if depth == "small":
+        neck_pitch = -0.06
+        head_pitch = -0.18
+    elif depth == "medium":
+        neck_pitch = -0.10
+        head_pitch = -0.26
+    else:
+        raise SkillExecutionError(f"unsupported bow depth: {depth!r}")
+    duration = float(parameters.get("duration_s", 5.0))
+    hold_fraction = float(parameters.get("hold_fraction", 0.35))
+    if not 0.0 <= hold_fraction <= 0.8:
+        raise SkillExecutionError("bow hold_fraction must be between 0.0 and 0.8")
+    settle_duration = duration * 0.10
+    hold_duration = duration * hold_fraction
+    move_duration = (duration - settle_duration - hold_duration) / 2.0
+    if move_duration <= 0.0:
+        raise SkillExecutionError("bow duration_s is too short for the requested hold_fraction")
+    keyframes = (
+        _head_keyframe(duration_s=settle_duration, label=f"{skill_id}_neutral_start"),
+        _head_keyframe(
+            head_pitch=head_pitch,
+            duration_s=move_duration,
+            label=f"{skill_id}_down",
+        ),
+        _head_keyframe(
+            head_pitch=head_pitch,
+            duration_s=hold_duration if hold_duration > 0.0 else 1e-6,
+            label=f"{skill_id}_hold",
+        ),
+        _head_keyframe(duration_s=move_duration, label=f"{skill_id}_neutral_end"),
+    )
+    # Add neck pitch after using the common helper so all non-moving axes remain
+    # explicitly neutral. The gesture is head/neck only; no torso/leg bow is
+    # attempted until whole-body posture control is validated.
+    keyframes = tuple(
+        JointKeyframeSegment(
+            positions_by_name={
+                **keyframe.positions_by_name,
+                "neck_pitch": neck_pitch
+                if keyframe.label in {f"{skill_id}_down", f"{skill_id}_hold"}
+                else 0.0,
+            },
+            duration_s=keyframe.duration_s,
+            label=keyframe.label,
+        )
+        for keyframe in keyframes
+    )
+    summary = (
+        f"Plan {skill_id}: gentle {depth} head/neck bow over {duration:.2f}s "
+        f"(neck_pitch={neck_pitch:.3f} rad, head_pitch={head_pitch:.3f} rad) "
+        "using a scripted head trajectory; no torso or leg motion."
+    )
+    return _scripted_keyframe_plan(skill, parameters, profile, keyframes=keyframes, summary=summary)
+
+
 BUILTIN_SKILL_PLANNERS: dict[str, SkillPlanner] = {
     "stand_idle": _plan_stand_idle,
     "stop": _plan_stop,
@@ -384,9 +453,11 @@ BUILTIN_SKILL_PLANNERS: dict[str, SkillPlanner] = {
     "turn_in_place": _plan_turn_in_place,
     "curve_walk": _plan_curve_walk,
     "sidestep": _plan_sidestep,
+    "neutral_head": _plan_neutral_head,
     "look_direction": _plan_look_direction,
     "nod_yes": _plan_nod_yes,
     "shake_no": _plan_shake_no,
+    "bow": _plan_bow,
 }
 
 

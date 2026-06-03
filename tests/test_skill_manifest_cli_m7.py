@@ -24,7 +24,7 @@ def test_skill_manifest_loader_and_summary() -> None:
     summary = summarize_manifest(manifest)
     assert summary["robot"] == "open_duck_mini_v2"
     assert summary["skill_count"] >= 30
-    assert 6 <= summary["available_sim_count"] <= 10
+    assert 6 <= summary["available_sim_count"] <= 12
     assert summary["unsupported_count"] >= 3
 
 

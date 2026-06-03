@@ -1,7 +1,7 @@
 """Execute safe scripted head/neck social skills against a MuJoCo simulator.
 
 This module is intentionally narrow. It executes manifest-backed scripted
-keyframe plans such as ``look_direction`` by holding all non-head joints at the
+keyframe plans such as ``neutral_head`` and ``look_direction`` by holding all non-head joints at the
 simulator-reported positions while smoothly moving only the declared head/neck
 actuators. Hardware execution is not exposed here.
 """
@@ -24,11 +24,12 @@ from .skill_manifest import DEFAULT_SKILL_MANIFEST
 
 
 HEAD_JOINT_NAMES = ("neck_pitch", "head_pitch", "head_yaw", "head_roll")
-SUPPORTED_SCRIPTED_SKILLS = {"look_direction", "nod_yes", "shake_no"}
-NEUTRAL_HOME_GESTURE_SKILLS = {"nod_yes", "shake_no"}
+SUPPORTED_SCRIPTED_SKILLS = {"neutral_head", "look_direction", "nod_yes", "shake_no", "bow"}
+NEUTRAL_HOME_GESTURE_SKILLS = {"nod_yes", "shake_no", "bow"}
 MOVING_HEAD_JOINTS_BY_SKILL: dict[str, set[str]] = {
     "nod_yes": {"head_pitch"},
     "shake_no": {"head_yaw"},
+    "bow": {"neck_pitch", "head_pitch"},
 }
 # Defaults are intentionally gentle for viewer validation. These scripted
 # social skills are pose trajectories, not twitch tests; callers can still
@@ -186,11 +187,11 @@ def target_positions_for_segment_step(
             alpha = float(step_index + 1) / float(transition_steps)
             result = interpolate_positions(start_positions_by_name, target_positions_by_name, alpha)
 
-    # Social gestures are axis-specific: shake_no is yaw-only and nod_yes is
-    # pitch-only. Do not let simulator drift from a previous segment get blended
-    # back through the non-moving head joints; command those joints directly to
-    # their home target every step. This keeps shake_no from looking like a
-    # downward head motion and makes final neutral truly neutral.
+    # Social gestures are axis-specific: shake_no is yaw-only, nod_yes is
+    # pitch-only, and bow is shallow neck/head pitch only. Do not let simulator
+    # drift from a previous segment get blended back through non-moving head
+    # joints; command those joints directly to their home target every step.
+    # This keeps gestures legible and makes final neutral truly neutral.
     for name in strict_names:
         if name in target_positions_by_name:
             result[name] = float(target_positions_by_name[name])
@@ -220,11 +221,11 @@ def resolve_keyframe_targets_for_execution(
 ) -> list[dict[str, float]]:
     """Resolve dry-run keyframes into live simulator targets.
 
-    ``look_direction`` uses absolute head targets. ``nod_yes`` and ``shake_no``
-    are neutral-home gestures: they first align to a straight head pose, move
+    ``look_direction`` uses absolute head targets. ``nod_yes``, ``shake_no``,
+    and ``bow`` are neutral-home gestures: they first align to a straight head pose, move
     only their intended axis, and return to that neutral pose. This matches the
-    social expectation that shake_no starts straight, turns left/right, and ends
-    straight without carrying over prior pitch/neck drift.
+    social expectation that each gesture starts straight, moves only its intended
+    head/neck axes, and ends straight without carrying over prior drift.
     """
 
     home = _gesture_home_positions(plan, reference_positions_by_name)
@@ -660,7 +661,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Execute safe scripted head/neck social skills against an already-running MuJoCo sim."
     )
-    parser.add_argument("skill", help="Scripted social skill id, e.g. look_direction, nod_yes, or shake_no.")
+    parser.add_argument("skill", help="Scripted social skill id, e.g. neutral_head, look_direction, nod_yes, shake_no, or bow.")
     parser.add_argument("--manifest", default=str(DEFAULT_SKILL_MANIFEST), help="Path to skill manifest JSON.")
     parser.add_argument("--args", default="{}", help="Skill parameter JSON object.")
     parser.add_argument("--backend", default="mujoco", choices=["mujoco"], help="Execution backend; hardware is not exposed.")
