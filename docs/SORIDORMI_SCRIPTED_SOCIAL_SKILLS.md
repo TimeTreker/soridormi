@@ -229,3 +229,27 @@ Commanded target head range:
 
 For debugging only, `--no-auto-stretch-duration` or
 `--max-head-velocity-radps 0.8` can restore the earlier debug speed, and `--max-head-velocity-radps 0` disables the limiter entirely. Those faster modes are not recommended for viewer validation.
+
+## M8G scripted social acceptance gates
+
+M8G adds `scripts/evaluate_scripted_social_skills.sh`, a Docker-wrapper command
+that validates the scripted social skills before more behaviors are promoted.
+Dry-run mode checks the planned trajectory; live MuJoCo mode also reports
+observed head ranges and base-height fall telemetry.
+
+```bash
+./scripts/evaluate_scripted_social_skills.sh --json | python -m json.tool
+
+./scripts/run_sim_server.sh \
+  --backend mujoco \
+  --profile open_duck_forward \
+  --viewer \
+  --follow-camera
+
+./scripts/evaluate_scripted_social_skills.sh \
+  --execute \
+  --backend mujoco \
+  --require-observed
+```
+
+See `docs/SORIDORMI_SCRIPTED_SOCIAL_ACCEPTANCE.md` for the full gate definition.

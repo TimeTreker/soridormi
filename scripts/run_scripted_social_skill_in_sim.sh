@@ -22,6 +22,7 @@ Options:
                        Planned head target speed limit in rad/s (default: 0.35; 0 disables).
   --no-auto-stretch-duration
                        Do not extend too-short gestures to satisfy the speed limit.
+  --fall-height-m N    Base-height fall threshold for live telemetry (default: 0.14).
   --kp KP              Position gain for scripted commands (default: 10).
   --kd KD              Velocity damping for scripted commands (default: 0.35).
   --dry-run            Validate and print without connecting to MuJoCo.

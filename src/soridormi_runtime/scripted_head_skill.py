@@ -58,6 +58,11 @@ class ScriptedHeadExecutionResult:
     transition_fraction: float
     max_head_velocity_radps: float | None
     auto_stretched_duration: bool
+    observed_min_base_height_m: float | None = None
+    observed_max_base_height_m: float | None = None
+    final_base_height_m: float | None = None
+    fall_height_m: float | None = None
+    fallen: bool | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -91,6 +96,17 @@ def command_positions_by_name(state: RobotState) -> dict[str, float]:
 
 def _head_subset(positions_by_name: Mapping[str, float]) -> dict[str, float]:
     return {name: float(positions_by_name.get(name, 0.0)) for name in HEAD_JOINT_NAMES}
+
+
+def _base_height_range(states: Sequence[RobotState]) -> tuple[float | None, float | None, float | None]:
+    heights = [
+        float(state.base_position_xyz[2])
+        for state in states
+        if state.base_position_xyz is not None and len(state.base_position_xyz) == 3
+    ]
+    if not heights:
+        return None, None, None
+    return min(heights), max(heights), heights[-1]
 
 
 def _head_ranges(history: Sequence[Mapping[str, float]]) -> tuple[dict[str, float], dict[str, float]]:
@@ -501,6 +517,7 @@ def execute_scripted_head_plan(
     transition_fraction: float = DEFAULT_TRANSITION_FRACTION,
     max_head_velocity_radps: float | None = DEFAULT_MAX_HEAD_VELOCITY_RADPS,
     auto_stretch_duration: bool = True,
+    fall_height_m: float = 0.14,
 ) -> ScriptedHeadExecutionResult:
     validate_scripted_head_plan(plan)
     if backend != "mujoco":
@@ -511,6 +528,8 @@ def execute_scripted_head_plan(
         raise SkillExecutionError("--transition-fraction must be between 0.0 and 1.0")
     if max_head_velocity_radps is not None and max_head_velocity_radps < 0.0:
         raise SkillExecutionError("--max-head-velocity-radps must be non-negative")
+    if fall_height_m <= 0.0:
+        raise SkillExecutionError("--fall-height-m must be positive")
 
     requested_duration_s = sum(float(keyframe.duration_s) for keyframe in plan.keyframes)
     dry_run_targets = resolve_keyframe_targets_for_execution(
@@ -561,6 +580,8 @@ def execute_scripted_head_plan(
             transition_fraction=float(transition_fraction),
             max_head_velocity_radps=max_head_velocity_radps,
             auto_stretched_duration=effective_duration_s > requested_duration_s + 1e-9,
+            fall_height_m=float(fall_height_m),
+            fallen=None,
         )
 
     robot_api_client_class = _load_robot_api_client_class()
@@ -592,6 +613,7 @@ def execute_scripted_head_plan(
         )
         commanded_history: list[dict[str, float]] = []
         observed_history: list[dict[str, float]] = [_head_subset(initial_positions)]
+        state_history: list[RobotState] = [state]
         final_positions = initial_positions
         for target_for_step in trajectory:
             commanded_history.append(_head_subset(target_for_step))
@@ -599,8 +621,11 @@ def execute_scripted_head_plan(
             state = client.step_motor_command(command)
             final_positions = joint_positions_by_name(state)
             observed_history.append(_head_subset(final_positions))
+            state_history.append(state)
         commanded_min, commanded_max = _head_ranges(commanded_history)
         observed_min, observed_max = _head_ranges(observed_history)
+        min_base_height, max_base_height, final_base_height = _base_height_range(state_history)
+        fallen = bool(min_base_height is not None and min_base_height < float(fall_height_m))
         return ScriptedHeadExecutionResult(
             skill_id=plan.skill_id,
             backend=backend,
@@ -621,6 +646,11 @@ def execute_scripted_head_plan(
             transition_fraction=float(transition_fraction),
             max_head_velocity_radps=max_head_velocity_radps,
             auto_stretched_duration=effective_duration_s > requested_duration_s + 1e-9,
+            observed_min_base_height_m=min_base_height,
+            observed_max_base_height_m=max_base_height,
+            final_base_height_m=final_base_height,
+            fall_height_m=float(fall_height_m),
+            fallen=fallen,
         )
     finally:
         client.close()
@@ -653,6 +683,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--no-auto-stretch-duration",
         action="store_true",
         help="Do not automatically extend too-short nod/shake durations to satisfy the head velocity limit.",
+    )
+    parser.add_argument(
+        "--fall-height-m",
+        type=float,
+        default=0.14,
+        help="Base-height fall threshold used for live telemetry (default: 0.14).",
     )
     parser.add_argument("--kp", type=float, default=10.0, help="Position gain for the scripted command.")
     parser.add_argument("--kd", type=float, default=0.35, help="Velocity damping for the scripted command.")
@@ -699,6 +735,13 @@ def _print_human(plan: SkillPlan, result: ScriptedHeadExecutionResult) -> None:
             lo = float(result.observed_min_positions_by_name.get(name, 0.0))
             hi = float(result.observed_max_positions_by_name.get(name, 0.0))
             print(f"- {name}: min={lo:.3f}, max={hi:.3f}")
+        if result.observed_min_base_height_m is not None:
+            print("Base-height stability:")
+            print(f"- fall_height_m: {float(result.fall_height_m or 0.0):.3f}")
+            print(f"- min_base_height_m: {float(result.observed_min_base_height_m):.3f}")
+            if result.final_base_height_m is not None:
+                print(f"- final_base_height_m: {float(result.final_base_height_m):.3f}")
+            print(f"- fallen: {bool(result.fallen)}")
     else:
         print("Dry-run only; no simulator or hardware command was executed.")
 
@@ -721,6 +764,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             transition_fraction=args.transition_fraction,
             max_head_velocity_radps=args.max_head_velocity_radps,
             auto_stretch_duration=not args.no_auto_stretch_duration,
+            fall_height_m=args.fall_height_m,
         )
     except (SkillExecutionError, RuntimeError) as exc:
         payload = {"ok": False, "error": str(exc)}
