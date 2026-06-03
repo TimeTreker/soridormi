@@ -1,0 +1,58 @@
+{
+  "args": {
+    "duration_s": 6.5,
+    "vx_mps": 0.11,
+    "vy_mps": 0.0,
+    "yaw_radps": 0.0
+  },
+  "command_space": {
+    "duration_s": [
+      3.0,
+      10.0
+    ],
+    "ramps": [
+      "stand_slow_fast_stop",
+      "stand_fast_slow_stop",
+      "pulse_walk_stop"
+    ],
+    "vx_mps": [
+      0.0,
+      0.22
+    ],
+    "vy_mps": [
+      -0.02,
+      0.02
+    ],
+    "yaw_radps": [
+      -0.05,
+      0.05
+    ]
+  },
+  "control_hz": 50.0,
+  "duration_s": 6.5,
+  "environment_context": {
+    "friction_range": [
+      0.8,
+      1.2
+    ],
+    "obstacles": [],
+    "terrain_height_m_range": [
+      0.0,
+      0.0
+    ],
+    "terrain_type": "flat"
+  },
+  "log_dir": "/data/logs",
+  "log_prefix": "scenario_suite_start_stop_velocity_ramp_v1",
+  "profile": "open_duck_forward",
+  "scenario_id": "start_stop_velocity_ramp_v1",
+  "scenario_status": "mujoco_registry_ready",
+  "skill_id": "walk_velocity",
+  "steps": 325,
+  "task_context": {
+    "gait_style": "default_walk",
+    "requires_obstacle_crossing": false,
+    "requires_progress": true,
+    "skill_family": "locomotion"
+  }
+}

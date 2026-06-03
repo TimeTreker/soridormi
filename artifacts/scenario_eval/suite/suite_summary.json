@@ -1,0 +1,82 @@
+{
+  "errors": [],
+  "failed_count": 0,
+  "missing_count": 0,
+  "ok": true,
+  "output_dir": "artifacts/scenario_eval/suite",
+  "passed_count": 3,
+  "report_paths": [
+    "artifacts/scenario_eval/suite/flat_walk_varied_speed_v1/scenario_rollout_report.json",
+    "artifacts/scenario_eval/suite/start_stop_velocity_ramp_v1/scenario_rollout_report.json",
+    "artifacts/scenario_eval/suite/curve_turn_walk_v1/scenario_rollout_report.json"
+  ],
+  "scenario_count": 3,
+  "scenario_results": [
+    {
+      "duration_s": 4.979999999999669,
+      "error_count": 0,
+      "expected_skill_id": "walk_velocity",
+      "fallen": false,
+      "forward_distance_m": 0.319184509107085,
+      "mean_forward_speed_mps": 0.06409327492110567,
+      "ok": true,
+      "report_path": "artifacts/scenario_eval/suite/flat_walk_varied_speed_v1/scenario_rollout_report.json",
+      "sample_count": 250,
+      "scenario_family": "locomotion_flat",
+      "scenario_id": "flat_walk_varied_speed_v1",
+      "scenario_status": "mujoco_registry_ready",
+      "scenario_title": "Flat walk with varied continuous speed",
+      "stuck_ratio": 0.004016064257028112,
+      "swing_clearance_p50_m": 0.010023828465555135,
+      "touchdown_count": 18,
+      "warning_count": 4
+    },
+    {
+      "duration_s": 6.479999999999504,
+      "error_count": 0,
+      "expected_skill_id": "walk_velocity",
+      "fallen": false,
+      "forward_distance_m": 0.28396045875668824,
+      "mean_forward_speed_mps": 0.043821058450109564,
+      "ok": true,
+      "report_path": "artifacts/scenario_eval/suite/start_stop_velocity_ramp_v1/scenario_rollout_report.json",
+      "sample_count": 325,
+      "scenario_family": "locomotion_flat",
+      "scenario_id": "start_stop_velocity_ramp_v1",
+      "scenario_status": "mujoco_registry_ready",
+      "scenario_title": "Start, transition, and stop command ramps",
+      "stuck_ratio": 0.05246913580246913,
+      "swing_clearance_p50_m": 0.007919188662089231,
+      "touchdown_count": 25,
+      "warning_count": 4
+    },
+    {
+      "duration_s": 5.479999999999614,
+      "error_count": 0,
+      "expected_skill_id": "curve_walk",
+      "fallen": false,
+      "forward_distance_m": 0.12449560667999504,
+      "mean_forward_speed_mps": 0.02271817640146055,
+      "ok": true,
+      "report_path": "artifacts/scenario_eval/suite/curve_turn_walk_v1/scenario_rollout_report.json",
+      "sample_count": 275,
+      "scenario_family": "locomotion_turning",
+      "scenario_id": "curve_turn_walk_v1",
+      "scenario_status": "mujoco_registry_ready",
+      "scenario_title": "Curved walking and in-place turning envelope",
+      "stuck_ratio": 0.2518248175182482,
+      "swing_clearance_p50_m": 0.005556822984959235,
+      "touchdown_count": 22,
+      "warning_count": 4
+    }
+  ],
+  "summary_metrics": {
+    "fallen_count": 0,
+    "max_stuck_ratio": 0.2518248175182482,
+    "mean_forward_distance_m": 0.2425468581812561,
+    "mean_forward_speed_mps": 0.043544169924225266,
+    "total_forward_distance_m": 0.7276405745437683,
+    "total_samples": 850
+  },
+  "warnings": []
+}
