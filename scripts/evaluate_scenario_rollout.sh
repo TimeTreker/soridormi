@@ -260,6 +260,12 @@ fi
 export PYTHONPATH="${PWD}/src${PYTHONPATH:+:${PYTHONPATH}}"
 mkdir -p "${output_dir}" data/logs
 
+run_skill_in_sim_script="${SORIDORMI_RUN_SKILL_IN_SIM_SH:-./scripts/run_skill_in_sim.sh}"
+if [ ! -f "${run_skill_in_sim_script}" ]; then
+  echo "error: run_skill_in_sim wrapper not found: ${run_skill_in_sim_script}" >&2
+  exit 1
+fi
+
 status() {
   printf '%s\n' "$*" >&2
 }
@@ -326,9 +332,9 @@ if [ -z "${log_path}" ]; then
     # Keep stdout reserved for the final scenario JSON report.  The runtime
     # wrapper and Docker Compose may print status/banner text, so send it to
     # stderr when callers request machine-readable output.
-    ./scripts/run_skill_in_sim.sh "${skill_run_args[@]}" >&2
+    bash "${run_skill_in_sim_script}" "${skill_run_args[@]}" >&2
   else
-    ./scripts/run_skill_in_sim.sh "${skill_run_args[@]}"
+    bash "${run_skill_in_sim_script}" "${skill_run_args[@]}"
   fi
 
   host_log_dir="data/logs"

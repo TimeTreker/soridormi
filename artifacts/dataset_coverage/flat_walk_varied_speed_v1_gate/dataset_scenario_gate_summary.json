@@ -1,0 +1,114 @@
+{
+  "command_source": "applied_command",
+  "errors": [
+    "dataset input not found: /data/training_datasets/flat_walk_varied_speed_v1.jsonl",
+    "flat_walk_varied_speed_v1: min_samples_per_scenario: 0 samples >= required 300"
+  ],
+  "gate_type": "soridormi.policy_supervision.scenario_gate.v1",
+  "generated_at_utc": "2026-06-03T12:12:39+00:00",
+  "inputs": [
+    "/data/training_datasets/flat_walk_varied_speed_v1.jsonl"
+  ],
+  "invalid_sample_count": 0,
+  "max_failure_ratio": 0.5,
+  "min_command_range_fraction": 0.25,
+  "min_samples_per_scenario": 300,
+  "ok": false,
+  "output_dir": "/host_repo/artifacts/dataset_coverage/flat_walk_varied_speed_v1_gate",
+  "present_scenarios": [],
+  "report_path": "/host_repo/artifacts/dataset_coverage/flat_walk_varied_speed_v1_gate/dataset_scenario_gate_report.md",
+  "require_environment_context": true,
+  "require_failure_flags": true,
+  "require_ramp_alpha": true,
+  "require_task_context": true,
+  "required_commands": [
+    "vx_mps",
+    "vy_mps",
+    "yaw_radps"
+  ],
+  "required_scenarios": [
+    "flat_walk_varied_speed_v1"
+  ],
+  "sample_count": 0,
+  "scenario_manifest": "configs/scenarios/open_duck_mini_v2_scenarios.json",
+  "scenario_results": [
+    {
+      "checks": [
+        {
+          "detail": "scenario is present in the manifest",
+          "name": "scenario_known",
+          "ok": true
+        },
+        {
+          "detail": "0 samples >= required 300",
+          "name": "min_samples_per_scenario",
+          "ok": false
+        }
+      ],
+      "command_stats": {
+        "vx_mps": {
+          "count": 0,
+          "covered_fraction": null,
+          "manifest_maximum": 0.25,
+          "manifest_minimum": -0.03,
+          "manifest_span": 0.28,
+          "maximum": null,
+          "minimum": null,
+          "span": null
+        },
+        "vy_mps": {
+          "count": 0,
+          "covered_fraction": null,
+          "manifest_maximum": 0.03,
+          "manifest_minimum": -0.03,
+          "manifest_span": 0.06,
+          "maximum": null,
+          "minimum": null,
+          "span": null
+        },
+        "yaw_radps": {
+          "count": 0,
+          "covered_fraction": null,
+          "manifest_maximum": 0.08,
+          "manifest_minimum": -0.08,
+          "manifest_span": 0.16,
+          "maximum": null,
+          "minimum": null,
+          "span": null
+        }
+      },
+      "environment_context_count": 0,
+      "errors": [
+        "min_samples_per_scenario: 0 samples >= required 300"
+      ],
+      "failure_count": 0,
+      "failure_flag_count": 0,
+      "failure_ratio": 0.0,
+      "fall_count": 0,
+      "known_in_manifest": true,
+      "ok": false,
+      "ramp_alpha_count": 0,
+      "ramp_alpha_maximum": null,
+      "ramp_alpha_minimum": null,
+      "ramp_name_counts": {},
+      "required": true,
+      "sample_count": 0,
+      "scenario_id": "flat_walk_varied_speed_v1",
+      "skill_counts": {},
+      "split_counts": {},
+      "status": "mujoco_registry_ready",
+      "stuck_count": 0,
+      "tag_counts": {},
+      "task_context_count": 0,
+      "terminated_count": 0,
+      "terrain_counts": {},
+      "title": "Flat walk with varied continuous speed",
+      "warnings": []
+    }
+  ],
+  "schema_version": 1,
+  "sha256_by_input": {},
+  "summary_path": "/host_repo/artifacts/dataset_coverage/flat_walk_varied_speed_v1_gate/dataset_scenario_gate_summary.json",
+  "valid_sample_count": 0,
+  "warnings": []
+}

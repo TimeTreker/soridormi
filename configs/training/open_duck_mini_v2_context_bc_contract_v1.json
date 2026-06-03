@@ -1,0 +1,412 @@
+{
+  "schema_version": "m9.bc_training_contract.v1",
+  "contract_id": "open_duck_mini_v2_context_bc_v1",
+  "robot_profile": "open_duck_mini_v2",
+  "status": "contract_ready",
+  "purpose": "Versioned context-conditioned behavior-cloning contract for Soridormi MuJoCo-first locomotion datasets before policy architecture changes.",
+  "natural_language_allowed": false,
+  "policy_io": {
+    "input_expression": "robot_state + desired_command + task_context + environment_context + short_history",
+    "output_expression": "action_14d",
+    "output_field": "teacher_action",
+    "legacy_output_field": "action",
+    "action_size": 14
+  },
+  "dataset_rows": {
+    "target_sample_type": "soridormi.policy_supervision.context_v1",
+    "legacy_sample_type": "soridormi.policy_supervision.v1",
+    "legacy_allowed_for_stage_1": true,
+    "required_context_fields": [
+      "scenario_id",
+      "skill_id",
+      "robot_state",
+      "desired_command",
+      "task_context",
+      "environment_context",
+      "teacher_action"
+    ],
+    "recommended_debug_fields": [
+      "rollout_id",
+      "episode_index",
+      "timestep",
+      "applied_command",
+      "command_ramp_alpha",
+      "command_ramp_name",
+      "failure_flags",
+      "stuck",
+      "fallen"
+    ]
+  },
+  "input_groups": [
+    {
+      "name": "robot_state",
+      "stage": 1,
+      "required": true,
+      "description": "Proprioceptive/runtime state consumed by the policy.",
+      "fields": [
+        {
+          "name": "observation",
+          "type": "float_vector",
+          "size": 101,
+          "required": true,
+          "legacy_field": "observation"
+        }
+      ]
+    },
+    {
+      "name": "desired_command",
+      "stage": 1,
+      "required": true,
+      "description": "Continuous command requested by a skill/planner; not raw language.",
+      "fields": [
+        {
+          "name": "vx_mps",
+          "type": "float",
+          "required": true,
+          "range": [
+            -0.3,
+            0.3
+          ]
+        },
+        {
+          "name": "vy_mps",
+          "type": "float",
+          "required": true,
+          "range": [
+            -0.1,
+            0.1
+          ]
+        },
+        {
+          "name": "yaw_radps",
+          "type": "float",
+          "required": true,
+          "range": [
+            -0.4,
+            0.4
+          ]
+        }
+      ]
+    },
+    {
+      "name": "task_context",
+      "stage": 2,
+      "required": true,
+      "description": "Bounded behavior-mode labels resolved by Soridormi/Chromie before policy execution.",
+      "fields": [
+        {
+          "name": "skill_id",
+          "type": "enum_string",
+          "required": true
+        },
+        {
+          "name": "gait_style",
+          "type": "enum_string",
+          "required": false
+        },
+        {
+          "name": "priority",
+          "type": "enum_string",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "environment_context",
+      "stage": 3,
+      "required": true,
+      "description": "Low-dimensional local environment context; perception features must be bounded and versioned before use.",
+      "fields": [
+        {
+          "name": "terrain_type",
+          "type": "enum_string",
+          "required": true,
+          "allowed_values": [
+            "flat",
+            "rough",
+            "slope",
+            "obstacle",
+            "unknown"
+          ]
+        },
+        {
+          "name": "friction_estimate",
+          "type": "float",
+          "required": false,
+          "range": [
+            0.0,
+            3.0
+          ]
+        },
+        {
+          "name": "obstacle_distance_m",
+          "type": "float",
+          "required": false,
+          "range": [
+            0.0,
+            5.0
+          ]
+        },
+        {
+          "name": "obstacle_height_m",
+          "type": "float",
+          "required": false,
+          "range": [
+            0.0,
+            0.25
+          ]
+        }
+      ]
+    },
+    {
+      "name": "short_history",
+      "stage": 4,
+      "required": false,
+      "description": "Explicit bounded recent commands/actions/contact summary. Raw unbounded logs are not a policy input.",
+      "fields": [
+        {
+          "name": "previous_action",
+          "type": "float_vector",
+          "size": 14,
+          "required": false
+        },
+        {
+          "name": "previous_command",
+          "type": "object",
+          "required": false
+        },
+        {
+          "name": "contact_history",
+          "type": "float_vector",
+          "required": false,
+          "max_size": 16
+        }
+      ]
+    }
+  ],
+  "output": {
+    "name": "action_14d",
+    "field": "teacher_action",
+    "legacy_field": "action",
+    "type": "float_vector",
+    "size": 14,
+    "description": "Teacher action in the same 14D actuator target/action space consumed by Soridormi runtime."
+  },
+  "adoption_stages": [
+    {
+      "stage": 1,
+      "name": "velocity_commanded_bc",
+      "required_input_groups": [
+        "robot_state",
+        "desired_command"
+      ],
+      "description": "Current near-term BC target: observation plus continuous vx/vy/yaw command."
+    },
+    {
+      "stage": 2,
+      "name": "skill_task_context_bc",
+      "required_input_groups": [
+        "robot_state",
+        "desired_command",
+        "task_context"
+      ],
+      "description": "Add skill_id/gait style/priority labels after datasets have reliable task_context fields."
+    },
+    {
+      "stage": 3,
+      "name": "terrain_context_bc",
+      "required_input_groups": [
+        "robot_state",
+        "desired_command",
+        "task_context",
+        "environment_context"
+      ],
+      "description": "Add terrain/friction context after scenario rollout and dataset gates pass."
+    },
+    {
+      "stage": 4,
+      "name": "history_conditioned_bc",
+      "required_input_groups": [
+        "robot_state",
+        "desired_command",
+        "task_context",
+        "environment_context",
+        "short_history"
+      ],
+      "description": "Add bounded short history for transitions, contacts, and residual/RL compatibility."
+    }
+  ],
+  "training_gates": {
+    "require_scenario_gate": true,
+    "require_rollout_acceptance_for_eval_scenarios": true,
+    "require_dataset_coverage_report": true,
+    "require_context_field_presence_before_stage": {
+      "2": [
+        "task_context",
+        "skill_id"
+      ],
+      "3": [
+        "environment_context",
+        "terrain_type"
+      ],
+      "4": [
+        "short_history"
+      ]
+    }
+  },
+  "example_row": {
+    "sample_type": "soridormi.policy_supervision.context_v1",
+    "schema_version": 1,
+    "scenario_id": "flat_walk_varied_speed_v1",
+    "rollout_id": "example_rollout",
+    "timestep": 123,
+    "skill_id": "walk_velocity",
+    "robot_state": {
+      "observation": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "desired_command": {
+      "vx_mps": 0.12,
+      "vy_mps": 0.0,
+      "yaw_radps": 0.05
+    },
+    "applied_command": {
+      "vx_mps": 0.11,
+      "vy_mps": 0.0,
+      "yaw_radps": 0.04
+    },
+    "task_context": {
+      "skill_id": "walk_velocity",
+      "gait_style": "default_walk",
+      "priority": "stable"
+    },
+    "environment_context": {
+      "terrain_type": "flat",
+      "obstacle_height_m": 0.0,
+      "friction_estimate": 1.0
+    },
+    "command_ramp_alpha": 1.0,
+    "teacher_action": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "failure_flags": {
+      "fallen": false,
+      "stuck": false,
+      "terminated": false
+    }
+  }
+}

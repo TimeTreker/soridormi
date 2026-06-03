@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -31,9 +32,8 @@ def test_scenario_rollout_shell_json_dry_run_is_machine_readable(tmp_path: Path)
 
 
 def test_scenario_rollout_shell_json_keeps_runtime_noise_off_stdout(tmp_path: Path) -> None:
-    script_path = Path("scripts/run_skill_in_sim.sh")
-    original_script = script_path.read_text(encoding="utf-8")
     log_prefix = "m9b_json_stdout_test"
+    fake_script_path = tmp_path / "fake_run_skill_in_sim.sh"
     fake_script = f"""#!/usr/bin/env bash
 set -euo pipefail
 printf 'runtime stdout noise should not reach JSON stdout\\n'
@@ -49,8 +49,10 @@ JSONL
 """
 
     try:
-        script_path.write_text(fake_script, encoding="utf-8")
-        script_path.chmod(0o755)
+        fake_script_path.write_text(fake_script, encoding="utf-8")
+        fake_script_path.chmod(0o755)
+        env = dict(os.environ)
+        env["SORIDORMI_RUN_SKILL_IN_SIM_SH"] = str(fake_script_path)
         result = subprocess.run(
             [
                 "bash",
@@ -67,10 +69,9 @@ JSONL
             text=True,
             capture_output=True,
             timeout=60,
+            env=env,
         )
     finally:
-        script_path.write_text(original_script, encoding="utf-8")
-        script_path.chmod(0o755)
         for path in Path("data/logs").glob(f"{log_prefix}*.jsonl"):
             path.unlink(missing_ok=True)
 
