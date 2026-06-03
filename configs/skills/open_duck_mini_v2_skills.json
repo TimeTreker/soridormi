@@ -1085,8 +1085,8 @@
       "id": "look_direction",
       "category": "social",
       "display_name": "Look Direction",
-      "description": "Turn head/neck toward a specified yaw/pitch direction.",
-      "status": "planned",
+      "description": "Turn head/neck toward a specified yaw/pitch direction using a scripted MuJoCo keyframe plan.",
+      "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
       "implementation_phase": "M7D_head_social",
       "parameters": {
@@ -1210,14 +1210,14 @@
       "id": "nod_yes",
       "category": "social",
       "display_name": "Nod Yes",
-      "description": "Small repeated head pitch motion for yes/acknowledgement.",
-      "status": "planned",
+      "description": "Visible repeated bounded head pitch motion for yes/acknowledgement using scripted MuJoCo keyframes.",
+      "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
       "implementation_phase": "M7D_head_social",
       "parameters": {
         "count": {
-          "min": 1,
-          "max": 3,
+          "min": 2,
+          "max": 8,
           "default": 2
         },
         "amplitude": {
@@ -1226,6 +1226,11 @@
             "medium"
           ],
           "default": "small"
+        },
+        "duration_s": {
+          "min": 1.0,
+          "max": 10.0,
+          "default": 4.0
         }
       },
       "preconditions": [
@@ -1246,6 +1251,7 @@
       },
       "evaluation": [
         "joint_limit_margin",
+        "tracking_error",
         "base_stability"
       ]
     },
@@ -1253,14 +1259,14 @@
       "id": "shake_no",
       "category": "social",
       "display_name": "Shake No",
-      "description": "Small repeated head yaw motion for no/decline.",
-      "status": "planned",
+      "description": "Visible repeated bounded head yaw motion for no/decline using scripted MuJoCo keyframes.",
+      "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
       "implementation_phase": "M7D_head_social",
       "parameters": {
         "count": {
-          "min": 1,
-          "max": 3,
+          "min": 2,
+          "max": 8,
           "default": 2
         },
         "amplitude": {
@@ -1269,6 +1275,11 @@
             "medium"
           ],
           "default": "small"
+        },
+        "duration_s": {
+          "min": 1.0,
+          "max": 10.0,
+          "default": 4.0
         }
       },
       "preconditions": [
@@ -1289,6 +1300,7 @@
       },
       "evaluation": [
         "joint_limit_margin",
+        "tracking_error",
         "base_stability"
       ]
     },

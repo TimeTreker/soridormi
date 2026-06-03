@@ -158,3 +158,31 @@ SORIDORMI_COMMAND_RAMP_SECONDS_OVERRIDE
 This is important because policy profiles such as `open_duck_forward` define
 command defaults; skill execution must intentionally override those defaults
 without mutating profile YAML files.
+
+## M8E: scripted head/neck social skill
+
+`look_direction` is now the first experimental sim-available social skill. It
+uses a scripted head/neck keyframe path instead of the walking policy velocity
+wrapper, so run it through the dedicated social script:
+
+```bash
+./scripts/run_scripted_social_skill_in_sim.sh look_direction \
+  --args '{"head_yaw_rad":0.25,"head_pitch_rad":-0.08,"duration_s":1.2}' \
+  --backend mujoco \
+  --dry-run
+```
+
+For live MuJoCo execution, start the simulator first with:
+
+```bash
+./scripts/run_sim_server.sh \
+  --backend mujoco \
+  --profile open_duck_forward \
+  --viewer \
+  --follow-camera
+```
+
+Then run the same `run_scripted_social_skill_in_sim.sh` command without
+`--dry-run`. The executor preserves non-head joints at their current simulator
+positions and only targets `neck_pitch`, `head_pitch`, `head_yaw`, and
+`head_roll`. Hardware remains unavailable.

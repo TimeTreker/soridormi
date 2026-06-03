@@ -45,8 +45,7 @@ def test_validate_scenario_for_teacher_collection_rejects_planned_by_default() -
 def test_velocity_collector_rejects_non_velocity_social_scenario() -> None:
     scenario = get_scenario_definition("look_direction_stationary_v1")
 
-    with pytest.raises(ScenarioCurriculumError, match="--allow-planned-scenario"):
-        validate_scenario_for_teacher_collection(scenario)
-
+    assert scenario.status in COLLECTOR_READY_STATUSES
+    assert scenario.primary_skill == "look_direction"
     with pytest.raises(ScenarioCurriculumError, match="vx_mps"):
-        validate_scenario_for_teacher_collection(scenario, allow_planned=True)
+        validate_scenario_for_teacher_collection(scenario)

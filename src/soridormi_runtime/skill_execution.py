@@ -53,6 +53,22 @@ class VelocitySegment:
 
 
 @dataclass(frozen=True)
+class JointKeyframeSegment:
+    """Scripted joint target segment emitted by a non-locomotion skill."""
+
+    positions_by_name: Mapping[str, float]
+    duration_s: float = 1.0
+    label: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "positions_by_name": {name: float(value) for name, value in self.positions_by_name.items()},
+            "duration_s": self.duration_s,
+            "label": self.label,
+        }
+
+
+@dataclass(frozen=True)
 class SkillPlan:
     """Dry-run plan produced from a manifest-declared skill."""
 
@@ -64,6 +80,7 @@ class SkillPlan:
     dry_run: bool
     summary: str
     commands: tuple[VelocitySegment, ...] = ()
+    keyframes: tuple[JointKeyframeSegment, ...] = ()
     safety: Mapping[str, Any] | None = None
     parameters: Mapping[str, Any] | None = None
 
@@ -77,6 +94,7 @@ class SkillPlan:
             "dry_run": self.dry_run,
             "summary": self.summary,
             "commands": [command.to_dict() for command in self.commands],
+            "keyframes": [keyframe.to_dict() for keyframe in self.keyframes],
             "safety": dict(self.safety or {}),
             "parameters": dict(self.parameters or {}),
             "total_duration_s": self.total_duration_s,
@@ -84,7 +102,9 @@ class SkillPlan:
 
     @property
     def total_duration_s(self) -> float:
-        return sum(command.duration_s for command in self.commands)
+        return sum(command.duration_s for command in self.commands) + sum(
+            keyframe.duration_s for keyframe in self.keyframes
+        )
 
 
 SkillPlanner = Callable[[dict[str, Any], Mapping[str, Any], str], SkillPlan]
@@ -246,6 +266,117 @@ def _plan_sidestep(skill: dict[str, Any], parameters: Mapping[str, Any], profile
     )
 
 
+def _scripted_keyframe_plan(
+    skill: dict[str, Any],
+    parameters: Mapping[str, Any],
+    profile: str,
+    *,
+    keyframes: Sequence[JointKeyframeSegment],
+    summary: str,
+) -> SkillPlan:
+    return SkillPlan(
+        skill_id=str(skill["id"]),
+        status=str(skill.get("status")),
+        category=str(skill.get("category")),
+        execution=str(skill.get("execution")),
+        profile=profile,
+        dry_run=True,
+        summary=summary,
+        keyframes=tuple(keyframes),
+        safety=skill.get("safety", {}),
+        parameters=parameters,
+    )
+
+
+def _head_keyframe(*, head_pitch: float = 0.0, head_yaw: float = 0.0, duration_s: float, label: str) -> JointKeyframeSegment:
+    return JointKeyframeSegment(
+        positions_by_name={
+            "neck_pitch": 0.0,
+            "head_pitch": float(head_pitch),
+            "head_yaw": float(head_yaw),
+            "head_roll": 0.0,
+        },
+        duration_s=float(duration_s),
+        label=label,
+    )
+
+
+def _amplitude_radians(value: Any, *, small: float, medium: float) -> float:
+    text = str(value or "small")
+    if text == "small":
+        return float(small)
+    if text == "medium":
+        return float(medium)
+    raise SkillExecutionError(f"unsupported scripted head amplitude: {text!r}")
+
+
+def _count_cycles(value: Any, *, minimum: int = 1, maximum: int = 8) -> int:
+    count = float(value)
+    if not count.is_integer():
+        raise SkillExecutionError("scripted social count must be an integer number of cycles")
+    result = int(count)
+    if result < minimum:
+        raise SkillExecutionError(f"scripted social count must be at least {minimum} cycles")
+    if result > maximum:
+        raise SkillExecutionError(f"scripted social count must be at most {maximum} cycles")
+    return result
+
+
+def _plan_look_direction(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+    skill_id = str(skill["id"])
+    head_yaw = float(parameters.get("head_yaw_rad", 0.0))
+    head_pitch = float(parameters.get("head_pitch_rad", 0.0))
+    duration = float(parameters.get("duration_s", 1.0))
+    keyframe = _head_keyframe(head_pitch=head_pitch, head_yaw=head_yaw, duration_s=duration, label=skill_id)
+    summary = (
+        f"Plan {skill_id}: head_yaw={head_yaw:.3f} rad, "
+        f"head_pitch={head_pitch:.3f} rad over {duration:.2f}s using scripted head keyframes."
+    )
+    return _scripted_keyframe_plan(skill, parameters, profile, keyframes=(keyframe,), summary=summary)
+
+
+def _plan_nod_yes(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+    skill_id = str(skill["id"])
+    count = _count_cycles(parameters.get("count", 2), minimum=2, maximum=8)
+    down_amplitude = _amplitude_radians(parameters.get("amplitude", "small"), small=0.18, medium=0.26)
+    up_amplitude = _amplitude_radians(parameters.get("amplitude", "small"), small=0.12, medium=0.18)
+    duration = float(parameters.get("duration_s", 4.0))
+    segment_duration = duration / float(max(1, count * 2 + 2))
+    keyframes: list[JointKeyframeSegment] = [
+        _head_keyframe(duration_s=segment_duration, label=f"{skill_id}_neutral_start")
+    ]
+    for index in range(count):
+        keyframes.append(_head_keyframe(head_pitch=-down_amplitude, duration_s=segment_duration, label=f"{skill_id}_down_{index + 1}"))
+        keyframes.append(_head_keyframe(head_pitch=up_amplitude, duration_s=segment_duration, label=f"{skill_id}_up_{index + 1}"))
+    keyframes.append(_head_keyframe(duration_s=segment_duration, label=f"{skill_id}_neutral_end"))
+    summary = (
+        f"Plan {skill_id}: {count} visible nod cycle(s), amplitude={parameters.get('amplitude', 'small')} "
+        f"(down={down_amplitude:.3f} rad, up={up_amplitude:.3f} rad pitch offsets) over "
+        f"{duration:.2f}s using scripted head keyframes."
+    )
+    return _scripted_keyframe_plan(skill, parameters, profile, keyframes=keyframes, summary=summary)
+
+
+def _plan_shake_no(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+    skill_id = str(skill["id"])
+    count = _count_cycles(parameters.get("count", 2), minimum=2, maximum=8)
+    amplitude = _amplitude_radians(parameters.get("amplitude", "small"), small=0.28, medium=0.40)
+    duration = float(parameters.get("duration_s", 4.0))
+    segment_duration = duration / float(max(1, count * 2 + 2))
+    keyframes: list[JointKeyframeSegment] = [
+        _head_keyframe(duration_s=segment_duration, label=f"{skill_id}_neutral_start")
+    ]
+    for index in range(count):
+        keyframes.append(_head_keyframe(head_yaw=amplitude, duration_s=segment_duration, label=f"{skill_id}_right_{index + 1}"))
+        keyframes.append(_head_keyframe(head_yaw=-amplitude, duration_s=segment_duration, label=f"{skill_id}_left_{index + 1}"))
+    keyframes.append(_head_keyframe(duration_s=segment_duration, label=f"{skill_id}_neutral_end"))
+    summary = (
+        f"Plan {skill_id}: {count} visible shake cycle(s), amplitude={parameters.get('amplitude', 'small')} "
+        f"({amplitude:.3f} rad yaw offsets) over {duration:.2f}s using scripted head keyframes."
+    )
+    return _scripted_keyframe_plan(skill, parameters, profile, keyframes=keyframes, summary=summary)
+
+
 BUILTIN_SKILL_PLANNERS: dict[str, SkillPlanner] = {
     "stand_idle": _plan_stand_idle,
     "stop": _plan_stop,
@@ -253,6 +384,9 @@ BUILTIN_SKILL_PLANNERS: dict[str, SkillPlanner] = {
     "turn_in_place": _plan_turn_in_place,
     "curve_walk": _plan_curve_walk,
     "sidestep": _plan_sidestep,
+    "look_direction": _plan_look_direction,
+    "nod_yes": _plan_nod_yes,
+    "shake_no": _plan_shake_no,
 }
 
 
@@ -410,12 +544,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("Soridormi skill dry-run")
         print("========================")
         print(plan.summary)
-        print("Commands:")
-        for command in plan.commands:
-            print(
-                f"- {command.label}: vx={command.vx_mps:.3f} vy={command.vy_mps:.3f} "
-                f"yaw={command.yaw_radps:.3f} duration={command.duration_s:.2f}s"
-            )
+        if plan.commands:
+            print("Commands:")
+            for command in plan.commands:
+                print(
+                    f"- {command.label}: vx={command.vx_mps:.3f} vy={command.vy_mps:.3f} "
+                    f"yaw={command.yaw_radps:.3f} duration={command.duration_s:.2f}s"
+                )
+        if plan.keyframes:
+            print("Keyframes:")
+            for keyframe in plan.keyframes:
+                targets = ", ".join(
+                    f"{name}={value:.3f}" for name, value in sorted(keyframe.positions_by_name.items())
+                )
+                print(f"- {keyframe.label}: {targets} duration={keyframe.duration_s:.2f}s")
         print("No robot, simulator, or hardware command was executed.")
     return 0
 

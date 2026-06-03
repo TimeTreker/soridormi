@@ -182,8 +182,8 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
 
     if available_count < 1:
         warnings.append("no skills are currently available in simulation")
-    if available_count > 8:
-        warnings.append("first executable subset is larger than the planned 6-8 safe sim skills")
+    if available_count > 10:
+        warnings.append("safe sim executable subset is larger than the current 10-skill checkpoint target")
 
     return SkillValidationResult(ok=not errors, errors=tuple(errors), warnings=tuple(warnings))
 

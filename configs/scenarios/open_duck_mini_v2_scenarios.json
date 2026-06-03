@@ -382,10 +382,10 @@
     {
       "id": "look_direction_stationary_v1",
       "title": "Stationary look-direction social cue",
-      "status": "planned",
+      "status": "mujoco_registry_ready",
       "priority": 100,
       "family": "social_safe_body",
-      "skills": ["look_direction", "stand"],
+      "skills": ["look_direction", "stand_idle"],
       "description": "First safe social scenario candidate: structured desired look direction while standing, without unsupported arm or hand actuation.",
       "task_context": {
         "skill_family": "social_safe_body",
