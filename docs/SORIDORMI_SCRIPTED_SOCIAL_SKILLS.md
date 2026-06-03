@@ -369,3 +369,59 @@ Acceptance gate:
   --backend mujoco \
   --require-observed
 ```
+
+## M8K look_at_person structured target skill
+
+`look_at_person` is now available as a MuJoCo-only experimental scripted social
+skill, but it intentionally does **not** run perception. A higher-level planner,
+perception module, or later Chromie layer must first resolve a bounded target
+direction, then Soridormi executes only that structured head trajectory:
+
+```json
+{
+  "target_ref": "person",
+  "target_yaw_rad": 0.30,
+  "target_pitch_rad": -0.06,
+  "duration_s": 4.0
+}
+```
+
+The behavior is neutral-home and axis bounded:
+
+1. align head/neck to neutral;
+2. move head yaw/pitch toward the structured target offset;
+3. hold briefly on the target;
+4. return to neutral.
+
+This keeps the low-level runtime structured and bounded. It does not consume raw
+natural language, camera frames, detections, or hardware commands.
+
+Dry-run validation:
+
+```bash
+./scripts/run_scripted_social_skill_in_sim.sh look_at_person \
+  --args '{"target_ref":"person","target_yaw_rad":0.30,"target_pitch_rad":-0.06,"duration_s":4.0}' \
+  --backend mujoco \
+  --control-hz 50 \
+  --dry-run \
+  --json | python -m json.tool
+```
+
+Live MuJoCo validation:
+
+```bash
+./scripts/run_sim_server.sh \
+  --backend mujoco \
+  --profile open_duck_forward \
+  --viewer \
+  --follow-camera
+```
+
+Second terminal:
+
+```bash
+./scripts/run_scripted_social_skill_in_sim.sh look_at_person \
+  --args '{"target_ref":"person","target_yaw_rad":0.30,"target_pitch_rad":-0.06,"duration_s":4.0}' \
+  --backend mujoco \
+  --control-hz 50
+```

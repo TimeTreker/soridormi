@@ -169,3 +169,29 @@ M8J adds `express_attention` to the default scripted social acceptance suite. Th
   --backend mujoco \
   --require-observed
 ```
+
+## M8K look_at_person gate
+
+M8K adds `look_at_person` to the default scripted social acceptance suite. The
+gate validates the structured-target contract rather than perception: the plan
+must command visible yaw toward a provided `target_yaw_rad`, command bounded
+pitch from `target_pitch_rad`, keep non-moving axes neutral, and return to
+neutral at the end.
+
+Dry-run:
+
+```bash
+./scripts/evaluate_scripted_social_skills.sh \
+  --skill look_at_person \
+  --json | python -m json.tool
+```
+
+Live MuJoCo:
+
+```bash
+./scripts/evaluate_scripted_social_skills.sh \
+  --skill look_at_person \
+  --execute \
+  --backend mujoco \
+  --require-observed
+```

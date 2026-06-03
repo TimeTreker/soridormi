@@ -1169,24 +1169,40 @@
       "id": "look_at_person",
       "category": "social",
       "display_name": "Look At Person",
-      "description": "Turn head/neck toward a person or target direction resolved by an external perception system.",
-      "status": "planned_external_target",
+      "description": "Turn head toward a structured person target direction provided by an external planner/perception layer. Soridormi does not run perception here; it only executes bounded yaw/pitch offsets.",
+      "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
       "implementation_phase": "M7D_head_social",
       "parameters": {
+        "target_yaw_rad": {
+          "min": -0.55,
+          "max": 0.55,
+          "default": 0.0
+        },
+        "target_pitch_rad": {
+          "min": -0.25,
+          "max": 0.2,
+          "default": 0.0
+        },
         "target_ref": {
           "type": "string",
           "default": "person"
         },
         "duration_s": {
-          "min": 0.2,
-          "max": 3.0,
-          "default": 1.0
+          "min": 2.0,
+          "max": 10.0,
+          "default": 4.0
+        },
+        "hold_fraction": {
+          "min": 0.0,
+          "max": 0.8,
+          "default": 0.5
         }
       },
       "preconditions": [
-        "target_direction_available",
-        "not_fallen"
+        "structured_target_direction_available",
+        "not_fallen",
+        "sim_or_dry_run"
       ],
       "required_actuator_groups": [
         "head_neck"
@@ -1203,8 +1219,10 @@
       },
       "evaluation": [
         "target_heading_error",
-        "joint_limit_margin"
-      ]
+        "joint_limit_margin",
+        "base_stability"
+      ],
+      "notes": "M8K implementation consumes structured target_yaw_rad/target_pitch_rad only. It does not run camera perception, person detection, raw natural language parsing, arms, hands, torso, or hardware."
     },
     {
       "id": "track_person",

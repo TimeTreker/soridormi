@@ -82,9 +82,12 @@ def test_scripted_social_acceptance_dry_run_passes_default_gates() -> None:
     assert summary.ok is True
     assert summary.executed is False
     by_skill = {result.skill_id: result for result in summary.results}
-    assert set(by_skill) == {"neutral_head", "look_direction", "nod_yes", "shake_no", "bow", "express_attention"}
+    assert set(by_skill) == {"neutral_head", "look_direction", "look_at_person", "nod_yes", "shake_no", "bow", "express_attention"}
     assert by_skill["neutral_head"].commanded_ranges["head_yaw"]["range"] == pytest.approx(0.0)
     assert by_skill["neutral_head"].commanded_ranges["head_pitch"]["range"] == pytest.approx(0.0)
+    assert by_skill["look_at_person"].commanded_ranges["head_yaw"]["max"] >= 0.28
+    assert by_skill["look_at_person"].commanded_ranges["head_pitch"]["min"] <= -0.05
+    assert by_skill["look_at_person"].commanded_ranges["head_roll"]["range"] == pytest.approx(0.0)
     assert by_skill["shake_no"].commanded_ranges["head_yaw"]["min"] <= -0.25
     assert by_skill["shake_no"].commanded_ranges["head_yaw"]["max"] >= 0.25
     assert by_skill["shake_no"].commanded_ranges["head_pitch"]["range"] == pytest.approx(0.0)

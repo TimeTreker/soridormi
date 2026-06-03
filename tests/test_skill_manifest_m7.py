@@ -144,7 +144,7 @@ def test_first_available_subset_is_small_and_supported() -> None:
         for skill in skills.values()
         if skill["status"] in {"available_sim", "available_sim_experimental"}
     ]
-    assert 6 <= len(available) <= 12
+    assert 6 <= len(available) <= 13
 
     for skill in available:
         required = set(skill["required_actuator_groups"])

@@ -37,6 +37,10 @@ Examples:
     --args '{"head_yaw_rad":0.25,"head_pitch_rad":-0.08,"duration_s":1.6}' \
     --backend mujoco
 
+  ./scripts/run_scripted_social_skill_in_sim.sh look_at_person \
+    --args '{"target_ref":"person","target_yaw_rad":0.30,"target_pitch_rad":-0.06,"duration_s":4.0}' \
+    --backend mujoco
+
   ./scripts/run_scripted_social_skill_in_sim.sh nod_yes \
     --args '{"count":2,"amplitude":"small","duration_s":4.0}' \
     --backend mujoco

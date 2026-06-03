@@ -346,6 +346,44 @@ def _plan_look_direction(skill: dict[str, Any], parameters: Mapping[str, Any], p
     return _scripted_keyframe_plan(skill, parameters, profile, keyframes=(keyframe,), summary=summary)
 
 
+def _plan_look_at_person(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+    skill_id = str(skill["id"])
+    target_yaw = float(parameters.get("target_yaw_rad", 0.0))
+    target_pitch = float(parameters.get("target_pitch_rad", 0.0))
+    target_ref = str(parameters.get("target_ref", "person") or "person")
+    duration = float(parameters.get("duration_s", 4.0))
+    hold_fraction = float(parameters.get("hold_fraction", 0.50))
+    if not 0.0 <= hold_fraction <= 0.8:
+        raise SkillExecutionError("look_at_person hold_fraction must be between 0.0 and 0.8")
+    settle_duration = duration * 0.15
+    hold_duration = duration * hold_fraction
+    move_duration = (duration - settle_duration - hold_duration) / 2.0
+    if move_duration <= 0.0:
+        raise SkillExecutionError("look_at_person duration_s is too short for the requested hold_fraction")
+    keyframes = (
+        _head_keyframe(duration_s=settle_duration, label=f"{skill_id}_neutral_start"),
+        _head_keyframe(
+            head_pitch=target_pitch,
+            head_yaw=target_yaw,
+            duration_s=move_duration,
+            label=f"{skill_id}_acquire_target",
+        ),
+        _head_keyframe(
+            head_pitch=target_pitch,
+            head_yaw=target_yaw,
+            duration_s=hold_duration if hold_duration > 0.0 else 1e-6,
+            label=f"{skill_id}_hold_target",
+        ),
+        _head_keyframe(duration_s=move_duration, label=f"{skill_id}_neutral_end"),
+    )
+    summary = (
+        f"Plan {skill_id}: look toward structured target {target_ref!r} "
+        f"with target_yaw={target_yaw:.3f} rad and target_pitch={target_pitch:.3f} rad "
+        f"over {duration:.2f}s using a scripted head trajectory; no perception is run."
+    )
+    return _scripted_keyframe_plan(skill, parameters, profile, keyframes=keyframes, summary=summary)
+
+
 def _plan_nod_yes(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
     skill_id = str(skill["id"])
     count = _count_cycles(parameters.get("count", 2), minimum=2, maximum=8)
@@ -499,6 +537,7 @@ BUILTIN_SKILL_PLANNERS: dict[str, SkillPlanner] = {
     "sidestep": _plan_sidestep,
     "neutral_head": _plan_neutral_head,
     "look_direction": _plan_look_direction,
+    "look_at_person": _plan_look_at_person,
     "nod_yes": _plan_nod_yes,
     "shake_no": _plan_shake_no,
     "bow": _plan_bow,
