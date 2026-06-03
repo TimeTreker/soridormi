@@ -73,8 +73,9 @@ if [ ! -f .env ]; then
   ./scripts/setup_env.sh >/dev/null
 fi
 
-docker compose -f compose.sim.yaml run --rm runtime bash -lc '
-  set -euo pipefail
-  source /opt/venvs/runtime/bin/activate
-  python -m soridormi_runtime.look_at_person_target "$@"
-' _ "$@"
+# Override the CUDA image entrypoint so --json stdout remains parseable.
+docker compose -f compose.sim.yaml run --rm   --entrypoint bash   runtime -lc '
+    set -euo pipefail
+    source /opt/venvs/runtime/bin/activate
+    python -m soridormi_runtime.look_at_person_target "$@"
+  ' _ "$@"

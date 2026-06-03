@@ -50,8 +50,10 @@ if [ ! -f .env ]; then
   ./scripts/setup_env.sh >/dev/null
 fi
 
-docker compose -f compose.sim.yaml run --rm runtime bash -lc '
-  set -euo pipefail
-  source /opt/venvs/runtime/bin/activate
-  python -m soridormi_runtime.scripted_social_acceptance "$@"
-' _ "$@"
+# Override the CUDA image entrypoint so --json stdout can be redirected into a
+# valid JSON file without the NVIDIA container banner at the top.
+docker compose -f compose.sim.yaml run --rm   --entrypoint bash   runtime -lc '
+    set -euo pipefail
+    source /opt/venvs/runtime/bin/activate
+    python -m soridormi_runtime.scripted_social_acceptance "$@"
+  ' _ "$@"
