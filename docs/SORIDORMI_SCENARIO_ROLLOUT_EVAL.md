@@ -1,7 +1,8 @@
 # Soridormi scenario rollout evaluation
 
-M9A adds a MuJoCo-first scenario rollout evaluator.  It is a measurement gate,
-not a training patch and not a hardware bridge.
+M9A added a MuJoCo-first scenario rollout evaluator.  M9B adds scenario-specific
+acceptance thresholds in `configs/scenarios/open_duck_mini_v2_scenarios.json`.
+This is a measurement gate, not a training patch and not a hardware bridge.
 
 The evaluator answers a small set of practical questions for one scenario:
 
@@ -10,6 +11,7 @@ The evaluator answers a small set of practical questions for one scenario:
 - Was it stuck for too much of the rollout?
 - Did the log contain touchdown, cadence, step-length, and clearance telemetry?
 - Which scenario and skill metadata were present in the JSONL log?
+- Which scenario-specific acceptance thresholds were applied?
 
 This follows the Soridormi direction that rough-ground or obstacle work should
 not be judged by survival alone.  Progress, stuck ratio, clearance, and fall
@@ -72,33 +74,60 @@ prefix, and evaluates that log.
 This writes `scenario_run_plan.json` and prints the derived skill and arguments
 without launching the runtime container.
 
-## Current acceptance thresholds
+## Scenario-specific thresholds
 
-M9A keeps thresholds as CLI defaults because we do not yet have enough measured
-baselines to store them in the scenario manifest.  M9B should move scenario-
-specific thresholds into the manifest after we inspect early reports.
+M9B stores normalized rollout thresholds under each scenario's
+`acceptance_thresholds` object.  The evaluator uses those manifest thresholds by
+default.  CLI threshold flags now mean **override the manifest**, not global
+defaults.
 
-Defaults:
+Example manifest fragment:
 
-- `--min-distance-m 0.05`
-- `--min-mean-forward-speed-mps 0.02`
-- `--max-stuck-sample-ratio 0.40`
-- `--min-touchdown-count 4`
-- `--min-swing-clearance-m 0.015`
-- `--max-low-clearance-ratio 0.35`
-- `--min-base-z-m 0.12`
-- `--max-abs-roll-pitch-rad 0.90`
+```json
+{
+  "id": "flat_walk_varied_speed_v1",
+  "acceptance_thresholds": {
+    "schema_version": "m9.scenario_rollout_acceptance.v1",
+    "min_distance_m": 0.15,
+    "min_mean_forward_speed_mps": 0.03,
+    "max_stuck_sample_ratio": 0.20,
+    "require_not_fallen": true,
+    "min_touchdown_count": 4,
+    "min_swing_clearance_m": 0.015,
+    "max_low_clearance_ratio": 0.35,
+    "require_foot_metrics": false,
+    "min_base_z_m": 0.12,
+    "max_abs_roll_pitch_rad": 0.90
+  }
+}
+```
 
-Foot metrics are warning-level by default for compatibility with older logs.
-Use `--require-foot-metrics` when evaluating logs that must include foot pose
-and contact telemetry.
+Use overrides only for local experiments or temporary debugging:
+
+```bash
+./scripts/evaluate_scenario_rollout.sh \
+  --scenario flat_walk_varied_speed_v1 \
+  --log data/logs/scenario_flat_walk_varied_speed_v1.jsonl \
+  --min-distance-m 0.05 \
+  --json | python -m json.tool
+```
+
+The report includes:
+
+- `acceptance_thresholds`
+- `threshold_source`, either `scenario_manifest`, `explicit`, or
+  `default_fallback`
+
+Foot metrics remain optional for the first registry-ready flat scenarios, but
+terrain and obstacle scenarios can set `require_foot_metrics: true` before they
+are promoted to MuJoCo eval readiness.
 
 ## Relationship to existing tools
 
-M9A reuses `soridormi_runtime.stride_step_metrics_eval` for low-level stride,
-clearance, stuck, and fall metrics.  The new layer adds scenario context,
-scenario/skill metadata checks, report files, and pass/fail acceptance for a
-single scenario.
+The evaluator reuses `soridormi_runtime.stride_step_metrics_eval` for low-level
+stride, clearance, stuck, and fall metrics.  The scenario layer adds scenario
+context, scenario/skill metadata checks, report files, and pass/fail acceptance
+for a single scenario.
 
-The next logical patch is M9B: scenario-specific acceptance thresholds in the
-scenario manifest or a companion config.
+The next logical patch is M9C: a batch scenario evaluation suite that runs all
+registry-ready scenarios and summarizes pass/fail status in one place.

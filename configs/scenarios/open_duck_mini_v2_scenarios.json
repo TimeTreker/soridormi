@@ -44,7 +44,11 @@
       "status": "mujoco_registry_ready",
       "priority": 10,
       "family": "locomotion_flat",
-      "skills": ["walk_velocity", "stand", "stop"],
+      "skills": [
+        "walk_velocity",
+        "stand",
+        "stop"
+      ],
       "description": "Collect and evaluate stable flat-ground walking across a continuous velocity range instead of one nominal command.",
       "task_context": {
         "skill_family": "locomotion",
@@ -54,24 +58,71 @@
       },
       "environment_context": {
         "terrain_type": "flat",
-        "terrain_height_m_range": [0.0, 0.0],
-        "friction_range": [0.8, 1.2],
+        "terrain_height_m_range": [
+          0.0,
+          0.0
+        ],
+        "friction_range": [
+          0.8,
+          1.2
+        ],
         "obstacles": []
       },
       "command_space": {
-        "vx_mps": [-0.03, 0.25],
-        "vy_mps": [-0.03, 0.03],
-        "yaw_radps": [-0.08, 0.08],
-        "duration_s": [2.0, 8.0],
-        "ramps": ["hold", "smooth_start", "smooth_stop", "slow_fast_slow"]
+        "vx_mps": [
+          -0.03,
+          0.25
+        ],
+        "vy_mps": [
+          -0.03,
+          0.03
+        ],
+        "yaw_radps": [
+          -0.08,
+          0.08
+        ],
+        "duration_s": [
+          2.0,
+          8.0
+        ],
+        "ramps": [
+          "hold",
+          "smooth_start",
+          "smooth_stop",
+          "slow_fast_slow"
+        ]
       },
       "success_metrics": {
-        "required": ["fall", "forward_progress_m", "mean_speed_mps", "stuck_ratio", "tracking_error"],
+        "required": [
+          "fall",
+          "forward_progress_m",
+          "mean_speed_mps",
+          "stuck_ratio",
+          "tracking_error"
+        ],
         "fall_allowed": false,
         "minimum_forward_progress_m": 0.15,
-        "maximum_stuck_ratio": 0.20
+        "maximum_stuck_ratio": 0.2
       },
-      "dataset_tags": ["bc_stage_1", "velocity_conditioned", "flat_ground", "ramp_commands"]
+      "dataset_tags": [
+        "bc_stage_1",
+        "velocity_conditioned",
+        "flat_ground",
+        "ramp_commands"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.15,
+        "min_mean_forward_speed_mps": 0.03,
+        "max_stuck_sample_ratio": 0.2,
+        "require_not_fallen": true,
+        "min_touchdown_count": 4,
+        "min_swing_clearance_m": 0.015,
+        "max_low_clearance_ratio": 0.35,
+        "require_foot_metrics": false,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 0.9
+      }
     },
     {
       "id": "start_stop_velocity_ramp_v1",
@@ -79,7 +130,11 @@
       "status": "mujoco_registry_ready",
       "priority": 20,
       "family": "locomotion_flat",
-      "skills": ["walk_velocity", "stand", "stop"],
+      "skills": [
+        "walk_velocity",
+        "stand",
+        "stop"
+      ],
       "description": "Exercise stand-to-walk, speed transitions, and walk-to-stand without instant command jumps dominating the dataset.",
       "task_context": {
         "skill_family": "locomotion",
@@ -89,24 +144,70 @@
       },
       "environment_context": {
         "terrain_type": "flat",
-        "terrain_height_m_range": [0.0, 0.0],
-        "friction_range": [0.8, 1.2],
+        "terrain_height_m_range": [
+          0.0,
+          0.0
+        ],
+        "friction_range": [
+          0.8,
+          1.2
+        ],
         "obstacles": []
       },
       "command_space": {
-        "vx_mps": [0.0, 0.22],
-        "vy_mps": [-0.02, 0.02],
-        "yaw_radps": [-0.05, 0.05],
-        "duration_s": [3.0, 10.0],
-        "ramps": ["stand_slow_fast_stop", "stand_fast_slow_stop", "pulse_walk_stop"]
+        "vx_mps": [
+          0.0,
+          0.22
+        ],
+        "vy_mps": [
+          -0.02,
+          0.02
+        ],
+        "yaw_radps": [
+          -0.05,
+          0.05
+        ],
+        "duration_s": [
+          3.0,
+          10.0
+        ],
+        "ramps": [
+          "stand_slow_fast_stop",
+          "stand_fast_slow_stop",
+          "pulse_walk_stop"
+        ]
       },
       "success_metrics": {
-        "required": ["fall", "settle_time_s", "forward_progress_m", "stuck_ratio", "terminal_speed_mps"],
+        "required": [
+          "fall",
+          "settle_time_s",
+          "forward_progress_m",
+          "stuck_ratio",
+          "terminal_speed_mps"
+        ],
         "fall_allowed": false,
         "maximum_terminal_speed_mps": 0.03,
         "maximum_stuck_ratio": 0.25
       },
-      "dataset_tags": ["bc_stage_1", "transitions", "ramp_alpha", "start_stop"]
+      "dataset_tags": [
+        "bc_stage_1",
+        "transitions",
+        "ramp_alpha",
+        "start_stop"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.1,
+        "min_mean_forward_speed_mps": 0.02,
+        "max_stuck_sample_ratio": 0.25,
+        "require_not_fallen": true,
+        "min_touchdown_count": 4,
+        "min_swing_clearance_m": 0.012,
+        "max_low_clearance_ratio": 0.4,
+        "require_foot_metrics": false,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 0.9
+      }
     },
     {
       "id": "curve_turn_walk_v1",
@@ -114,7 +215,11 @@
       "status": "mujoco_registry_ready",
       "priority": 30,
       "family": "locomotion_turning",
-      "skills": ["curve_walk", "turn_in_place", "walk_velocity"],
+      "skills": [
+        "curve_walk",
+        "turn_in_place",
+        "walk_velocity"
+      ],
       "description": "Cover yaw-rate conditioning and command transitions between straight, curved, and near-in-place turning.",
       "task_context": {
         "skill_family": "locomotion",
@@ -124,23 +229,69 @@
       },
       "environment_context": {
         "terrain_type": "flat",
-        "terrain_height_m_range": [0.0, 0.0],
-        "friction_range": [0.8, 1.2],
+        "terrain_height_m_range": [
+          0.0,
+          0.0
+        ],
+        "friction_range": [
+          0.8,
+          1.2
+        ],
         "obstacles": []
       },
       "command_space": {
-        "vx_mps": [-0.02, 0.18],
-        "vy_mps": [-0.02, 0.02],
-        "yaw_radps": [-0.20, 0.20],
-        "duration_s": [3.0, 8.0],
-        "ramps": ["straight_curve_straight", "curve_reverse_curve", "turn_stop"]
+        "vx_mps": [
+          -0.02,
+          0.18
+        ],
+        "vy_mps": [
+          -0.02,
+          0.02
+        ],
+        "yaw_radps": [
+          -0.2,
+          0.2
+        ],
+        "duration_s": [
+          3.0,
+          8.0
+        ],
+        "ramps": [
+          "straight_curve_straight",
+          "curve_reverse_curve",
+          "turn_stop"
+        ]
       },
       "success_metrics": {
-        "required": ["fall", "yaw_tracking_error", "forward_progress_m", "stuck_ratio", "heading_drift"],
+        "required": [
+          "fall",
+          "yaw_tracking_error",
+          "forward_progress_m",
+          "stuck_ratio",
+          "heading_drift"
+        ],
         "fall_allowed": false,
-        "maximum_stuck_ratio": 0.30
+        "maximum_stuck_ratio": 0.3
       },
-      "dataset_tags": ["bc_stage_1", "yaw_conditioned", "curves", "turning"]
+      "dataset_tags": [
+        "bc_stage_1",
+        "yaw_conditioned",
+        "curves",
+        "turning"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.06,
+        "min_mean_forward_speed_mps": 0.015,
+        "max_stuck_sample_ratio": 0.3,
+        "require_not_fallen": true,
+        "min_touchdown_count": 4,
+        "min_swing_clearance_m": 0.012,
+        "max_low_clearance_ratio": 0.45,
+        "require_foot_metrics": false,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 0.95
+      }
     },
     {
       "id": "rough_ground_walk_v1",
@@ -148,7 +299,9 @@
       "status": "planned",
       "priority": 40,
       "family": "locomotion_terrain",
-      "skills": ["walk_velocity"],
+      "skills": [
+        "walk_velocity"
+      ],
       "description": "Move beyond survival on rough ground by measuring progress, fall status, stuck ratio, and foot clearance.",
       "task_context": {
         "skill_family": "locomotion",
@@ -158,24 +311,70 @@
       },
       "environment_context": {
         "terrain_type": "rough_ground",
-        "terrain_height_m_range": [0.0, 0.025],
-        "friction_range": [0.7, 1.3],
+        "terrain_height_m_range": [
+          0.0,
+          0.025
+        ],
+        "friction_range": [
+          0.7,
+          1.3
+        ],
         "obstacles": []
       },
       "command_space": {
-        "vx_mps": [0.03, 0.20],
-        "vy_mps": [-0.02, 0.02],
-        "yaw_radps": [-0.12, 0.12],
-        "duration_s": [3.0, 10.0],
-        "ramps": ["hold", "smooth_start", "slow_fast_slow"]
+        "vx_mps": [
+          0.03,
+          0.2
+        ],
+        "vy_mps": [
+          -0.02,
+          0.02
+        ],
+        "yaw_radps": [
+          -0.12,
+          0.12
+        ],
+        "duration_s": [
+          3.0,
+          10.0
+        ],
+        "ramps": [
+          "hold",
+          "smooth_start",
+          "slow_fast_slow"
+        ]
       },
       "success_metrics": {
-        "required": ["fall", "forward_progress_m", "stuck_ratio", "min_foot_clearance_m", "terrain_contact_events"],
+        "required": [
+          "fall",
+          "forward_progress_m",
+          "stuck_ratio",
+          "min_foot_clearance_m",
+          "terrain_contact_events"
+        ],
         "fall_allowed": false,
-        "minimum_forward_progress_m": 0.10,
+        "minimum_forward_progress_m": 0.1,
         "maximum_stuck_ratio": 0.35
       },
-      "dataset_tags": ["bc_stage_3", "terrain_context", "rough_ground", "clearance"]
+      "dataset_tags": [
+        "bc_stage_3",
+        "terrain_context",
+        "rough_ground",
+        "clearance"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.1,
+        "min_mean_forward_speed_mps": 0.015,
+        "max_stuck_sample_ratio": 0.35,
+        "require_not_fallen": true,
+        "min_touchdown_count": 4,
+        "min_swing_clearance_m": 0.018,
+        "max_low_clearance_ratio": 0.45,
+        "require_foot_metrics": true,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 1.0
+      }
     },
     {
       "id": "small_stones_walk_v1",
@@ -183,7 +382,9 @@
       "status": "planned",
       "priority": 50,
       "family": "locomotion_terrain",
-      "skills": ["walk_velocity"],
+      "skills": [
+        "walk_velocity"
+      ],
       "description": "Introduce discrete small terrain perturbations while keeping obstacle dimensions below a conservative crossing threshold.",
       "task_context": {
         "skill_family": "locomotion",
@@ -193,30 +394,81 @@
       },
       "environment_context": {
         "terrain_type": "small_stones",
-        "terrain_height_m_range": [0.005, 0.020],
-        "friction_range": [0.7, 1.3],
+        "terrain_height_m_range": [
+          0.005,
+          0.02
+        ],
+        "friction_range": [
+          0.7,
+          1.3
+        ],
         "obstacles": [
           {
             "type": "stone_field",
-            "height_m_range": [0.005, 0.020],
-            "count_range": [8, 30]
+            "height_m_range": [
+              0.005,
+              0.02
+            ],
+            "count_range": [
+              8,
+              30
+            ]
           }
         ]
       },
       "command_space": {
-        "vx_mps": [0.03, 0.16],
-        "vy_mps": [-0.02, 0.02],
-        "yaw_radps": [-0.10, 0.10],
-        "duration_s": [4.0, 10.0],
-        "ramps": ["hold", "smooth_start"]
+        "vx_mps": [
+          0.03,
+          0.16
+        ],
+        "vy_mps": [
+          -0.02,
+          0.02
+        ],
+        "yaw_radps": [
+          -0.1,
+          0.1
+        ],
+        "duration_s": [
+          4.0,
+          10.0
+        ],
+        "ramps": [
+          "hold",
+          "smooth_start"
+        ]
       },
       "success_metrics": {
-        "required": ["fall", "forward_progress_m", "stuck_ratio", "min_foot_clearance_m", "contacts_per_meter"],
+        "required": [
+          "fall",
+          "forward_progress_m",
+          "stuck_ratio",
+          "min_foot_clearance_m",
+          "contacts_per_meter"
+        ],
         "fall_allowed": false,
-        "minimum_forward_progress_m": 0.10,
-        "maximum_stuck_ratio": 0.40
+        "minimum_forward_progress_m": 0.1,
+        "maximum_stuck_ratio": 0.4
       },
-      "dataset_tags": ["bc_stage_3", "terrain_context", "small_stones", "clearance"]
+      "dataset_tags": [
+        "bc_stage_3",
+        "terrain_context",
+        "small_stones",
+        "clearance"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.1,
+        "min_mean_forward_speed_mps": 0.012,
+        "max_stuck_sample_ratio": 0.4,
+        "require_not_fallen": true,
+        "min_touchdown_count": 4,
+        "min_swing_clearance_m": 0.02,
+        "max_low_clearance_ratio": 0.5,
+        "require_foot_metrics": true,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 1.0
+      }
     },
     {
       "id": "corridor_keep_heading_v1",
@@ -224,7 +476,11 @@
       "status": "planned",
       "priority": 60,
       "family": "obstacle_response",
-      "skills": ["walk_velocity", "curve_walk", "stop"],
+      "skills": [
+        "walk_velocity",
+        "curve_walk",
+        "stop"
+      ],
       "description": "Represent constrained walking where lateral drift and heading error matter before adding full obstacle navigation.",
       "task_context": {
         "skill_family": "locomotion",
@@ -234,9 +490,18 @@
       },
       "environment_context": {
         "terrain_type": "flat_corridor",
-        "terrain_height_m_range": [0.0, 0.0],
-        "friction_range": [0.8, 1.2],
-        "corridor_width_m_range": [0.45, 0.80],
+        "terrain_height_m_range": [
+          0.0,
+          0.0
+        ],
+        "friction_range": [
+          0.8,
+          1.2
+        ],
+        "corridor_width_m_range": [
+          0.45,
+          0.8
+        ],
         "obstacles": [
           {
             "type": "side_wall_pair",
@@ -245,19 +510,58 @@
         ]
       },
       "command_space": {
-        "vx_mps": [0.03, 0.18],
-        "vy_mps": [-0.02, 0.02],
-        "yaw_radps": [-0.08, 0.08],
-        "duration_s": [4.0, 12.0],
-        "ramps": ["hold", "straight_curve_straight"]
+        "vx_mps": [
+          0.03,
+          0.18
+        ],
+        "vy_mps": [
+          -0.02,
+          0.02
+        ],
+        "yaw_radps": [
+          -0.08,
+          0.08
+        ],
+        "duration_s": [
+          4.0,
+          12.0
+        ],
+        "ramps": [
+          "hold",
+          "straight_curve_straight"
+        ]
       },
       "success_metrics": {
-        "required": ["fall", "forward_progress_m", "stuck_ratio", "lateral_drift_m", "wall_contact_count"],
+        "required": [
+          "fall",
+          "forward_progress_m",
+          "stuck_ratio",
+          "lateral_drift_m",
+          "wall_contact_count"
+        ],
         "fall_allowed": false,
         "maximum_wall_contact_count": 0,
         "maximum_stuck_ratio": 0.35
       },
-      "dataset_tags": ["bc_stage_4", "bounded_navigation", "corridor", "obstacle_context"]
+      "dataset_tags": [
+        "bc_stage_4",
+        "bounded_navigation",
+        "corridor",
+        "obstacle_context"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.12,
+        "min_mean_forward_speed_mps": 0.015,
+        "max_stuck_sample_ratio": 0.35,
+        "require_not_fallen": true,
+        "min_touchdown_count": 4,
+        "min_swing_clearance_m": 0.012,
+        "max_low_clearance_ratio": 0.45,
+        "require_foot_metrics": false,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 0.9
+      }
     },
     {
       "id": "stop_before_obstacle_v1",
@@ -265,7 +569,10 @@
       "status": "planned",
       "priority": 70,
       "family": "obstacle_response",
-      "skills": ["walk_velocity", "stop"],
+      "skills": [
+        "walk_velocity",
+        "stop"
+      ],
       "description": "Condition on obstacle metadata and verify safe stopping before contact or attempted crossing.",
       "task_context": {
         "skill_family": "locomotion",
@@ -275,31 +582,82 @@
       },
       "environment_context": {
         "terrain_type": "flat_with_obstacle",
-        "terrain_height_m_range": [0.0, 0.0],
-        "friction_range": [0.8, 1.2],
+        "terrain_height_m_range": [
+          0.0,
+          0.0
+        ],
+        "friction_range": [
+          0.8,
+          1.2
+        ],
         "obstacles": [
           {
             "type": "low_barrier",
-            "height_m_range": [0.020, 0.050],
-            "distance_m_range": [0.25, 0.80],
+            "height_m_range": [
+              0.02,
+              0.05
+            ],
+            "distance_m_range": [
+              0.25,
+              0.8
+            ],
             "collision_policy": "stop_before_contact"
           }
         ]
       },
       "command_space": {
-        "vx_mps": [0.03, 0.16],
-        "vy_mps": [0.0, 0.0],
-        "yaw_radps": [-0.04, 0.04],
-        "duration_s": [3.0, 8.0],
-        "ramps": ["approach_stop", "smooth_stop"]
+        "vx_mps": [
+          0.03,
+          0.16
+        ],
+        "vy_mps": [
+          0.0,
+          0.0
+        ],
+        "yaw_radps": [
+          -0.04,
+          0.04
+        ],
+        "duration_s": [
+          3.0,
+          8.0
+        ],
+        "ramps": [
+          "approach_stop",
+          "smooth_stop"
+        ]
       },
       "success_metrics": {
-        "required": ["fall", "stopping_distance_m", "obstacle_contact_count", "terminal_speed_mps", "stuck_ratio"],
+        "required": [
+          "fall",
+          "stopping_distance_m",
+          "obstacle_contact_count",
+          "terminal_speed_mps",
+          "stuck_ratio"
+        ],
         "fall_allowed": false,
         "maximum_obstacle_contact_count": 0,
         "maximum_terminal_speed_mps": 0.03
       },
-      "dataset_tags": ["bc_stage_4", "obstacle_context", "safe_stop", "approach"]
+      "dataset_tags": [
+        "bc_stage_4",
+        "obstacle_context",
+        "safe_stop",
+        "approach"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.05,
+        "min_mean_forward_speed_mps": 0.005,
+        "max_stuck_sample_ratio": 0.45,
+        "require_not_fallen": true,
+        "min_touchdown_count": 2,
+        "min_swing_clearance_m": 0.01,
+        "max_low_clearance_ratio": 0.55,
+        "require_foot_metrics": false,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 0.9
+      }
     },
     {
       "id": "step_over_low_obstacle_v1",
@@ -307,7 +665,9 @@
       "status": "planned",
       "priority": 80,
       "family": "obstacle_response",
-      "skills": ["walk_velocity"],
+      "skills": [
+        "walk_velocity"
+      ],
       "description": "Future staged crossing task for clearance/residual improvement after baseline progress and rough-ground metrics are reliable.",
       "task_context": {
         "skill_family": "locomotion",
@@ -317,32 +677,86 @@
       },
       "environment_context": {
         "terrain_type": "flat_with_low_obstacle",
-        "terrain_height_m_range": [0.0, 0.0],
-        "friction_range": [0.8, 1.2],
+        "terrain_height_m_range": [
+          0.0,
+          0.0
+        ],
+        "friction_range": [
+          0.8,
+          1.2
+        ],
         "obstacles": [
           {
             "type": "low_barrier",
-            "height_m_range": [0.010, 0.030],
-            "width_m_range": [0.010, 0.040],
-            "distance_m_range": [0.25, 0.70],
+            "height_m_range": [
+              0.01,
+              0.03
+            ],
+            "width_m_range": [
+              0.01,
+              0.04
+            ],
+            "distance_m_range": [
+              0.25,
+              0.7
+            ],
             "collision_policy": "cross_without_tripping"
           }
         ]
       },
       "command_space": {
-        "vx_mps": [0.03, 0.12],
-        "vy_mps": [0.0, 0.0],
-        "yaw_radps": [-0.03, 0.03],
-        "duration_s": [4.0, 10.0],
-        "ramps": ["approach_cross_continue", "approach_cross_stop"]
+        "vx_mps": [
+          0.03,
+          0.12
+        ],
+        "vy_mps": [
+          0.0,
+          0.0
+        ],
+        "yaw_radps": [
+          -0.03,
+          0.03
+        ],
+        "duration_s": [
+          4.0,
+          10.0
+        ],
+        "ramps": [
+          "approach_cross_continue",
+          "approach_cross_stop"
+        ]
       },
       "success_metrics": {
-        "required": ["fall", "obstacle_crossed", "min_foot_clearance_m", "obstacle_contact_count", "forward_progress_m"],
+        "required": [
+          "fall",
+          "obstacle_crossed",
+          "min_foot_clearance_m",
+          "obstacle_contact_count",
+          "forward_progress_m"
+        ],
         "fall_allowed": false,
         "obstacle_crossed_required": true,
         "maximum_obstacle_contact_count": 1
       },
-      "dataset_tags": ["rl_residual_later", "obstacle_context", "clearance", "crossing"]
+      "dataset_tags": [
+        "rl_residual_later",
+        "obstacle_context",
+        "clearance",
+        "crossing"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.12,
+        "min_mean_forward_speed_mps": 0.012,
+        "max_stuck_sample_ratio": 0.45,
+        "require_not_fallen": true,
+        "min_touchdown_count": 4,
+        "min_swing_clearance_m": 0.025,
+        "max_low_clearance_ratio": 0.45,
+        "require_foot_metrics": true,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 1.0
+      }
     },
     {
       "id": "recovery_after_push_v1",
@@ -350,7 +764,11 @@
       "status": "planned",
       "priority": 90,
       "family": "recovery",
-      "skills": ["stand", "walk_velocity", "stop"],
+      "skills": [
+        "stand",
+        "walk_velocity",
+        "stop"
+      ],
       "description": "Evaluate recovery from small simulated pushes only after baseline walking and stop behavior are stable.",
       "task_context": {
         "skill_family": "recovery",
@@ -360,24 +778,73 @@
       },
       "environment_context": {
         "terrain_type": "flat",
-        "terrain_height_m_range": [0.0, 0.0],
-        "friction_range": [0.8, 1.2],
-        "perturbation_force_n_range": [1.0, 8.0],
+        "terrain_height_m_range": [
+          0.0,
+          0.0
+        ],
+        "friction_range": [
+          0.8,
+          1.2
+        ],
+        "perturbation_force_n_range": [
+          1.0,
+          8.0
+        ],
         "obstacles": []
       },
       "command_space": {
-        "vx_mps": [0.0, 0.12],
-        "vy_mps": [-0.02, 0.02],
-        "yaw_radps": [-0.08, 0.08],
-        "duration_s": [3.0, 8.0],
-        "ramps": ["hold", "recover_to_stand", "recover_to_walk"]
+        "vx_mps": [
+          0.0,
+          0.12
+        ],
+        "vy_mps": [
+          -0.02,
+          0.02
+        ],
+        "yaw_radps": [
+          -0.08,
+          0.08
+        ],
+        "duration_s": [
+          3.0,
+          8.0
+        ],
+        "ramps": [
+          "hold",
+          "recover_to_stand",
+          "recover_to_walk"
+        ]
       },
       "success_metrics": {
-        "required": ["fall", "recovery_time_s", "base_height_min_m", "orientation_error_max_rad", "terminal_speed_mps"],
+        "required": [
+          "fall",
+          "recovery_time_s",
+          "base_height_min_m",
+          "orientation_error_max_rad",
+          "terminal_speed_mps"
+        ],
         "fall_allowed": false,
         "maximum_recovery_time_s": 3.0
       },
-      "dataset_tags": ["rl_residual_later", "recovery", "perturbation", "robustness"]
+      "dataset_tags": [
+        "rl_residual_later",
+        "recovery",
+        "perturbation",
+        "robustness"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.0,
+        "min_mean_forward_speed_mps": 0.0,
+        "max_stuck_sample_ratio": 1.0,
+        "require_not_fallen": true,
+        "min_touchdown_count": 0,
+        "min_swing_clearance_m": 0.0,
+        "max_low_clearance_ratio": 1.0,
+        "require_foot_metrics": false,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 1.0
+      }
     },
     {
       "id": "look_direction_stationary_v1",
@@ -385,7 +852,10 @@
       "status": "mujoco_registry_ready",
       "priority": 100,
       "family": "social_safe_body",
-      "skills": ["look_direction", "stand_idle"],
+      "skills": [
+        "look_direction",
+        "stand_idle"
+      ],
       "description": "First safe social scenario candidate: structured desired look direction while standing, without unsupported arm or hand actuation.",
       "task_context": {
         "skill_family": "social_safe_body",
@@ -395,22 +865,63 @@
       },
       "environment_context": {
         "terrain_type": "flat",
-        "terrain_height_m_range": [0.0, 0.0],
-        "friction_range": [0.8, 1.2],
+        "terrain_height_m_range": [
+          0.0,
+          0.0
+        ],
+        "friction_range": [
+          0.8,
+          1.2
+        ],
         "obstacles": []
       },
       "command_space": {
-        "look_yaw_rad": [-0.50, 0.50],
-        "look_pitch_rad": [-0.25, 0.25],
-        "duration_s": [1.0, 4.0],
-        "ramps": ["smooth_look", "look_hold_return"]
+        "look_yaw_rad": [
+          -0.5,
+          0.5
+        ],
+        "look_pitch_rad": [
+          -0.25,
+          0.25
+        ],
+        "duration_s": [
+          1.0,
+          4.0
+        ],
+        "ramps": [
+          "smooth_look",
+          "look_hold_return"
+        ]
       },
       "success_metrics": {
-        "required": ["fall", "orientation_tracking_error", "base_drift_m", "joint_limit_margin"],
+        "required": [
+          "fall",
+          "orientation_tracking_error",
+          "base_drift_m",
+          "joint_limit_margin"
+        ],
         "fall_allowed": false,
         "maximum_base_drift_m": 0.03
       },
-      "dataset_tags": ["safe_social_first", "stationary", "structured_context"]
+      "dataset_tags": [
+        "safe_social_first",
+        "stationary",
+        "structured_context"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.0,
+        "min_mean_forward_speed_mps": 0.0,
+        "max_stuck_sample_ratio": 1.0,
+        "require_not_fallen": true,
+        "min_touchdown_count": 0,
+        "min_swing_clearance_m": 0.0,
+        "max_low_clearance_ratio": 1.0,
+        "require_foot_metrics": false,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 0.7
+      }
     }
-  ]
+  ],
+  "acceptance_threshold_schema_version": "m9.scenario_rollout_acceptance.v1"
 }

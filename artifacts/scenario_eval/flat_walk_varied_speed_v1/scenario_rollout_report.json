@@ -1,27 +1,40 @@
 {
+  "acceptance_thresholds": {
+    "contact_threshold": 0.5,
+    "max_abs_roll_pitch_rad": 0.9,
+    "max_low_clearance_ratio": 0.35,
+    "max_stuck_sample_ratio": 0.2,
+    "min_base_z_m": 0.12,
+    "min_distance_m": 0.15,
+    "min_mean_forward_speed_mps": 0.03,
+    "min_swing_clearance_m": 0.015,
+    "min_touchdown_count": 4,
+    "require_foot_metrics": false,
+    "require_not_fallen": true
+  },
   "checks": [
     {
-      "message": "forward_distance_m: 0.319184509107085 >= 0.05",
+      "message": "forward_distance_m: 0.319184509107085 >= 0.15",
       "name": "forward_distance_m",
       "ok": true,
       "severity": "error",
-      "threshold": 0.05,
+      "threshold": 0.15,
       "value": 0.319184509107085
     },
     {
-      "message": "mean_forward_speed_mps: 0.06409327492110567 >= 0.02",
+      "message": "mean_forward_speed_mps: 0.06409327492110567 >= 0.03",
       "name": "mean_forward_speed_mps",
       "ok": true,
       "severity": "error",
-      "threshold": 0.02,
+      "threshold": 0.03,
       "value": 0.06409327492110567
     },
     {
-      "message": "stuck_ratio: 0.004016064257028112 <= 0.4",
+      "message": "stuck_ratio: 0.004016064257028112 <= 0.2",
       "name": "stuck_ratio",
       "ok": true,
       "severity": "error",
-      "threshold": 0.4,
+      "threshold": 0.2,
       "value": 0.004016064257028112
     },
     {
@@ -96,7 +109,7 @@
   },
   "errors": [],
   "expected_skill_id": "walk_velocity",
-  "log_path": "data/logs/scenario_flat_walk_varied_speed_v1_20260603_093311.jsonl",
+  "log_path": "data/logs/scenario_flat_walk_varied_speed_v1_20260603_095026.jsonl",
   "metrics": {
     "cadence_steps_per_s": 3.6144578313255415,
     "fallen": false,
@@ -184,7 +197,7 @@
         "p95_m": 0.011974147689273807
       }
     },
-    "log_path": "data/logs/scenario_flat_walk_varied_speed_v1_20260603_093311.jsonl",
+    "log_path": "data/logs/scenario_flat_walk_varied_speed_v1_20260603_095026.jsonl",
     "ok": true,
     "sample_count": 250,
     "samples_with_base": 250,
@@ -476,15 +489,15 @@
       "detected": false,
       "explicit_stuck_samples": 0,
       "speed_based_stuck_sample_ratio": 0.004016064257028112,
-      "speed_threshold_mps": 0.02
+      "speed_threshold_mps": 0.03
     },
     "thresholds": {
       "contact_threshold": 0.5,
       "max_abs_roll_pitch_rad": 0.9,
       "max_low_clearance_ratio": 0.35,
-      "max_stuck_sample_ratio": 0.4,
+      "max_stuck_sample_ratio": 0.2,
       "min_base_z_m": 0.12,
-      "min_forward_speed_mps": 0.02,
+      "min_forward_speed_mps": 0.03,
       "min_step_length_m": 0.01,
       "min_swing_clearance_m": 0.015,
       "min_touchdown_count": 4
@@ -499,6 +512,7 @@
     "requires_progress": true,
     "skill_family": "locomotion"
   },
+  "threshold_source": "scenario_manifest",
   "warnings": [
     "low swing-clearance ratio is high: 1.000 > 0.350",
     "log does not carry scenario_id metadata; evaluated against requested scenario only",

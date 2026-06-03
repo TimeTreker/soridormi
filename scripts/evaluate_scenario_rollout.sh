@@ -30,17 +30,17 @@ Options:
   --skip-model-check                Forwarded to run_skill_in_sim.sh.
   --dry-run-only                    Print derived skill plan without launching MuJoCo runtime.
   --json                            Print JSON report instead of Markdown.
-  --min-distance-m M                Progress threshold (default: 0.05).
-  --min-mean-forward-speed-mps M    Forward-speed threshold (default: 0.02).
-  --max-stuck-sample-ratio R        Stuck threshold (default: 0.40).
-  --allow-fallen                    Do not fail when fall telemetry is detected.
-  --min-touchdown-count N           Warning threshold (default: 4).
-  --min-swing-clearance-m M         Warning threshold (default: 0.015).
-  --max-low-clearance-ratio R       Warning threshold (default: 0.35).
-  --require-foot-metrics            Fail if foot-position/contact metrics are missing.
-  --min-base-z-m M                  Fall threshold (default: 0.12).
-  --max-abs-roll-pitch-rad R        Fall threshold (default: 0.90).
-  --contact-threshold C             Foot contact threshold (default: 0.5).
+  --min-distance-m M                Override manifest progress threshold.
+  --min-mean-forward-speed-mps M    Override manifest forward-speed threshold.
+  --max-stuck-sample-ratio R        Override manifest stuck threshold.
+  --allow-fallen                    Override manifest require_not_fallen=false.
+  --min-touchdown-count N           Override manifest touchdown warning threshold.
+  --min-swing-clearance-m M         Override manifest swing-clearance threshold.
+  --max-low-clearance-ratio R       Override manifest low-clearance ratio threshold.
+  --require-foot-metrics            Override manifest require_foot_metrics=true.
+  --min-base-z-m M                  Override manifest fall-height threshold.
+  --max-abs-roll-pitch-rad R        Override manifest fall-orientation threshold.
+  --contact-threshold C             Override manifest foot contact threshold.
   -h, --help                        Show this help.
 
 Examples:
@@ -71,17 +71,17 @@ log_dir="/data/logs"
 skip_model_check="0"
 dry_run_only="0"
 json_output="0"
-min_distance_m="0.05"
-min_mean_forward_speed_mps="0.02"
-max_stuck_sample_ratio="0.40"
+min_distance_m=""
+min_mean_forward_speed_mps=""
+max_stuck_sample_ratio=""
 allow_fallen="0"
-min_touchdown_count="4"
-min_swing_clearance_m="0.015"
-max_low_clearance_ratio="0.35"
+min_touchdown_count=""
+min_swing_clearance_m=""
+max_low_clearance_ratio=""
 require_foot_metrics="0"
-min_base_z_m="0.12"
-max_abs_roll_pitch_rad="0.90"
-contact_threshold="0.5"
+min_base_z_m=""
+max_abs_roll_pitch_rad=""
+contact_threshold=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -260,6 +260,10 @@ fi
 export PYTHONPATH="${PWD}/src${PYTHONPATH:+:${PYTHONPATH}}"
 mkdir -p "${output_dir}" data/logs
 
+status() {
+  printf '%s\n' "$*" >&2
+}
+
 plan_args=(
   --scenario "${scenario}"
   --scenario-manifest "${scenario_manifest}"
@@ -284,20 +288,24 @@ skill_args="$(python -c 'import json,sys; print(json.dumps(json.load(sys.stdin)[
 plan_steps="$(python -c 'import json,sys; print(json.load(sys.stdin)["steps"])' <<<"${plan_json}")"
 
 if [ -z "${log_path}" ]; then
-  echo "Soridormi scenario rollout evaluation"
-  echo "======================================"
-  echo "Scenario: ${scenario}"
-  echo "Skill: ${skill_id}"
-  echo "Skill args: ${skill_args}"
-  echo "Profile: ${profile}"
-  echo "Steps: ${plan_steps}"
-  echo "Backend: ${backend}"
-  echo "Run plan: ${output_dir}/scenario_run_plan.json"
-  echo "This assumes MuJoCo is already running with:"
-  echo "  ./scripts/run_sim_server.sh --backend mujoco --profile ${profile} --viewer --follow-camera"
+  status "Soridormi scenario rollout evaluation"
+  status "======================================"
+  status "Scenario: ${scenario}"
+  status "Skill: ${skill_id}"
+  status "Skill args: ${skill_args}"
+  status "Profile: ${profile}"
+  status "Steps: ${plan_steps}"
+  status "Backend: ${backend}"
+  status "Run plan: ${output_dir}/scenario_run_plan.json"
+  status "This assumes MuJoCo is already running with:"
+  status "  ./scripts/run_sim_server.sh --backend mujoco --profile ${profile} --viewer --follow-camera"
 
   if [ "${dry_run_only}" = "1" ]; then
-    echo "Dry-run only; not launching runtime."
+    if [ "${json_output}" = "1" ]; then
+      printf '%s\n' "${plan_json}"
+    else
+      status "Dry-run only; not launching runtime."
+    fi
     exit 0
   fi
 
@@ -314,7 +322,14 @@ if [ -z "${log_path}" ]; then
   if [ "${skip_model_check}" = "1" ]; then
     skill_run_args+=(--skip-model-check)
   fi
-  ./scripts/run_skill_in_sim.sh "${skill_run_args[@]}"
+  if [ "${json_output}" = "1" ]; then
+    # Keep stdout reserved for the final scenario JSON report.  The runtime
+    # wrapper and Docker Compose may print status/banner text, so send it to
+    # stderr when callers request machine-readable output.
+    ./scripts/run_skill_in_sim.sh "${skill_run_args[@]}" >&2
+  else
+    ./scripts/run_skill_in_sim.sh "${skill_run_args[@]}"
+  fi
 
   host_log_dir="data/logs"
   if [[ "${log_dir}" != "/data/logs" ]]; then
@@ -335,18 +350,36 @@ report_args=(
   --scenario-manifest "${scenario_manifest}"
   --log "${log_path}"
   --fallback-control-hz "${control_hz}"
-  --min-distance-m "${min_distance_m}"
-  --min-mean-forward-speed-mps "${min_mean_forward_speed_mps}"
-  --max-stuck-sample-ratio "${max_stuck_sample_ratio}"
-  --min-touchdown-count "${min_touchdown_count}"
-  --min-swing-clearance-m "${min_swing_clearance_m}"
-  --max-low-clearance-ratio "${max_low_clearance_ratio}"
-  --min-base-z-m "${min_base_z_m}"
-  --max-abs-roll-pitch-rad "${max_abs_roll_pitch_rad}"
-  --contact-threshold "${contact_threshold}"
   --output "${output_dir}/scenario_rollout_report.md"
   --json-output "${output_dir}/scenario_rollout_report.json"
 )
+if [ -n "${min_distance_m}" ]; then
+  report_args+=(--min-distance-m "${min_distance_m}")
+fi
+if [ -n "${min_mean_forward_speed_mps}" ]; then
+  report_args+=(--min-mean-forward-speed-mps "${min_mean_forward_speed_mps}")
+fi
+if [ -n "${max_stuck_sample_ratio}" ]; then
+  report_args+=(--max-stuck-sample-ratio "${max_stuck_sample_ratio}")
+fi
+if [ -n "${min_touchdown_count}" ]; then
+  report_args+=(--min-touchdown-count "${min_touchdown_count}")
+fi
+if [ -n "${min_swing_clearance_m}" ]; then
+  report_args+=(--min-swing-clearance-m "${min_swing_clearance_m}")
+fi
+if [ -n "${max_low_clearance_ratio}" ]; then
+  report_args+=(--max-low-clearance-ratio "${max_low_clearance_ratio}")
+fi
+if [ -n "${min_base_z_m}" ]; then
+  report_args+=(--min-base-z-m "${min_base_z_m}")
+fi
+if [ -n "${max_abs_roll_pitch_rad}" ]; then
+  report_args+=(--max-abs-roll-pitch-rad "${max_abs_roll_pitch_rad}")
+fi
+if [ -n "${contact_threshold}" ]; then
+  report_args+=(--contact-threshold "${contact_threshold}")
+fi
 if [ "${allow_fallen}" = "1" ]; then
   report_args+=(--allow-fallen)
 fi

@@ -75,6 +75,11 @@ class ScenarioDefinition:
             return []
         return [str(item) for item in raw]
 
+    @property
+    def acceptance_thresholds(self) -> dict[str, Any]:
+        raw = self.payload.get("acceptance_thresholds", {})
+        return deepcopy(raw) if isinstance(raw, dict) else {}
+
     def command_range(self, field_name: str) -> tuple[float, float]:
         raw = self.command_space.get(field_name)
         if not isinstance(raw, list) or len(raw) != 2:

@@ -27,8 +27,8 @@ DEFAULT_PROFILE = "open_duck_forward"
 class ScenarioRolloutThresholds:
     """Acceptance thresholds for one MuJoCo scenario rollout report.
 
-    M9A keeps thresholds conservative and CLI-driven.  M9B can move the same
-    fields into the scenario manifest once we have real measured baselines.
+    M9B treats the scenario manifest as the default source of truth and keeps
+    the CLI flags as explicit overrides for local experiments.
     """
 
     min_distance_m: float = 0.05
@@ -45,6 +45,111 @@ class ScenarioRolloutThresholds:
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def _bool_from_manifest(value: Any, *, default: bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes"}:
+            return True
+        if lowered in {"false", "0", "no"}:
+            return False
+    return default
+
+
+def _threshold_number(raw: Mapping[str, Any], key: str, default: float | int) -> float:
+    value = _as_float(raw.get(key), default=float(default))
+    return float(default if value is None else value)
+
+
+def thresholds_from_scenario_manifest(
+    scenario: ScenarioDefinition,
+    *,
+    fallback: ScenarioRolloutThresholds | None = None,
+) -> ScenarioRolloutThresholds:
+    """Resolve scenario-specific rollout thresholds from manifest metadata.
+
+    The normalized M9B field is ``acceptance_thresholds``.  Older M8
+    ``success_metrics`` fields remain a compatibility fallback so historical
+    manifests can still be evaluated.
+    """
+
+    base = fallback or ScenarioRolloutThresholds()
+    raw = scenario.acceptance_thresholds
+    success_metrics = scenario.payload.get("success_metrics", {})
+    if not raw and isinstance(success_metrics, Mapping):
+        raw = {
+            "min_distance_m": success_metrics.get("minimum_forward_progress_m", base.min_distance_m),
+            "max_stuck_sample_ratio": success_metrics.get("maximum_stuck_ratio", base.max_stuck_sample_ratio),
+            "require_not_fallen": not bool(success_metrics.get("fall_allowed", not base.require_not_fallen)),
+        }
+
+    if not isinstance(raw, Mapping) or not raw:
+        return base
+
+    return ScenarioRolloutThresholds(
+        min_distance_m=_threshold_number(raw, "min_distance_m", base.min_distance_m),
+        min_mean_forward_speed_mps=_threshold_number(
+            raw, "min_mean_forward_speed_mps", base.min_mean_forward_speed_mps
+        ),
+        max_stuck_sample_ratio=_threshold_number(raw, "max_stuck_sample_ratio", base.max_stuck_sample_ratio),
+        require_not_fallen=_bool_from_manifest(raw.get("require_not_fallen"), default=base.require_not_fallen),
+        min_touchdown_count=int(_threshold_number(raw, "min_touchdown_count", base.min_touchdown_count)),
+        min_swing_clearance_m=_threshold_number(raw, "min_swing_clearance_m", base.min_swing_clearance_m),
+        max_low_clearance_ratio=_threshold_number(raw, "max_low_clearance_ratio", base.max_low_clearance_ratio),
+        require_foot_metrics=_bool_from_manifest(raw.get("require_foot_metrics"), default=base.require_foot_metrics),
+        min_base_z_m=_threshold_number(raw, "min_base_z_m", base.min_base_z_m),
+        max_abs_roll_pitch_rad=_threshold_number(raw, "max_abs_roll_pitch_rad", base.max_abs_roll_pitch_rad),
+        contact_threshold=_threshold_number(raw, "contact_threshold", base.contact_threshold),
+    )
+
+
+def overlay_threshold_overrides(
+    thresholds: ScenarioRolloutThresholds,
+    *,
+    min_distance_m: float | None = None,
+    min_mean_forward_speed_mps: float | None = None,
+    max_stuck_sample_ratio: float | None = None,
+    require_not_fallen: bool | None = None,
+    min_touchdown_count: int | None = None,
+    min_swing_clearance_m: float | None = None,
+    max_low_clearance_ratio: float | None = None,
+    require_foot_metrics: bool | None = None,
+    min_base_z_m: float | None = None,
+    max_abs_roll_pitch_rad: float | None = None,
+    contact_threshold: float | None = None,
+) -> ScenarioRolloutThresholds:
+    """Return thresholds with only explicitly provided CLI overrides applied."""
+
+    return ScenarioRolloutThresholds(
+        min_distance_m=thresholds.min_distance_m if min_distance_m is None else float(min_distance_m),
+        min_mean_forward_speed_mps=(
+            thresholds.min_mean_forward_speed_mps
+            if min_mean_forward_speed_mps is None
+            else float(min_mean_forward_speed_mps)
+        ),
+        max_stuck_sample_ratio=(
+            thresholds.max_stuck_sample_ratio if max_stuck_sample_ratio is None else float(max_stuck_sample_ratio)
+        ),
+        require_not_fallen=thresholds.require_not_fallen if require_not_fallen is None else bool(require_not_fallen),
+        min_touchdown_count=thresholds.min_touchdown_count if min_touchdown_count is None else int(min_touchdown_count),
+        min_swing_clearance_m=(
+            thresholds.min_swing_clearance_m if min_swing_clearance_m is None else float(min_swing_clearance_m)
+        ),
+        max_low_clearance_ratio=(
+            thresholds.max_low_clearance_ratio if max_low_clearance_ratio is None else float(max_low_clearance_ratio)
+        ),
+        require_foot_metrics=(
+            thresholds.require_foot_metrics if require_foot_metrics is None else bool(require_foot_metrics)
+        ),
+        min_base_z_m=thresholds.min_base_z_m if min_base_z_m is None else float(min_base_z_m),
+        max_abs_roll_pitch_rad=(
+            thresholds.max_abs_roll_pitch_rad if max_abs_roll_pitch_rad is None else float(max_abs_roll_pitch_rad)
+        ),
+        contact_threshold=thresholds.contact_threshold if contact_threshold is None else float(contact_threshold),
+    )
 
 
 @dataclass(frozen=True)
@@ -94,6 +199,8 @@ class ScenarioRolloutReport:
     task_context: dict[str, Any]
     environment_context: dict[str, Any]
     command_space: dict[str, Any]
+    acceptance_thresholds: dict[str, Any]
+    threshold_source: str
     metrics: dict[str, Any]
     checks: list[dict[str, Any]]
     stride_step_report: dict[str, Any]
@@ -281,7 +388,12 @@ def evaluate_scenario_rollout(
     fallback_control_hz: float | None = 50.0,
 ) -> ScenarioRolloutReport:
     scenario = get_scenario_definition(scenario_id, manifest_path)
-    cfg = thresholds or ScenarioRolloutThresholds()
+    if thresholds is None:
+        cfg = thresholds_from_scenario_manifest(scenario)
+        threshold_source = "scenario_manifest" if scenario.acceptance_thresholds else "default_fallback"
+    else:
+        cfg = thresholds
+        threshold_source = "explicit"
     stride_thresholds = StrideStepThresholds(
         min_forward_speed_mps=cfg.min_mean_forward_speed_mps,
         max_stuck_sample_ratio=cfg.max_stuck_sample_ratio,
@@ -454,6 +566,8 @@ def evaluate_scenario_rollout(
         task_context=scenario.task_context,
         environment_context=scenario.environment_context,
         command_space=scenario.command_space,
+        acceptance_thresholds=cfg.as_dict(),
+        threshold_source=threshold_source,
         metrics=metrics,
         checks=[check.to_dict() for check in checks],
         stride_step_report=stride.to_dict(),
@@ -481,6 +595,7 @@ def render_markdown(report: ScenarioRolloutReport) -> str:
         f"Status: {report.scenario_status}",
         f"Family: {report.scenario_family}",
         f"Expected skill: {report.expected_skill_id or 'n/a'}",
+        f"Threshold source: {report.threshold_source}",
         f"Log: {report.log_path}",
         f"Samples: {report.sample_count}",
         f"Duration: {_format_value(report.duration_s)} s",
@@ -518,7 +633,9 @@ def render_markdown(report: ScenarioRolloutReport) -> str:
             )
         )
 
-    lines.extend(["", "## Scenario context", "", "```json"])
+    lines.extend(["", "## Acceptance thresholds", "", "```json"])
+    lines.append(json.dumps(report.acceptance_thresholds, indent=2, sort_keys=True))
+    lines.extend(["```", "", "## Scenario context", "", "```json"])
     lines.append(
         json.dumps(
             {
@@ -551,17 +668,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--log-dir", default="/data/logs")
     parser.add_argument("--print-run-plan", action="store_true", help="Print the deterministic skill-run plan and exit")
     parser.add_argument("--fallback-control-hz", type=float, default=50.0)
-    parser.add_argument("--min-distance-m", type=float, default=0.05)
-    parser.add_argument("--min-mean-forward-speed-mps", type=float, default=0.02)
-    parser.add_argument("--max-stuck-sample-ratio", type=float, default=0.40)
-    parser.add_argument("--allow-fallen", action="store_true", help="Do not fail when fall telemetry is detected")
-    parser.add_argument("--min-touchdown-count", type=int, default=4)
-    parser.add_argument("--min-swing-clearance-m", type=float, default=0.015)
-    parser.add_argument("--max-low-clearance-ratio", type=float, default=0.35)
-    parser.add_argument("--require-foot-metrics", action="store_true")
-    parser.add_argument("--min-base-z-m", type=float, default=0.12)
-    parser.add_argument("--max-abs-roll-pitch-rad", type=float, default=0.90)
-    parser.add_argument("--contact-threshold", type=float, default=0.5)
+    parser.add_argument("--min-distance-m", type=float, default=None, help="Override manifest min_distance_m")
+    parser.add_argument(
+        "--min-mean-forward-speed-mps", type=float, default=None, help="Override manifest min_mean_forward_speed_mps"
+    )
+    parser.add_argument("--max-stuck-sample-ratio", type=float, default=None, help="Override manifest max_stuck_sample_ratio")
+    parser.add_argument("--allow-fallen", action="store_true", help="Override manifest require_not_fallen=false")
+    parser.add_argument("--min-touchdown-count", type=int, default=None, help="Override manifest min_touchdown_count")
+    parser.add_argument("--min-swing-clearance-m", type=float, default=None, help="Override manifest min_swing_clearance_m")
+    parser.add_argument("--max-low-clearance-ratio", type=float, default=None, help="Override manifest max_low_clearance_ratio")
+    parser.add_argument("--require-foot-metrics", action="store_true", help="Override manifest require_foot_metrics=true")
+    parser.add_argument("--min-base-z-m", type=float, default=None, help="Override manifest min_base_z_m")
+    parser.add_argument("--max-abs-roll-pitch-rad", type=float, default=None, help="Override manifest max_abs_roll_pitch_rad")
+    parser.add_argument("--contact-threshold", type=float, default=None, help="Override manifest contact_threshold")
     parser.add_argument("--output", type=Path, default=None, help="Optional Markdown report path")
     parser.add_argument("--json-output", type=Path, default=None, help="Optional JSON report path")
     parser.add_argument("--json", action="store_true", help="Print JSON instead of Markdown")
@@ -588,23 +707,42 @@ def main(argv: list[str] | None = None) -> int:
     if args.log is None:
         raise SystemExit("--log is required unless --print-run-plan is used")
 
+    override_requested = any(
+        value is not None
+        for value in (
+            args.min_distance_m,
+            args.min_mean_forward_speed_mps,
+            args.max_stuck_sample_ratio,
+            args.min_touchdown_count,
+            args.min_swing_clearance_m,
+            args.max_low_clearance_ratio,
+            args.min_base_z_m,
+            args.max_abs_roll_pitch_rad,
+            args.contact_threshold,
+        )
+    ) or args.allow_fallen or args.require_foot_metrics
+    resolved_thresholds = None
+    if override_requested:
+        resolved_thresholds = overlay_threshold_overrides(
+            thresholds_from_scenario_manifest(get_scenario_definition(args.scenario, args.scenario_manifest)),
+            min_distance_m=args.min_distance_m,
+            min_mean_forward_speed_mps=args.min_mean_forward_speed_mps,
+            max_stuck_sample_ratio=args.max_stuck_sample_ratio,
+            require_not_fallen=False if args.allow_fallen else None,
+            min_touchdown_count=args.min_touchdown_count,
+            min_swing_clearance_m=args.min_swing_clearance_m,
+            max_low_clearance_ratio=args.max_low_clearance_ratio,
+            require_foot_metrics=True if args.require_foot_metrics else None,
+            min_base_z_m=args.min_base_z_m,
+            max_abs_roll_pitch_rad=args.max_abs_roll_pitch_rad,
+            contact_threshold=args.contact_threshold,
+        )
+
     report = evaluate_scenario_rollout(
         args.log,
         scenario_id=args.scenario,
         manifest_path=args.scenario_manifest,
-        thresholds=ScenarioRolloutThresholds(
-            min_distance_m=args.min_distance_m,
-            min_mean_forward_speed_mps=args.min_mean_forward_speed_mps,
-            max_stuck_sample_ratio=args.max_stuck_sample_ratio,
-            require_not_fallen=not args.allow_fallen,
-            min_touchdown_count=args.min_touchdown_count,
-            min_swing_clearance_m=args.min_swing_clearance_m,
-            max_low_clearance_ratio=args.max_low_clearance_ratio,
-            require_foot_metrics=args.require_foot_metrics,
-            min_base_z_m=args.min_base_z_m,
-            max_abs_roll_pitch_rad=args.max_abs_roll_pitch_rad,
-            contact_threshold=args.contact_threshold,
-        ),
+        thresholds=resolved_thresholds,
         fallback_control_hz=args.fallback_control_hz,
     )
     if args.json_output is not None:
