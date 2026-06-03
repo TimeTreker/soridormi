@@ -321,11 +321,15 @@ def test_scripted_social_shell_wrapper_runs_inside_runtime_container(tmp_path: P
             env_path.write_text(old_env)
 
     docker_args = capture_path.read_text().splitlines()
-    assert docker_args[:6] == ["compose", "-f", "compose.sim.yaml", "run", "--rm", "runtime"]
+    assert docker_args[:5] == ["compose", "-f", "compose.sim.yaml", "run", "--rm"]
+    assert "--entrypoint" in docker_args
     assert "bash" in docker_args
-    assert "-lc" in docker_args
+    runtime_index = docker_args.index("runtime")
+    assert runtime_index > docker_args.index("--entrypoint")
+    assert docker_args[runtime_index + 1] == "-lc"
     assert any("python -m soridormi_runtime.scripted_head_skill \"$@\"" in line for line in docker_args)
     separator_index = docker_args.index("_")
+    assert separator_index > runtime_index
     assert docker_args[separator_index:] == [
         "_",
         "look_direction",
