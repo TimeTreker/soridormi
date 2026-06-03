@@ -1169,7 +1169,7 @@
       "id": "look_at_person",
       "category": "social",
       "display_name": "Look At Person",
-      "description": "Turn head toward a structured person target direction provided by an external planner/perception layer. Soridormi does not run perception here; it only executes bounded yaw/pitch offsets.",
+      "description": "Turn head toward a structured person target direction provided by an external planner/perception layer and, by default, hold gaze on that target. Soridormi does not run perception here; it only executes bounded yaw/pitch offsets.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
       "implementation_phase": "M7D_head_social",
@@ -1197,6 +1197,14 @@
           "min": 0.0,
           "max": 0.8,
           "default": 0.5
+        },
+        "end_mode": {
+          "type": "string",
+          "enum": [
+            "hold_target",
+            "return_neutral"
+          ],
+          "default": "hold_target"
         }
       },
       "preconditions": [
@@ -1222,7 +1230,7 @@
         "joint_limit_margin",
         "base_stability"
       ],
-      "notes": "M8K implementation consumes structured target_yaw_rad/target_pitch_rad only. It does not run camera perception, person detection, raw natural language parsing, arms, hands, torso, or hardware."
+      "notes": "M8K implementation consumes structured target_yaw_rad/target_pitch_rad only. M8M changes the default gaze behavior to hold_target so the robot does not immediately return to neutral after looking at somebody. It does not run camera perception, person detection, raw natural language parsing, arms, hands, torso, or hardware."
     },
     {
       "id": "track_person",

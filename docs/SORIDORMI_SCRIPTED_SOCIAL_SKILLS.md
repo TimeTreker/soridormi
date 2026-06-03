@@ -382,7 +382,8 @@ direction, then Soridormi executes only that structured head trajectory:
   "target_ref": "person",
   "target_yaw_rad": 0.30,
   "target_pitch_rad": -0.06,
-  "duration_s": 4.0
+  "duration_s": 4.0,
+  "end_mode": "hold_target"
 }
 ```
 
@@ -390,8 +391,12 @@ The behavior is neutral-home and axis bounded:
 
 1. align head/neck to neutral;
 2. move head yaw/pitch toward the structured target offset;
-3. hold briefly on the target;
-4. return to neutral.
+3. hold gaze on the target by default.
+
+This is intentionally different from one-shot gestures such as `shake_no` or
+`bow`: socially, looking at a person should usually maintain attention instead
+of snapping back to straight ahead. Pass `"end_mode":"return_neutral"` only
+when the desired behavior is a brief glance followed by reset.
 
 This keeps the low-level runtime structured and bounded. It does not consume raw
 natural language, camera frames, detections, or hardware commands.
@@ -400,7 +405,7 @@ Dry-run validation:
 
 ```bash
 ./scripts/run_scripted_social_skill_in_sim.sh look_at_person \
-  --args '{"target_ref":"person","target_yaw_rad":0.30,"target_pitch_rad":-0.06,"duration_s":4.0}' \
+  --args '{"target_ref":"person","target_yaw_rad":0.30,"target_pitch_rad":-0.06,"duration_s":4.0,"end_mode":"hold_target"}' \
   --backend mujoco \
   --control-hz 50 \
   --dry-run \
@@ -421,7 +426,16 @@ Second terminal:
 
 ```bash
 ./scripts/run_scripted_social_skill_in_sim.sh look_at_person \
-  --args '{"target_ref":"person","target_yaw_rad":0.30,"target_pitch_rad":-0.06,"duration_s":4.0}' \
+  --args '{"target_ref":"person","target_yaw_rad":0.30,"target_pitch_rad":-0.06,"duration_s":4.0,"end_mode":"hold_target"}' \
   --backend mujoco \
   --control-hz 50
 ```
+
+## M8L look-target provider boundary
+
+`look_at_person` still does not run perception. Use
+`./scripts/run_look_at_person_target.sh` or
+`python -m soridormi_runtime.look_at_person_target` to resolve a manual,
+JSON-fixture, or normalized image-point target into bounded `target_yaw_rad` and
+`target_pitch_rad` arguments before executing the existing scripted head
+trajectory. See `docs/SORIDORMI_LOOK_TARGET_PROVIDER.md`.

@@ -89,6 +89,7 @@ def test_look_at_person_manifest_promoted_to_structured_target_skill() -> None:
     assert skill["safety"]["hardware_enabled"] is False
     assert "structured" in skill["notes"]
     assert "does not run camera perception" in skill["notes"]
+    assert skill["parameters"]["end_mode"]["default"] == "hold_target"
 
 
 def test_look_at_person_plan_consumes_structured_target_direction() -> None:
@@ -108,20 +109,20 @@ def test_look_at_person_plan_consumes_structured_target_direction() -> None:
         "look_at_person_neutral_start",
         "look_at_person_acquire_target",
         "look_at_person_hold_target",
-        "look_at_person_neutral_end",
     ]
     assert set(plan.keyframes[0].positions_by_name) == set(HEAD_JOINT_NAMES)
     assert plan.keyframes[1].positions_by_name["head_yaw"] == pytest.approx(0.30)
     assert plan.keyframes[1].positions_by_name["head_pitch"] == pytest.approx(-0.06)
     assert plan.keyframes[1].positions_by_name["neck_pitch"] == pytest.approx(0.0)
     assert plan.keyframes[1].positions_by_name["head_roll"] == pytest.approx(0.0)
-    assert plan.keyframes[-1].positions_by_name["head_yaw"] == pytest.approx(0.0)
-    assert plan.keyframes[-1].positions_by_name["head_pitch"] == pytest.approx(0.0)
+    assert plan.keyframes[-1].positions_by_name["head_yaw"] == pytest.approx(0.30)
+    assert plan.keyframes[-1].positions_by_name["head_pitch"] == pytest.approx(-0.06)
     assert sum(keyframe.duration_s for keyframe in plan.keyframes) == pytest.approx(4.0)
     assert "no perception" in plan.summary
+    assert "end_mode=hold_target" in plan.summary
 
 
-def test_look_at_person_targets_start_and_end_at_neutral_not_prior_drift() -> None:
+def test_look_at_person_targets_start_neutral_then_hold_target_by_default() -> None:
     plan = _registry().create_plan(
         "look_at_person",
         {"target_yaw_rad": 0.30, "target_pitch_rad": -0.06, "duration_s": 4.0},
@@ -132,7 +133,10 @@ def test_look_at_person_targets_start_and_end_at_neutral_not_prior_drift() -> No
     )
 
     assert targets[0] == {"neck_pitch": 0.0, "head_pitch": 0.0, "head_yaw": 0.0, "head_roll": 0.0}
-    assert targets[-1] == {"neck_pitch": 0.0, "head_pitch": 0.0, "head_yaw": 0.0, "head_roll": 0.0}
+    assert targets[-1]["head_yaw"] == pytest.approx(0.30)
+    assert targets[-1]["head_pitch"] == pytest.approx(-0.06)
+    assert targets[-1]["neck_pitch"] == pytest.approx(0.0)
+    assert targets[-1]["head_roll"] == pytest.approx(0.0)
     assert targets[1]["head_yaw"] == pytest.approx(0.30)
     assert targets[1]["head_pitch"] == pytest.approx(-0.06)
     assert targets[1]["neck_pitch"] == pytest.approx(0.0)
@@ -144,7 +148,7 @@ def test_look_at_person_rejects_out_of_range_target() -> None:
         _registry().create_plan("look_at_person", {"target_yaw_rad": 2.0})
 
 
-def test_look_at_person_dry_run_reports_target_and_neutral_return() -> None:
+def test_look_at_person_dry_run_reports_target_and_holds_gaze_by_default() -> None:
     plan = _registry().create_plan(
         "look_at_person",
         {"target_yaw_rad": 0.30, "target_pitch_rad": -0.06, "duration_s": 4.0},
@@ -156,11 +160,11 @@ def test_look_at_person_dry_run_reports_target_and_neutral_return() -> None:
     assert result.target_min_positions_by_name["head_pitch"] <= -0.05
     assert result.target_min_positions_by_name["neck_pitch"] == pytest.approx(0.0)
     assert result.target_max_positions_by_name["head_roll"] == pytest.approx(0.0)
-    assert result.target_positions_by_name["head_yaw"] == pytest.approx(0.0)
-    assert result.target_positions_by_name["head_pitch"] == pytest.approx(0.0)
+    assert result.target_positions_by_name["head_yaw"] == pytest.approx(0.30)
+    assert result.target_positions_by_name["head_pitch"] == pytest.approx(-0.06)
 
 
-def test_look_at_person_live_fake_client_observes_target_and_returns_neutral(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_look_at_person_live_fake_client_holds_target_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(scripted_head_skill, "_load_robot_api_client_class", lambda: _FakeRobotApiClient)
     plan = _registry().create_plan(
         "look_at_person",
@@ -173,8 +177,33 @@ def test_look_at_person_live_fake_client_observes_target_and_returns_neutral(mon
     assert result.fallen is False
     assert result.observed_max_positions_by_name["head_yaw"] >= 0.28
     assert result.observed_min_positions_by_name["head_pitch"] <= -0.05
-    assert result.final_positions_by_name["head_yaw"] == pytest.approx(0.0)
-    assert result.final_positions_by_name["head_pitch"] == pytest.approx(0.0)
+    assert result.final_positions_by_name["head_yaw"] == pytest.approx(0.30)
+    assert result.final_positions_by_name["head_pitch"] == pytest.approx(-0.06)
+
+
+def test_look_at_person_can_explicitly_return_to_neutral() -> None:
+    plan = _registry().create_plan(
+        "look_at_person",
+        {
+            "target_yaw_rad": 0.30,
+            "target_pitch_rad": -0.06,
+            "duration_s": 4.0,
+            "end_mode": "return_neutral",
+        },
+    )
+
+    assert [keyframe.label for keyframe in plan.keyframes] == [
+        "look_at_person_neutral_start",
+        "look_at_person_acquire_target",
+        "look_at_person_hold_target",
+        "look_at_person_neutral_end",
+    ]
+    result = execute_scripted_head_plan(plan, dry_run=True, control_hz=20.0)
+
+    assert result.target_max_positions_by_name["head_yaw"] >= 0.28
+    assert result.target_min_positions_by_name["head_pitch"] <= -0.05
+    assert result.target_positions_by_name["head_yaw"] == pytest.approx(0.0)
+    assert result.target_positions_by_name["head_pitch"] == pytest.approx(0.0)
 
 
 def test_look_at_person_is_part_of_acceptance_dry_run() -> None:
@@ -214,4 +243,4 @@ def test_look_at_person_cli_dry_run_json() -> None:
     assert payload["ok"] is True
     assert payload["plan"]["skill_id"] == "look_at_person"
     assert payload["plan"]["keyframes"][1]["positions_by_name"]["head_yaw"] == pytest.approx(0.30)
-    assert payload["result"]["target_positions_by_name"]["head_pitch"] == pytest.approx(0.0)
+    assert payload["result"]["target_positions_by_name"]["head_pitch"] == pytest.approx(-0.06)

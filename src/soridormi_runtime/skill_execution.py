@@ -353,14 +353,18 @@ def _plan_look_at_person(skill: dict[str, Any], parameters: Mapping[str, Any], p
     target_ref = str(parameters.get("target_ref", "person") or "person")
     duration = float(parameters.get("duration_s", 4.0))
     hold_fraction = float(parameters.get("hold_fraction", 0.50))
+    end_mode = str(parameters.get("end_mode", "hold_target") or "hold_target")
+    if end_mode not in {"hold_target", "return_neutral"}:
+        raise SkillExecutionError("look_at_person end_mode must be 'hold_target' or 'return_neutral'")
     if not 0.0 <= hold_fraction <= 0.8:
         raise SkillExecutionError("look_at_person hold_fraction must be between 0.0 and 0.8")
     settle_duration = duration * 0.15
     hold_duration = duration * hold_fraction
-    move_duration = (duration - settle_duration - hold_duration) / 2.0
+    remaining_duration = duration - settle_duration - hold_duration
+    move_duration = remaining_duration / 2.0 if end_mode == "return_neutral" else remaining_duration
     if move_duration <= 0.0:
         raise SkillExecutionError("look_at_person duration_s is too short for the requested hold_fraction")
-    keyframes = (
+    keyframes: list[JointKeyframeSegment] = [
         _head_keyframe(duration_s=settle_duration, label=f"{skill_id}_neutral_start"),
         _head_keyframe(
             head_pitch=target_pitch,
@@ -374,14 +378,16 @@ def _plan_look_at_person(skill: dict[str, Any], parameters: Mapping[str, Any], p
             duration_s=hold_duration if hold_duration > 0.0 else 1e-6,
             label=f"{skill_id}_hold_target",
         ),
-        _head_keyframe(duration_s=move_duration, label=f"{skill_id}_neutral_end"),
-    )
+    ]
+    if end_mode == "return_neutral":
+        keyframes.append(_head_keyframe(duration_s=move_duration, label=f"{skill_id}_neutral_end"))
     summary = (
         f"Plan {skill_id}: look toward structured target {target_ref!r} "
         f"with target_yaw={target_yaw:.3f} rad and target_pitch={target_pitch:.3f} rad "
-        f"over {duration:.2f}s using a scripted head trajectory; no perception is run."
+        f"over {duration:.2f}s using a scripted head trajectory; "
+        f"end_mode={end_mode}; no perception is run."
     )
-    return _scripted_keyframe_plan(skill, parameters, profile, keyframes=keyframes, summary=summary)
+    return _scripted_keyframe_plan(skill, parameters, profile, keyframes=tuple(keyframes), summary=summary)
 
 
 def _plan_nod_yes(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
