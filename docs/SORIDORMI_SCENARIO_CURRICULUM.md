@@ -138,8 +138,10 @@ Then collect scenario-aware teacher data from another terminal:
   --command-ramp-steps 20 \
   --seed 7 \
   --output /data/training_datasets/flat_walk_varied_speed_v1.jsonl \
-  --json
+  --json | python -m json.tool
 ```
+
+When `--json` is set, the wrapper keeps stdout machine-readable and sends Docker/status text to stderr. If the runtime fails before the collector can emit JSON, the wrapper returns a JSON failure payload with `ok=false` and a short stderr preview instead of leaving callers with an empty pipe.
 
 `planned` scenarios are rejected by default so they cannot silently become accepted training sources. Use `--allow-planned-scenario` only when intentionally collecting metadata-only exploratory rows before MuJoCo evaluator promotion.
 
