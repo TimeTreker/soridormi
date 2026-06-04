@@ -57,28 +57,26 @@ exists.
 
 ## Recommended MuJoCo-first flow
 
-Start the simulator:
+Collect scenario-aware teacher data directly. The random teacher collector owns
+the MuJoCo collection lifecycle; do not start a second `run_sim_server.sh` for
+this command. Pass `--viewer` to the collector when visual inspection is needed.
 
-```bash
-./scripts/run_sim_server.sh \
-  --backend mujoco \
-  --profile open_duck_forward \
-  --viewer \
-  --follow-camera
-```
-
-Collect scenario-aware teacher data:
 
 ```bash
 ./scripts/collect_random_teacher_dataset.sh \
   --backend mujoco \
+  --viewer \
   --scenario flat_walk_varied_speed_v1 \
   --profile open_duck_forward \
   --episodes 4 \
   --steps-per-episode 500 \
   --command-ramp-steps 30 \
-  --output /data/training_datasets/flat_walk_varied_speed_v1.jsonl
+  --output /data/training_datasets/flat_walk_varied_speed_v1.jsonl \
+  --json | python -m json.tool
 ```
+
+Continue only if the collection JSON reports `ok: true` and a positive
+`sample_count`.
 
 Run descriptive coverage first:
 
@@ -96,7 +94,8 @@ Then run the gate:
   --require-scenario flat_walk_varied_speed_v1 \
   --min-samples-per-scenario 300 \
   --min-command-range-fraction 0.25 \
-  --output-dir artifacts/dataset_coverage/flat_walk_varied_speed_v1_gate
+  --output-dir artifacts/dataset_coverage/flat_walk_varied_speed_v1_gate \
+  --json | python -m json.tool
 ```
 
 ## Outputs

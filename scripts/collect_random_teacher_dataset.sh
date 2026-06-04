@@ -9,8 +9,9 @@ Usage: ./scripts/collect_random_teacher_dataset.sh [options]
 
 Collect behavior-cloning samples by rolling out the teacher policy under random
 piecewise velocity commands. Command changes are ramped by default so the
-dataset covers continuous speed transitions instead of only abrupt jumps. Start
-the MuJoCo sim server separately before using this script.
+dataset covers continuous speed transitions instead of only abrupt jumps. The
+collector owns its MuJoCo collection lifecycle; do not start a second sim server
+for the same collection run.
 
 Common options:
   --profile NAME                 teacher profile (default: open_duck_forward)
@@ -32,12 +33,13 @@ Negative ranges may be passed either as separate values or with '=':
   --vx-range -0.03,0.15
   --vx-range=-0.03,0.15
   --backend NAME                 expected sim backend; default: mujoco
-  --viewer                       viewer mode hint for matching sim server command
-  --no-viewer                    headless mode hint; default
+  --viewer                       request viewer for the collector-owned MuJoCo run
+  --no-viewer                    request headless collection; default
 
-Sim server commands for walking teacher parity:
-  ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
-  ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
+Collector ownership:
+  This wrapper owns the random-teacher collection run. Do not start a separate
+  ./scripts/run_sim_server.sh for this command; use --viewer here when visual
+  inspection is needed.
 USAGE
 }
 
@@ -97,9 +99,8 @@ status "=========================================="
 status "Expected sim backend: ${sim_backend}"
 status "MuJoCo viewer hint: ${viewer_enabled}"
 status ""
-status "Make sure the simulator is already running in another terminal with the same"
-status "teacher profile compatibility flags, for example:"
-status "  ./scripts/run_sim_server.sh --backend ${sim_backend} --profile open_duck_forward $(if [ "${viewer_enabled}" = "1" ]; then echo --viewer --follow-camera; else echo --no-viewer; fi)"
+status "Collector-owned sim lifecycle: do not start a second run_sim_server.sh for this collection."
+status "Use --viewer on this command when visual inspection is needed."
 
 SORIDORMI_REPO_ROOT="$(pwd)"
 source scripts/lib/container_paths.sh

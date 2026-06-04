@@ -218,5 +218,6 @@ def test_gate_dataset_scenario_coverage_help_documents_mujoco_flow() -> None:
     )
     assert "--require-ready-locomotion" in proc.stdout
     assert "--min-command-range-fraction" in proc.stdout
-    assert "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera" in proc.stdout
-    assert "./scripts/collect_random_teacher_dataset.sh --backend mujoco --scenario flat_walk_varied_speed_v1" in proc.stdout
+    assert "do not" in proc.stdout.lower()
+    assert "run_sim_server.sh" in proc.stdout
+    assert "./scripts/collect_random_teacher_dataset.sh --backend mujoco --viewer --scenario flat_walk_varied_speed_v1" in proc.stdout

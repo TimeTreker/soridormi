@@ -18,21 +18,16 @@ directory containing train/val/test JSONL files.
 
 ## Validate a raw MuJoCo teacher dataset
 
-Start the simulator in a separate terminal:
+Collect scenario-aware teacher data directly. The random teacher collector owns
+its MuJoCo collection lifecycle, so do not start a separate `run_sim_server.sh`
+for the same run. Use `--viewer` on the collector command when visual inspection
+is needed.
 
-```bash
-./scripts/run_sim_server.sh \
-  --backend mujoco \
-  --profile open_duck_forward \
-  --viewer \
-  --follow-camera
-```
-
-Collect scenario-aware teacher data:
 
 ```bash
 ./scripts/collect_random_teacher_dataset.sh \
   --backend mujoco \
+  --viewer \
   --scenario flat_walk_varied_speed_v1 \
   --profile open_duck_forward \
   --episodes 2 \
@@ -40,8 +35,12 @@ Collect scenario-aware teacher data:
   --command-ramp-steps 20 \
   --seed 7 \
   --output /data/training_datasets/flat_walk_varied_speed_v1.jsonl \
-  --json
+  --json | python -m json.tool
 ```
+
+Continue only when the collection JSON reports `ok: true` and a positive
+`sample_count`. If the JSONL is empty, fix collection before running coverage,
+export, or prepare.
 
 Report coverage:
 
@@ -49,7 +48,7 @@ Report coverage:
 ./scripts/report_dataset_coverage.sh \
   /data/training_datasets/flat_walk_varied_speed_v1.jsonl \
   --output-dir /data/training_datasets/coverage/flat_walk_varied_speed_v1 \
-  --json
+  --json | python -m json.tool
 ```
 
 The generated artifacts are:

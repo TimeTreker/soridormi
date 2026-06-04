@@ -45,8 +45,10 @@ Examples:
     --min-command-range-fraction 0.35
 
 Recommended MuJoCo-first collection flow:
-  ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
-  ./scripts/collect_random_teacher_dataset.sh --backend mujoco --scenario flat_walk_varied_speed_v1 --profile open_duck_forward --episodes 4 --steps-per-episode 500 --command-ramp-steps 30 --output /data/training_datasets/flat_walk_varied_speed_v1.jsonl
+  collect_random_teacher_dataset.sh owns its MuJoCo collection lifecycle; do not
+  start a separate run_sim_server.sh for the same collection run. Use --viewer
+  on the collector command for visual inspection.
+  ./scripts/collect_random_teacher_dataset.sh --backend mujoco --viewer --scenario flat_walk_varied_speed_v1 --profile open_duck_forward --episodes 4 --steps-per-episode 500 --command-ramp-steps 30 --output /data/training_datasets/flat_walk_varied_speed_v1.jsonl --json | python -m json.tool
   ./scripts/gate_dataset_scenario_coverage.sh /data/training_datasets/flat_walk_varied_speed_v1.jsonl --require-scenario flat_walk_varied_speed_v1
 USAGE
 }

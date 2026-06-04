@@ -21,6 +21,14 @@ the same split.
 The default also stratifies by `scenario_id`, so each scenario is split using its
 own rollout groups where enough groups are available.
 
+## Prerequisite: non-empty context JSONL
+
+Prepare only runs after a successful context export. The input context JSONL must
+contain rows and the export report should show `ok: true`, `converted_count > 0`,
+and `output_written: true`. If prepare reports `no samples read from input
+paths`, the context file is empty or missing; return to collection/export instead
+of trying to train.
+
 ## Basic usage
 
 ```bash

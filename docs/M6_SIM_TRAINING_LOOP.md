@@ -105,19 +105,7 @@ Collect small grids first. Do not train from one perfect short rollout and expec
 
 ### Random command-sequence collection
 
-For freer walking behavior, collect piecewise random command sequences after the fixed command suite passes. Keep the MuJoCo backend explicit and keep headless mode as the default functional test:
-
-```bash
-./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
-```
-
-Optional visual inspection:
-
-```bash
-./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
-```
-
-In another terminal:
+For freer walking behavior, collect piecewise random command sequences after the fixed command suite passes. Keep the MuJoCo backend explicit. The random collector owns its MuJoCo collection lifecycle, so do not start a separate `run_sim_server.sh` for this command. Use `--viewer` on the collector command for visual inspection.
 
 ```bash
 ./scripts/collect_random_teacher_dataset.sh \
@@ -131,12 +119,13 @@ In another terminal:
   --command-hold-steps 80,250 \
   --command-ramp-steps 20 \
   --backend mujoco \
-  --no-viewer
+  --viewer \
+  --json | python -m json.tool
 ```
 
 Negative range values are valid in either shell style, so both `--vx-range -0.03,0.15` and `--vx-range=-0.03,0.15` are supported. The collector ramps each new target command over `--command-ramp-steps` control steps by default. Keep this nonzero for continuous-speed BC datasets, because the robot should learn smooth speed changes such as slow -> normal -> fast -> stop, not only abrupt command jumps. Use `--command-ramp-steps 0` only for explicit step-response debugging.
 
-Use `--viewer` only when the simulator terminal was started with `./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer`. The collector records both the applied command and the target command plus command segment/ramp metadata so later training/evaluation can distinguish fixed-command grids from random continuous command-transition data.
+The collector records both the applied command and the target command plus command segment/ramp metadata so later training/evaluation can distinguish fixed-command grids from random continuous command-transition data. Continue only if the JSON result reports `ok: true` and a positive `sample_count`.
 
 ## 3. Train a teacher behavior-clone policy
 

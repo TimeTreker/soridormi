@@ -284,6 +284,22 @@ Run runtime loop from host through Compose:
 ./scripts/run_runtime_loop.sh
 ```
 
+### Simulator ownership for live tools
+
+Soridormi live MuJoCo commands use two patterns:
+
+- External-sim evaluation/runtime tools require a separately running simulator
+  server. Start it with `./scripts/run_sim_server.sh --backend mujoco --profile
+  open_duck_forward --viewer --follow-camera`, then run tools such as
+  `evaluate_scenario_rollout.sh`, `evaluate_scenario_suite.sh`,
+  `run_skill_in_sim.sh`, or scripted social skill commands in another terminal.
+- Random teacher dataset collection owns its collection lifecycle. Do not start
+  a second `run_sim_server.sh` for `collect_random_teacher_dataset.sh`; pass
+  `--viewer` to the collector itself when visual inspection is needed.
+
+For the current M9 dataset pipeline, see
+`docs/SORIDORMI_DATA_PIPELINE_M9.md`.
+
 ## Runtime backend selection
 
 The runtime uses `SORIDORMI_BACKEND`:

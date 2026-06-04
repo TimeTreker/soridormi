@@ -187,19 +187,9 @@ The wrapper delegates to the existing command-grid comparison path, so the outpu
 
 ## M6B random teacher data collection
 
-After the fixed-command M6A suite is measurable, collect teacher data from random piecewise velocity commands. This produces trajectories that include command transitions instead of one constant command per episode. Start the MuJoCo backend explicitly in another terminal; headless is the default functional-test mode:
+After the fixed-command M6A suite is measurable, collect teacher data from random piecewise velocity commands. This produces trajectories that include command transitions instead of one constant command per episode. The random collector owns its MuJoCo collection lifecycle, so do not start a separate `run_sim_server.sh` for this command. Use `--viewer` on the collector command when visual inspection is needed.
 
-```bash
-./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
-```
-
-For visual inspection, use the same MuJoCo backend with the viewer enabled:
-
-```bash
-./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
-```
-
-Then collect a conservative random-command teacher dataset:
+Collect a conservative random-command teacher dataset:
 
 ```bash
 ./scripts/collect_random_teacher_dataset.sh \
@@ -212,12 +202,13 @@ Then collect a conservative random-command teacher dataset:
   --yaw-range -0.20,0.20 \
   --command-hold-steps 80,250 \
   --backend mujoco \
-  --no-viewer
+  --viewer \
+  --json | python -m json.tool
 ```
 
 Negative range values are valid in either shell style, so both `--vx-range -0.03,0.15` and `--vx-range=-0.03,0.15` are supported.
 
-The same script accepts `--viewer` as a hint matching the simulator terminal command, but it does not replace the separate simulator process. The output JSONL stores `scenario_id`, `rollout_id`, `command_segment_index`, `command_segment_id`, `command_segment_step_index`, and the active `policy_command` for each sample. Use grouped splits by `source_log` for smoke training and by `scenario_id` or held-out seeds when testing broader generalization.
+The output JSONL stores `scenario_id`, `rollout_id`, `command_segment_index`, `command_segment_id`, `command_segment_step_index`, and the active `policy_command` for each sample. Use grouped splits by `source_log` for smoke training and by `scenario_id` or held-out seeds when testing broader generalization. Continue only if the collection JSON reports `ok: true` and a positive `sample_count`.
 
 This collector should be used for walking, turning, stopping, small lateral motion, and command transitions. Do not include sit-down or stand-up motions until Soridormi has a separate pose-transition teacher or scripted pose-transition controller and an explicit task/mode conditioning contract.
 

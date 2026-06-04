@@ -23,15 +23,19 @@ Common examples:
     --output-dir /data/training_datasets/coverage/flat_walk_varied_speed_v1_prepared
 
 Recommended MuJoCo-first collection flow before reporting:
-  ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
+  collect_random_teacher_dataset.sh owns its MuJoCo collection lifecycle; do not
+  start a separate run_sim_server.sh for the same collection run. Use --viewer
+  on the collector command for visual inspection.
   ./scripts/collect_random_teacher_dataset.sh \
     --backend mujoco \
+    --viewer \
     --scenario flat_walk_varied_speed_v1 \
     --profile open_duck_forward \
     --episodes 2 \
     --steps-per-episode 300 \
     --command-ramp-steps 20 \
-    --output /data/training_datasets/flat_walk_varied_speed_v1.jsonl
+    --output /data/training_datasets/flat_walk_varied_speed_v1.jsonl \
+    --json | python -m json.tool
   ./scripts/report_dataset_coverage.sh /data/training_datasets/flat_walk_varied_speed_v1.jsonl
 USAGE
 }

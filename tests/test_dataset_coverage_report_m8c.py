@@ -155,6 +155,8 @@ def test_report_dataset_coverage_script_documents_mujoco_collection_flow() -> No
 
     assert "scenario_id" in proc.stdout
     assert "failure/stuck flags" in proc.stdout
-    assert "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera" in proc.stdout
+    assert "do not" in proc.stdout.lower()
+    assert "run_sim_server.sh" in proc.stdout
     assert "./scripts/collect_random_teacher_dataset.sh" in proc.stdout
+    assert "--viewer" in proc.stdout
     assert "--scenario flat_walk_varied_speed_v1" in proc.stdout

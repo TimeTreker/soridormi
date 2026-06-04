@@ -304,5 +304,5 @@ def test_collect_random_teacher_dataset_script_documents_mujoco_viewer_flags() -
     assert "--command-ramp-steps" in proc.stdout
     assert "--scenario ID" in proc.stdout
     assert "--list-scenarios" in proc.stdout
-    assert "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer" in proc.stdout
-    assert "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera" in proc.stdout
+    assert "collector owns" in proc.stdout.lower()
+    assert "do not start a separate" in proc.stdout.lower()

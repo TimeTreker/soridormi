@@ -14,6 +14,30 @@ converts existing JSONL data into `soridormi.policy_supervision.context_v1` rows
 and validates each converted row against
 `configs/training/open_duck_mini_v2_context_bc_contract_v1.json`.
 
+## Prerequisite: collect a non-empty teacher dataset
+
+The exporter does not connect to MuJoCo. First collect a non-empty raw teacher
+JSONL. The random teacher collector owns its MuJoCo collection lifecycle, so do
+not start a separate `run_sim_server.sh` for the same run. Use `--viewer` on the
+collector command when visual inspection is needed.
+
+```bash
+./scripts/collect_random_teacher_dataset.sh \
+  --backend mujoco \
+  --viewer \
+  --scenario flat_walk_varied_speed_v1 \
+  --profile open_duck_forward \
+  --episodes 2 \
+  --steps-per-episode 300 \
+  --command-ramp-steps 20 \
+  --seed 7 \
+  --output /data/training_datasets/flat_walk_varied_speed_v1.jsonl \
+  --json | python -m json.tool
+```
+
+Continue only when the collection JSON reports `ok: true` and a positive
+`sample_count`.
+
 ## Convert a scenario-aware teacher dataset
 
 ```bash
@@ -91,7 +115,9 @@ output when at least one valid context row is converted and validated. If the
 input path is wrong, empty, or every row is invalid, the command fails and the
 previous output file is left untouched. Check `converted_count`, `sample_count`,
 `errors`, and `output_written` in the JSON result before running the BC contract
-validator.
+validator. If the JSON reports `input JSONL not found`, `no samples read from
+input paths`, or `converted_count: 0`, go back to collection; do not validate or
+prepare the empty context file.
 
 ## Next step: prepare train/val/test splits
 
