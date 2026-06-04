@@ -103,3 +103,18 @@ PYTHONPATH=src pytest -q \
 python -m compileall -q src tests
 bash -n scripts/prepare_context_bc_dataset.sh scripts/export_context_bc_dataset.sh
 ```
+
+
+## Final prepared dataset gate
+
+After preparing train/val/test splits, run the M9H prepared dataset gate before BC training:
+
+```bash
+./scripts/gate_context_bc_prepared_dataset.sh \
+  /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1/prepared_manifest.json \
+  --require-scenario flat_walk_varied_speed_v1 \
+  --output-dir artifacts/training/context_bc/prepared_gate/flat_walk_varied_speed_v1 \
+  --json | python -m json.tool
+```
+
+This catches empty splits, manifest/file mismatches, and rollout leakage across splits.

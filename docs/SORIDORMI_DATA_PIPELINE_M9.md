@@ -13,13 +13,16 @@ There are two live-MuJoCo patterns:
    evaluation, free-walk policy checks, scripted social skills, and look-target
    commands.
 2. **Collector-owned-sim tools** own their MuJoCo collection lifecycle.  Use this
-   pattern for `collect_random_teacher_dataset.sh`.  Do not start a second
+   pattern for `collect_random_teacher_dataset.sh`.  The wrapper starts a
+   temporary simulator container, waits for the API port, runs the runtime
+   collector, and then stops the simulator.  Do not start a second
    `run_sim_server.sh` for the same collection run; that can create reset
    contention and leave the JSONL empty.
 
 When a collector-owned tool supports `--viewer`, treat it as a request for the
-collector's MuJoCo server to use the viewer.  It is not a reminder to manually
-start a separate viewer server.
+collector's own MuJoCo server to use the viewer.  It is not a reminder to
+manually start a separate viewer server.  Use `--external-sim` only for advanced
+debugging when you intentionally want to connect to an already-running server.
 
 ## End-to-end flat-walk context BC data flow
 
@@ -36,6 +39,8 @@ terminal for this command.
   --episodes 2 \
   --steps-per-episode 300 \
   --command-ramp-steps 20 \
+  --reset-attempts 10 \
+  --reset-retry-sleep 0.5 \
   --seed 7 \
   --output /data/training_datasets/flat_walk_varied_speed_v1.jsonl \
   --json | python -m json.tool
@@ -47,6 +52,7 @@ For visual inspection during collection, request the viewer on the same command:
 ./scripts/collect_random_teacher_dataset.sh \
   --backend mujoco \
   --viewer \
+  --follow-camera \
   --scenario flat_walk_varied_speed_v1 \
   --profile open_duck_forward \
   --episodes 2 \
@@ -59,7 +65,10 @@ For visual inspection during collection, request the viewer on the same command:
 
 A successful collection must report `ok: true` and a positive `sample_count`.
 If the output reports `sample_count: 0`, stop here and fix the collection issue
-before export or prepare.
+before export or prepare.  A transient reset error such as
+`Again('Resource temporarily unavailable')` should be retried by the collector;
+raise `--reset-attempts`/`--reset-retry-sleep` only if the sim is still warming
+up slowly.
 
 Quick check inside the runtime data volume:
 

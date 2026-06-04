@@ -17,14 +17,17 @@ and validates each converted row against
 ## Prerequisite: collect a non-empty teacher dataset
 
 The exporter does not connect to MuJoCo. First collect a non-empty raw teacher
-JSONL. The random teacher collector owns its MuJoCo collection lifecycle, so do
-not start a separate `run_sim_server.sh` for the same run. Use `--viewer` on the
-collector command when visual inspection is needed.
+JSONL. The random teacher collector owns its MuJoCo collection lifecycle: it
+starts its own temporary sim container, waits for it to listen, runs the runtime
+collector, and stops the sim when done. Do not start a separate
+`run_sim_server.sh` for the same run. Use `--viewer` on the collector command
+when visual inspection is needed.
 
 ```bash
 ./scripts/collect_random_teacher_dataset.sh \
   --backend mujoco \
   --viewer \
+  --follow-camera \
   --scenario flat_walk_varied_speed_v1 \
   --profile open_duck_forward \
   --episodes 2 \

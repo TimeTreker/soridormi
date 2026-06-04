@@ -8,6 +8,7 @@ from soridormi_runtime.random_teacher_dataset_collect import (
     HoldStepRange,
     _normalize_negative_range_args,
     _range_text_from_args,
+    _reset_env_with_retries,
     collect_random_teacher_dataset,
     generate_random_command_schedule,
     ramped_segment_command,
@@ -52,6 +53,23 @@ class FakeRandomTeacherEnv:
         )
 
 
+class FlakyResetRandomTeacherEnv(FakeRandomTeacherEnv):
+    failures_before_success = 2
+
+    def reset(self) -> object:
+        self.reset_count += 1
+        if self.reset_count <= self.failures_before_success:
+            raise RuntimeError("Resource temporarily unavailable")
+        self.index = 0
+        return object()
+
+
+class AlwaysFailResetRandomTeacherEnv(FakeRandomTeacherEnv):
+    def reset(self) -> object:
+        self.reset_count += 1
+        raise RuntimeError("Resource temporarily unavailable")
+
+
 
 
 def test_ramped_segment_command_interpolates_velocity_commands() -> None:
@@ -92,6 +110,34 @@ def test_ramped_segment_command_can_be_disabled() -> None:
 
     assert alpha == 1.0
     assert command.x_velocity == target.x_velocity
+
+def test_reset_env_with_retries_handles_transient_failures() -> None:
+    env = FlakyResetRandomTeacherEnv()
+    sleeps: list[float] = []
+
+    ok, attempts_used, error = _reset_env_with_retries(
+        env,
+        attempts=3,
+        sleep_s=0.1,
+        sleep_fn=sleeps.append,
+    )
+
+    assert ok
+    assert attempts_used == 3
+    assert error is None
+    assert sleeps == [0.1, 0.1]
+
+
+def test_reset_env_with_retries_reports_exhausted_failures() -> None:
+    env = AlwaysFailResetRandomTeacherEnv()
+
+    ok, attempts_used, error = _reset_env_with_retries(env, attempts=2, sleep_s=0.0)
+
+    assert not ok
+    assert attempts_used == 2
+    assert error is not None
+    assert "Resource temporarily unavailable" in error
+
 
 def test_generate_random_command_schedule_is_seeded_and_covers_episode() -> None:
     import numpy as np
@@ -161,6 +207,43 @@ def test_collect_random_teacher_dataset_writes_segment_metadata(tmp_path: Path) 
     samples, summary = load_and_validate_dataset(output)
     assert summary.ok
     assert len(samples) == 24
+
+
+def test_collect_random_teacher_dataset_retries_transient_reset_failure(tmp_path: Path) -> None:
+    output = tmp_path / "random_teacher_retry.jsonl"
+    result = collect_random_teacher_dataset(
+        profile="teacher_profile",
+        output_path=output,
+        episodes=1,
+        steps_per_episode=4,
+        command_hold_steps=HoldStepRange(2, 2),
+        command_ramp_steps=1,
+        seed=7,
+        reset_attempts=3,
+        reset_retry_sleep=0.0,
+        env_factory=FlakyResetRandomTeacherEnv,
+    )
+
+    assert result.ok
+    assert result.sample_count == 4
+    assert any("reset succeeded on attempt 3" in warning for warning in result.warnings)
+
+
+def test_collect_random_teacher_dataset_reports_exhausted_reset_failure(tmp_path: Path) -> None:
+    output = tmp_path / "random_teacher_reset_fail.jsonl"
+    result = collect_random_teacher_dataset(
+        profile="teacher_profile",
+        output_path=output,
+        episodes=1,
+        steps_per_episode=4,
+        reset_attempts=2,
+        reset_retry_sleep=0.0,
+        env_factory=AlwaysFailResetRandomTeacherEnv,
+    )
+
+    assert not result.ok
+    assert result.sample_count == 0
+    assert any("reset failed after 2 attempt(s)" in error for error in result.errors)
 
 
 def test_collect_random_teacher_dataset_manifest_records_ranges(tmp_path: Path) -> None:
@@ -304,5 +387,9 @@ def test_collect_random_teacher_dataset_script_documents_mujoco_viewer_flags() -
     assert "--command-ramp-steps" in proc.stdout
     assert "--scenario ID" in proc.stdout
     assert "--list-scenarios" in proc.stdout
+    assert "--reset-attempts" in proc.stdout
+    assert "--reset-retry-sleep" in proc.stdout
+    assert "--external-sim" in proc.stdout
+    assert "--follow-camera" in proc.stdout
     assert "collector owns" in proc.stdout.lower()
     assert "do not start a separate" in proc.stdout.lower()

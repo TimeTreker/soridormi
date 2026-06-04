@@ -1,26 +1,20 @@
 # Soridormi Context BC Dataset Export Report
 
-Result: **FAIL**
+Result: **PASS**
 
 Output: `/data/training_datasets/context_bc/flat_walk_varied_speed_v1.context.jsonl`
 Manifest: `/data/training_datasets/context_bc/flat_walk_varied_speed_v1.context.jsonl.manifest.json`
-Samples read: `0`
-Converted: `0`
+Samples read: `600`
+Converted: `600`
 Skipped: `0`
 Invalid converted rows: `0`
-Output updated: `False`
-SHA256: `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+Output updated: `True`
+SHA256: `2a13dd053aff95a6aff19fa609f2a5076e59a16e70266595feb8ec37a36bed25`
 
 ## Scenario counts
 
-No converted scenarios.
+- `flat_walk_varied_speed_v1`: 600
 
 ## Skill counts
 
-No converted skills.
-
-## Errors
-
-- input JSONL not found: /data/training_datasets/flat_walk_varied_speed_v1.jsonl
-- no samples read from input paths
-- no context BC samples were written; output file was not updated
+- `walk_velocity`: 600

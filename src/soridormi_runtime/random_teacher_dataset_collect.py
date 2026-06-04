@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +27,31 @@ from soridormi_runtime.walking_reward import WalkingRewardConfig
 
 
 DEFAULT_RANDOM_OUTPUT = Path("/data/training_datasets/teacher_policy_random_walk.jsonl")
+
+
+def _reset_env_with_retries(
+    env: Any,
+    *,
+    attempts: int = 1,
+    sleep_s: float = 0.0,
+    sleep_fn: Callable[[float], None] = time.sleep,
+) -> tuple[bool, int, str | None]:
+    """Reset a simulator environment with bounded transient-error retries."""
+
+    max_attempts = max(1, int(attempts))
+    delay = max(0.0, float(sleep_s))
+    last_error: str | None = None
+    for attempt_index in range(max_attempts):
+        try:
+            env.reset()
+            return True, attempt_index + 1, None
+        except Exception as exc:  # pragma: no cover - concrete exception type varies by transport/backend
+            last_error = repr(exc)
+            if attempt_index + 1 >= max_attempts:
+                break
+            if delay > 0.0:
+                sleep_fn(delay)
+    return False, max_attempts, last_error
 
 
 @dataclass(frozen=True)
@@ -308,6 +334,8 @@ def collect_random_teacher_dataset(
     port: int = 5555,
     stop_on_terminated: bool = True,
     reset_on_start: bool = True,
+    reset_attempts: int = 1,
+    reset_retry_sleep: float = 0.0,
     env_factory: Callable[..., Any] | None = None,
     scenario: ScenarioDefinition | None = None,
     initial_warnings: list[str] | None = None,
@@ -377,11 +405,21 @@ def collect_random_teacher_dataset(
                     warnings.append(f"episode {episode_index}: empty command schedule")
                     continue
 
-                try:
-                    env.reset()
-                except Exception as exc:
-                    errors.append(f"episode {episode_index}: reset failed: {exc!r}")
+                reset_ok, reset_tries_used, reset_error = _reset_env_with_retries(
+                    env,
+                    attempts=reset_attempts,
+                    sleep_s=reset_retry_sleep,
+                )
+                if not reset_ok:
+                    errors.append(
+                        f"episode {episode_index}: reset failed after {reset_tries_used} "
+                        f"attempt(s): {reset_error}"
+                    )
                     break
+                if reset_tries_used > 1:
+                    warnings.append(
+                        f"episode {episode_index}: reset succeeded on attempt {reset_tries_used}"
+                    )
 
                 previous_command = PolicyCommand()
                 for segment in schedule:
@@ -639,6 +677,18 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--forward-velocity-sigma", type=float, default=0.20)
     parser.add_argument("--continue-after-terminated", action="store_true")
     parser.add_argument("--no-reset", action="store_true")
+    parser.add_argument(
+        "--reset-attempts",
+        type=int,
+        default=5,
+        help="Retry transient simulator reset failures this many times per episode (default: 5)",
+    )
+    parser.add_argument(
+        "--reset-retry-sleep",
+        type=float,
+        default=0.25,
+        help="Seconds to sleep between simulator reset attempts (default: 0.25)",
+    )
     parser.add_argument("--json", action="store_true")
     return parser
 
@@ -745,6 +795,8 @@ def main(argv: list[str] | None = None) -> int:
         port=args.port,
         stop_on_terminated=not args.continue_after_terminated,
         reset_on_start=not args.no_reset,
+        reset_attempts=args.reset_attempts,
+        reset_retry_sleep=args.reset_retry_sleep,
         scenario=scenario,
         initial_warnings=scenario_warnings,
     )

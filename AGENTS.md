@@ -47,7 +47,7 @@ Include tests when behavior changes. Include docs when a milestone changes usage
 
 See `docs/PATCH_DELIVERY_AND_VALIDATION.md`.
 
-For live simulator functional tests, do not rely on an implicit backend. Use MuJoCo explicitly; the viewer is off by default, but the command-line must make `--viewer` available for visual inspection. If the robot may walk out of the initial frame, include the viewer follow-camera command: `./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera`. Exception: random teacher dataset collection owns its MuJoCo collection lifecycle, so do not pair `collect_random_teacher_dataset.sh` with a second `run_sim_server.sh`; use the collector's own `--viewer` flag.
+For live simulator functional tests, do not rely on an implicit backend. Use MuJoCo explicitly; the viewer is off by default, but the command-line must make `--viewer` available for visual inspection. If the robot may walk out of the initial frame, include the viewer follow-camera command: `./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera`. Exception: random teacher dataset collection owns its MuJoCo collection lifecycle by starting and stopping its own temporary sim container, so do not pair `collect_random_teacher_dataset.sh` with a second `run_sim_server.sh`; use the collector's own `--viewer` and usually `--follow-camera` flags. Use `--external-sim` only for advanced debugging.
 
 ## Validation expectations
 
