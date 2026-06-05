@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/lib/latest_policy_log.sh
 
 OFFICIAL_TRACE="${SORIDORMI_OFFICIAL_TRACE:-/data/official_baseline/latest_official_baseline.trace.jsonl}"
 SORIDORMI_LOG="${SORIDORMI_TRACE_LOG:-}"
@@ -45,7 +46,7 @@ done
 
 if [ -z "${SORIDORMI_LOG}" ]; then
   if [ -d data/logs ]; then
-    latest_host_log="$(ls -t data/logs/policy_*.mcap data/logs/runtime_*.mcap data/logs/*.jsonl 2>/dev/null | head -n 1 || true)"
+    latest_host_log="$(find_latest_policy_log data/logs)"
     if [ -n "${latest_host_log}" ]; then
       SORIDORMI_LOG="/data/logs/$(basename "${latest_host_log}")"
     fi

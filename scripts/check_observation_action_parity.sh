@@ -2,6 +2,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+source scripts/lib/latest_policy_log.sh
 
 # Host-side wrapper for the M4.11 parity checker.
 # Usage on host:
@@ -16,7 +17,7 @@ POLICY_PATH="${SORIDORMI_POLICY_PATH:-/workspaces/Open_Duck_Mini/BEST_WALK_ONNX_
 STEPS="${SORIDORMI_COMPARE_STEPS:-100}"
 
 if [[ -z "${SORIDORMI_LOG_HOST}" ]]; then
-  SORIDORMI_LOG_HOST="$(ls -1t data/logs/policy_*.mcap data/logs/runtime_*.mcap data/logs/*.jsonl 2>/dev/null | head -n 1 || true)"
+  SORIDORMI_LOG_HOST="$(find_latest_policy_log data/logs)"
 fi
 
 if [[ -z "${OFFICIAL_TRACE_HOST}" ]]; then
