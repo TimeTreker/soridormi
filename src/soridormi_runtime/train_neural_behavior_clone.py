@@ -14,9 +14,12 @@ import numpy as np
 
 from soridormi_runtime.create_policy_profile import create_replacement_profile
 from soridormi_runtime.train_behavior_clone import (
+    INPUT_MODE_OBSERVATION,
+    INPUT_MODES,
     SplitMetrics,
     _default_normalization_path,
     _denormalize,
+    _input_size_for,
     _load_or_make_normalization,
     _load_prepared_manifest,
     _load_split_arrays,
@@ -55,6 +58,7 @@ class NeuralBehaviorCloneTrainResult:
     best_epoch: int | None
     metrics: dict[str, SplitMetrics]
     train_sample_count: int = 0
+    input_mode: str = INPUT_MODE_OBSERVATION
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -304,6 +308,7 @@ def train_neural_behavior_clone(
     profile_force: bool = False,
     observation_size: int = DEFAULT_OBSERVATION_SIZE,
     action_size: int = DEFAULT_ACTION_SIZE,
+    input_mode: str = INPUT_MODE_OBSERVATION,
 ) -> NeuralBehaviorCloneTrainResult:
     torch = _import_torch()
     hidden = _parse_hidden_sizes(hidden_sizes)
@@ -317,6 +322,15 @@ def train_neural_behavior_clone(
     _seed_everything(torch, seed)
 
     manifest_path, manifest, manifest_errors = _load_prepared_manifest(prepared)
+    try:
+        model_observation_size = _input_size_for(input_mode, robot_observation_size=observation_size)
+    except ValueError as exc:
+        model_observation_size = observation_size
+        manifest_errors.append(str(exc))
+    if input_mode != INPUT_MODE_OBSERVATION and export_onnx:
+        manifest_errors.append(
+            f"Input mode {input_mode} is offline training data only; use --skip-onnx until runtime context plumbing is implemented"
+        )
     output = Path(output_dir) if output_dir is not None else manifest_path.parent / "neural_behavior_clone"
     output.mkdir(parents=True, exist_ok=True)
     checkpoint_path = output / "neural_behavior_clone.pt"
@@ -337,7 +351,7 @@ def train_neural_behavior_clone(
             report_path=str(report_path),
             profile_path=str(profile_path) if profile_path is not None else None,
             normalization_path=str(normalization_path) if normalization_path is not None else None,
-            observation_size=observation_size,
+            observation_size=model_observation_size,
             action_size=action_size,
             hidden_sizes=hidden,
             activation=activation,
@@ -350,6 +364,7 @@ def train_neural_behavior_clone(
             best_val_loss=None,
             best_epoch=None,
             metrics=empty_metrics,
+            input_mode=input_mode,
             errors=errors,
             warnings=list(warnings or []),
         )
@@ -373,27 +388,37 @@ def train_neural_behavior_clone(
         path = split_paths.get(name)
         if path is None:
             arrays[name] = (
-                np.zeros((0, observation_size), dtype=np.float64),
+                np.zeros((0, model_observation_size), dtype=np.float64),
                 np.zeros((0, action_size), dtype=np.float64),
                 [f"Prepared manifest missing {name} split path"],
                 [],
             )
         else:
-            arrays[name] = _load_split_arrays(path, observation_size=observation_size, action_size=action_size)
+            arrays[name] = _load_split_arrays(
+                path,
+                observation_size=observation_size,
+                action_size=action_size,
+                input_mode=input_mode,
+            )
         errors.extend(f"{name}: {error}" for error in arrays[name][2])
         warnings.extend(f"{name}: {warning}" for warning in arrays[name][3])
+    if input_mode != INPUT_MODE_OBSERVATION:
+        warnings.append(
+            f"Input mode {input_mode} is offline training data only; runtime policy context plumbing was not changed"
+        )
 
     train_obs, train_actions, _train_errors, _train_warnings = arrays["train"]
     if train_obs.shape[0] == 0:
         errors.append("train split has no valid samples")
 
-    norm_path = Path(normalization_path) if normalization_path is not None else _default_normalization_path(manifest_path)
+    norm_path = Path(normalization_path) if normalization_path is not None else _default_normalization_path(manifest_path, input_mode)
     normalization, used_norm_path, norm_errors, norm_warnings = _load_or_make_normalization(
         norm_path,
         train_obs,
         train_actions,
-        observation_size=observation_size,
+        observation_size=model_observation_size,
         action_size=action_size,
+        input_mode=input_mode,
     )
     errors.extend(norm_errors)
     warnings.extend(norm_warnings)
@@ -408,7 +433,7 @@ def train_neural_behavior_clone(
 
     network = _build_mlp(
         torch,
-        observation_size=observation_size,
+        observation_size=model_observation_size,
         action_size=action_size,
         hidden_sizes=hidden,
         activation=activation,
@@ -496,8 +521,10 @@ def train_neural_behavior_clone(
         "hidden_sizes": hidden,
         "activation": activation,
         "dropout": dropout,
-        "observation_size": observation_size,
+        "observation_size": model_observation_size,
         "action_size": action_size,
+        "input_mode": input_mode,
+        "robot_observation_size": observation_size,
         "normalization": {key: value.astype(np.float32) for key, value in normalization.items()},
         "history": history,
         "best_val_loss": best_val_loss,
@@ -510,7 +537,7 @@ def train_neural_behavior_clone(
         try:
             export_module = _make_normalized_policy_module(torch, network.cpu(), normalization)
             export_module.eval()
-            dummy = torch.zeros((1, observation_size), dtype=torch.float32)
+            dummy = torch.zeros((1, model_observation_size), dtype=torch.float32)
             torch.onnx.export(
                 export_module,
                 dummy,
@@ -541,7 +568,7 @@ def train_neural_behavior_clone(
                 force=profile_force,
                 input_name="obs",
                 output_name="continuous_actions",
-                input_shape=[1, observation_size],
+                input_shape=[1, model_observation_size],
                 output_shape=[1, action_size],
                 input_type="tensor(float)",
                 output_type="tensor(float)",
@@ -562,7 +589,7 @@ def train_neural_behavior_clone(
         report_path=str(report_path),
         profile_path=str(profile_path) if profile_path is not None else None,
         normalization_path=str(used_norm_path) if used_norm_path is not None else None,
-        observation_size=observation_size,
+        observation_size=model_observation_size,
         action_size=action_size,
         hidden_sizes=hidden,
         activation=activation,
@@ -576,6 +603,7 @@ def train_neural_behavior_clone(
         best_epoch=best_epoch,
         metrics=metrics,
         train_sample_count=int(train_obs.shape[0]),
+        input_mode=input_mode,
         errors=errors,
         warnings=warnings,
     )
@@ -613,6 +641,7 @@ def main() -> None:
     parser.add_argument("--profile-template", default="open_duck_forward", help="Template profile for generated runtime profile")
     parser.add_argument("--profile-output-dir", default="configs/policies")
     parser.add_argument("--force-profile", action="store_true", help="Overwrite generated profile YAML")
+    parser.add_argument("--input-mode", choices=sorted(INPUT_MODES), default=INPUT_MODE_OBSERVATION)
     parser.add_argument("--json", action="store_true", help="Print result JSON")
     args = parser.parse_args()
 
@@ -637,6 +666,7 @@ def main() -> None:
             profile_template=args.profile_template,
             profile_output_dir=args.profile_output_dir,
             profile_force=args.force_profile,
+            input_mode=args.input_mode,
         )
     except Exception as exc:
         if args.json:
@@ -655,6 +685,7 @@ def main() -> None:
         print(f"Checkpoint: {result.checkpoint_path}")
         print(f"ONNX: {result.onnx_path or 'n/a'}")
         print(f"Profile: {result.profile_path or 'n/a'}")
+        print(f"Input mode: {result.input_mode}")
         print(f"Device: {result.device}")
         print(f"Best val loss: {result.best_val_loss}")
         for name, metrics in result.metrics.items():

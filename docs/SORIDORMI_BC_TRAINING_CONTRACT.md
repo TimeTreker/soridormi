@@ -96,3 +96,36 @@ Before a stage is used for training, run:
 
 This keeps BC data variation and scenario coverage central before policy
 architecture changes.
+
+## Stage 1 offline training mode
+
+The linear and neural BC trainers keep the legacy 101D observation input by
+default. For Stage 1 context-conditioned experiments, use the explicit input
+mode:
+
+```bash
+./scripts/train_behavior_clone.sh \
+  /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1/prepared_manifest.json \
+  --input-mode context_stage1_command
+```
+
+This trains on a 104D feature vector:
+
+```text
+robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps)
+```
+
+The default normalization artifact for this mode is
+`normalization.context_stage1_command.json`, so it does not overwrite the
+legacy 101D `normalization.json`.
+
+For neural smoke runs, context input mode is checkpoint-only until Soridormi
+runtime policy context plumbing exists:
+
+```bash
+./scripts/train_neural_behavior_clone.sh \
+  /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1/prepared_manifest.json \
+  --input-mode context_stage1_command \
+  --skip-onnx \
+  --no-profile
+```

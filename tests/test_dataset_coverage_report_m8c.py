@@ -160,3 +160,10 @@ def test_report_dataset_coverage_script_documents_mujoco_collection_flow() -> No
     assert "./scripts/collect_random_teacher_dataset.sh" in proc.stdout
     assert "--viewer" in proc.stdout
     assert "--scenario flat_walk_varied_speed_v1" in proc.stdout
+
+
+def test_report_dataset_coverage_script_overrides_cuda_entrypoint_for_json_stdout() -> None:
+    script = Path("scripts/report_dataset_coverage.sh").read_text(encoding="utf-8")
+
+    assert "--entrypoint bash" in script
+    assert "python -m soridormi_runtime.dataset_coverage_report" in script

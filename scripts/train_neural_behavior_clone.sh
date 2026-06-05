@@ -18,8 +18,10 @@ soridormi_translate_container_data_args translated_args "$@"
 # /app/configs read-only for safety, so this writer workflow temporarily remounts
 # configs read-write.
 SORIDORMI_CONFIGS_MOUNT_MODE=rw \
-docker compose -f compose.sim.yaml run --rm runtime bash -lc '
-  set -euo pipefail
-  source /opt/venvs/runtime/bin/activate
-  python -m soridormi_runtime.train_neural_behavior_clone "$@"
-' _ "${translated_args[@]}"
+docker compose -f compose.sim.yaml run --rm \
+  --entrypoint bash \
+  runtime -lc '
+    set -euo pipefail
+    source /opt/venvs/runtime/bin/activate
+    python -m soridormi_runtime.train_neural_behavior_clone "$@"
+  ' _ "${translated_args[@]}"

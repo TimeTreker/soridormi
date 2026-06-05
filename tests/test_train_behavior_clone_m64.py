@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 
 from soridormi_runtime.train_behavior_clone import (
+    INPUT_MODE_CONTEXT_STAGE1_COMMAND,
     predict_linear_behavior_clone,
     train_behavior_clone_baseline,
 )
@@ -28,6 +29,28 @@ def _sample(step: int) -> dict:
         "observation": observation,
         "action": action,
         "raw_action": action,
+    }
+
+
+def _context_sample(step: int) -> dict:
+    legacy = _sample(step)
+    return {
+        "schema_version": 1,
+        "sample_type": "soridormi.policy_supervision.context_v1",
+        "scenario_id": "flat_walk_varied_speed_v1",
+        "rollout_id": f"rollout_{step // 4}",
+        "skill_id": "walk_velocity",
+        "step_index": step,
+        "robot_time": step * 0.02,
+        "robot_state": {"observation": legacy["observation"]},
+        "desired_command": {"vx_mps": 0.1, "vy_mps": 0.0, "yaw_radps": 0.0},
+        "task_context": {"skill_family": "locomotion"},
+        "environment_context": {"terrain_type": "flat"},
+        "short_history": {
+            "previous_action": [0.0] * 14,
+            "previous_command": {"vx_mps": 0.0, "vy_mps": 0.0, "yaw_radps": 0.0},
+        },
+        "teacher_action": legacy["action"],
     }
 
 
@@ -56,6 +79,25 @@ def _prepared_dataset(tmp_path: Path) -> Path:
     return prepared
 
 
+def _context_prepared_dataset(tmp_path: Path) -> Path:
+    prepared = tmp_path / "context_prepared"
+    prepared.mkdir()
+    _write_jsonl(prepared / "train.jsonl", [_context_sample(step) for step in range(8)])
+    _write_jsonl(prepared / "val.jsonl", [_context_sample(step) for step in range(8, 10)])
+    _write_jsonl(prepared / "test.jsonl", [_context_sample(step) for step in range(10, 12)])
+    manifest = {
+        "schema_version": 1,
+        "dataset_type": "soridormi.policy_supervision.context_prepared.v1",
+        "splits": {
+            "train": {"name": "train", "path": str(prepared / "train.jsonl"), "sample_count": 8},
+            "val": {"name": "val", "path": str(prepared / "val.jsonl"), "sample_count": 2},
+            "test": {"name": "test", "path": str(prepared / "test.jsonl"), "sample_count": 2},
+        },
+    }
+    (prepared / "prepared_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    return prepared
+
+
 def test_train_behavior_clone_baseline_writes_model_metrics_and_report(tmp_path: Path) -> None:
     prepared = _prepared_dataset(tmp_path)
 
@@ -66,6 +108,11 @@ def test_train_behavior_clone_baseline_writes_model_metrics_and_report(tmp_path:
     assert result.metrics["train"].mae is not None
     assert result.metrics["train"].mae < 1e-9
     assert Path(result.model_path).exists()
+    assert result.normalization_path is not None
+    normalization = json.loads(Path(result.normalization_path).read_text(encoding="utf-8"))
+    assert normalization["normalization_type"] == "soridormi.policy_supervision.normalization.v1"
+    assert len(normalization["observation_mean"]) == 101
+    assert len(normalization["action_mean"]) == 14
     assert Path(result.metrics_path).exists()
     assert Path(result.report_path).exists()
 
@@ -110,3 +157,75 @@ def test_train_behavior_clone_reports_missing_manifest(tmp_path: Path) -> None:
     assert any("File not found" in error for error in result.errors)
     assert Path(result.metrics_path).exists()
     assert Path(result.report_path).exists()
+
+
+def test_train_behavior_clone_accepts_context_prepared_rows(tmp_path: Path) -> None:
+    prepared = _context_prepared_dataset(tmp_path)
+
+    result = train_behavior_clone_baseline(prepared, ridge_lambda=0.0)
+
+    assert result.ok
+    assert result.train_sample_count == 8
+    assert result.metrics["train"].mae is not None
+    assert result.metrics["train"].mae < 1e-9
+    assert Path(result.model_path).exists()
+
+
+def test_train_behavior_clone_stage1_context_mode_appends_command_features(tmp_path: Path) -> None:
+    prepared = _context_prepared_dataset(tmp_path)
+
+    result = train_behavior_clone_baseline(
+        prepared,
+        output_dir=tmp_path / "run",
+        ridge_lambda=0.0,
+        input_mode=INPUT_MODE_CONTEXT_STAGE1_COMMAND,
+    )
+
+    assert result.ok
+    assert result.input_mode == INPUT_MODE_CONTEXT_STAGE1_COMMAND
+    assert result.observation_size == 104
+    assert result.normalization_path is not None
+    assert Path(result.normalization_path).name == "normalization.context_stage1_command.json"
+    normalization = json.loads(Path(result.normalization_path).read_text(encoding="utf-8"))
+    assert normalization["input_mode"] == INPUT_MODE_CONTEXT_STAGE1_COMMAND
+    assert len(normalization["observation_mean"]) == 104
+
+    model = np.load(result.model_path)
+    assert model["weights"].shape == (104, 14)
+    assert str(model["input_mode"][0]) == INPUT_MODE_CONTEXT_STAGE1_COMMAND
+
+
+def test_train_behavior_clone_stage1_context_mode_requires_desired_command(tmp_path: Path) -> None:
+    prepared = tmp_path / "context_prepared"
+    prepared.mkdir()
+    bad = _context_sample(0)
+    bad.pop("desired_command")
+    _write_jsonl(prepared / "train.jsonl", [bad])
+    _write_jsonl(prepared / "val.jsonl", [_context_sample(1)])
+    _write_jsonl(prepared / "test.jsonl", [_context_sample(2)])
+    manifest = {
+        "schema_version": 1,
+        "dataset_type": "soridormi.policy_supervision.context_prepared.v1",
+        "splits": {
+            "train": {"name": "train", "path": str(prepared / "train.jsonl"), "sample_count": 1},
+            "val": {"name": "val", "path": str(prepared / "val.jsonl"), "sample_count": 1},
+            "test": {"name": "test", "path": str(prepared / "test.jsonl"), "sample_count": 1},
+        },
+    }
+    (prepared / "prepared_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    result = train_behavior_clone_baseline(
+        prepared,
+        output_dir=tmp_path / "run",
+        input_mode=INPUT_MODE_CONTEXT_STAGE1_COMMAND,
+    )
+
+    assert not result.ok
+    assert any("desired_command must be an object" in error for error in result.errors)
+
+
+def test_train_behavior_clone_wrapper_overrides_cuda_entrypoint_for_json_stdout() -> None:
+    script = Path("scripts/train_behavior_clone.sh").read_text(encoding="utf-8")
+
+    assert "--entrypoint bash" in script
+    assert "python -m soridormi_runtime.train_behavior_clone" in script

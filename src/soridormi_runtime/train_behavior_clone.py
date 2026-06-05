@@ -14,6 +14,17 @@ from soridormi_runtime.training_dataset import DEFAULT_ACTION_SIZE, DEFAULT_OBSE
 
 BEHAVIOR_CLONE_SCHEMA_VERSION = 1
 DEFAULT_RIDGE_LAMBDA = 1e-4
+PREPARED_DATASET_TYPES = {
+    "soridormi.policy_supervision.prepared.v1",
+    "soridormi.policy_supervision.context_prepared.v1",
+}
+INPUT_MODE_OBSERVATION = "observation"
+INPUT_MODE_CONTEXT_STAGE1_COMMAND = "context_stage1_command"
+INPUT_MODES = {
+    INPUT_MODE_OBSERVATION,
+    INPUT_MODE_CONTEXT_STAGE1_COMMAND,
+}
+CONTEXT_STAGE1_COMMAND_FIELDS = ("vx_mps", "vy_mps", "yaw_radps")
 
 
 @dataclass
@@ -43,6 +54,7 @@ class BehaviorCloneTrainResult:
     action_size: int
     metrics: dict[str, SplitMetrics]
     train_sample_count: int = 0
+    input_mode: str = INPUT_MODE_OBSERVATION
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -78,8 +90,10 @@ def _load_prepared_manifest(prepared: str | Path) -> tuple[Path, dict[str, Any],
     manifest, errors = _load_json(manifest_path)
     if errors:
         return manifest_path, manifest, errors
-    if manifest.get("dataset_type") != "soridormi.policy_supervision.prepared.v1":
-        errors.append("Prepared manifest dataset_type must be soridormi.policy_supervision.prepared.v1")
+    dataset_type = manifest.get("dataset_type")
+    if dataset_type not in PREPARED_DATASET_TYPES:
+        allowed = ", ".join(sorted(PREPARED_DATASET_TYPES))
+        errors.append(f"Prepared manifest dataset_type must be one of: {allowed}")
     if not isinstance(manifest.get("splits"), dict):
         errors.append("Prepared manifest is missing splits")
     return manifest_path, manifest, errors
@@ -105,20 +119,79 @@ def _vector(value: Any, *, size: int, field_name: str) -> tuple[list[float] | No
     return [float(item) for item in value], None
 
 
+def _input_size_for(input_mode: str, *, robot_observation_size: int) -> int:
+    if input_mode == INPUT_MODE_OBSERVATION:
+        return robot_observation_size
+    if input_mode == INPUT_MODE_CONTEXT_STAGE1_COMMAND:
+        return robot_observation_size + len(CONTEXT_STAGE1_COMMAND_FIELDS)
+    raise ValueError(f"Unsupported input mode {input_mode!r}; use one of: {', '.join(sorted(INPUT_MODES))}")
+
+
+def _observation_value_from_sample(sample: dict[str, Any]) -> Any:
+    observation_value = sample.get("observation")
+    if observation_value is None:
+        robot_state = sample.get("robot_state")
+        if isinstance(robot_state, dict):
+            observation_value = robot_state.get("observation")
+    return observation_value
+
+
+def _action_value_from_sample(sample: dict[str, Any]) -> Any:
+    action_value = sample.get("action")
+    if action_value is None:
+        action_value = sample.get("teacher_action")
+    return action_value
+
+
+def _policy_input_from_sample(
+    sample: dict[str, Any],
+    *,
+    input_mode: str,
+    robot_observation_size: int,
+) -> tuple[list[float] | None, str | None]:
+    observation, observation_error = _vector(
+        _observation_value_from_sample(sample),
+        size=robot_observation_size,
+        field_name="observation",
+    )
+    if observation_error is not None:
+        return None, observation_error
+    assert observation is not None
+
+    if input_mode == INPUT_MODE_OBSERVATION:
+        return observation, None
+
+    if input_mode == INPUT_MODE_CONTEXT_STAGE1_COMMAND:
+        desired_command = sample.get("desired_command")
+        if not isinstance(desired_command, dict):
+            return None, "desired_command must be an object for context_stage1_command input mode"
+        command_values: list[float] = []
+        for field_name in CONTEXT_STAGE1_COMMAND_FIELDS:
+            value = desired_command.get(field_name)
+            if not _is_finite_number(value):
+                return None, f"desired_command.{field_name} must be a finite number"
+            command_values.append(float(value))
+        return observation + command_values, None
+
+    return None, f"Unsupported input mode {input_mode!r}; use one of: {', '.join(sorted(INPUT_MODES))}"
+
+
 def _load_split_arrays(
     path: Path,
     *,
     observation_size: int,
     action_size: int,
+    input_mode: str = INPUT_MODE_OBSERVATION,
     max_reported_issues: int = 50,
 ) -> tuple[np.ndarray, np.ndarray, list[str], list[str]]:
+    input_size = _input_size_for(input_mode, robot_observation_size=observation_size)
     observations: list[list[float]] = []
     actions: list[list[float]] = []
     errors: list[str] = []
     warnings: list[str] = []
     if not path.exists():
         return (
-            np.zeros((0, observation_size), dtype=np.float64),
+            np.zeros((0, input_size), dtype=np.float64),
             np.zeros((0, action_size), dtype=np.float64),
             [f"Split file not found: {path}"],
             warnings,
@@ -139,8 +212,16 @@ def _load_split_arrays(
                 if len(errors) < max_reported_issues:
                     errors.append(f"line {line_number}: expected JSON object")
                 continue
-            obs, obs_error = _vector(sample.get("observation"), size=observation_size, field_name="observation")
-            action, action_error = _vector(sample.get("action"), size=action_size, field_name="action")
+            obs, obs_error = _policy_input_from_sample(
+                sample,
+                input_mode=input_mode,
+                robot_observation_size=observation_size,
+            )
+            action, action_error = _vector(
+                _action_value_from_sample(sample),
+                size=action_size,
+                field_name="action",
+            )
             sample_errors = [error for error in (obs_error, action_error) if error is not None]
             if sample_errors:
                 if len(errors) < max_reported_issues:
@@ -153,14 +234,16 @@ def _load_split_arrays(
     if not observations and not errors:
         warnings.append(f"Split file has no samples: {path}")
     return (
-        np.asarray(observations, dtype=np.float64).reshape((-1, observation_size)),
+        np.asarray(observations, dtype=np.float64).reshape((-1, input_size)),
         np.asarray(actions, dtype=np.float64).reshape((-1, action_size)),
         errors,
         warnings,
     )
 
 
-def _default_normalization_path(prepared_manifest_path: Path) -> Path:
+def _default_normalization_path(prepared_manifest_path: Path, input_mode: str = INPUT_MODE_OBSERVATION) -> Path:
+    if input_mode != INPUT_MODE_OBSERVATION:
+        return prepared_manifest_path.parent / f"normalization.{input_mode}.json"
     return prepared_manifest_path.parent / "normalization.json"
 
 
@@ -199,6 +282,7 @@ def _load_or_make_normalization(
     *,
     observation_size: int,
     action_size: int,
+    input_mode: str = INPUT_MODE_OBSERVATION,
 ) -> tuple[dict[str, np.ndarray], Path | None, list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -228,6 +312,20 @@ def _load_or_make_normalization(
         "action_mean": np.mean(train_actions, axis=0),
         "action_std": np.where(action_std > 1e-6, action_std, 1e-6),
     }
+    if normalization_path is not None:
+        normalization_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "schema_version": 1,
+            "normalization_type": "soridormi.policy_supervision.normalization.v1",
+            "input_mode": input_mode,
+            "source": "computed_from_train_split",
+            "observation_mean": [float(x) for x in arrays["observation_mean"].tolist()],
+            "observation_std": [float(x) for x in arrays["observation_std"].tolist()],
+            "action_mean": [float(x) for x in arrays["action_mean"].tolist()],
+            "action_std": [float(x) for x in arrays["action_std"].tolist()],
+        }
+        normalization_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        warnings[-1] = f"Normalization file not found; wrote train-only normalization: {normalization_path}"
     return arrays, normalization_path, errors, warnings
 
 
@@ -337,8 +435,14 @@ def train_behavior_clone_baseline(
     ridge_lambda: float = DEFAULT_RIDGE_LAMBDA,
     observation_size: int = DEFAULT_OBSERVATION_SIZE,
     action_size: int = DEFAULT_ACTION_SIZE,
+    input_mode: str = INPUT_MODE_OBSERVATION,
 ) -> BehaviorCloneTrainResult:
     manifest_path, manifest, manifest_errors = _load_prepared_manifest(prepared)
+    try:
+        model_observation_size = _input_size_for(input_mode, robot_observation_size=observation_size)
+    except ValueError as exc:
+        model_observation_size = observation_size
+        manifest_errors.append(str(exc))
     output = Path(output_dir) if output_dir is not None else manifest_path.parent / "behavior_clone_baseline"
     output.mkdir(parents=True, exist_ok=True)
     model_path = output / "linear_behavior_clone.npz"
@@ -359,9 +463,10 @@ def train_behavior_clone_baseline(
             report_path=str(report_path),
             normalization_path=str(normalization_path) if normalization_path is not None else None,
             ridge_lambda=ridge_lambda,
-            observation_size=observation_size,
+            observation_size=model_observation_size,
             action_size=action_size,
             metrics=empty_metrics,
+            input_mode=input_mode,
             errors=manifest_errors,
         )
         metrics_path.write_text(json.dumps(asdict(result), indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -381,27 +486,37 @@ def train_behavior_clone_baseline(
         path = split_paths.get(name)
         if path is None:
             arrays[name] = (
-                np.zeros((0, observation_size), dtype=np.float64),
+                np.zeros((0, model_observation_size), dtype=np.float64),
                 np.zeros((0, action_size), dtype=np.float64),
                 [f"Prepared manifest missing {name} split path"],
                 [],
             )
         else:
-            arrays[name] = _load_split_arrays(path, observation_size=observation_size, action_size=action_size)
+            arrays[name] = _load_split_arrays(
+                path,
+                observation_size=observation_size,
+                action_size=action_size,
+                input_mode=input_mode,
+            )
         errors.extend(f"{name}: {error}" for error in arrays[name][2])
         warnings.extend(f"{name}: {warning}" for warning in arrays[name][3])
+    if input_mode != INPUT_MODE_OBSERVATION:
+        warnings.append(
+            f"Input mode {input_mode} is offline training data only; runtime policy context plumbing was not changed"
+        )
 
     train_observations, train_actions, _train_errors, _train_warnings = arrays["train"]
     if train_observations.shape[0] == 0:
         errors.append("train split has no valid samples")
 
-    norm_path = Path(normalization_path) if normalization_path is not None else _default_normalization_path(manifest_path)
+    norm_path = Path(normalization_path) if normalization_path is not None else _default_normalization_path(manifest_path, input_mode)
     normalization, used_norm_path, norm_errors, norm_warnings = _load_or_make_normalization(
         norm_path,
         train_observations,
         train_actions,
-        observation_size=observation_size,
+        observation_size=model_observation_size,
         action_size=action_size,
+        input_mode=input_mode,
     )
     errors.extend(norm_errors)
     warnings.extend(norm_warnings)
@@ -419,10 +534,11 @@ def train_behavior_clone_baseline(
             report_path=str(report_path),
             normalization_path=str(used_norm_path) if used_norm_path is not None else None,
             ridge_lambda=ridge_lambda,
-            observation_size=observation_size,
+            observation_size=model_observation_size,
             action_size=action_size,
             metrics=empty_metrics,
             train_sample_count=int(train_observations.shape[0]),
+            input_mode=input_mode,
             errors=errors,
             warnings=warnings,
         )
@@ -457,9 +573,10 @@ def train_behavior_clone_baseline(
         observation_std=normalization["observation_std"].astype(np.float32),
         action_mean=normalization["action_mean"].astype(np.float32),
         action_std=normalization["action_std"].astype(np.float32),
-        observation_size=np.asarray([observation_size], dtype=np.int64),
+        observation_size=np.asarray([model_observation_size], dtype=np.int64),
         action_size=np.asarray([action_size], dtype=np.int64),
         ridge_lambda=np.asarray([ridge_lambda], dtype=np.float64),
+        input_mode=np.asarray([input_mode]),
     )
 
     result = BehaviorCloneTrainResult(
@@ -471,10 +588,11 @@ def train_behavior_clone_baseline(
         report_path=str(report_path),
         normalization_path=str(used_norm_path) if used_norm_path is not None else None,
         ridge_lambda=ridge_lambda,
-        observation_size=observation_size,
+        observation_size=model_observation_size,
         action_size=action_size,
         metrics=metrics,
         train_sample_count=int(train_observations.shape[0]),
+        input_mode=input_mode,
         warnings=warnings,
     )
     payload = asdict(result)
@@ -496,6 +614,7 @@ def print_train_summary(result: BehaviorCloneTrainResult) -> None:
     print(f"Metrics: {result.metrics_path}")
     print(f"Report: {result.report_path}")
     print(f"Normalization: {result.normalization_path or 'inline'}")
+    print(f"Input mode: {result.input_mode}")
     print(f"Train samples: {result.train_sample_count}")
     print("Metrics:")
     for split in result.metrics.values():
@@ -521,6 +640,7 @@ def main() -> None:
     parser.add_argument("--ridge-lambda", type=float, default=DEFAULT_RIDGE_LAMBDA)
     parser.add_argument("--observation-size", type=int, default=DEFAULT_OBSERVATION_SIZE)
     parser.add_argument("--action-size", type=int, default=DEFAULT_ACTION_SIZE)
+    parser.add_argument("--input-mode", choices=sorted(INPUT_MODES), default=INPUT_MODE_OBSERVATION)
     parser.add_argument("--json", action="store_true", help="Print machine-readable result JSON")
     args = parser.parse_args()
 
@@ -531,6 +651,7 @@ def main() -> None:
         ridge_lambda=args.ridge_lambda,
         observation_size=args.observation_size,
         action_size=args.action_size,
+        input_mode=args.input_mode,
     )
     if args.json:
         print(json.dumps(asdict(result), indent=2, sort_keys=True))
