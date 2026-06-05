@@ -14,7 +14,14 @@ from soridormi_runtime.linear_behavior_clone_policy import load_linear_behavior_
 from soridormi_runtime.onnx_providers import resolve_onnx_providers, verify_active_providers
 from soridormi_runtime.policy_profiles import PolicyProfile
 from soridormi_runtime.training_dataset import DEFAULT_ACTION_SIZE, DEFAULT_OBSERVATION_SIZE, sha256_file
-from soridormi_runtime.train_behavior_clone import _load_prepared_manifest, _load_split_arrays, _path_from_manifest, predict_linear_behavior_clone
+from soridormi_runtime.train_behavior_clone import (
+    INPUT_MODE_OBSERVATION,
+    _input_size_for,
+    _load_prepared_manifest,
+    _load_split_arrays,
+    _path_from_manifest,
+    predict_linear_behavior_clone,
+)
 
 EVALUATION_SCHEMA_VERSION = 1
 DEFAULT_OUTPUT_ROOT = Path("data/training_evaluations")
@@ -55,6 +62,8 @@ class PolicyEvaluationResult:
     action_size: int
     splits: dict[str, EvaluationSplitResult]
     thresholds: dict[str, float]
+    input_mode: str = INPUT_MODE_OBSERVATION
+    policy_input_size: int = DEFAULT_OBSERVATION_SIZE
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     generated_at_utc: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
@@ -332,6 +341,12 @@ def evaluate_policy_profile(
 ) -> PolicyEvaluationResult:
     policy_profile = profile if isinstance(profile, PolicyProfile) else PolicyProfile.load(profile)
     manifest_path, manifest, manifest_errors = _load_prepared_manifest(prepared)
+    input_mode = str(getattr(policy_profile.model, "input_mode", INPUT_MODE_OBSERVATION) or INPUT_MODE_OBSERVATION)
+    try:
+        policy_input_size = _input_size_for(input_mode, robot_observation_size=observation_size)
+    except ValueError as exc:
+        policy_input_size = observation_size
+        manifest_errors = [*manifest_errors, str(exc)]
     output = Path(output_dir) if output_dir is not None else DEFAULT_OUTPUT_ROOT / f"{policy_profile.name}_{utc_stamp()}"
     output.mkdir(parents=True, exist_ok=True)
     evaluation_path = output / "evaluation.json"
@@ -370,6 +385,8 @@ def evaluate_policy_profile(
             report_path=str(report_path),
             prediction_paths=prediction_paths,
             observation_size=observation_size,
+            input_mode=input_mode,
+            policy_input_size=policy_input_size,
             action_size=action_size,
             splits=split_results,
             thresholds=thresholds,
@@ -395,6 +412,7 @@ def evaluate_policy_profile(
             path,
             observation_size=observation_size,
             action_size=action_size,
+            input_mode=input_mode,
         )
         if max_samples_per_split is not None and max_samples_per_split > 0:
             observations = observations[:max_samples_per_split]
@@ -451,6 +469,8 @@ def evaluate_policy_profile(
         report_path=str(report_path),
         prediction_paths=prediction_paths,
         observation_size=observation_size,
+        input_mode=input_mode,
+        policy_input_size=policy_input_size,
         action_size=action_size,
         splits=split_results,
         thresholds=thresholds,
@@ -472,6 +492,8 @@ def print_evaluation_summary(result: PolicyEvaluationResult) -> None:
     print(f"Model kind: {result.model_kind}")
     print(f"Model: {result.model_path}")
     print(f"Prepared manifest: {result.prepared_manifest_path}")
+    print(f"Input mode: {result.input_mode}")
+    print(f"Policy input size: {result.policy_input_size}")
     print(f"Output dir: {result.output_dir}")
     print(f"Evaluation: {result.evaluation_path}")
     print(f"Report: {result.report_path}")

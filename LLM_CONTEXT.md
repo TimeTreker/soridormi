@@ -48,6 +48,22 @@ with runtime policy input plumbing. A context model can be exported as a
 `[1, 104]` ONNX/profile, but promotion still requires model validation and
 MuJoCo rollout evidence.
 
+Current M10 candidate:
+
+```text
+profile: context_stage1_flat_walk_v1_10ep
+model: /data/training_runs/context_stage1_flat_walk_v1_10ep_neural_bc_m10/neural_behavior_clone.onnx
+dataset: /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1_10ep/prepared_manifest.json
+```
+
+Validated checkpoint:
+
+```text
+check_policy_model: OK
+offline evaluation: test MAE ~= 0.00953, val MAE ~= 0.0286
+200-step MuJoCo smoke: OK, 104D policy input, no resets, forward_x ~= 0.259 m
+```
+
 ## Read First
 
 ```text

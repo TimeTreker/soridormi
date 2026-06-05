@@ -496,11 +496,6 @@ def train_behavior_clone_baseline(
             )
         errors.extend(f"{name}: {error}" for error in arrays[name][2])
         warnings.extend(f"{name}: {warning}" for warning in arrays[name][3])
-    if input_mode != INPUT_MODE_OBSERVATION:
-        warnings.append(
-            f"Input mode {input_mode} is offline training data only; runtime policy context plumbing was not changed"
-        )
-
     train_observations, train_actions, _train_errors, _train_warnings = arrays["train"]
     if train_observations.shape[0] == 0:
         errors.append("train split has no valid samples")

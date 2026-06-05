@@ -118,6 +118,23 @@ The next checkpoint is to train/export a real Stage 1 context neural candidate,
 validate its profile/model contract, and compare it in MuJoCo against the
 official teacher before any promotion.
 
+Current Stage 1 context candidate:
+
+```text
+profile: context_stage1_flat_walk_v1_10ep
+input: robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps)
+model input shape: [1, 104]
+model path: /data/training_runs/context_stage1_flat_walk_v1_10ep_neural_bc_m10/neural_behavior_clone.onnx
+```
+
+Checkpoint evidence:
+
+```text
+model/profile contract: OK
+offline evaluation on flat_walk_varied_speed_v1_10ep: test MAE ~= 0.00953
+bounded MuJoCo smoke: 200 steps, 104D inputs, no resets, forward_x ~= 0.259 m
+```
+
 ### M11: broader locomotion generalization
 
 Expand scenario coverage to start/stop transitions, turning, curves, lateral

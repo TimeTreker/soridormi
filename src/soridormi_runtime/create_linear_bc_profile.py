@@ -12,6 +12,7 @@ import yaml
 from soridormi_runtime.create_policy_profile import _profile_yaml_text, _validate_profile_name
 from soridormi_runtime.linear_behavior_clone_policy import load_linear_behavior_clone_model
 from soridormi_runtime.policy_contract import build_policy_contract
+from soridormi_runtime.policy_input_features import INPUT_MODE_OBSERVATION, input_size_for
 from soridormi_runtime.policy_profiles import DEFAULT_PROFILE_NAME, PolicyProfile
 
 
@@ -72,6 +73,18 @@ def build_linear_bc_profile_payload(
     contract = build_policy_contract(template_profile, robot_config_path=robot_config_path)
     if not contract.ok:
         raise ValueError(f"template profile contract is invalid: {'; '.join(contract.errors)}")
+    loaded_model = load_linear_behavior_clone_model(model_path)
+    model_input_mode = loaded_model.input_mode if loaded_model.ok else INPUT_MODE_OBSERVATION
+    expected_policy_input_size = input_size_for(
+        model_input_mode,
+        robot_observation_size=int(contract.observation["size"]),
+    )
+    model_input_size = loaded_model.observation_size if loaded_model.ok else expected_policy_input_size
+    if loaded_model.ok and model_input_size != expected_policy_input_size:
+        raise ValueError(
+            f"linear model observation_size={model_input_size} does not match input mode "
+            f"{model_input_mode!r} size {expected_policy_input_size}"
+        )
 
     payload = copy.deepcopy(template_profile.payload)
     payload["name"] = profile_name
@@ -88,6 +101,8 @@ def build_linear_bc_profile_payload(
     contract_payload["observation_size"] = int(contract.observation["size"])
     contract_payload["action_size"] = int(contract.action["size"])
     contract_payload["joint_names"] = list(contract.action["joint_order"])
+    contract_payload["input_mode"] = model_input_mode
+    contract_payload["policy_input_size"] = model_input_size
     payload["contract"] = contract_payload
 
     model = _mapping(payload.get("model"))
@@ -95,10 +110,11 @@ def build_linear_bc_profile_payload(
     model["path"] = str(model_path)
     model["input_name"] = "obs"
     model["output_name"] = "continuous_actions"
-    model["input_shape"] = [1, int(contract.observation["size"])]
+    model["input_shape"] = [1, model_input_size]
     model["output_shape"] = [1, int(contract.action["size"])]
     model["input_type"] = "tensor(float)"
     model["output_type"] = "tensor(float)"
+    model["input_mode"] = model_input_mode
     payload["model"] = model
 
     logging = _mapping(payload.get("logging"))
