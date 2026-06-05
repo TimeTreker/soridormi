@@ -58,6 +58,9 @@ model: /data/training_runs/context_stage1_flat_walk_v1_10ep_neural_bc_m10/neural
 
 profile: context_stage1_flat_walk_v1_10ep_e80
 model: /data/training_runs/context_stage1_flat_walk_v1_10ep_neural_bc_m10_e80/neural_behavior_clone.onnx
+
+profile: context_stage1_three_scenario_10ep_e80
+model: /data/training_runs/context_stage1_three_scenario_10ep_neural_bc_m10_e80/neural_behavior_clone.onnx
 ```
 
 Initial candidate checkpoint:
@@ -112,6 +115,36 @@ profile and fixes the low-speed command threshold seen in the initial model,
 but it is still not promotable because the curve/turning scenario gets stuck.
 Next work should add curve/yaw context coverage and retrain against a broader
 multi-scenario Stage 1 dataset before promotion.
+
+Latest three-scenario candidate checkpoint:
+
+```text
+profile: context_stage1_three_scenario_10ep_e80
+dataset: /data/training_datasets/context_bc/prepared/context_stage1_three_scenario_10ep/prepared_manifest.json
+raw data:
+  flat_walk_varied_speed_v1_10ep: 3000 samples
+  start_stop_velocity_ramp_v1_10ep: 3000 samples
+  curve_turn_walk_v1_10ep: 3000 samples
+prepared splits: train 7200, val 900, test 900
+check_policy_model: OK
+offline evaluation:
+  train MAE ~= 0.00720
+  val MAE ~= 0.01101
+  test MAE ~= 0.01244
+scenario suite: PASS, 3/3 scenarios accepted
+  flat_walk_varied_speed_v1: forward_distance ~= 0.312 m, mean speed ~= 0.0627 m/s
+  start_stop_velocity_ramp_v1: forward_distance ~= 0.267 m, mean speed ~= 0.0411 m/s
+  curve_turn_walk_v1: forward_distance ~= 0.155 m, mean speed ~= 0.0282 m/s
+  total_forward_distance_m ~= 0.733
+  mean_forward_speed_mps ~= 0.0440
+  fallen_count: 0
+```
+
+Interpretation: the three-scenario candidate is the current best MuJoCo
+candidate. It passes the same flat/start-stop/curve suite that the flat-only
+models failed, including the curve case. Do not call it hardware-ready yet:
+all three scenario reports still warn about low swing clearance, so the next
+checkpoint is visual/follow-camera inspection and clearance-focused refinement.
 
 ## Read First
 

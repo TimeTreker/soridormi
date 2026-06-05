@@ -130,6 +130,11 @@ profile: context_stage1_flat_walk_v1_10ep_e80
 input: robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps)
 model input shape: [1, 104]
 model path: /data/training_runs/context_stage1_flat_walk_v1_10ep_neural_bc_m10_e80/neural_behavior_clone.onnx
+
+profile: context_stage1_three_scenario_10ep_e80
+input: robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps)
+model input shape: [1, 104]
+model path: /data/training_runs/context_stage1_three_scenario_10ep_neural_bc_m10_e80/neural_behavior_clone.onnx
 ```
 
 Initial candidate checkpoint evidence:
@@ -184,6 +189,37 @@ low-speed command-response threshold, but it is still not promotable because
 the curve/turning scenario gets stuck. The next M10/M11 work is broader
 multi-scenario context-policy data, especially curve/yaw coverage, followed by
 retraining and scenario-suite comparison against the official teacher.
+
+Three-scenario candidate checkpoint evidence:
+
+```text
+profile: context_stage1_three_scenario_10ep_e80
+prepared dataset: /data/training_datasets/context_bc/prepared/context_stage1_three_scenario_10ep/prepared_manifest.json
+raw scenario data:
+  flat_walk_varied_speed_v1_10ep: 3000 samples
+  start_stop_velocity_ramp_v1_10ep: 3000 samples
+  curve_turn_walk_v1_10ep: 3000 samples
+prepared splits: train 7200, val 900, test 900
+model/profile contract: OK
+offline evaluation:
+  train MAE ~= 0.00720
+  val MAE ~= 0.01101
+  test MAE ~= 0.01244
+flat/start-stop/curve suite: PASS, 3/3 scenarios accepted
+  flat_walk_varied_speed_v1: forward_distance ~= 0.312 m, mean speed ~= 0.0627 m/s
+  start_stop_velocity_ramp_v1: forward_distance ~= 0.267 m, mean speed ~= 0.0411 m/s
+  curve_turn_walk_v1: forward_distance ~= 0.155 m, mean speed ~= 0.0282 m/s
+  total_forward_distance_m ~= 0.733
+  mean_forward_speed_mps ~= 0.0440
+  fallen_count: 0
+```
+
+Conclusion: the three-scenario candidate is the current best MuJoCo candidate.
+It passes the suite that the flat-only context candidates failed, including the
+curve/turning case. It is not hardware-ready: all three accepted scenario
+reports still warn about low swing clearance. The next checkpoint is visual
+follow-camera inspection plus clearance-focused refinement before any broader
+promotion.
 
 ### M11: broader locomotion generalization
 
