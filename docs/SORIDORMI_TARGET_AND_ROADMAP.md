@@ -135,6 +135,26 @@ offline evaluation on flat_walk_varied_speed_v1_10ep: test MAE ~= 0.00953
 bounded MuJoCo smoke: 200 steps, 104D inputs, no resets, forward_x ~= 0.259 m
 ```
 
+Scenario-suite evidence:
+
+```text
+context_stage1_flat_walk_v1_10ep:
+  flat/start-stop/curve suite: FAIL, 0/3 scenarios accepted
+  total_forward_distance_m ~= 0.0419
+  mean_forward_speed_mps ~= 0.00251
+  fallen_count: 0
+
+open_duck_forward teacher baseline on the same suite:
+  PASS, 3/3 scenarios accepted
+  total_forward_distance_m ~= 0.728
+  mean_forward_speed_mps ~= 0.0435
+```
+
+Conclusion: M10 runtime plumbing is useful, but this Stage 1 context candidate
+is not promotable. It stays upright but mostly stands still at scenario nominal
+commands. The next M10/M11 work is command-response diagnosis and better
+context-policy data/model coverage before promotion.
+
 ### M11: broader locomotion generalization
 
 Expand scenario coverage to start/stop transitions, turning, curves, lateral

@@ -64,6 +64,27 @@ offline evaluation: test MAE ~= 0.00953, val MAE ~= 0.0286
 200-step MuJoCo smoke: OK, 104D policy input, no resets, forward_x ~= 0.259 m
 ```
 
+Scenario-suite checkpoint:
+
+```text
+context_stage1_flat_walk_v1_10ep:
+  suite: flat_walk_varied_speed_v1, start_stop_velocity_ramp_v1, curve_turn_walk_v1
+  result: FAIL, 0/3 scenarios accepted
+  total_forward_distance_m ~= 0.0419
+  mean_forward_speed_mps ~= 0.00251
+  fallen_count: 0
+open_duck_forward teacher baseline:
+  result: PASS, 3/3 scenarios accepted
+  total_forward_distance_m ~= 0.728
+  mean_forward_speed_mps ~= 0.0435
+```
+
+Interpretation: the context candidate is runnable and remains upright, but it
+is not promotable. It mostly stands still at the scenario nominal commands even
+though the official teacher passes the same suite. Next work should diagnose
+command-response/generalization and improve the Stage 1 dataset/model before
+promotion.
+
 ## Read First
 
 ```text
