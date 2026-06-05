@@ -118,18 +118,24 @@ The next checkpoint is to train/export a real Stage 1 context neural candidate,
 validate its profile/model contract, and compare it in MuJoCo against the
 official teacher before any promotion.
 
-Current Stage 1 context candidate:
+Current Stage 1 context candidates:
 
 ```text
 profile: context_stage1_flat_walk_v1_10ep
 input: robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps)
 model input shape: [1, 104]
 model path: /data/training_runs/context_stage1_flat_walk_v1_10ep_neural_bc_m10/neural_behavior_clone.onnx
+
+profile: context_stage1_flat_walk_v1_10ep_e80
+input: robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps)
+model input shape: [1, 104]
+model path: /data/training_runs/context_stage1_flat_walk_v1_10ep_neural_bc_m10_e80/neural_behavior_clone.onnx
 ```
 
-Checkpoint evidence:
+Initial candidate checkpoint evidence:
 
 ```text
+profile: context_stage1_flat_walk_v1_10ep
 model/profile contract: OK
 offline evaluation on flat_walk_varied_speed_v1_10ep: test MAE ~= 0.00953
 bounded MuJoCo smoke: 200 steps, 104D inputs, no resets, forward_x ~= 0.259 m
@@ -152,8 +158,32 @@ open_duck_forward teacher baseline on the same suite:
 
 Conclusion: M10 runtime plumbing is useful, but this Stage 1 context candidate
 is not promotable. It stays upright but mostly stands still at scenario nominal
-commands. The next M10/M11 work is command-response diagnosis and better
-context-policy data/model coverage before promotion.
+commands.
+
+E80 candidate checkpoint evidence:
+
+```text
+profile: context_stage1_flat_walk_v1_10ep_e80
+model/profile contract: OK
+offline evaluation on flat_walk_varied_speed_v1_10ep: test MAE ~= 0.00596
+bounded MuJoCo velocity smoke:
+  vx=0.125 -> forward_x ~= 0.226 m, mean speed ~= 0.0568 m/s
+  vx=0.140 -> forward_x ~= 0.308 m, mean speed ~= 0.0774 m/s
+  vx=0.150 -> forward_x ~= 0.348 m, mean speed ~= 0.0874 m/s
+flat/start-stop/curve suite: FAIL, 2/3 scenarios accepted
+  flat_walk_varied_speed_v1: PASS
+  start_stop_velocity_ramp_v1: PASS
+  curve_turn_walk_v1: FAIL
+  total_forward_distance_m ~= 0.502
+  mean_forward_speed_mps ~= 0.0307
+  fallen_count: 0
+```
+
+Conclusion: E80 is a better experimental runtime profile and fixes the
+low-speed command-response threshold, but it is still not promotable because
+the curve/turning scenario gets stuck. The next M10/M11 work is broader
+multi-scenario context-policy data, especially curve/yaw coverage, followed by
+retraining and scenario-suite comparison against the official teacher.
 
 ### M11: broader locomotion generalization
 

@@ -48,17 +48,22 @@ with runtime policy input plumbing. A context model can be exported as a
 `[1, 104]` ONNX/profile, but promotion still requires model validation and
 MuJoCo rollout evidence.
 
-Current M10 candidate:
+Current M10 candidates:
+
+```text
+dataset: /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1_10ep/prepared_manifest.json
+
+profile: context_stage1_flat_walk_v1_10ep
+model: /data/training_runs/context_stage1_flat_walk_v1_10ep_neural_bc_m10/neural_behavior_clone.onnx
+
+profile: context_stage1_flat_walk_v1_10ep_e80
+model: /data/training_runs/context_stage1_flat_walk_v1_10ep_neural_bc_m10_e80/neural_behavior_clone.onnx
+```
+
+Initial candidate checkpoint:
 
 ```text
 profile: context_stage1_flat_walk_v1_10ep
-model: /data/training_runs/context_stage1_flat_walk_v1_10ep_neural_bc_m10/neural_behavior_clone.onnx
-dataset: /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1_10ep/prepared_manifest.json
-```
-
-Validated checkpoint:
-
-```text
 check_policy_model: OK
 offline evaluation: test MAE ~= 0.00953, val MAE ~= 0.0286
 200-step MuJoCo smoke: OK, 104D policy input, no resets, forward_x ~= 0.259 m
@@ -81,9 +86,32 @@ open_duck_forward teacher baseline:
 
 Interpretation: the context candidate is runnable and remains upright, but it
 is not promotable. It mostly stands still at the scenario nominal commands even
-though the official teacher passes the same suite. Next work should diagnose
-command-response/generalization and improve the Stage 1 dataset/model before
-promotion.
+though the official teacher passes the same suite.
+
+E80 candidate checkpoint:
+
+```text
+profile: context_stage1_flat_walk_v1_10ep_e80
+check_policy_model: OK
+offline evaluation: test MAE ~= 0.00596, val MAE ~= 0.01709
+200-step MuJoCo command-response smoke:
+  vx=0.125 -> forward_x ~= 0.226 m, mean speed ~= 0.0568 m/s
+  vx=0.140 -> forward_x ~= 0.308 m, mean speed ~= 0.0774 m/s
+  vx=0.150 -> forward_x ~= 0.348 m, mean speed ~= 0.0874 m/s
+scenario suite: FAIL, 2/3 scenarios accepted
+  flat_walk_varied_speed_v1: PASS
+  start_stop_velocity_ramp_v1: PASS
+  curve_turn_walk_v1: FAIL
+  total_forward_distance_m ~= 0.502
+  mean_forward_speed_mps ~= 0.0307
+  fallen_count: 0
+```
+
+Interpretation: the E80 context candidate is a better runnable experimental
+profile and fixes the low-speed command threshold seen in the initial model,
+but it is still not promotable because the curve/turning scenario gets stuck.
+Next work should add curve/yaw context coverage and retrain against a broader
+multi-scenario Stage 1 dataset before promotion.
 
 ## Read First
 
