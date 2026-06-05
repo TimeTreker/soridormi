@@ -60,6 +60,7 @@ def test_policy_profile_loads_env_contract(tmp_path: Path) -> None:
     assert env["SORIDORMI_POLICY_OUTPUT_NAME"] == "continuous_actions"
     assert env["SORIDORMI_POLICY_EXPECTED_INPUT_SHAPE"] == "1,101"
     assert env["SORIDORMI_POLICY_EXPECTED_OUTPUT_SHAPE"] == "1,14"
+    assert env["SORIDORMI_POLICY_INPUT_MODE"] == "observation"
     assert env["SORIDORMI_COMMAND_X"] == "0.07"
     assert env["SORIDORMI_COMMAND_Y"] == "-0.01"
     assert env["SORIDORMI_COMMAND_YAW"] == "0.02"
@@ -86,3 +87,19 @@ def test_resolve_policy_profile_from_env_file(tmp_path: Path, monkeypatch: pytes
     monkeypatch.delenv("SORIDORMI_POLICY_PROFILE", raising=False)
 
     assert resolve_policy_profile_path(None) == profile_path
+
+
+def test_policy_profile_exports_stage1_context_input_mode(tmp_path: Path) -> None:
+    profile_path = tmp_path / "context_profile.yaml"
+    write_profile(profile_path)
+    text = profile_path.read_text(encoding="utf-8")
+    text = text.replace("input_shape: [1, 101]", "input_shape: [1, 104]\n  input_mode: context_stage1_command")
+    text += "\ncontract:\n  input_mode: context_stage1_command\n  policy_input_size: 104\n"
+    profile_path.write_text(text, encoding="utf-8")
+
+    profile = PolicyProfile.load(profile_path)
+    env = profile.env()
+
+    assert profile.model.input_mode == "context_stage1_command"
+    assert env["SORIDORMI_POLICY_INPUT_MODE"] == "context_stage1_command"
+    assert env["SORIDORMI_POLICY_EXPECTED_INPUT_SHAPE"] == "1,104"

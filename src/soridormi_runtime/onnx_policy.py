@@ -10,6 +10,12 @@ import onnxruntime as ort
 from soridormi_api import RobotState
 from soridormi_runtime.observation_builder import ObservationBuilder
 from soridormi_runtime.onnx_providers import resolve_onnx_providers, verify_active_providers
+from soridormi_runtime.policy_input_features import (
+    INPUT_MODE_OBSERVATION,
+    build_policy_input_batch,
+    input_size_for,
+    normalize_policy_input_mode,
+)
 
 
 DEFAULT_POLICY_PATH = Path("/workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx")
@@ -87,6 +93,8 @@ class OnnxPolicy:
         )
         self.expected_input_name = os.environ.get("SORIDORMI_POLICY_INPUT_NAME") or None
         self.expected_output_name = os.environ.get("SORIDORMI_POLICY_OUTPUT_NAME") or None
+        self.input_mode = normalize_policy_input_mode(os.environ.get("SORIDORMI_POLICY_INPUT_MODE"))
+        self.last_command_vector: list[float] = [0.0] * 7
 
         if session_factory is None:
             if not self.policy_path.exists():
@@ -107,6 +115,7 @@ class OnnxPolicy:
         self.input_name = self._select_input_name(self.expected_input_name)
         self.output_name = self._select_output_name(self.expected_output_name)
         self._validate_io_contract_from_env()
+        self.policy_input_size = self._policy_input_size_from_session_or_env()
         self.last_observation: np.ndarray | None = None
         self.last_observation_stats: dict[str, object] | None = None
         self.last_action: np.ndarray | None = None
@@ -171,6 +180,7 @@ class OnnxPolicy:
         return list(self.observation_builder.config.joint_names)
 
     def set_command_vector(self, command: list[float] | tuple[float, ...] | np.ndarray) -> None:
+        self.last_command_vector = [float(x) for x in np.asarray(command, dtype=np.float32).reshape(-1).tolist()]
         self.observation_builder.set_command(command)
 
     def set_imitation_phase(self, imitation_phase: list[float] | tuple[float, ...] | np.ndarray) -> None:
@@ -224,12 +234,20 @@ class OnnxPolicy:
         self.last_action_stats = None
 
     def compute_action(self, state: RobotState) -> np.ndarray:
-        obs = self.observation_builder.build_batch(state)
+        robot_observation = self.observation_builder.build_batch(state)
 
-        if obs.shape != self.OBS_BATCH_SHAPE:
+        if robot_observation.shape != self.OBS_BATCH_SHAPE:
             raise RuntimeError(
-                f"Policy observation must have shape {self.OBS_BATCH_SHAPE}, got {obs.shape}"
+                f"Policy robot observation must have shape {self.OBS_BATCH_SHAPE}, got {robot_observation.shape}"
             )
+        obs = build_policy_input_batch(
+            robot_observation,
+            input_mode=self.input_mode,
+            command_vector=self.last_command_vector,
+        )
+        expected_shape = (1, self.policy_input_size)
+        if obs.shape != expected_shape:
+            raise RuntimeError(f"Policy input must have shape {expected_shape}, got {obs.shape}")
 
         self.last_observation = obs.copy()
         self.last_observation_stats = _array_stats("observation", obs)
@@ -269,12 +287,29 @@ class OnnxPolicy:
             "providers": list(self.providers),
             "input_name": self.input_name,
             "input_shape": _shape_for_name(inputs, self.input_name),
+            "input_mode": self.input_mode,
+            "policy_input_size": self.policy_input_size,
             "output_name": self.output_name,
             "output_shape": _shape_for_name(outputs, self.output_name),
             "available_inputs": [str(item.name) for item in inputs],
             "available_outputs": [str(item.name) for item in outputs],
             "joint_names": self.joint_names,
         }
+
+    def _policy_input_size_from_session_or_env(self) -> int:
+        expected_shape = _parse_shape_env("SORIDORMI_POLICY_EXPECTED_INPUT_SHAPE")
+        if expected_shape:
+            last = expected_shape[-1]
+            if isinstance(last, int):
+                return int(last)
+        shape = _shape_for_name(self.session.get_inputs(), self.input_name)
+        if shape:
+            last = shape[-1]
+            try:
+                return int(last)
+            except (TypeError, ValueError):
+                pass
+        return input_size_for(self.input_mode, robot_observation_size=self.OBS_BATCH_SHAPE[1])
 
 
 def _parse_shape_env(name: str) -> list[object] | None:

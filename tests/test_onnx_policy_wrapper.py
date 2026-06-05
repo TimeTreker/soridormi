@@ -5,6 +5,7 @@ import numpy as np
 from soridormi_api import IMUState, JointState, RobotState
 from soridormi_runtime.observation_builder import ObservationBuilder, ObservationBuilderConfig
 from soridormi_runtime.onnx_policy import OnnxPolicy
+from soridormi_runtime.policy_input_features import INPUT_MODE_CONTEXT_STAGE1_COMMAND
 
 
 JOINT_NAMES = [
@@ -49,6 +50,18 @@ class FakeSession:
         obs = feed["obs"]
         assert obs.shape == (1, 101)
         return [np.arange(14, dtype=np.float32).reshape(1, 14) * 0.01]
+
+
+class FakeContextSession(FakeSession):
+    def get_inputs(self):
+        return [FakeIo("obs", [1, 104])]
+
+    def run(self, output_names, feed):
+        self.last_feed = feed
+        obs = feed["obs"]
+        assert obs.shape == (1, 104)
+        assert np.allclose(obs[0, -3:], [0.12, -0.02, 0.05])
+        return [np.arange(14, dtype=np.float32).reshape(1, 14) * 0.02]
 
 
 def make_state() -> RobotState:
@@ -114,3 +127,30 @@ def test_onnx_policy_describe_contains_metadata() -> None:
     assert info["output_name"] == "continuous_actions"
     assert info["output_shape"] == [1, 14]
     assert info["joint_names"] == JOINT_NAMES
+
+
+def test_onnx_policy_stage1_context_mode_appends_velocity_command(monkeypatch) -> None:
+    monkeypatch.setenv("SORIDORMI_POLICY_INPUT_MODE", INPUT_MODE_CONTEXT_STAGE1_COMMAND)
+    monkeypatch.setenv("SORIDORMI_POLICY_EXPECTED_INPUT_SHAPE", "1,104")
+    builder = ObservationBuilder(
+        ObservationBuilderConfig(
+            joint_names=JOINT_NAMES,
+            default_positions_by_name={name: 0.0 for name in JOINT_NAMES},
+        )
+    )
+    policy = OnnxPolicy(
+        policy_path="/tmp/fake_context.onnx",
+        providers=["CPUExecutionProvider"],
+        observation_builder=builder,
+        session_factory=lambda path, providers: FakeContextSession(path, providers),
+    )
+    policy.set_command_vector([0.12, -0.02, 0.05, 0.0, 0.0, 0.0, 0.0])
+
+    action = policy.compute_action(make_state())
+
+    assert action.shape == (14,)
+    assert policy.get_observation() is not None
+    assert len(policy.get_observation() or []) == 104
+    info = policy.describe()
+    assert info["input_mode"] == INPUT_MODE_CONTEXT_STAGE1_COMMAND
+    assert info["policy_input_size"] == 104

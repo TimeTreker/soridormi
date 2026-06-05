@@ -105,6 +105,16 @@ for training. Add profile/model contracts for 104D+ context inputs. Only after
 this should context-mode neural policies be exported and packaged as runnable
 ONNX profiles.
 
+M10 Stage 1 starts with the explicit policy input mode:
+
+```text
+context_stage1_command:
+  robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps)
+```
+
+Profiles must declare this mode and a `[1, 104]` model input shape before a
+context-trained model is allowed to run through the runtime path.
+
 ### M11: broader locomotion generalization
 
 Expand scenario coverage to start/stop transitions, turning, curves, lateral

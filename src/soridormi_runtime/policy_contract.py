@@ -9,6 +9,7 @@ from typing import Any
 
 from soridormi_runtime.action_mapper import PolicyActionMapper
 from soridormi_runtime.observation_builder import ObservationBuilder, resolve_robot_config_path
+from soridormi_runtime.policy_input_features import INPUT_MODE_OBSERVATION, input_size_for, normalize_policy_input_mode
 from soridormi_runtime.policy_profiles import PolicyProfile
 
 
@@ -29,6 +30,7 @@ class PolicyContractResult:
     robot_config_path: str
     model: dict[str, Any]
     observation: dict[str, Any]
+    policy_input: dict[str, Any]
     action: dict[str, Any]
     command: dict[str, Any]
     phase: dict[str, Any]
@@ -142,14 +144,21 @@ def build_policy_contract(
     model_output_size = _shape_last_dim(model.output_shape)
     expected_obs_size = int(_profile_contract_value(policy_profile, "observation_size", obs_size))
     expected_action_size = int(_profile_contract_value(policy_profile, "action_size", action_size))
+    input_mode = normalize_policy_input_mode(
+        _profile_contract_value(policy_profile, "input_mode", getattr(model, "input_mode", INPUT_MODE_OBSERVATION))
+    )
+    policy_input_size = input_size_for(input_mode, robot_observation_size=obs_size)
+    declared_policy_input_size = _profile_contract_value(policy_profile, "policy_input_size", None)
     declared_joint_names = _list_of_strings(_profile_contract_value(policy_profile, "joint_names", None))
 
     if expected_obs_size != obs_size:
         errors.append(f"Profile contract.observation_size={expected_obs_size}, runtime observation size={obs_size}")
     if expected_action_size != action_size:
         errors.append(f"Profile contract.action_size={expected_action_size}, runtime action size={action_size}")
-    if model_input_size is not None and model_input_size != obs_size:
-        errors.append(f"Model input last dimension is {model_input_size}, runtime observation size is {obs_size}")
+    if declared_policy_input_size is not None and int(declared_policy_input_size) != policy_input_size:
+        errors.append(f"Profile contract.policy_input_size={declared_policy_input_size}, runtime policy input size={policy_input_size}")
+    if model_input_size is not None and model_input_size != policy_input_size:
+        errors.append(f"Model input last dimension is {model_input_size}, runtime policy input size is {policy_input_size}")
     if model_output_size is not None and model_output_size != action_size:
         errors.append(f"Model output last dimension is {model_output_size}, runtime action size is {action_size}")
     if declared_joint_names is not None and declared_joint_names != joint_names:
@@ -176,6 +185,18 @@ def build_policy_contract(
             for name in joint_names
         },
     }
+    policy_input_payload: dict[str, Any] = {
+        "mode": input_mode,
+        "size": policy_input_size,
+        "dtype": "float32",
+        "robot_observation_size": obs_size,
+        "description": "Policy input fed to model after optional runtime context features are appended",
+    }
+    if input_mode == "context_stage1_command":
+        policy_input_payload["segments"] = [
+            {"name": "robot_state.observation", "size": obs_size, "start": 0, "end": obs_size},
+            {"name": "desired_command.vx_vy_yaw", "size": 3, "start": obs_size, "end": policy_input_size},
+        ]
     action_payload: dict[str, Any] = {
         "size": action_size,
         "dtype": "float32",
@@ -212,6 +233,7 @@ def build_policy_contract(
         "output_shape": list(model.output_shape),
         "input_type": model.input_type,
         "output_type": model.output_type,
+        "input_mode": getattr(model, "input_mode", INPUT_MODE_OBSERVATION),
     }
     metadata_payload = {
         "profile_description": policy_profile.description,
@@ -227,6 +249,7 @@ def build_policy_contract(
         robot_config_path=str(robot_path),
         model=model_payload,
         observation=observation_payload,
+        policy_input=policy_input_payload,
         action=action_payload,
         command=command_payload,
         phase=phase_payload,
@@ -249,6 +272,7 @@ def print_contract_summary(result: PolicyContractResult) -> None:
         f"{result.model['output_name']} {result.model['output_shape']} {result.model['output_type']}"
     )
     print(f"Observation: size={result.observation['size']} dtype={result.observation['dtype']}")
+    print(f"Policy input: mode={result.policy_input['mode']} size={result.policy_input['size']} dtype={result.policy_input['dtype']}")
     print(f"Action: size={result.action['size']} dtype={result.action['dtype']}")
     print("Observation segments:")
     for item in result.observation["segments"]:

@@ -130,3 +130,32 @@ runtime policy context plumbing exists:
   --skip-onnx \
   --no-profile
 ```
+
+## Runtime Stage 1 context input
+
+M10 adds the matching runtime/profile input mode:
+
+```text
+context_stage1_command
+```
+
+This runtime mode appends the first three policy command values to the 101D
+robot observation:
+
+```text
+policy_input[104] = robot_state.observation[101] + vx_mps + vy_mps + yaw_radps
+```
+
+A runnable context policy profile must declare both:
+
+```yaml
+contract:
+  input_mode: context_stage1_command
+  policy_input_size: 104
+model:
+  input_shape: [1, 104]
+  input_mode: context_stage1_command
+```
+
+This only wires the runtime contract. A context-trained ONNX policy still needs
+model export, profile validation, and MuJoCo rollout evidence before promotion.

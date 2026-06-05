@@ -9,6 +9,11 @@ import numpy as np
 
 from soridormi_api import RobotState
 from soridormi_runtime.observation_builder import ObservationBuilder
+from soridormi_runtime.policy_input_features import (
+    INPUT_MODE_OBSERVATION,
+    build_policy_input_batch,
+    normalize_policy_input_mode,
+)
 LINEAR_BEHAVIOR_CLONE_KIND = "linear_behavior_clone"
 
 
@@ -23,6 +28,7 @@ class LinearBehaviorCloneModel:
     action_std: np.ndarray
     observation_size: int = 101
     action_size: int = 14
+    input_mode: str = INPUT_MODE_OBSERVATION
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -58,6 +64,30 @@ def _npz_array(payload: Any, name: str, shape: tuple[int, ...], errors: list[str
     return arr
 
 
+def _npz_scalar_int(payload: Any, name: str, default: int) -> int:
+    if name not in payload:
+        return int(default)
+    try:
+        values = np.asarray(payload[name]).reshape(-1)
+        if values.size:
+            return int(values[0])
+    except Exception:
+        return int(default)
+    return int(default)
+
+
+def _npz_scalar_str(payload: Any, name: str, default: str) -> str:
+    if name not in payload:
+        return str(default)
+    try:
+        values = np.asarray(payload[name]).reshape(-1)
+        if values.size:
+            return str(values[0])
+    except Exception:
+        return str(default)
+    return str(default)
+
+
 def load_linear_behavior_clone_model(
     path: str | os.PathLike[str],
     *,
@@ -78,11 +108,15 @@ def load_linear_behavior_clone_model(
             action_std=np.ones(action_size, dtype=np.float32),
             observation_size=observation_size,
             action_size=action_size,
+            input_mode=INPUT_MODE_OBSERVATION,
             errors=[f"Linear behavior-clone model not found: {model_path}"],
         )
 
     try:
         with np.load(model_path) as payload:
+            observation_size = _npz_scalar_int(payload, "observation_size", observation_size)
+            action_size = _npz_scalar_int(payload, "action_size", action_size)
+            input_mode = normalize_policy_input_mode(_npz_scalar_str(payload, "input_mode", INPUT_MODE_OBSERVATION))
             weights = _npz_array(payload, "weights", (observation_size, action_size), errors)
             bias = _npz_array(payload, "bias", (action_size,), errors)
             observation_mean = _npz_array(payload, "observation_mean", (observation_size,), errors)
@@ -100,6 +134,7 @@ def load_linear_behavior_clone_model(
             action_std=np.ones(action_size, dtype=np.float32),
             observation_size=observation_size,
             action_size=action_size,
+            input_mode=INPUT_MODE_OBSERVATION,
             errors=[f"Failed to load linear behavior-clone model {model_path}: {exc!r}"],
         )
 
@@ -118,6 +153,7 @@ def load_linear_behavior_clone_model(
         action_std=action_std,
         observation_size=observation_size,
         action_size=action_size,
+        input_mode=input_mode,
         errors=errors,
         warnings=warnings,
     )
@@ -149,6 +185,8 @@ class LinearBehaviorClonePolicy:
         self.model = load_linear_behavior_clone_model(self.policy_path)
         if not self.model.ok:
             raise RuntimeError("; ".join(self.model.errors))
+        self.input_mode = normalize_policy_input_mode(os.environ.get("SORIDORMI_POLICY_INPUT_MODE") or self.model.input_mode)
+        self.last_command_vector: list[float] = [0.0] * 7
         self.observation_builder = observation_builder or ObservationBuilder.from_robot_config(
             path=robot_config_path
         )
@@ -162,6 +200,7 @@ class LinearBehaviorClonePolicy:
         return list(self.observation_builder.config.joint_names)
 
     def set_command_vector(self, command: list[float] | tuple[float, ...] | np.ndarray) -> None:
+        self.last_command_vector = [float(x) for x in np.asarray(command, dtype=np.float32).reshape(-1).tolist()]
         self.observation_builder.set_command(command)
 
     def set_imitation_phase(self, imitation_phase: list[float] | tuple[float, ...] | np.ndarray) -> None:
@@ -200,11 +239,19 @@ class LinearBehaviorClonePolicy:
         self.last_action_stats = None
 
     def compute_action(self, state: RobotState) -> np.ndarray:
-        obs = self.observation_builder.build_batch(state)
-        if obs.shape != self.OBS_BATCH_SHAPE:
+        robot_observation = self.observation_builder.build_batch(state)
+        if robot_observation.shape != self.OBS_BATCH_SHAPE:
             raise RuntimeError(
-                f"Policy observation must have shape {self.OBS_BATCH_SHAPE}, got {obs.shape}"
+                f"Policy robot observation must have shape {self.OBS_BATCH_SHAPE}, got {robot_observation.shape}"
             )
+        obs = build_policy_input_batch(
+            robot_observation,
+            input_mode=self.input_mode,
+            command_vector=self.last_command_vector,
+        )
+        expected_shape = (1, self.model.observation_size)
+        if obs.shape != expected_shape:
+            raise RuntimeError(f"Policy input must have shape {expected_shape}, got {obs.shape}")
         self.last_observation = obs.copy()
         self.last_observation_stats = _array_stats("observation", obs)
 
@@ -237,6 +284,7 @@ class LinearBehaviorClonePolicy:
             "policy_path": str(self.policy_path),
             "input_name": "obs",
             "input_shape": [1, self.model.observation_size],
+            "input_mode": self.input_mode,
             "output_name": "continuous_actions",
             "output_shape": [1, self.model.action_size],
             "joint_names": self.joint_names,

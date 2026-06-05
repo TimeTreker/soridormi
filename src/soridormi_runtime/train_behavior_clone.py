@@ -10,6 +10,13 @@ from typing import Any, Iterable
 
 import numpy as np
 
+from soridormi_runtime.policy_input_features import (
+    CONTEXT_STAGE1_COMMAND_FIELDS,
+    INPUT_MODE_CONTEXT_STAGE1_COMMAND,
+    INPUT_MODE_OBSERVATION,
+    INPUT_MODES,
+    input_size_for,
+)
 from soridormi_runtime.training_dataset import DEFAULT_ACTION_SIZE, DEFAULT_OBSERVATION_SIZE, sha256_file
 
 BEHAVIOR_CLONE_SCHEMA_VERSION = 1
@@ -18,13 +25,6 @@ PREPARED_DATASET_TYPES = {
     "soridormi.policy_supervision.prepared.v1",
     "soridormi.policy_supervision.context_prepared.v1",
 }
-INPUT_MODE_OBSERVATION = "observation"
-INPUT_MODE_CONTEXT_STAGE1_COMMAND = "context_stage1_command"
-INPUT_MODES = {
-    INPUT_MODE_OBSERVATION,
-    INPUT_MODE_CONTEXT_STAGE1_COMMAND,
-}
-CONTEXT_STAGE1_COMMAND_FIELDS = ("vx_mps", "vy_mps", "yaw_radps")
 
 
 @dataclass
@@ -120,11 +120,7 @@ def _vector(value: Any, *, size: int, field_name: str) -> tuple[list[float] | No
 
 
 def _input_size_for(input_mode: str, *, robot_observation_size: int) -> int:
-    if input_mode == INPUT_MODE_OBSERVATION:
-        return robot_observation_size
-    if input_mode == INPUT_MODE_CONTEXT_STAGE1_COMMAND:
-        return robot_observation_size + len(CONTEXT_STAGE1_COMMAND_FIELDS)
-    raise ValueError(f"Unsupported input mode {input_mode!r}; use one of: {', '.join(sorted(INPUT_MODES))}")
+    return input_size_for(input_mode, robot_observation_size=robot_observation_size)
 
 
 def _observation_value_from_sample(sample: dict[str, Any]) -> Any:

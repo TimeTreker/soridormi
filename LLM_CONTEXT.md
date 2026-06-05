@@ -17,7 +17,8 @@ executes body skills safely in MuJoCo or hardware.
 
 ## Current Focus
 
-Active direction: M9 context BC data pipeline.
+Active direction: M10 runtime context policy plumbing after M9 Stage 1 offline
+context BC.
 
 Low-level policy direction:
 
@@ -42,8 +43,10 @@ Use:
 ./scripts/train_neural_behavior_clone.sh PREPARED_CONTEXT_DATASET --input-mode context_stage1_command --skip-onnx --no-profile
 ```
 
-Context-mode neural training is checkpoint-only until runtime context features
-are wired into policy execution.
+Context-mode neural training can now share the same Stage 1 feature definition
+with runtime policy input plumbing. ONNX export/promotion still requires a
+context model, a `[1, 104]` profile contract, model validation, and MuJoCo
+rollout evidence.
 
 ## Read First
 

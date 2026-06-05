@@ -4,6 +4,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from soridormi_runtime.policy_contract import build_policy_contract, observation_segments
+from soridormi_runtime.policy_input_features import INPUT_MODE_CONTEXT_STAGE1_COMMAND
 
 
 JOINT_NAMES = [
@@ -55,7 +56,15 @@ action_mapping:
     )
 
 
-def write_profile(path: Path, *, output_shape: str = "[1, 14]", joint_names: list[str] | None = None) -> None:
+def write_profile(
+    path: Path,
+    *,
+    output_shape: str = "[1, 14]",
+    joint_names: list[str] | None = None,
+    input_shape: str = "[1, 101]",
+    input_mode: str = "observation",
+    policy_input_size: int = 101,
+) -> None:
     joint_names_block = ""
     if joint_names is not None:
         joint_names_block = "  joint_names:\n" + "\n".join(f"    - {name}" for name in joint_names) + "\n"
@@ -68,15 +77,18 @@ metadata:
   policy_family: test
 contract:
   observation_size: 101
+  input_mode: {input_mode}
+  policy_input_size: {policy_input_size}
   action_size: 14
 {joint_names_block}model:
   path: /models/replacement.onnx
   input_name: obs
   output_name: continuous_actions
-  input_shape: [1, 101]
+  input_shape: {input_shape}
   output_shape: {output_shape}
   input_type: tensor(float)
   output_type: tensor(float)
+  input_mode: {input_mode}
 action_mapping:
   action_scale: 0.25
   max_motor_velocity: 5.24
@@ -108,6 +120,8 @@ def test_policy_contract_exports_replacement_interface(tmp_path: Path) -> None:
 
     assert result.ok
     assert result.observation["size"] == 101
+    assert result.policy_input["mode"] == "observation"
+    assert result.policy_input["size"] == 101
     assert result.action["size"] == 14
     assert result.model["input_shape"] == [1, 101]
     assert result.model["output_shape"] == [1, 14]
@@ -137,6 +151,28 @@ def test_policy_contract_reports_model_shape_mismatch(tmp_path: Path) -> None:
 
     assert not result.ok
     assert any("Model output last dimension" in error for error in result.errors)
+
+
+def test_policy_contract_accepts_stage1_context_policy_input(tmp_path: Path) -> None:
+    robot_config = tmp_path / "robot.yaml"
+    profile_path = tmp_path / "profile.yaml"
+    write_robot_config(robot_config)
+    write_profile(
+        profile_path,
+        input_shape="[1, 104]",
+        input_mode=INPUT_MODE_CONTEXT_STAGE1_COMMAND,
+        policy_input_size=104,
+        joint_names=JOINT_NAMES,
+    )
+
+    result = build_policy_contract(profile_path, robot_config_path=robot_config)
+
+    assert result.ok
+    assert result.observation["size"] == 101
+    assert result.policy_input["mode"] == INPUT_MODE_CONTEXT_STAGE1_COMMAND
+    assert result.policy_input["size"] == 104
+    assert result.policy_input["segments"][-1]["name"] == "desired_command.vx_vy_yaw"
+    assert result.model["input_shape"] == [1, 104]
 
 
 def test_policy_contract_reports_declared_joint_order_mismatch(tmp_path: Path) -> None:

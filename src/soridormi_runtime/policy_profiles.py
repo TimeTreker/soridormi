@@ -10,6 +10,8 @@ from typing import Any
 
 import yaml
 
+from soridormi_runtime.policy_input_features import INPUT_MODE_OBSERVATION, normalize_policy_input_mode
+
 DEFAULT_PROFILE_NAME = "open_duck_forward"
 DEFAULT_PROFILE_DIRS = (Path("/app/configs/policies"), Path("configs/policies"))
 
@@ -97,6 +99,7 @@ class PolicyModelSpec:
     output_shape: list[Any] = field(default_factory=lambda: [1, 14])
     input_type: str = "tensor(float)"
     output_type: str = "tensor(float)"
+    input_mode: str = INPUT_MODE_OBSERVATION
 
 
 @dataclass(frozen=True)
@@ -112,6 +115,7 @@ class PolicyProfile:
         path = resolve_policy_profile_path(profile)
         payload = _load_yaml_mapping(path)
         model_payload = _mapping(payload.get("model"))
+        contract_payload = _mapping(payload.get("contract"))
         model_path = model_payload.get("path")
         if not model_path:
             raise ValueError("policy profile model.path is required")
@@ -124,6 +128,7 @@ class PolicyProfile:
             output_shape=list(model_payload.get("output_shape", [1, 14])),
             input_type=str(model_payload.get("input_type", "tensor(float)")),
             output_type=str(model_payload.get("output_type", "tensor(float)")),
+            input_mode=normalize_policy_input_mode(model_payload.get("input_mode", contract_payload.get("input_mode", INPUT_MODE_OBSERVATION))),
         )
         return cls(
             name=str(payload.get("name") or path.stem),
@@ -159,6 +164,7 @@ class PolicyProfile:
             "SORIDORMI_POLICY_EXPECTED_OUTPUT_SHAPE": _shape_to_env(self.model.output_shape),
             "SORIDORMI_POLICY_EXPECTED_INPUT_TYPE": self.model.input_type,
             "SORIDORMI_POLICY_EXPECTED_OUTPUT_TYPE": self.model.output_type,
+            "SORIDORMI_POLICY_INPUT_MODE": self.model.input_mode,
             "SORIDORMI_RUNTIME_MODE": str(runtime.get("mode", "onnx_policy")),
             "SORIDORMI_BACKEND": str(runtime.get("backend", "sim")),
             "CONTROL_HZ": _fmt(runtime.get("control_hz", 50)),
@@ -271,6 +277,7 @@ def main() -> None:
         print(f"  model: {profile.model.path}")
         print(f"  model kind: {profile.model.kind}")
         print(f"  input: {profile.model.input_name} {profile.model.input_shape} {profile.model.input_type}")
+        print(f"  input mode: {profile.model.input_mode}")
         print(f"  output: {profile.model.output_name} {profile.model.output_shape} {profile.model.output_type}")
 
 

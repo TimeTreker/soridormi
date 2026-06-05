@@ -9,6 +9,7 @@ from soridormi_runtime.check_policy_model import check_profile_model
 from soridormi_runtime.create_linear_bc_profile import create_linear_bc_profile
 from soridormi_runtime.linear_behavior_clone_policy import LinearBehaviorClonePolicy, load_linear_behavior_clone_model
 from soridormi_runtime.observation_builder import ObservationBuilder, ObservationBuilderConfig
+from soridormi_runtime.policy_input_features import INPUT_MODE_CONTEXT_STAGE1_COMMAND
 from soridormi_runtime.policy_profiles import PolicyProfile
 
 
@@ -55,6 +56,25 @@ def _write_linear_model(path: Path, *, action_value: float = 0.25) -> None:
     )
 
 
+def _write_stage1_context_linear_model(path: Path) -> None:
+    weights = np.zeros((104, 14), dtype=np.float32)
+    weights[101, 0] = 1.0
+    weights[102, 1] = 1.0
+    weights[103, 2] = 1.0
+    np.savez(
+        path,
+        weights=weights,
+        bias=np.zeros(14, dtype=np.float32),
+        observation_mean=np.zeros(104, dtype=np.float32),
+        observation_std=np.ones(104, dtype=np.float32),
+        action_mean=np.zeros(14, dtype=np.float32),
+        action_std=np.ones(14, dtype=np.float32),
+        observation_size=np.asarray([104], dtype=np.int64),
+        action_size=np.asarray([14], dtype=np.int64),
+        input_mode=np.asarray([INPUT_MODE_CONTEXT_STAGE1_COMMAND]),
+    )
+
+
 def test_linear_behavior_clone_policy_computes_action_and_updates_history(tmp_path: Path) -> None:
     model = tmp_path / "linear_behavior_clone.npz"
     _write_linear_model(model, action_value=0.125)
@@ -67,6 +87,21 @@ def test_linear_behavior_clone_policy_computes_action_and_updates_history(tmp_pa
     assert np.allclose(action, 0.125)
     assert policy.get_observation() is not None
     assert np.allclose(builder.last_action, 0.125)
+
+
+def test_linear_behavior_clone_policy_stage1_context_mode_uses_command_features(tmp_path: Path) -> None:
+    model = tmp_path / "linear_behavior_clone_context.npz"
+    _write_stage1_context_linear_model(model)
+    builder = ObservationBuilder(ObservationBuilderConfig(joint_names=JOINTS))
+    policy = LinearBehaviorClonePolicy(model, observation_builder=builder)
+    policy.set_command_vector([0.12, -0.02, 0.05, 0.0, 0.0, 0.0, 0.0])
+
+    action = policy.compute_action(_state())
+
+    assert policy.input_mode == INPUT_MODE_CONTEXT_STAGE1_COMMAND
+    assert policy.get_observation() is not None
+    assert len(policy.get_observation() or []) == 104
+    assert np.allclose(action[:3], [0.12, -0.02, 0.05])
 
 
 def test_linear_behavior_clone_model_validation_reports_bad_shapes(tmp_path: Path) -> None:
