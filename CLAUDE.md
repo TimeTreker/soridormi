@@ -1,153 +1,101 @@
 # CLAUDE.md
 
-Project-local instructions for Claude Code or any coding assistant working on Soridormi.
+Project-local instructions for Claude Code or any coding assistant working on
+Soridormi.
 
-## Project identity
+## Project Identity
 
-Soridormi is a sim-to-real humanoid robot development stack based on Open Duck Mini v2. The engineering goal is to make one runtime/policy engine run in MuJoCo first, then support training/model replacement, then transfer the same runtime contracts to real robot hardware.
+Soridormi is a reusable sim-to-real humanoid robotics stack for Open Duck Mini
+v2. The goal is not a one-off walking demo. Soridormi should preserve clean
+runtime/API/backend contracts so the same policy runtime can run in MuJoCo,
+support model replacement/training, and eventually transfer to real hardware.
 
-Do not treat this as a one-off demo script. The official Open Duck scripts are the reference behavior; Soridormi is the engineering platform that should reproduce that behavior through clean APIs, logging, profiles, and Docker workflows.
+Official Open Duck code is the behavioral reference. Soridormi should reproduce
+official behavior through its own runtime contracts, logging, profiles, and
+Docker host workflows.
 
-## Long-term roadmap
+## Current Direction
 
-M4: Runnable ONNX policy system
-- Starts with one command.
-- Robot moves in MuJoCo.
-- Logs state/action/debug info.
-- Can compare runs.
-- Can survive/reset/restart.
-- Model path is configurable.
+Current active direction: M9 context-aware locomotion data and behavior cloning.
 
-M5: Model replacement interface
-- Any compatible ONNX model can be dropped in.
-- Observation/action contract is documented.
-- Policy metadata/config is externalized.
-- Multiple policies can be selected by profile.
-- Validation tools check model compatibility before runtime.
+Near-term policy contract:
 
-M6: Training pipeline
-- Collect data.
-- Define reward/tasks.
-- Train control policy.
-- Export ONNX.
-- Run the same Soridormi runtime with the new model.
-
-M7: Transfer to real robot
-- Jetson runtime image.
-- Hardware backend implementation.
-- Motor driver interface.
-- IMU/battery/state reader.
-- Safety supervisor and emergency stop.
-- Dry-run mode, low-power tests, tethered walking.
-
-## Current active milestone
-
-Current milestone: M4.x, specifically M4.13 next.
-
-Current goal: make Soridormi's ONNX policy runtime reproduce the official Open Duck MuJoCo inference loop closely enough that `open_duck_forward` walks forward inside Soridormi, not only inside the official baseline runner.
-
-## Critical evidence already established
-
-1. Official Open Duck baseline works in the Docker/MuJoCo environment.
-   - `./scripts/run_official_forward_baseline.sh`
-   - Result observed: `BEST_WALK_ONNX_2.onnx` walks forward.
-   - Example summary: about 1.82 m forward over about 19.4 s.
-
-2. Soridormi target replay exactly reproduces official motion.
-   - Official motor targets replayed through Soridormi MuJoCo backend produced zero error on motor targets, joint positions, joint velocities, contacts, and forward displacement over the compared window.
-   - Conclusion: simulator backend, reset pose, MuJoCo model, stepping, and command application are correct when given official motor targets.
-
-3. ONNX inference wrapper is correct.
-   - Official observations run through Soridormi's ONNX wrapper reproduce official actions with zero error.
-   - Soridormi observations run through Soridormi's ONNX wrapper reproduce Soridormi logged actions with zero error.
-   - Conclusion: ONNX Runtime provider/session/input/output handling is not the bug.
-
-4. Phase and command are already aligned.
-   - `phase mean_mae = 0.0`
-   - `command mean_mae = 0.0`
-   - This was fixed by mounting/using official `polynomial_coefficients.pkl` reference data in the runtime container.
-
-5. Remaining divergence is closed-loop observation/history/timing.
-   - First step official and Soridormi observations/actions are nearly identical.
-   - Later steps diverge.
-   - Worst segments repeatedly: `accelerometer_xyz`, `gyro_xyz`, `feet_contacts`, plus action history segments caused by earlier action divergence.
-   - M4.12 synchronous API did not improve metrics; do not assume it solved the issue.
-
-## Do not regress these decisions
-
-- Keep the ONNX policy path. Do not switch to open-loop gait unless explicitly requested.
-- Do not train a new model yet. The official model already works in the official baseline.
-- Do not rewrite the MuJoCo backend unless trace evidence proves it is necessary. Target replay proved backend correctness.
-- Do not randomly tune command/action scale to hide the mismatch. Use official-vs-Soridormi trace comparison.
-- Do not remove logging/comparison tools. They are the main debugging mechanism.
-
-## Active next task: M4.13
-
-Implement exact official loop-order parity.
-
-The suspected mismatch is not static observation layout. It is loop order / history timing / sensor sample timing:
-
-Official-style loop should be treated as the reference:
-
-1. Observe current state after prior MuJoCo decimation.
-2. Build observation using current IMU/joints/contacts, previous action history, previous motor targets, command, and phase.
-3. Run ONNX inference.
-4. Update action history according to official timing.
-5. Compute motor targets from `default_actuator + action * action_scale` with motor speed limit.
-6. Apply motor targets.
-7. Step MuJoCo decimation times.
-8. Read next state.
-
-M4.13 should add a first-divergence report:
-
-- first step where obs MAE exceeds a small threshold
-- first segment to diverge
-- official values and Soridormi values for that segment
-- last_action / motor_targets history at that step
-- sensor sample time and robot time
-
-## Useful commands
-
-Official reference:
-
-```bash
-SORIDORMI_OFFICIAL_MAX_SECONDS=10 ./scripts/run_official_forward_baseline.sh
-./scripts/show_official_baseline_summary.sh
+```text
+robot_state + desired_command + task_context + environment_context + short_history -> action_14d
 ```
 
-Soridormi policy run:
+Near-term trainable stage:
 
-```bash
-./scripts/run_official_compatible_policy_server.sh open_duck_forward
-./scripts/run_policy_experiment.sh open_duck_forward
+```text
+robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps) -> action_14d
 ```
 
-Trace comparison:
+The Stage 1 context input mode is offline training only until runtime context
+plumbing is implemented. Do not package a context-mode policy as runtime ONNX
+unless the runtime can provide the same context features.
 
-```bash
-./scripts/compare_latest_official_soridormi_trace.sh
-./scripts/check_latest_observation_action_parity.sh
+## Core Rules
+
+- Focus on Soridormi unless the user explicitly asks for Chromie or another
+  project.
+- Keep MuJoCo-first validation before hardware.
+- Do not replace locomotion work with open-loop gait.
+- Do not hide failures behind tuning.
+- Preserve official baseline, replay, comparison, and parity scripts.
+- Preserve Docker host wrapper behavior; users usually run scripts from the
+  host, and wrappers should enter the correct Docker service internally.
+- If official compatibility needs reference files, fail fast when they are
+  missing.
+- Do not feed raw natural language or raw perception directly into the low-level
+  14D action policy. Convert it to bounded structured context first.
+- Hardware work must default to read-only or dry-run validation unless the user
+  explicitly asks to send actuator commands.
+
+## Important Docs
+
+Read these before changing direction:
+
+```text
+README.md
+docs/README.md
+docs/PROJECT_SOP.md
+docs/PATCH_DELIVERY_AND_VALIDATION.md
+docs/SORIDORMI_POLICY_CONTEXT_CONTRACT.md
+docs/SORIDORMI_BC_TRAINING_CONTRACT.md
+docs/SORIDORMI_DATA_PIPELINE_M9.md
 ```
 
-Target replay isolation:
+## Validation
 
-```bash
-SORIDORMI_OFFICIAL_MAX_SECONDS=10 ./scripts/run_official_forward_baseline.sh
-./scripts/replay_latest_official_targets.sh
-./scripts/compare_official_replay_trace.sh
-```
-
-Tests:
+Preferred local validation:
 
 ```bash
 pytest -q
+python -m compileall -q src
 ```
 
-## Engineering style
+For live simulator tests, use MuJoCo explicitly:
 
-- Make small, trace-driven changes.
-- Prefer complete files in patch zips when updating the user.
-- Keep default behavior safe.
-- If adding scripts, make them host-runnable wrappers that enter Docker internally.
-- Avoid silent fallback for official-compatibility modes; fail fast if required files are missing.
-- Preserve compatibility with future real robot backend: the runtime should speak `RobotState` and `MotorCommand`, while backend implementation changes.
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
+```
+
+Optional visual inspection:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
+```
+
+Exception: `collect_random_teacher_dataset.sh` owns its temporary MuJoCo
+simulator lifecycle. Do not pair it with a second `run_sim_server.sh`; use the
+collector's own `--viewer` and usually `--follow-camera` flags.
+
+## Patch Style
+
+The user prefers plain git patch files, not zip archives. Assume downloaded
+patches live in `~/Downloads` unless the user says otherwise.
+
+Every patch response must include both patch integrity and functional validation
+commands. For docs-only patches, still validate expected sections and Markdown
+fences. For code, run relevant tests and compile checks. For sim/training, give
+local checks plus live MuJoCo validation commands.

@@ -300,6 +300,10 @@ Soridormi live MuJoCo commands use two patterns:
 For the current M9 dataset pipeline, see
 `docs/SORIDORMI_DATA_PIPELINE_M9.md`.
 
+For the curated documentation map, see `docs/README.md`. Keep durable project
+contracts and runbooks in `docs/`; generated reports should go under
+`artifacts/` and stay out of git.
+
 ## Runtime backend selection
 
 The runtime uses `SORIDORMI_BACKEND`:
