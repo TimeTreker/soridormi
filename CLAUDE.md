@@ -10,6 +10,11 @@ v2. The goal is not a one-off walking demo. Soridormi should preserve clean
 runtime/API/backend contracts so the same policy runtime can run in MuJoCo,
 support model replacement/training, and eventually transfer to real hardware.
 
+Soridormi is the robot cerebellum: body control, locomotion, safety,
+simulation, training/evaluation, and future hardware execution. Chromie is the
+robot brain in `TimeTreker/chromie.git` on `main`: conversation, memory, human
+interaction, high-level planning, and skill selection.
+
 Official Open Duck code is the behavioral reference. Soridormi should reproduce
 official behavior through its own runtime contracts, logging, profiles, and
 Docker host workflows.
@@ -60,6 +65,7 @@ README.md
 docs/README.md
 docs/PROJECT_SOP.md
 docs/PATCH_DELIVERY_AND_VALIDATION.md
+docs/SORIDORMI_TARGET_AND_ROADMAP.md
 docs/SORIDORMI_POLICY_CONTEXT_CONTRACT.md
 docs/SORIDORMI_BC_TRAINING_CONTRACT.md
 docs/SORIDORMI_DATA_PIPELINE_M9.md

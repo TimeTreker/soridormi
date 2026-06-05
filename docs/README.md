@@ -13,6 +13,8 @@ be committed.
 - `docs/PROJECT_SOP.md`: project backbone and validation philosophy.
 - `docs/architecture.md`: runtime/API/simulator architecture.
 - `docs/PATCH_DELIVERY_AND_VALIDATION.md`: patch and validation expectations.
+- `docs/SORIDORMI_TARGET_AND_ROADMAP.md`: cerebellum target, Chromie brain
+  boundary, and main milestones.
 
 ## Active locomotion/data docs
 

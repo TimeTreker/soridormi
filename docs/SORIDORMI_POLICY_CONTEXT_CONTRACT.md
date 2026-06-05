@@ -14,7 +14,16 @@ policy(
 ) -> action_14d
 ```
 
-For Open Duck Mini v2, `action_14d` remains the 14-dimensional action/target vector consumed by the Soridormi action mapper and Robot API. The contract does not mean a language model should directly output joint actions. Natural language should be resolved by a planner or skill router into bounded structured context first.
+For Open Duck Mini v2, `action_14d` remains the 14-dimensional action/target
+vector consumed by the Soridormi action mapper and Robot API. The contract does
+not mean a language model should directly output joint actions.
+
+Soridormi is the robot cerebellum. Chromie, in
+`https://github.com/TimeTreker/chromie.git` on `main`, is the robot brain:
+conversation, memory, intent understanding, and high-level skill choice.
+Chromie or another planner should resolve natural language into bounded
+structured skills/context first; Soridormi validates those fields and executes
+the body controller.
 
 ## Input groups
 
@@ -203,4 +212,4 @@ emergency stop
 sim acceptance gates before hardware
 ```
 
-Chromie or any future planner may choose skill/context values, but Soridormi must validate ranges and reject unavailable, unsupported, or unsafe requests before the policy runs.
+Chromie or any future planner may choose skill/context values, but Soridormi must validate ranges and reject unavailable, unsupported, or unsafe requests before the policy runs. Chromie must not send raw joint actions, motor commands, or low-level `action_14d` policy outputs.

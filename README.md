@@ -6,6 +6,29 @@ The project goal is to replace the original Raspberry Pi-style onboard runtime w
 
 Project name note: the intended bronze dragon name is **Soridormi**.
 
+## Whole-robot role
+
+Soridormi is the robot **cerebellum**: body control, locomotion, safety,
+simulation, training/evaluation, and future hardware execution.
+
+Chromie is the robot **brain**, maintained in
+`https://github.com/TimeTreker/chromie.git` on `main`. Chromie handles
+conversation, memory, intent understanding, high-level planning, and skill
+selection.
+
+The intended boundary is:
+
+```text
+Chromie brain
+  -> structured skill/context request
+  -> Soridormi cerebellum
+  -> safe body execution in MuJoCo or hardware
+```
+
+Chromie must not send raw joint actions or low-level 14D policy actions.
+Chromie should call bounded skills such as `walk_velocity`, `look_at_person`,
+`nod_yes`, `stand_idle`, or `stop`; Soridormi validates and executes them.
+
 ## Design goals
 
 ```text
@@ -303,6 +326,9 @@ For the current M9 dataset pipeline, see
 For the curated documentation map, see `docs/README.md`. Keep durable project
 contracts and runbooks in `docs/`; generated reports should go under
 `artifacts/` and stay out of git.
+
+For the target and milestone plan, see
+`docs/SORIDORMI_TARGET_AND_ROADMAP.md`.
 
 ## Runtime backend selection
 

@@ -38,9 +38,10 @@ context-conditioned rows should use:
 }
 ```
 
-Natural language is not a policy input. Chromie or another planner may choose a
-skill and context, but Soridormi validates bounded structured fields before
-training or execution.
+Natural language is not a policy input. Chromie is the robot brain and may
+choose a skill/context from user intent, but Soridormi is the robot cerebellum:
+it validates bounded structured fields before training or execution and owns the
+low-level `action_14d` body policy.
 
 ## Validate the contract
 

@@ -10,6 +10,11 @@ MuJoCo now and hardware later. The current project direction is
 scenario-aware, context-conditioned locomotion data and behavior cloning in
 MuJoCo.
 
+Soridormi is the robot cerebellum/body runtime. Chromie is the robot brain in
+`TimeTreker/chromie.git` on `main`. Chromie talks with people, understands
+intent, plans high-level behavior, and chooses skills. Soridormi validates and
+executes body skills safely in MuJoCo or hardware.
+
 ## Current Focus
 
 Active direction: M9 context BC data pipeline.
@@ -47,6 +52,7 @@ README.md
 docs/README.md
 docs/PROJECT_SOP.md
 docs/PATCH_DELIVERY_AND_VALIDATION.md
+docs/SORIDORMI_TARGET_AND_ROADMAP.md
 docs/SORIDORMI_POLICY_CONTEXT_CONTRACT.md
 docs/SORIDORMI_BC_TRAINING_CONTRACT.md
 docs/SORIDORMI_DATA_PIPELINE_M9.md
@@ -123,6 +129,9 @@ For JSON-producing shell wrappers, stdout must stay machine-readable when
 ## Boundaries
 
 - MuJoCo before hardware.
+- Chromie is brain; Soridormi is cerebellum/body runtime.
+- Chromie calls structured skills/context, never raw joint actions or low-level
+  `action_14d` policy outputs.
 - Hardware commands require explicit user intent; otherwise dry-run/read-only.
 - BC copies the teacher distribution. Do not claim it improves stride,
   clearance, obstacles, or recovery beyond teacher behavior without rollout

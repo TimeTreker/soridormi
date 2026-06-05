@@ -4,7 +4,14 @@ This document defines the project backbone. Future work should first strengthen 
 
 ## SOP-0: Target definition
 
-Goal: Open Duck Mini v2 walks reliably in MuJoCo first, then the same Soridormi runtime controls hardware through a hardware backend.
+Goal: Soridormi is the robot cerebellum for Open Duck Mini v2. It makes the
+body walk and act reliably in MuJoCo first, then uses the same runtime contracts
+to control hardware through a hardware backend.
+
+Chromie is the robot brain in `TimeTreker/chromie.git` on `main`. Chromie owns
+conversation, memory, human interaction, high-level planning, and choosing which
+body skill should run. Soridormi owns body-control validation, locomotion,
+policy execution, safety, simulation, and hardware execution.
 
 Core invariant:
 
@@ -14,6 +21,14 @@ Same policy interface.
 Same RobotState.
 Same MotorCommand.
 Different backend.
+```
+
+Brain/cerebellum boundary:
+
+```text
+Chromie chooses structured intent.
+Soridormi validates and executes body skills.
+Chromie never sends raw joint actions or low-level 14D policy actions.
 ```
 
 ## SOP-1: Official baseline
@@ -122,7 +137,27 @@ standing pose
 low-speed tethered walk
 ```
 
-## SOP-9: Hardware safety and staged rollout
+## SOP-9: Chromie brain integration
+
+Expose Soridormi skills and status as a structured API that Chromie can call.
+The first integration target is MuJoCo-only.
+
+Chromie-facing requests should look like bounded skills/context, not motor
+targets:
+
+```text
+walk_velocity(vx_mps, vy_mps, yaw_radps, duration_s)
+turn_in_place(yaw_radps, duration_s)
+look_at_person(target_id or target bearing)
+nod_yes()
+stand_idle()
+stop()
+```
+
+Soridormi responses must include status and explicit refusal/failure reasons for
+unsafe, unsupported, unavailable, or out-of-range requests.
+
+## SOP-10: Hardware safety and staged rollout
 
 Before walking on hardware, add hard safety boundaries:
 
@@ -137,7 +172,7 @@ operator checklist
 log everything
 ```
 
-## SOP-10: Patch delivery and validation
+## SOP-11: Patch delivery and validation
 
 Future LLM sessions must deliver plain `.patch` files unless the user asks for another format. The user normally downloads patches to `~/Downloads`, so user-facing commands should use that path.
 

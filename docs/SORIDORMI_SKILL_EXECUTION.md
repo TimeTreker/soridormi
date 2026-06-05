@@ -5,6 +5,11 @@ still **dry-run only**: it resolves manifest-declared skills into high-level
 velocity command plans, but it does not connect to MuJoCo, hardware, MCP, or
 motor commands.
 
+This registry is the planned Chromie-to-Soridormi body boundary. Chromie is the
+brain that chooses high-level actions; Soridormi is the cerebellum that
+validates skill parameters, checks availability/safety, and executes body
+controllers.
+
 The purpose is to make skill implementation incremental and testable:
 
 1. declare a skill in `configs/skills/open_duck_mini_v2_skills.json`;
@@ -72,6 +77,8 @@ The current M7C/M7D implementation only lowers single-segment locomotion skills 
 - Parameters are range-checked against the manifest.
 - Unsupported or future skills are rejected rather than silently executed.
 - Social speech/TTS remains outside Soridormi and belongs to Chromie.
+- Chromie must call structured skills/context, not raw joint targets or
+  low-level `action_14d` policy outputs.
 
 ## Functional validation
 

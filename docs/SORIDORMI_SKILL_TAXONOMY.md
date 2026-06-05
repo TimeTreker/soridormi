@@ -2,7 +2,11 @@
 
 Status: M7 bootstrap proposal.
 
-Soridormi's near-term M6 work remains command-conditioned free walking in MuJoCo. M7 starts the next platform layer: a skill-based robot body interface. A higher-level system should eventually ask Soridormi for safe named behaviors instead of directly manipulating velocity commands, joint targets, or motor commands.
+Soridormi is the robot cerebellum/body runtime. Chromie is the robot brain in
+`TimeTreker/chromie.git` on `main`. M7 starts the body-skill interface between
+them: Chromie or another high-level planner should ask Soridormi for safe named
+behaviors instead of directly manipulating velocity commands, joint targets, or
+motor commands.
 
 ## Design decision: define the full skill universe first
 
@@ -64,7 +68,9 @@ small bow
 attention gesture
 ```
 
-Speech/TTS belongs outside Soridormi, for example in Chromie. Soridormi owns the body action.
+Speech/TTS belongs outside Soridormi, in Chromie. Soridormi owns the body
+action and may reject a requested skill if it is unsupported, unsafe,
+unavailable, or outside validated ranges.
 
 ## M7 milestone structure
 
@@ -254,7 +260,7 @@ Validation checks include:
 - parameter min/default/max sanity;
 - available skills must not require unsupported actuator groups.
 
-The `--llm-context` output is intentionally read-only context for future Chromie/MCP planners. It must not be interpreted as permission to execute planned or unsupported skills.
+The `--llm-context` output is intentionally read-only context for Chromie/MCP planners. It must not be interpreted as permission to execute planned or unsupported skills.
 
 ## First executable subset
 

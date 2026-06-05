@@ -6,6 +6,8 @@ Repository-local guidance for coding agents working on Soridormi.
 
 Build a reusable sim-to-real engineering runtime, not a one-off demo. Official Open Duck code is the reference; Soridormi should reproduce it through clean runtime/API/backend contracts and then make model replacement/training/hardware transfer easy.
 
+Soridormi is the robot cerebellum/body runtime. Chromie, in `TimeTreker/chromie.git` on `main`, is the robot brain that handles conversation, memory, high-level planning, and skill choice.
+
 ## Current focus
 
 M9.x: scenario-aware locomotion data and context-conditioned behavior cloning.
@@ -29,6 +31,7 @@ robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps) -> act
 - Do not hide failures behind tuning.
 - Do not remove the official baseline, replay, or parity scripts.
 - Do not feed raw natural language or raw perception directly into the low-level 14D action policy.
+- Do not let Chromie or any planner send raw joint actions, motor commands, or low-level `action_14d` policy outputs; use structured skills/context.
 - Preserve Docker host wrapper behavior: user usually runs scripts from host.
 - If a host script needs Python package imports, it should enter the correct Docker service internally.
 - If official compatibility needs reference files, fail fast if they are missing.
