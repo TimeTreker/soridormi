@@ -120,8 +120,7 @@ The default normalization artifact for this mode is
 `normalization.context_stage1_command.json`, so it does not overwrite the
 legacy 101D `normalization.json`.
 
-For neural smoke runs, context input mode is checkpoint-only until Soridormi
-runtime policy context plumbing exists:
+For neural smoke runs without runtime artifacts:
 
 ```bash
 ./scripts/train_neural_behavior_clone.sh \
@@ -157,5 +156,16 @@ model:
   input_mode: context_stage1_command
 ```
 
-This only wires the runtime contract. A context-trained ONNX policy still needs
-model export, profile validation, and MuJoCo rollout evidence before promotion.
+After M10 profile plumbing, neural context-mode training can export an ONNX
+model and generate this profile metadata:
+
+```bash
+./scripts/train_neural_behavior_clone.sh \
+  /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1/prepared_manifest.json \
+  --input-mode context_stage1_command \
+  --profile-name context_stage1_candidate \
+  --force-profile
+```
+
+A context-trained ONNX policy still needs profile/model validation and MuJoCo
+rollout evidence before promotion.

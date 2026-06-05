@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from soridormi_runtime.train_neural_behavior_clone import (
     _parse_hidden_sizes,
@@ -180,21 +181,42 @@ def test_train_neural_behavior_clone_accepts_stage1_context_mode_checkpoint_only
     assert Path(result.checkpoint_path).exists()
 
 
-def test_train_neural_behavior_clone_rejects_context_mode_onnx_export(tmp_path: Path) -> None:
+def test_train_neural_behavior_clone_exports_stage1_context_onnx_profile(tmp_path: Path, monkeypatch) -> None:
     prepared = _context_prepared_dataset(tmp_path)
+    exported: dict[str, object] = {}
+
+    def fake_export(module, dummy, path, **kwargs) -> None:
+        exported["dummy_shape"] = list(dummy.shape)
+        exported["input_names"] = kwargs.get("input_names")
+        Path(path).write_bytes(b"fake onnx")
+
+    import torch
+
+    monkeypatch.setattr(torch.onnx, "export", fake_export)
 
     result = train_neural_behavior_clone(
         prepared,
         output_dir=tmp_path / "run",
         input_mode=INPUT_MODE_CONTEXT_STAGE1_COMMAND,
         export_onnx=True,
-        create_profile=False,
+        create_profile=True,
+        profile_name="context_stage1_test",
+        profile_output_dir=tmp_path / "profiles",
         epochs=1,
         device="cpu",
     )
 
-    assert not result.ok
-    assert any("--skip-onnx" in error for error in result.errors)
+    assert result.ok
+    assert exported["dummy_shape"] == [1, 104]
+    assert exported["input_names"] == ["obs"]
+    assert result.onnx_path is not None
+    assert Path(result.onnx_path).exists()
+    assert result.profile_path is not None
+    profile = yaml.safe_load(Path(result.profile_path).read_text(encoding="utf-8"))
+    assert profile["model"]["input_shape"] == [1, 104]
+    assert profile["model"]["input_mode"] == INPUT_MODE_CONTEXT_STAGE1_COMMAND
+    assert profile["contract"]["policy_input_size"] == 104
+    assert profile["contract"]["input_mode"] == INPUT_MODE_CONTEXT_STAGE1_COMMAND
 
 
 def test_train_neural_behavior_clone_wrapper_overrides_cuda_entrypoint_for_json_stdout() -> None:

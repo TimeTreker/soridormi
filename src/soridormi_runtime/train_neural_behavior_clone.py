@@ -327,10 +327,6 @@ def train_neural_behavior_clone(
     except ValueError as exc:
         model_observation_size = observation_size
         manifest_errors.append(str(exc))
-    if input_mode != INPUT_MODE_OBSERVATION and export_onnx:
-        manifest_errors.append(
-            f"Input mode {input_mode} is offline training data only; use --skip-onnx until runtime context plumbing is implemented"
-        )
     output = Path(output_dir) if output_dir is not None else manifest_path.parent / "neural_behavior_clone"
     output.mkdir(parents=True, exist_ok=True)
     checkpoint_path = output / "neural_behavior_clone.pt"
@@ -402,11 +398,6 @@ def train_neural_behavior_clone(
             )
         errors.extend(f"{name}: {error}" for error in arrays[name][2])
         warnings.extend(f"{name}: {warning}" for warning in arrays[name][3])
-    if input_mode != INPUT_MODE_OBSERVATION:
-        warnings.append(
-            f"Input mode {input_mode} is offline training data only; runtime policy context plumbing was not changed"
-        )
-
     train_obs, train_actions, _train_errors, _train_warnings = arrays["train"]
     if train_obs.shape[0] == 0:
         errors.append("train split has no valid samples")
@@ -572,6 +563,8 @@ def train_neural_behavior_clone(
                 output_shape=[1, action_size],
                 input_type="tensor(float)",
                 output_type="tensor(float)",
+                input_mode=input_mode,
+                policy_input_size=model_observation_size,
             )
             profile_path = profile.path
         except Exception as exc:

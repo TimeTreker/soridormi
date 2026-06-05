@@ -125,6 +125,43 @@ def test_build_replacement_profile_payload_stamps_contract(tmp_path: Path) -> No
     assert payload["logging"]["prefix"] == "policy_my_replacement"
 
 
+def test_build_replacement_profile_payload_stamps_context_input_mode(tmp_path: Path) -> None:
+    robot_config = tmp_path / "robot.yaml"
+    template_path = tmp_path / "template.yaml"
+    write_robot_config(robot_config)
+    write_template_profile(template_path)
+
+    payload = build_replacement_profile_payload(
+        name="context_model",
+        model_path="/models/context.onnx",
+        template=template_path,
+        robot_config_path=robot_config,
+        input_mode="context_stage1_command",
+    )
+
+    assert payload["contract"]["input_mode"] == "context_stage1_command"
+    assert payload["contract"]["policy_input_size"] == 104
+    assert payload["model"]["input_mode"] == "context_stage1_command"
+    assert payload["model"]["input_shape"] == [1, 104]
+
+
+def test_build_replacement_profile_rejects_mismatched_policy_input_size(tmp_path: Path) -> None:
+    robot_config = tmp_path / "robot.yaml"
+    template_path = tmp_path / "template.yaml"
+    write_robot_config(robot_config)
+    write_template_profile(template_path)
+
+    with pytest.raises(ValueError, match="policy_input_size"):
+        build_replacement_profile_payload(
+            name="bad_context_model",
+            model_path="/models/context.onnx",
+            template=template_path,
+            robot_config_path=robot_config,
+            input_mode="context_stage1_command",
+            policy_input_size=105,
+        )
+
+
 def test_create_replacement_profile_writes_loadable_valid_profile(tmp_path: Path) -> None:
     robot_config = tmp_path / "robot.yaml"
     template_path = tmp_path / "template.yaml"

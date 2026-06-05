@@ -40,13 +40,13 @@ Use:
 
 ```bash
 ./scripts/train_behavior_clone.sh PREPARED_CONTEXT_DATASET --input-mode context_stage1_command
-./scripts/train_neural_behavior_clone.sh PREPARED_CONTEXT_DATASET --input-mode context_stage1_command --skip-onnx --no-profile
+./scripts/train_neural_behavior_clone.sh PREPARED_CONTEXT_DATASET --input-mode context_stage1_command --profile-name context_stage1_candidate --force-profile
 ```
 
 Context-mode neural training can now share the same Stage 1 feature definition
-with runtime policy input plumbing. ONNX export/promotion still requires a
-context model, a `[1, 104]` profile contract, model validation, and MuJoCo
-rollout evidence.
+with runtime policy input plumbing. A context model can be exported as a
+`[1, 104]` ONNX/profile, but promotion still requires model validation and
+MuJoCo rollout evidence.
 
 ## Read First
 

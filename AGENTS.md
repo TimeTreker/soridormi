@@ -88,4 +88,5 @@ For current context BC data/training:
 ./scripts/validate_bc_training_contract.sh --sample-jsonl CONTEXT.jsonl --json
 ./scripts/prepare_context_bc_dataset.sh CONTEXT.jsonl --output-dir PREPARED_DIR --json
 ./scripts/train_behavior_clone.sh PREPARED_DIR/prepared_manifest.json --input-mode context_stage1_command --json
+./scripts/train_neural_behavior_clone.sh PREPARED_DIR/prepared_manifest.json --input-mode context_stage1_command --profile-name context_stage1_candidate --force-profile --json
 ```

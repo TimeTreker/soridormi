@@ -101,9 +101,8 @@ robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps) -> act
 ### M10: runtime context policy plumbing
 
 Extend runtime policy execution so it can provide the same context features used
-for training. Add profile/model contracts for 104D+ context inputs. Only after
-this should context-mode neural policies be exported and packaged as runnable
-ONNX profiles.
+for training. Add profile/model contracts for 104D+ context inputs, then allow
+context-mode neural policies to export as runnable ONNX profiles.
 
 M10 Stage 1 starts with the explicit policy input mode:
 
@@ -114,6 +113,10 @@ context_stage1_command:
 
 Profiles must declare this mode and a `[1, 104]` model input shape before a
 context-trained model is allowed to run through the runtime path.
+
+The next checkpoint is to train/export a real Stage 1 context neural candidate,
+validate its profile/model contract, and compare it in MuJoCo against the
+official teacher before any promotion.
 
 ### M11: broader locomotion generalization
 

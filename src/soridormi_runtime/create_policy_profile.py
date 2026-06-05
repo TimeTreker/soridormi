@@ -10,6 +10,7 @@ from typing import Any
 import yaml
 
 from soridormi_runtime.policy_contract import build_policy_contract
+from soridormi_runtime.policy_input_features import input_size_for, normalize_policy_input_mode
 from soridormi_runtime.policy_profiles import DEFAULT_PROFILE_NAME, PolicyProfile
 
 _PROFILE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
@@ -74,6 +75,8 @@ def build_replacement_profile_payload(
     output_shape: list[Any] | tuple[Any, ...] | str | None = None,
     input_type: str | None = None,
     output_type: str | None = None,
+    input_mode: str | None = None,
+    policy_input_size: int | None = None,
 ) -> dict[str, Any]:
     """Clone a known-good policy profile and stamp the runtime contract into it.
 
@@ -103,10 +106,28 @@ def build_replacement_profile_payload(
     contract_payload["observation_size"] = int(contract.observation["size"])
     contract_payload["action_size"] = int(contract.action["size"])
     contract_payload["joint_names"] = list(contract.action["joint_order"])
+    normalized_input_mode: str | None = None
+    resolved_policy_input_size: int | None = None
+    if input_mode is not None:
+        normalized_input_mode = normalize_policy_input_mode(input_mode)
+        expected_policy_input_size = input_size_for(
+            normalized_input_mode,
+            robot_observation_size=int(contract.observation["size"]),
+        )
+        if policy_input_size is not None and int(policy_input_size) != expected_policy_input_size:
+            raise ValueError(
+                f"policy_input_size={policy_input_size} does not match input mode "
+                f"{normalized_input_mode!r} size {expected_policy_input_size}"
+            )
+        resolved_policy_input_size = expected_policy_input_size
+        contract_payload["input_mode"] = normalized_input_mode
+        contract_payload["policy_input_size"] = resolved_policy_input_size
     payload["contract"] = contract_payload
 
     model = _mapping(payload.get("model"))
     model["path"] = str(model_path)
+    if normalized_input_mode is not None:
+        model["input_mode"] = normalized_input_mode
     if input_name is not None:
         model["input_name"] = str(input_name)
     if output_name is not None:
@@ -115,6 +136,8 @@ def build_replacement_profile_payload(
     parsed_output_shape = _parse_shape(output_shape, name="output_shape")
     if parsed_input_shape is not None:
         model["input_shape"] = parsed_input_shape
+    elif resolved_policy_input_size is not None:
+        model["input_shape"] = [1, resolved_policy_input_size]
     if parsed_output_shape is not None:
         model["output_shape"] = parsed_output_shape
     if input_type is not None:
@@ -147,6 +170,8 @@ def create_replacement_profile(
     output_shape: list[Any] | tuple[Any, ...] | str | None = None,
     input_type: str | None = None,
     output_type: str | None = None,
+    input_mode: str | None = None,
+    policy_input_size: int | None = None,
 ) -> CreatedPolicyProfile:
     profile_name = _validate_profile_name(name)
     payload = build_replacement_profile_payload(
@@ -161,6 +186,8 @@ def create_replacement_profile(
         output_shape=output_shape,
         input_type=input_type,
         output_type=output_type,
+        input_mode=input_mode,
+        policy_input_size=policy_input_size,
     )
     yaml_text = _profile_yaml_text(payload)
     if stdout:
@@ -191,6 +218,8 @@ def main() -> None:
     parser.add_argument("--output-shape", default=None, help="Override model.output_shape, e.g. '[1, 14]' or '1,14'")
     parser.add_argument("--input-type", default=None, help="Override model.input_type")
     parser.add_argument("--output-type", default=None, help="Override model.output_type")
+    parser.add_argument("--input-mode", default=None, help="Override model/contract input mode")
+    parser.add_argument("--policy-input-size", type=int, default=None, help="Override contract.policy_input_size")
     args = parser.parse_args()
 
     result = create_replacement_profile(
@@ -209,6 +238,8 @@ def main() -> None:
         output_shape=args.output_shape,
         input_type=args.input_type,
         output_type=args.output_type,
+        input_mode=args.input_mode,
+        policy_input_size=args.policy_input_size,
     )
     if args.stdout:
         print(result.yaml_text, end="")
