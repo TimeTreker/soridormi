@@ -14,13 +14,16 @@ be committed.
 - `docs/architecture.md`: runtime/API/simulator architecture.
 - `docs/PATCH_DELIVERY_AND_VALIDATION.md`: patch and validation expectations.
 - `docs/SORIDORMI_TARGET_AND_ROADMAP.md`: cerebellum target, Chromie brain
-  boundary, and main milestones.
+  boundary, milestone direction, and current policy evidence.
+- `docs/SORIDORMI_EXECUTION_ROADMAP.md`: gated milestone sequence, acceptance
+  criteria, major risks, and immediate execution plan.
 
 ## Active locomotion/data docs
 
 - `docs/SORIDORMI_POLICY_CONTEXT_CONTRACT.md`
 - `docs/SORIDORMI_BC_TRAINING_CONTRACT.md`
-- `docs/SORIDORMI_DATA_PIPELINE_M9.md`
+- `docs/SORIDORMI_DATA_PIPELINE_M9.md`: source-of-truth M9 command order,
+  including the M9I training-ready bundle.
 - `docs/SORIDORMI_SCENARIO_CURRICULUM.md`
 - `docs/SORIDORMI_DATASET_COVERAGE.md`
 - `docs/SORIDORMI_DATASET_SCENARIO_GATE.md`

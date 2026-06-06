@@ -327,8 +327,10 @@ For the curated documentation map, see `docs/README.md`. Keep durable project
 contracts and runbooks in `docs/`; generated reports should go under
 `artifacts/` and stay out of git.
 
-For the target and milestone plan, see
-`docs/SORIDORMI_TARGET_AND_ROADMAP.md`.
+For the system target and current candidate evidence, see
+`docs/SORIDORMI_TARGET_AND_ROADMAP.md`. For the gated milestone sequence,
+acceptance criteria, and immediate work queue, see
+`docs/SORIDORMI_EXECUTION_ROADMAP.md`.
 
 ## Runtime backend selection
 

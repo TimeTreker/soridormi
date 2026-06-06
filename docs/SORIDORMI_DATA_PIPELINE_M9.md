@@ -139,6 +139,38 @@ The prepare step should report positive split sample counts.  If it reports
 `no samples read from input paths`, the context JSONL is empty or missing; go
 back to collection/export instead of trying to train.
 
+### 7. Gate the prepared train/val/test artifact
+
+```bash
+./scripts/gate_context_bc_prepared_dataset.sh \
+  /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1/prepared_manifest.json \
+  --require-scenario flat_walk_varied_speed_v1 \
+  --output-dir artifacts/training/context_bc/prepared_gate/flat_walk_varied_speed_v1 \
+  --json | python -m json.tool
+```
+
+The gate must report `ok: true`.  A split with zero samples or zero rollout
+groups is not training-ready.
+
+### 8. Build the training-ready bundle
+
+After both the scenario coverage gate and prepared dataset gate pass, bundle
+their outputs with the prepared manifest, BC contract, file hashes, and
+recommended training commands:
+
+```bash
+./scripts/build_context_bc_training_ready_report.sh \
+  /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1/prepared_manifest.json \
+  --scenario-gate artifacts/dataset_coverage/flat_walk_varied_speed_v1_gate/dataset_scenario_gate_summary.json \
+  --prepared-gate artifacts/training/context_bc/prepared_gate/flat_walk_varied_speed_v1/prepared_context_gate_report.json \
+  --profile-name context_stage1_candidate \
+  --output-dir artifacts/training/context_bc/training_ready/flat_walk_varied_speed_v1 \
+  --json | python -m json.tool
+```
+
+This report is the final offline readiness checkpoint before running
+`train_behavior_clone.sh` or `train_neural_behavior_clone.sh`.
+
 ## External-sim eval example
 
 Scenario evaluation is not the same as teacher dataset collection.  It uses the

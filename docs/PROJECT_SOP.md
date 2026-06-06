@@ -2,6 +2,10 @@
 
 This document defines the project backbone. Future work should first strengthen this path; helper scripts and reports are secondary unless they directly support one of these steps.
 
+Milestone order and promotion decisions are governed by
+`docs/SORIDORMI_EXECUTION_ROADMAP.md`. A later SOP stage may be developed in
+parallel, but it must not be promoted past an unmet roadmap gate.
+
 ## SOP-0: Target definition
 
 Goal: Soridormi is the robot cerebellum for Open Duck Mini v2. It makes the

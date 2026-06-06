@@ -1,5 +1,10 @@
 # Soridormi target and roadmap
 
+This document defines the system target, ownership boundaries, milestone
+direction, and current candidate evidence. For the gated execution sequence,
+acceptance criteria, risks, and immediate work queue, see
+`docs/SORIDORMI_EXECUTION_ROADMAP.md`.
+
 ## System target
 
 Soridormi is the robot cerebellum: the body-control, locomotion, safety, and
