@@ -13,6 +13,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 from soridormi_runtime.mcp.http_server import build_mcp_tools, create_mcp_server
+from soridormi_runtime.mcp.runtime_tools import SoridormiRuntimeToolService
 from soridormi_runtime.mcp.manifest import build_soridormi_capability_bundle
 
 
@@ -54,6 +55,13 @@ def test_mcp_tool_schemas_come_from_authoritative_manifest() -> None:
 def test_mcp_server_rejects_hardware_mode_until_runtime_adapter_exists() -> None:
     with pytest.raises(ValueError, match="hardware_dry_run"):
         create_mcp_server(mode="hardware")
+
+
+def test_mcp_server_accepts_injected_runtime_adapter() -> None:
+    service = object.__new__(SoridormiRuntimeToolService)
+    server = create_mcp_server(mode="sim", adapter="runtime", service=service)
+
+    assert server.name == "soridormi"
 
 
 def test_streamable_http_preserves_plan_state_across_requests() -> None:

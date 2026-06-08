@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import inspect
 import logging
 import os
 from collections.abc import AsyncIterator
@@ -17,6 +18,7 @@ from starlette.types import Receive, Scope, Send
 
 from .local_tools import SoridormiLocalToolService
 from .manifest import CapabilityBundle, build_soridormi_capability_bundle
+from .runtime_tools import SoridormiRuntimeToolService
 
 logger = logging.getLogger(__name__)
 _SERVER_MODES = {"sim", "hardware_dry_run"}
@@ -52,13 +54,22 @@ def build_mcp_tools(bundle: CapabilityBundle) -> list[types.Tool]:
 def create_mcp_server(
     *,
     mode: str = "sim",
-    service: SoridormiLocalToolService | None = None,
+    adapter: str = "dry_run",
+    service: SoridormiLocalToolService | SoridormiRuntimeToolService | None = None,
 ) -> Server:
     if mode not in _SERVER_MODES:
         raise ValueError(
             "the current MCP server supports only sim and hardware_dry_run modes"
         )
-    tool_service = service or SoridormiLocalToolService(mode=mode)
+    if adapter not in {"dry_run", "runtime"}:
+        raise ValueError("adapter must be 'dry_run' or 'runtime'")
+    tool_service = service
+    if tool_service is None:
+        tool_service = (
+            SoridormiLocalToolService(mode=mode)
+            if adapter == "dry_run"
+            else SoridormiRuntimeToolService.from_env(mode=mode)
+        )
     tools = build_mcp_tools(build_soridormi_capability_bundle(mode=mode))
     tool_names = {tool.name for tool in tools}
     server = Server("soridormi")
@@ -71,7 +82,10 @@ def create_mcp_server(
     async def call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         if name not in tool_names:
             raise ValueError(f"unknown Soridormi MCP tool: {name}")
-        return tool_service.call_tool(name, arguments)
+        result = tool_service.call_tool(name, arguments)
+        if inspect.isawaitable(result):
+            return await result
+        return result
 
     return server
 
@@ -79,10 +93,11 @@ def create_mcp_server(
 def create_asgi_app(
     *,
     mode: str = "sim",
-    service: SoridormiLocalToolService | None = None,
+    adapter: str = "dry_run",
+    service: SoridormiLocalToolService | SoridormiRuntimeToolService | None = None,
     path: str = "/mcp",
 ) -> Starlette:
-    server = create_mcp_server(mode=mode, service=service)
+    server = create_mcp_server(mode=mode, adapter=adapter, service=service)
     session_manager = StreamableHTTPSessionManager(
         app=server,
         event_store=None,
@@ -125,13 +140,18 @@ def main() -> None:
         choices=sorted(_SERVER_MODES),
     )
     parser.add_argument(
+        "--adapter",
+        default=os.getenv("SORIDORMI_MCP_ADAPTER", "dry_run"),
+        choices=["dry_run", "runtime"],
+    )
+    parser.add_argument(
         "--log-level",
         default=os.getenv("SORIDORMI_MCP_LOG_LEVEL", "info"),
     )
     args = parser.parse_args()
 
     uvicorn.run(
-        create_asgi_app(mode=args.mode, path=args.path),
+        create_asgi_app(mode=args.mode, adapter=args.adapter, path=args.path),
         host=args.host,
         port=args.port,
         log_level=args.log_level,

@@ -52,9 +52,9 @@ A safe short-motion DAG should follow this shape:
 `stop` and `emergency_stop` may preempt any running motion task. Raw motor,
 joint, and torque APIs must remain outside LLM-visible manifests.
 
-## Local dry-run tool shim
+## Tool services
 
-Soridormi now includes a small in-process MCP-style tool service:
+Soridormi includes a small in-process dry-run tool service:
 
 ```python
 from soridormi_runtime.mcp.local_tools import SoridormiLocalToolService
@@ -74,5 +74,14 @@ PYTHONPATH=src python -m soridormi_runtime.mcp.call_tool \
   --args-json '{"commands":[{"vx":0.08,"vy":0.0,"yaw":0.0,"duration_s":1.0}]}'
 ```
 
-This is not the final MCP server. It is the robot-side tool core that a future
-stdio or HTTP MCP server should wrap.
+The Streamable HTTP server uses this dry-run service by default. For
+runtime-backed simulation, `SoridormiRuntimeToolService` owns the existing
+Soridormi robot/controller interfaces and executes bounded velocity segments:
+
+```bash
+./scripts/run_runtime_mcp_server.sh
+```
+
+The runtime adapter is preemptible by stop, cancel, emergency stop, and MCP
+request cancellation. It currently rejects hardware modes because the
+`HardwareRobot` backend is still a placeholder.

@@ -112,6 +112,33 @@ services:
     working_dir: /app
     command: bash
 
+  mcp-runtime:
+    extends:
+      service: runtime
+    build:
+      args:
+        RUNTIME_EXTRA: ${RUNTIME_MCP_EXTRA:-runtime-gpu,mcp}
+    image: soridormi-runtime-mcp:cuda13.1-cudnn-dev
+    container_name: soridormi-runtime-mcp
+    stdin_open: false
+    tty: false
+    environment:
+      SORIDORMI_MCP_HOST: "0.0.0.0"
+      SORIDORMI_MCP_PORT: ${SORIDORMI_MCP_PORT:-8000}
+      SORIDORMI_MCP_PATH: ${SORIDORMI_MCP_PATH:-/mcp}
+      SORIDORMI_MCP_MODE: sim
+      SORIDORMI_MCP_ADAPTER: runtime
+      SORIDORMI_MCP_LOG_LEVEL: ${SORIDORMI_MCP_LOG_LEVEL:-info}
+      SORIDORMI_RUNTIME_MODE: onnx_policy
+    command:
+      - python
+      - -m
+      - soridormi_runtime.mcp.http_server
+      - --adapter
+      - runtime
+    profiles:
+      - mcp-runtime
+
   sim:
     build:
       context: .

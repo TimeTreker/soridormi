@@ -130,10 +130,18 @@ Streamable HTTP:
 ./scripts/run_mcp_server.sh
 ```
 
-The current MCP service is intentionally limited to `sim` and
-`hardware_dry_run`. It preserves plan and emergency-stop state but never sends
-motor commands. See [Soridormi MCP server](docs/SORIDORMI_MCP_SERVER.md) for
-the deployment contract and Chromie endpoint configuration.
+The default MCP service is intentionally dry-run only. For runtime-backed
+simulation, start the simulator and then run:
+
+```bash
+./scripts/run_runtime_mcp_server.sh
+```
+
+The runtime adapter executes bounded plans through the existing runtime
+robot/controller interfaces and supports preemptive stop, cancellation, and
+emergency stop. It rejects hardware modes until `HardwareRobot` is implemented.
+See [Soridormi MCP server](docs/SORIDORMI_MCP_SERVER.md) for the deployment
+contract and Chromie endpoint configuration.
 
 ## Quick start on PC
 
