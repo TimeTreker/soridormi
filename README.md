@@ -120,6 +120,21 @@ chromie
 
 The username is controlled by `CONTAINER_USER=chromie` in `.env`. The Dockerfiles also handle base images where UID/GID 1000 already exists, so builds should not fail with `GID '1000' already exists`.
 
+## MCP boundary for Chromie
+
+Soridormi exposes its safe robot capability boundary from a dedicated
+`soridormi-mcp` container. Chromie runs separately and connects over MCP
+Streamable HTTP:
+
+```bash
+./scripts/run_mcp_server.sh
+```
+
+The current MCP service is intentionally limited to `sim` and
+`hardware_dry_run`. It preserves plan and emergency-stop state but never sends
+motor commands. See [Soridormi MCP server](docs/SORIDORMI_MCP_SERVER.md) for
+the deployment contract and Chromie endpoint configuration.
+
 ## Quick start on PC
 
 ### 1. Clone this repo

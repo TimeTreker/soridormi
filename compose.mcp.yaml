@@ -1,0 +1,34 @@
+services:
+  mcp:
+    build:
+      context: .
+      dockerfile: docker/mcp/Dockerfile
+      args:
+        USER_ID: ${UID:-1000}
+        GROUP_ID: ${GID:-1000}
+        USERNAME: ${CONTAINER_USER:-chromie}
+    image: soridormi-mcp:latest
+    container_name: soridormi-mcp
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${SORIDORMI_MCP_PORT:-8000}:8000"
+    environment:
+      SORIDORMI_MCP_HOST: "0.0.0.0"
+      SORIDORMI_MCP_PORT: "8000"
+      SORIDORMI_MCP_PATH: ${SORIDORMI_MCP_PATH:-/mcp}
+      SORIDORMI_MCP_MODE: ${SORIDORMI_MCP_MODE:-sim}
+      SORIDORMI_MCP_LOG_LEVEL: ${SORIDORMI_MCP_LOG_LEVEL:-info}
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import socket; socket.create_connection(("127.0.0.1", 8000), timeout=2).close()
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s

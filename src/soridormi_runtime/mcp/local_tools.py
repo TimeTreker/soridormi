@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
+from threading import RLock
 from typing import Any
 
 _MAX_COMMANDS = 8
@@ -29,38 +30,46 @@ class MotionPlan:
 class SoridormiLocalToolService:
     """Safe in-process implementation of Soridormi MCP-style tools.
 
-    This is not a network MCP server yet. It is the robot-side tool core that a
-    future stdio/HTTP MCP server can wrap. Motion execution is intentionally
-    dry-run only here; it never talks to motors or the runtime control loop.
+    Motion execution is intentionally dry-run only here; it never talks to
+    motors or the runtime control loop.
     """
 
     mode: str = "sim"
     backend: str = "local_tool_dry_run"
     plans: dict[str, MotionPlan] = field(default_factory=dict)
     emergency_stop: bool = False
+    _lock: RLock = field(default_factory=RLock, init=False, repr=False)
 
     def call_tool(self, tool_name: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
-        args = args or {}
-        if tool_name == "soridormi.robot.get_status":
-            return self.get_status()
-        if tool_name == "soridormi.robot.get_mode":
-            return {"mode": self.mode}
-        if tool_name == "soridormi.robot.get_battery":
-            return {"percent": None, "critical": False}
-        if tool_name == "soridormi.motion.create_plan":
-            return self.create_motion_plan(args)
-        if tool_name == "soridormi.motion.execute_plan":
-            return self.execute_motion_plan(str(args.get("plan_id", "")))
-        if tool_name == "soridormi.motion.stop":
-            return {"stopped": True, "summary": "Soridormi local dry-run stop accepted."}
-        if tool_name == "soridormi.motion.cancel":
-            return {"cancelled": True, "summary": "Soridormi local dry-run motion cancel accepted."}
-        if tool_name == "soridormi.safety.monitor_motion":
-            return {"ok": not self.emergency_stop, "event": "emergency_stop" if self.emergency_stop else None}
-        if tool_name == "soridormi.safety.emergency_stop":
-            self.emergency_stop = True
-            return {"stopped": True, "emergency": True, "reason": args.get("reason", "unspecified")}
-        raise KeyError(f"unknown Soridormi local tool: {tool_name}")
+        with self._lock:
+            args = args or {}
+            if tool_name == "soridormi.robot.get_status":
+                return self.get_status()
+            if tool_name == "soridormi.robot.get_mode":
+                return {"mode": self.mode}
+            if tool_name == "soridormi.robot.get_battery":
+                return {"percent": None, "critical": False}
+            if tool_name == "soridormi.motion.create_plan":
+                return self.create_motion_plan(args)
+            if tool_name == "soridormi.motion.execute_plan":
+                return self.execute_motion_plan(str(args.get("plan_id", "")))
+            if tool_name == "soridormi.motion.stop":
+                return {"stopped": True, "summary": "Soridormi local dry-run stop accepted."}
+            if tool_name == "soridormi.motion.cancel":
+                return {"cancelled": True, "summary": "Soridormi local dry-run motion cancel accepted."}
+            if tool_name == "soridormi.safety.monitor_motion":
+                return {
+                    "ok": not self.emergency_stop,
+                    "event": "emergency_stop" if self.emergency_stop else None,
+                }
+            if tool_name == "soridormi.safety.emergency_stop":
+                self.emergency_stop = True
+                return {
+                    "stopped": True,
+                    "emergency": True,
+                    "reason": args.get("reason", "unspecified"),
+                }
+            raise KeyError(f"unknown Soridormi local tool: {tool_name}")
 
     def get_status(self) -> dict[str, Any]:
         return {

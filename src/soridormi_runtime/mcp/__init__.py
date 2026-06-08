@@ -1,4 +1,4 @@
-"""MCP-ready Soridormi capability manifest exports."""
+"""Soridormi MCP capability exports."""
 
 from .dag_contract import build_soridormi_dag_contract
 from .manifest import CapabilityBundle, build_soridormi_capability_bundle
