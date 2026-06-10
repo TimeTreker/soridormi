@@ -228,7 +228,8 @@ observation[101]
   - start_stop_velocity_ramp_v1: 0.0076m (need +0.0074m)
   - curve_turn_walk_v1: 0.0063m (need +0.0087m)
 - [ ] Perform follow-camera visual inspection
-- [ ] Define clearance-focused promotion thresholds
+- [x] Define clearance-focused promotion thresholds
+- [x] Add threshold-aligned M10 clearance readiness report
 - [ ] Re-evaluate against the official teacher
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
 
@@ -247,7 +248,7 @@ teacher comparison: PENDING
 > **Current status:** The candidate passes 3/3 scenarios but does not pass G10
 > due to swing clearance deficit across all three scenarios.
 >
-> **Clearance readiness:** See `artifacts/m10_clearance_readiness/m10_clearance_readiness.md`
+> **Clearance readiness:** Generate with `./scripts/analyze_m10_clearance_readiness.sh --profile-name context_stage1_three_scenario_10ep_e80 --output-dir artifacts/m10_clearance_readiness/context_stage1_three_scenario_10ep_e80`.
 >
 > **Decision path:**
 > - **Option 1 (Recommended):** Pursue clearance-focused refinement before M10.0 release
