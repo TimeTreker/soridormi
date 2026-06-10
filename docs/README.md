@@ -17,6 +17,9 @@ be committed.
   boundary, milestone direction, and current policy evidence.
 - `docs/SORIDORMI_EXECUTION_ROADMAP.md`: gated milestone sequence, acceptance
   criteria, major risks, and immediate execution plan.
+- `docs/SORIDORMI_NEURAL_PARAMETER_ADAPTIVE_MPC_WBC.md`: future
+  neural parameter-adaptive MPC/WBC controller design; NN estimates model
+  error while MPC/WBC enforces physics.
 
 ## Active locomotion/data docs
 

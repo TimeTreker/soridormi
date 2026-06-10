@@ -7,14 +7,31 @@ import sys
 import time
 from pathlib import Path
 
-import httpx
-import pytest
-from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
+import importlib.util
 
-from soridormi_runtime.mcp.http_server import build_mcp_tools, create_mcp_server
-from soridormi_runtime.mcp.runtime_tools import SoridormiRuntimeToolService
-from soridormi_runtime.mcp.manifest import build_soridormi_capability_bundle
+import pytest
+
+_MCP_HTTP_DEPS = ("httpx", "mcp", "uvicorn", "starlette")
+_MISSING_MCP_HTTP_DEPS = [
+    name for name in _MCP_HTTP_DEPS if importlib.util.find_spec(name) is None
+]
+
+pytestmark = pytest.mark.skipif(
+    bool(_MISSING_MCP_HTTP_DEPS),
+    reason=(
+        "install the mcp extra to run Soridormi MCP HTTP server tests; "
+        f"missing: {', '.join(_MISSING_MCP_HTTP_DEPS)}"
+    ),
+)
+
+if not _MISSING_MCP_HTTP_DEPS:
+    import httpx
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamable_http_client
+
+    from soridormi_runtime.mcp.http_server import build_mcp_tools, create_mcp_server
+    from soridormi_runtime.mcp.runtime_tools import SoridormiRuntimeToolService
+    from soridormi_runtime.mcp.manifest import build_soridormi_capability_bundle
 
 
 ROOT = Path(__file__).resolve().parents[1]

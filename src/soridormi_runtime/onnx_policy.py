@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, Callable, Sequence
 
 import numpy as np
-import onnxruntime as ort
 
 from soridormi_api import RobotState
 from soridormi_runtime.observation_builder import ObservationBuilder
@@ -21,9 +20,20 @@ from soridormi_runtime.policy_input_features import (
 DEFAULT_POLICY_PATH = Path("/workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx")
 
 
+def _load_onnxruntime() -> Any:
+    try:
+        import onnxruntime as ort
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "onnxruntime is required for live ONNX policy inference; "
+            "install the runtime or sim extra to load a real ONNX model"
+        ) from exc
+    return ort
+
+
 def choose_onnx_providers(prefer_cuda: bool = True) -> list[str]:
     """Choose ONNX Runtime providers for Soridormi policy inference."""
-    selection = resolve_onnx_providers(ort.get_available_providers(), prefer_cuda=prefer_cuda)
+    selection = resolve_onnx_providers(_load_onnxruntime().get_available_providers(), prefer_cuda=prefer_cuda)
     if not selection.ok:
         raise RuntimeError("; ".join(selection.errors))
     return selection.providers
@@ -82,7 +92,7 @@ class OnnxPolicy:
             provider_selection_errors: list[str] = []
             requested_providers = list(providers)
         else:
-            provider_selection = resolve_onnx_providers(ort.get_available_providers(), prefer_cuda=prefer_cuda)
+            provider_selection = resolve_onnx_providers(_load_onnxruntime().get_available_providers(), prefer_cuda=prefer_cuda)
             self.providers = provider_selection.providers
             provider_selection_errors = list(provider_selection.errors)
             requested_providers = provider_selection.requested
@@ -99,7 +109,7 @@ class OnnxPolicy:
         if session_factory is None:
             if not self.policy_path.exists():
                 raise FileNotFoundError(f"ONNX policy file not found: {self.policy_path}")
-            self.session = ort.InferenceSession(str(self.policy_path), providers=self.providers)
+            self.session = _load_onnxruntime().InferenceSession(str(self.policy_path), providers=self.providers)
         else:
             self.session = session_factory(str(self.policy_path), providers=self.providers)
 

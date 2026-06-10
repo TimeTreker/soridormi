@@ -56,6 +56,21 @@ def test_visual_inspection_plan_includes_follow_camera_and_required_scenarios(tm
         assert item["visual_checklist"]
 
 
+def test_visual_inspection_readiness_command_targets_explicit_report_path(tmp_path: Path) -> None:
+    readiness_path = tmp_path / "clearance_readiness" / "custom_readiness.json"
+
+    plan = build_m10_visual_inspection_plan(
+        profile="candidate",
+        output_dir=tmp_path / "visual",
+        readiness_report=readiness_path,
+    )
+
+    assert plan.readiness_report == str(readiness_path)
+    assert "--output-dir" in plan.readiness_command
+    assert plan.readiness_command[plan.readiness_command.index("--output-dir") + 1] == str(readiness_path.parent)
+    assert "--json-output" in plan.readiness_command
+    assert plan.readiness_command[plan.readiness_command.index("--json-output") + 1] == str(readiness_path)
+
 def test_visual_inspection_plan_blocks_when_readiness_required_and_missing(tmp_path: Path) -> None:
     plan = build_m10_visual_inspection_plan(
         profile="candidate",
@@ -124,6 +139,8 @@ def test_m10_visual_inspection_cli_functionally_writes_plan_artifacts(tmp_path: 
     payload = json.loads(result.stdout)
     assert payload["status"] == "READY_FOR_VISUAL_INSPECTION_PLAN"
     assert "--follow-camera" in payload["sim_server_command"]
+    assert payload["readiness_command"][payload["readiness_command"].index("--output-dir") + 1] == str(readiness_path.parent)
+    assert payload["readiness_command"][payload["readiness_command"].index("--json-output") + 1] == str(readiness_path)
     assert (output_dir / "m10_visual_inspection_plan.json").exists()
     assert "Start MuJoCo follow-camera server" in (output_dir / "m10_visual_inspection_plan.md").read_text()
 

@@ -84,6 +84,17 @@ def _camera_dict(distance: float, azimuth: float, elevation: float) -> dict[str,
     }
 
 
+def _readiness_command_output_args(readiness_path: Path, *, explicit_readiness_report: bool) -> list[str]:
+    if explicit_readiness_report:
+        return [
+            "--output-dir",
+            str(readiness_path.parent),
+            "--json-output",
+            str(readiness_path),
+        ]
+    return ["--output-dir", str(readiness_path.parent)]
+
+
 def _scenario_checklist(scenario_id: str) -> list[str]:
     common = [
         "Confirm both swing feet visibly clear the ground instead of scraping through stance transitions.",
@@ -166,7 +177,8 @@ def build_m10_visual_inspection_plan(
 ) -> M10VisualInspectionPlan:
     scenario_ids = list(scenarios)
     resolved_output_dir = Path(output_dir) if output_dir is not None else DEFAULT_OUTPUT_ROOT / profile
-    readiness_path = Path(readiness_report) if readiness_report is not None else resolved_output_dir / "m10_clearance_readiness.json"
+    explicit_readiness_report = readiness_report is not None
+    readiness_path = Path(readiness_report) if explicit_readiness_report else resolved_output_dir / "m10_clearance_readiness.json"
     blockers: list[str] = []
     notes: list[str] = []
     readiness_status: str | None = None
@@ -208,8 +220,10 @@ def build_m10_visual_inspection_plan(
         "./scripts/analyze_m10_clearance_readiness.sh",
         "--profile-name",
         profile,
-        "--output-dir",
-        str(resolved_output_dir),
+        *_readiness_command_output_args(
+            readiness_path,
+            explicit_readiness_report=explicit_readiness_report,
+        ),
         "--json",
         "--strict",
     ]

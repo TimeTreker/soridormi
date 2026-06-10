@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 import numpy as np
-import onnxruntime as ort
 
 from soridormi_api import RobotState
 from soridormi_runtime.onnx_policy import OnnxPolicy
@@ -16,6 +15,17 @@ from soridormi_runtime.policy_profiles import DEFAULT_PROFILE_NAME, PolicyProfil
 
 ACTION_SIZE = 14
 OBS_SIZE = 101
+
+
+def _load_onnxruntime() -> Any:
+    try:
+        import onnxruntime as ort
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "onnxruntime is required for live residual ONNX policy inference; "
+            "install the runtime or sim extra to load a real ONNX model"
+        ) from exc
+    return ort
 
 
 @contextmanager
@@ -125,7 +135,7 @@ class ResidualOnnxPolicy:
             requested_providers = list(providers)
             provider_selection_errors: list[str] = []
         else:
-            selection = resolve_onnx_providers(ort.get_available_providers(), prefer_cuda=prefer_cuda)
+            selection = resolve_onnx_providers(_load_onnxruntime().get_available_providers(), prefer_cuda=prefer_cuda)
             self.providers = selection.providers
             requested_providers = selection.requested
             provider_selection_errors = list(selection.errors)
@@ -134,7 +144,7 @@ class ResidualOnnxPolicy:
         if not self.policy_path.exists() and session_factory is None:
             raise FileNotFoundError(f"Residual ONNX policy file not found: {self.policy_path}")
         if session_factory is None:
-            self.session = ort.InferenceSession(str(self.policy_path), providers=self.providers)
+            self.session = _load_onnxruntime().InferenceSession(str(self.policy_path), providers=self.providers)
         else:
             self.session = session_factory(str(self.policy_path), providers=self.providers)
         active_providers = self._active_session_providers()
