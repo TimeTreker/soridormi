@@ -171,6 +171,26 @@ recommended training commands:
 This report is the final offline readiness checkpoint before running
 `train_behavior_clone.sh` or `train_neural_behavior_clone.sh`.
 
+### Full prepare → gate → training-ready pipeline
+
+To run prepare, prepared-gate, and training-ready report generation in one step,
+use:
+
+```bash
+./scripts/run_context_bc_training_ready_pipeline.sh \
+  /data/training_datasets/context_bc/flat_walk_varied_speed_v1.context.jsonl \
+  --scenario-gate artifacts/dataset_coverage/flat_walk_varied_speed_v1_gate/dataset_scenario_gate_summary.json \
+  --require-scenario flat_walk_varied_speed_v1 \
+  --output-dir /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1 \
+  --prepared-gate-dir artifacts/training/context_bc/prepared_gate/flat_walk_varied_speed_v1 \
+  --training-ready-dir artifacts/training/context_bc/training_ready/flat_walk_varied_speed_v1 \
+  --report artifacts/training/context_bc/prepared_flat_walk_varied_speed_v1.md \
+  --json | python -m json.tool
+```
+
+This wrapper script is useful when you want the M9 data pipeline to proceed from
+prepared dataset creation through readiness reporting without manual staging.
+
 ## External-sim eval example
 
 Scenario evaluation is not the same as teacher dataset collection.  It uses the

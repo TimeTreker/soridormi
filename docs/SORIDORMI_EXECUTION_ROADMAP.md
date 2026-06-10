@@ -211,7 +211,7 @@ observation[101]
 
 ---
 
-## M10 - Runtime context policy [Current]
+## M10 - Runtime context policy [Current: clearance blocker identified]
 
 **Goal:** Run context-conditioned policies through the production runtime path.
 
@@ -223,11 +223,14 @@ observation[101]
 - [x] Diagnose low-speed and curve failures
 - [x] Train a three-scenario candidate
 - [x] Pass the flat/start-stop/curve suite
+- [x] Diagnose low swing-foot clearance ✗ FAILS
+  - flat_walk_varied_speed_v1: 0.0102m (need +0.0048m)
+  - start_stop_velocity_ramp_v1: 0.0076m (need +0.0074m)
+  - curve_turn_walk_v1: 0.0063m (need +0.0087m)
 - [ ] Perform follow-camera visual inspection
-- [ ] Diagnose low swing-foot clearance
 - [ ] Define clearance-focused promotion thresholds
 - [ ] Re-evaluate against the official teacher
-- [ ] Decide whether the candidate remains experimental or is promoted
+- [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
 
 **Gate G10:**
 
@@ -236,13 +239,19 @@ profile/model contract: PASS
 bounded rollout: PASS
 required scenario suite: PASS
 fall/reset limits: PASS
-foot-clearance threshold: PASS
-visual inspection: PASS
-teacher comparison recorded
+foot-clearance threshold: ✗ FAIL (all scenarios < 0.015m)
+visual inspection: PENDING
+teacher comparison: PENDING
 ```
 
-> The current candidate passes 3/3 scenarios but does not pass G10 because
-> swing clearance remains inadequate.
+> **Current status:** The candidate passes 3/3 scenarios but does not pass G10
+> due to swing clearance deficit across all three scenarios.
+>
+> **Clearance readiness:** See `artifacts/m10_clearance_readiness/m10_clearance_readiness.md`
+>
+> **Decision path:**
+> - **Option 1 (Recommended):** Pursue clearance-focused refinement before M10.0 release
+> - **Option 2:** Accept as experimental M10.0, document limitation, refine in M11
 
 ---
 

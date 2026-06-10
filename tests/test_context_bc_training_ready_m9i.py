@@ -185,3 +185,12 @@ def test_training_ready_shell_help_mentions_gate_inputs() -> None:
     text = Path("scripts/build_context_bc_training_ready_report.sh").read_text(encoding="utf-8")
     assert "--scenario-gate PATH" in text
     assert "--prepared-gate PATH" in text
+
+
+def test_context_bc_training_ready_pipeline_help_mentions_required_inputs() -> None:
+    text = Path("scripts/run_context_bc_training_ready_pipeline.sh").read_text(encoding="utf-8")
+    assert "--scenario-gate PATH" in text
+    assert "--require-scenario SCENARIO" in text
+    assert "--output-dir DIR" in text
+    assert "--prepared-gate-dir DIR" in text
+    assert "--training-ready-dir DIR" in text
