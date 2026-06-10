@@ -16,7 +16,17 @@ from soridormi_runtime.scenario_rollout_eval import build_scenario_run_plan
 
 
 DEFAULT_SUITE_STATUSES = tuple(sorted(COLLECTOR_READY_STATUSES))
-SUPPORTED_LOCOMOTION_SKILLS = frozenset({"walk_velocity", "curve_walk", "turn_in_place", "stand", "stop", "stand_idle"})
+SUPPORTED_LOCOMOTION_SKILLS = frozenset(
+    {"walk_velocity", "curve_walk", "turn_in_place", "stand", "stop", "stand_idle"}
+)
+CLEARANCE_CHECK_NAMES = frozenset(
+    {
+        "foot_metrics_present",
+        "touchdown_count",
+        "low_clearance_swing_ratio",
+        "swing_clearance_p50_m",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -219,6 +229,54 @@ def _as_float(value: Any) -> float | None:
     return parsed
 
 
+def _as_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _clearance_check_failed(report: Mapping[str, Any]) -> bool:
+    checks = report.get("checks", [])
+    if not isinstance(checks, list):
+        return False
+    for check in checks:
+        if not isinstance(check, Mapping):
+            continue
+        if check.get("name") not in CLEARANCE_CHECK_NAMES:
+            continue
+        if check.get("ok") is False and str(check.get("severity", "error")) == "error":
+            return True
+    return False
+
+
+def _foot_metrics_present(
+    metrics: Mapping[str, Any], stride_report: Mapping[str, Any]
+) -> tuple[bool, int | None]:
+    samples_with_feet = _as_int(metrics.get("samples_with_feet"))
+    if samples_with_feet is None:
+        samples_with_feet = _as_int(stride_report.get("samples_with_feet"))
+    if samples_with_feet is not None:
+        return samples_with_feet > 0, samples_with_feet
+    # Backward-compatible fallback for historical reports created before
+    # metrics.samples_with_feet existed.  If any foot-derived metric is present,
+    # treat foot metrics as present but leave the count unknown.
+    present = any(
+        metrics.get(key) is not None
+        for key in (
+            "touchdown_count",
+            "swing_clearance_p05_m",
+            "swing_clearance_p50_m",
+            "low_clearance_swing_ratio",
+        )
+    )
+    return present, None
+
+
 def _mean(values: Iterable[float]) -> float | None:
     vals = list(values)
     if not vals:
@@ -259,7 +317,11 @@ def build_scenario_suite_report(
             continue
         scenario_id = str(report.get("scenario_id", ""))
         seen.add(scenario_id)
-        metrics = report.get("metrics", {}) if isinstance(report.get("metrics"), Mapping) else {}
+        metrics = _mapping(report.get("metrics"))
+        thresholds = _mapping(report.get("acceptance_thresholds"))
+        stride_report = _mapping(report.get("stride_step_report"))
+        foot_metrics_present, samples_with_feet = _foot_metrics_present(metrics, stride_report)
+        require_foot_metrics = bool(thresholds.get("require_foot_metrics"))
         item = {
             "scenario_id": scenario_id,
             "scenario_title": report.get("scenario_title"),
@@ -273,8 +335,14 @@ def build_scenario_suite_report(
             "mean_forward_speed_mps": metrics.get("mean_forward_speed_mps"),
             "stuck_ratio": metrics.get("stuck_ratio"),
             "fallen": metrics.get("fallen"),
+            "samples_with_feet": samples_with_feet,
             "touchdown_count": metrics.get("touchdown_count"),
+            "swing_clearance_p05_m": metrics.get("swing_clearance_p05_m"),
             "swing_clearance_p50_m": metrics.get("swing_clearance_p50_m"),
+            "low_clearance_swing_ratio": metrics.get("low_clearance_swing_ratio"),
+            "require_foot_metrics": require_foot_metrics,
+            "foot_metrics_present": foot_metrics_present,
+            "clearance_failed": _clearance_check_failed(report),
             "report_path": str(path),
             "error_count": len(report.get("errors", []) or []),
             "warning_count": len(report.get("warnings", []) or []),
@@ -310,12 +378,30 @@ def build_scenario_suite_report(
     distances_f = [value for value in distances if value is not None]
     speeds_f = [value for value in speeds if value is not None]
     stuck_f = [value for value in stuck_ratios if value is not None]
+    swing_p50 = [_as_float(item.get("swing_clearance_p50_m")) for item in results]
+    swing_p05 = [_as_float(item.get("swing_clearance_p05_m")) for item in results]
+    low_clearance_ratios = [_as_float(item.get("low_clearance_swing_ratio")) for item in results]
+    swing_p50_f = [value for value in swing_p50 if value is not None]
+    swing_p05_f = [value for value in swing_p05 if value is not None]
+    low_clearance_f = [value for value in low_clearance_ratios if value is not None]
 
     summary_metrics = {
         "total_forward_distance_m": sum(distances_f) if distances_f else None,
         "mean_forward_distance_m": _mean(distances_f),
         "mean_forward_speed_mps": _mean(speeds_f),
         "max_stuck_ratio": max(stuck_f) if stuck_f else None,
+        "min_swing_clearance_p50_m": min(swing_p50_f) if swing_p50_f else None,
+        "min_swing_clearance_p05_m": min(swing_p05_f) if swing_p05_f else None,
+        "max_low_clearance_ratio": max(low_clearance_f) if low_clearance_f else None,
+        "clearance_failed_count": sum(
+            1 for item in results if item.get("clearance_failed") is True
+        ),
+        "foot_metrics_missing_count": sum(
+            1
+            for item in results
+            if item.get("require_foot_metrics") is True
+            and item.get("foot_metrics_present") is False
+        ),
         "fallen_count": sum(1 for item in results if item.get("fallen") is True),
         "total_samples": sum(int(item.get("sample_count") or 0) for item in results),
     }
@@ -367,21 +453,29 @@ def render_suite_markdown(report: ScenarioSuiteReport) -> str:
             "",
             "## Scenario results",
             "",
-            "| Scenario | Result | Skill | Distance m | Mean speed m/s | Stuck ratio | Fallen | Report |",
-            "| --- | --- | --- | ---: | ---: | ---: | --- | --- |",
+            (
+                "| Scenario | Result | Skill | Distance m | Mean speed m/s | Stuck ratio "
+                "| Swing p50 m | Low-clearance ratio | Fallen | Report |"
+            ),
+            "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |",
         ]
     )
     for item in report.scenario_results:
         result = "PASS" if item.get("ok") else "FAIL"
         report_path = item.get("report_path") or "n/a"
         lines.append(
-            "| {scenario} | {result} | {skill} | {distance} | {speed} | {stuck} | {fallen} | {report} |".format(
+            (
+                "| {scenario} | {result} | {skill} | {distance} | {speed} | {stuck} "
+                "| {swing_p50} | {low_clearance} | {fallen} | {report} |"
+            ).format(
                 scenario=item.get("scenario_id"),
                 result=result,
                 skill=item.get("expected_skill_id") or "n/a",
                 distance=_format_value(item.get("forward_distance_m")),
                 speed=_format_value(item.get("mean_forward_speed_mps")),
                 stuck=_format_value(item.get("stuck_ratio")),
+                swing_p50=_format_value(item.get("swing_clearance_p50_m")),
+                low_clearance=_format_value(item.get("low_clearance_swing_ratio")),
                 fallen=_format_value(item.get("fallen")),
                 report=report_path,
             )

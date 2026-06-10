@@ -118,8 +118,8 @@
         "require_not_fallen": true,
         "min_touchdown_count": 4,
         "min_swing_clearance_m": 0.015,
-        "max_low_clearance_ratio": 0.35,
-        "require_foot_metrics": false,
+        "max_low_clearance_ratio": 0.25,
+        "require_foot_metrics": true,
         "min_base_z_m": 0.12,
         "max_abs_roll_pitch_rad": 0.9
       }
@@ -202,9 +202,9 @@
         "max_stuck_sample_ratio": 0.25,
         "require_not_fallen": true,
         "min_touchdown_count": 4,
-        "min_swing_clearance_m": 0.012,
-        "max_low_clearance_ratio": 0.4,
-        "require_foot_metrics": false,
+        "min_swing_clearance_m": 0.015,
+        "max_low_clearance_ratio": 0.25,
+        "require_foot_metrics": true,
         "min_base_z_m": 0.12,
         "max_abs_roll_pitch_rad": 0.9
       }
@@ -286,9 +286,9 @@
         "max_stuck_sample_ratio": 0.3,
         "require_not_fallen": true,
         "min_touchdown_count": 4,
-        "min_swing_clearance_m": 0.012,
-        "max_low_clearance_ratio": 0.45,
-        "require_foot_metrics": false,
+        "min_swing_clearance_m": 0.015,
+        "max_low_clearance_ratio": 0.25,
+        "require_foot_metrics": true,
         "min_base_z_m": 0.12,
         "max_abs_roll_pitch_rad": 0.95
       }

@@ -70,6 +70,9 @@ def test_thresholds_resolve_from_scenario_manifest() -> None:
     assert thresholds.min_mean_forward_speed_mps == 0.03
     assert thresholds.max_stuck_sample_ratio == 0.20
     assert thresholds.require_not_fallen is True
+    assert thresholds.min_swing_clearance_m == 0.015
+    assert thresholds.max_low_clearance_ratio == 0.25
+    assert thresholds.require_foot_metrics is True
 
 
 def test_manifest_thresholds_are_used_by_default(tmp_path: Path) -> None:
@@ -117,7 +120,9 @@ def test_explicit_threshold_override_can_relax_manifest_requirement(tmp_path: Pa
 
 
 def test_overlay_threshold_overrides_only_changes_explicit_fields() -> None:
-    base = ScenarioRolloutThresholds(min_distance_m=0.15, max_stuck_sample_ratio=0.20, require_foot_metrics=False)
+    base = ScenarioRolloutThresholds(
+        min_distance_m=0.15, max_stuck_sample_ratio=0.20, require_foot_metrics=False
+    )
 
     overlaid = overlay_threshold_overrides(base, min_distance_m=0.05, require_foot_metrics=True)
 
@@ -155,7 +160,17 @@ def test_cli_uses_manifest_thresholds_without_override(tmp_path: Path) -> None:
 
 def test_cli_threshold_override_marks_source_explicit(tmp_path: Path) -> None:
     path = tmp_path / "short_walk_cli_override.jsonl"
-    _write_jsonl(path, [_row(0, 0.00), _row(1, 0.04), _row(2, 0.08), _row(3, 0.12)])
+    _write_jsonl(
+        path,
+        [
+            _row(0, 0.00),
+            _row(1, 0.04),
+            _row(2, 0.08),
+            _row(3, 0.12),
+            _row(4, 0.16),
+            _row(5, 0.20),
+        ],
+    )
 
     result = subprocess.run(
         [

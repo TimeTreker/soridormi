@@ -491,33 +491,44 @@ def evaluate_scenario_rollout(
     if cfg.require_not_fallen:
         checks.append(_check_bool("not_fallen", stride.fall.get("detected"), False))
 
+    foot_metric_severity = "error" if cfg.require_foot_metrics else "warning"
     if stride.samples_with_feet > 0:
+        checks.append(
+            ScenarioCheck(
+                name="foot_metrics_present",
+                ok=True,
+                value=stride.samples_with_feet,
+                threshold=">0",
+                severity="info",
+                message=f"log includes {stride.samples_with_feet} feet_position samples",
+            )
+        )
         checks.append(
             _check_at_least(
                 "touchdown_count",
                 stride.step_events.get("touchdown_count"),
                 cfg.min_touchdown_count,
-                severity="warning",
+                severity=foot_metric_severity,
             )
         )
         low_clearance_ratio = stride.foot_clearance.get("low_clearance_swing_ratio")
-        if low_clearance_ratio is not None:
+        if low_clearance_ratio is not None or cfg.require_foot_metrics:
             checks.append(
                 _check_at_most(
                     "low_clearance_swing_ratio",
                     low_clearance_ratio,
                     cfg.max_low_clearance_ratio,
-                    severity="warning",
+                    severity=foot_metric_severity,
                 )
             )
         swing_p50 = stride.foot_clearance.get("swing", {}).get("p50_m")
-        if swing_p50 is not None:
+        if swing_p50 is not None or cfg.require_foot_metrics:
             checks.append(
                 _check_at_least(
                     "swing_clearance_p50_m",
                     swing_p50,
                     cfg.min_swing_clearance_m,
-                    severity="warning",
+                    severity=foot_metric_severity,
                 )
             )
     elif cfg.require_foot_metrics:
@@ -546,9 +557,11 @@ def evaluate_scenario_rollout(
         "stuck_ratio": stride.stuck.get("speed_based_stuck_sample_ratio"),
         "fallen": stride.fall.get("detected"),
         "min_base_z_m": stride.fall.get("min_base_z_m"),
+        "samples_with_feet": stride.samples_with_feet,
         "touchdown_count": stride.step_events.get("touchdown_count"),
         "cadence_steps_per_s": stride.step_events.get("cadence_steps_per_s"),
         "step_length_mean_m": stride.step_events.get("step_length_m", {}).get("mean_m"),
+        "swing_clearance_p05_m": stride.foot_clearance.get("swing", {}).get("p05_m"),
         "swing_clearance_p50_m": stride.foot_clearance.get("swing", {}).get("p50_m"),
         "low_clearance_swing_ratio": stride.foot_clearance.get("low_clearance_swing_ratio"),
     }
@@ -612,9 +625,11 @@ def render_markdown(report: ScenarioRolloutReport) -> str:
         "stuck_ratio",
         "fallen",
         "min_base_z_m",
+        "samples_with_feet",
         "touchdown_count",
         "cadence_steps_per_s",
         "step_length_mean_m",
+        "swing_clearance_p05_m",
         "swing_clearance_p50_m",
         "low_clearance_swing_ratio",
     ):
