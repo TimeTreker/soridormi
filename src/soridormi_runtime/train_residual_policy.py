@@ -70,6 +70,18 @@ class ResidualOptimizationResult:
 
 
 @dataclass(frozen=True)
+class ResidualTrainingCommand:
+    command: PolicyCommand | None
+    weight: float = 1.0
+
+    def describe(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"weight": float(self.weight)}
+        if self.command is not None:
+            payload.update(self.command.describe())
+        return payload
+
+
+@dataclass(frozen=True)
 class ResidualPolicyTrainResult:
     ok: bool
     teacher_profile: str
@@ -293,7 +305,7 @@ def evaluate_residual_bias_live(
     reward_config: WalkingRewardConfig,
     host: str,
     port: int,
-    training_commands: Sequence[PolicyCommand] | None = None,
+    training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None = None,
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
 ) -> float:
@@ -324,7 +336,7 @@ def evaluate_phase_contact_residual_live(
     reward_config: WalkingRewardConfig,
     host: str,
     port: int,
-    training_commands: Sequence[PolicyCommand] | None = None,
+    training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None = None,
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
 ) -> float:
@@ -356,7 +368,7 @@ def evaluate_command_state_residual_live(
     reward_config: WalkingRewardConfig,
     host: str,
     port: int,
-    training_commands: Sequence[PolicyCommand] | None = None,
+    training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None = None,
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
 ) -> float:
@@ -396,18 +408,19 @@ def _evaluate_residual_live(
     reward_config: WalkingRewardConfig,
     host: str,
     port: int,
-    training_commands: Sequence[PolicyCommand] | None,
+    training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None,
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
 ) -> float:
     scores: list[float] = []
-    commands: Sequence[PolicyCommand | None] = training_commands or [None]
-    for command in commands:
+    weights: list[float] = []
+    commands = _normalize_training_commands(training_commands)
+    for command_spec in commands:
         env = RlFineTuneEnv(
             profile=teacher_profile,
             host=host,
             port=port,
-            command=command,
+            command=command_spec.command,
             residual_config=ResidualActionConfig(
                 residual_scale=residual_scale,
                 residual_clip_abs=residual_clip_abs,
@@ -438,7 +451,13 @@ def _evaluate_residual_live(
         )
         # Prefer policies that survive longer when total reward ties.
         scores.append(float(total + 0.001 * completed))
-    return float(np.mean(scores))
+        weights.append(float(command_spec.weight))
+    return float(
+        np.average(
+            np.asarray(scores, dtype=np.float64),
+            weights=np.asarray(weights, dtype=np.float64),
+        )
+    )
 
 
 def episodic_clearance_adjustment(
@@ -455,6 +474,30 @@ def episodic_clearance_adjustment(
     median_ratio = float(np.median(values)) / target
     low_ratio = float(np.mean(values < target))
     return float(clearance_weight) * median_ratio - float(low_clearance_penalty_weight) * low_ratio
+
+
+def _normalize_training_commands(
+    training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None,
+) -> list[ResidualTrainingCommand]:
+    if not training_commands:
+        return [ResidualTrainingCommand(command=None, weight=1.0)]
+    normalized: list[ResidualTrainingCommand] = []
+    for item in training_commands:
+        if isinstance(item, ResidualTrainingCommand):
+            command = item.command
+            weight = item.weight
+        else:
+            command = item
+            weight = 1.0
+        if command is not None and not isinstance(command, PolicyCommand):
+            raise TypeError(f"training command must be PolicyCommand, got {type(command).__name__}")
+        if not math.isfinite(float(weight)) or float(weight) <= 0.0:
+            raise ValueError(f"training command weight must be positive and finite, got {weight!r}")
+        if isinstance(item, ResidualTrainingCommand) and float(item.weight) == float(weight):
+            normalized.append(item)
+        else:
+            normalized.append(ResidualTrainingCommand(command=command, weight=float(weight)))
+    return normalized
 
 
 class _ConstantResidualModule:  # created dynamically after torch import
@@ -858,7 +901,7 @@ def train_residual_policy(
     host: str = "127.0.0.1",
     port: int = 5555,
     actor_kind: str = RESIDUAL_ACTOR_CONSTANT,
-    training_commands: Sequence[PolicyCommand] | None = None,
+    training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None = None,
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
     initial_checkpoint: Path | None = None,
@@ -999,9 +1042,9 @@ def train_residual_policy(
         "schema_version": 1,
         "teacher_profile": teacher_profile,
         "actor_kind": actor_kind,
-        "training_commands": (
-            [] if not training_commands else [command.describe() for command in training_commands]
-        ),
+        "training_commands": []
+        if not training_commands
+        else [command.describe() for command in _normalize_training_commands(training_commands)],
         "policy_input_size": input_size,
         "output_dir": str(output_dir),
         "steps_per_episode": int(steps_per_episode),
@@ -1050,6 +1093,26 @@ def _write_report(path: Path, payload: dict[str, Any]) -> None:
         f"Policy input size: `{payload.get('policy_input_size')}`",
         "",
     ]
+    training_commands = payload.get("training_commands") or []
+    if training_commands:
+        lines.extend(
+            [
+                "## Training commands",
+                "",
+                "| vx | vy | yaw | weight |",
+                "| ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for command in training_commands:
+            lines.append(
+                "| {vx:.6g} | {vy:.6g} | {yaw:.6g} | {weight:.6g} |".format(
+                    vx=float(command.get("x_velocity", 0.0)),
+                    vy=float(command.get("y_velocity", 0.0)),
+                    yaw=float(command.get("yaw_velocity", 0.0)),
+                    weight=float(command.get("weight", 1.0)),
+                )
+            )
+        lines.append("")
     optimization = payload.get("optimization")
     if optimization:
         lines.extend(
@@ -1085,22 +1148,34 @@ def _profile_input_size(profile: PolicyProfile) -> int:
 
 
 def _parse_training_command(value: str) -> PolicyCommand:
+    return _parse_training_command_spec(value).command or PolicyCommand()
+
+
+def _parse_training_command_spec(value: str) -> ResidualTrainingCommand:
     parts = [part.strip() for part in str(value).split(",")]
-    if len(parts) != 3:
+    if len(parts) not in {3, 4}:
         raise argparse.ArgumentTypeError(
-            f"training command must be VX,VY,YAW, got {value!r}"
+            f"training command must be VX,VY,YAW or VX,VY,YAW,WEIGHT, got {value!r}"
         )
     try:
-        vx, vy, yaw = (float(part) for part in parts)
+        vx, vy, yaw = (float(part) for part in parts[:3])
+        weight = float(parts[3]) if len(parts) == 4 else 1.0
     except ValueError as exc:
         raise argparse.ArgumentTypeError(
-            f"training command must contain numeric VX,VY,YAW values, got {value!r}"
+            f"training command must contain numeric VX,VY,YAW[,WEIGHT] values, got {value!r}"
         ) from exc
-    if not np.all(np.isfinite([vx, vy, yaw])):
+    if not np.all(np.isfinite([vx, vy, yaw, weight])):
         raise argparse.ArgumentTypeError(
-            f"training command must contain finite VX,VY,YAW values, got {value!r}"
+            f"training command must contain finite VX,VY,YAW[,WEIGHT] values, got {value!r}"
         )
-    return PolicyCommand(x_velocity=vx, y_velocity=vy, yaw_velocity=yaw)
+    if weight <= 0.0:
+        raise argparse.ArgumentTypeError(
+            f"training command weight must be positive when provided, got {value!r}"
+        )
+    return ResidualTrainingCommand(
+        command=PolicyCommand(x_velocity=vx, y_velocity=vy, yaw_velocity=yaw),
+        weight=weight,
+    )
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -1125,8 +1200,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "--training-command",
         action="append",
         default=[],
-        metavar="VX,VY,YAW",
-        help="Repeat to score every residual candidate across multiple velocity commands",
+        metavar="VX,VY,YAW[,WEIGHT]",
+        help=(
+            "Repeat to score every residual candidate across multiple velocity commands. "
+            "Optional WEIGHT emphasizes harder commands such as start/stop or turning."
+        ),
     )
     parser.add_argument("--steps-per-episode", type=int, default=300, help="Simulator steps per candidate residual episode")
     parser.add_argument("--iterations", type=int, default=5, help="CEM iterations")
@@ -1174,7 +1252,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = _build_arg_parser().parse_args()
     final_clip = args.final_action_clip_abs if args.final_action_clip_abs > 0 else None
-    training_commands = [_parse_training_command(value) for value in args.training_command]
+    training_commands = [_parse_training_command_spec(value) for value in args.training_command]
     opt_cfg = ResidualOptimizationConfig(
         iterations=args.iterations,
         population=args.population,

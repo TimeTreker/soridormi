@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from soridormi_api import IMUState, JointState, RobotState
+from soridormi_runtime.policy_command import PolicyCommand
 from soridormi_runtime.policy_factory import normalize_policy_backend
 from soridormi_runtime.policy_profiles import PolicyModelSpec, PolicyProfile
 from soridormi_runtime.residual_policy import ResidualOnnxPolicy
@@ -17,7 +18,10 @@ from soridormi_runtime.train_residual_policy import (
     PHASE_CONTACT_PARAMETER_SIZE,
     RESIDUAL_ACTOR_PHASE_CONTACT,
     ResidualOptimizationConfig,
+    ResidualTrainingCommand,
+    _normalize_training_commands,
     _parse_training_command,
+    _parse_training_command_spec,
     _write_residual_profile,
     command_state_residual_action,
     command_state_residual_features,
@@ -277,6 +281,32 @@ def test_parse_training_command_builds_velocity_command() -> None:
     assert command.x_velocity == pytest.approx(0.09)
     assert command.y_velocity == pytest.approx(0.0)
     assert command.yaw_velocity == pytest.approx(0.12)
+
+
+def test_parse_training_command_spec_accepts_optional_weight() -> None:
+    spec = _parse_training_command_spec("0.08,0.0,0.20,3.5")
+
+    assert spec.command is not None
+    assert spec.command.x_velocity == pytest.approx(0.08)
+    assert spec.command.yaw_velocity == pytest.approx(0.20)
+    assert spec.weight == pytest.approx(3.5)
+    assert spec.describe()["weight"] == pytest.approx(3.5)
+
+
+def test_normalize_training_commands_preserves_legacy_unweighted_commands() -> None:
+    command = PolicyCommand(x_velocity=0.1, yaw_velocity=0.2)
+    weighted = ResidualTrainingCommand(command=PolicyCommand(x_velocity=0.05), weight=2.0)
+
+    specs = _normalize_training_commands([command, weighted])
+
+    assert [item.weight for item in specs] == pytest.approx([1.0, 2.0])
+    assert specs[0].command is command
+    assert specs[1] is weighted
+
+
+def test_normalize_training_commands_rejects_nonpositive_weight() -> None:
+    with pytest.raises(ValueError, match="positive"):
+        _normalize_training_commands([ResidualTrainingCommand(command=PolicyCommand(), weight=0.0)])
 
 
 def test_write_residual_profile_sets_runtime_kind(tmp_path: Path, monkeypatch) -> None:

@@ -194,6 +194,11 @@ zero-residual smoke with the context candidate completed 40/40 steps and
 observed 9 swing samples with mean clearance about `0.00919 m`; all 9 were
 below `0.015 m`, confirming that the reward sees the M10 failure.
 
+Residual training supports optional per-command emphasis with
+`--training-command VX,VY,YAW,WEIGHT`. Use this to focus the next run on
+start/stop and turning clearance while still retaining a lower-weight flat-walk
+command.
+
 First bounded clearance experiment:
 
 ```bash

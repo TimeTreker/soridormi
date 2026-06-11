@@ -246,6 +246,8 @@ observation[101]
   - actor inputs: bias + left/right foot contact + cosine/sine gait phase
   - bounded by `tanh` plus the existing residual scale and clipping envelope
   - supports repeated `--training-command VX,VY,YAW` conditions
+  - supports optional command weights as `--training-command VX,VY,YAW,WEIGHT`
+    for start/stop and turning emphasis
   - 104D ONNX contract and 100-step MuJoCo deployment smoke: PASS
 - [x] Train and evaluate a phase/contact candidate across the three M10 scenarios
   - candidate: `m10_phase_contact_clearance_cem3x8_s53`

@@ -243,14 +243,17 @@ The residual trainer supports three bounded cross-entropy-search actors:
 - `--actor-kind command_state_mlp`: a nonlinear four-hidden-unit actor with the
   same feature/output contract and a linear skip path.
 
-The phase/contact actor can be scored across multiple velocity conditions:
+The residual trainer can be scored across multiple velocity conditions. Add an
+optional fourth comma-separated value to weight harder commands, which is useful
+when the next M10 run should emphasize start/stop and turning clearance without
+dropping the near-passing flat-walk case:
 
 ```bash
 ./scripts/train_residual_policy.sh context_stage1_three_scenario_10ep_e80 \
-  --actor-kind phase_contact \
-  --training-command 0.125,0,0 \
-  --training-command 0.06,0,0 \
-  --training-command 0.09,0,0.12 \
+  --actor-kind command_state_mlp \
+  --training-command 0.125,0,0,1.0 \
+  --training-command 0.06,0,0,2.0 \
+  --training-command 0.09,0,0.12,3.0 \
   --swing-clearance-weight 0.5 \
   --low-clearance-penalty-weight 0.5
 ```
