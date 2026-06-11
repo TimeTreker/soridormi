@@ -25,6 +25,7 @@ DEFAULT_RESIDUAL_PT_NAME = "residual_policy.pt"
 RESIDUAL_ACTOR_CONSTANT = "constant"
 RESIDUAL_ACTOR_PHASE_CONTACT = "phase_contact"
 RESIDUAL_ACTOR_COMMAND_STATE = "command_state"
+RESIDUAL_ACTOR_COMMAND_STATE_MLP = "command_state_mlp"
 PHASE_CONTACT_OBSERVATION_START = 97
 PHASE_CONTACT_OBSERVATION_STOP = 101
 PHASE_CONTACT_FEATURE_SIZE = 5
@@ -37,6 +38,13 @@ COMMAND_STATE_ACTION_INDICES = (2, 3, 4, 11, 12, 13)
 COMMAND_STATE_FEATURE_SIZE = 20
 COMMAND_STATE_OUTPUT_SIZE = len(COMMAND_STATE_ACTION_INDICES)
 COMMAND_STATE_PARAMETER_SIZE = COMMAND_STATE_FEATURE_SIZE * COMMAND_STATE_OUTPUT_SIZE
+COMMAND_STATE_MLP_HIDDEN_SIZE = 4
+COMMAND_STATE_MLP_PARAMETER_SIZE = (
+    COMMAND_STATE_PARAMETER_SIZE
+    + COMMAND_STATE_FEATURE_SIZE * COMMAND_STATE_MLP_HIDDEN_SIZE
+    + COMMAND_STATE_MLP_HIDDEN_SIZE
+    + COMMAND_STATE_MLP_HIDDEN_SIZE * COMMAND_STATE_OUTPUT_SIZE
+)
 
 
 @dataclass(frozen=True)
@@ -121,15 +129,33 @@ def optimize_command_state_residual(
     return _optimize_parameter_vector(evaluate, parameter_size=COMMAND_STATE_PARAMETER_SIZE, config=config)
 
 
+def optimize_command_state_mlp_residual(
+    evaluate: Callable[[np.ndarray], float],
+    *,
+    config: ResidualOptimizationConfig | None = None,
+    initial_mean: np.ndarray | list[float] | None = None,
+) -> ResidualOptimizationResult:
+    return _optimize_parameter_vector(
+        evaluate,
+        parameter_size=COMMAND_STATE_MLP_PARAMETER_SIZE,
+        config=config,
+        initial_mean=initial_mean,
+    )
+
+
 def _optimize_parameter_vector(
     evaluate: Callable[[np.ndarray], float],
     *,
     parameter_size: int,
     config: ResidualOptimizationConfig | None,
+    initial_mean: np.ndarray | list[float] | None = None,
 ) -> ResidualOptimizationResult:
     cfg = config or ResidualOptimizationConfig()
     rng = np.random.default_rng(int(cfg.seed))
-    mean = np.zeros(parameter_size, dtype=np.float32)
+    if initial_mean is None:
+        mean = np.zeros(parameter_size, dtype=np.float32)
+    else:
+        mean = np.asarray(initial_mean, dtype=np.float32).reshape(parameter_size).copy()
     std = np.full(parameter_size, float(cfg.initial_std), dtype=np.float32)
     elite_count = max(1, int(math.ceil(float(cfg.population) * float(cfg.elite_fraction))))
     best_residual = mean.copy()
@@ -140,7 +166,7 @@ def _optimize_parameter_vector(
         candidates = rng.normal(mean, std, size=(max(1, int(cfg.population)), parameter_size)).astype(np.float32)
         candidates = np.clip(candidates, -float(cfg.residual_clip_abs), float(cfg.residual_clip_abs))
         if cfg.include_zero_candidate:
-            candidates[0, :] = 0.0
+            candidates[0, :] = mean
         scores = np.asarray([float(evaluate(candidate)) for candidate in candidates], dtype=np.float64)
         order = np.argsort(scores)[::-1]
         elites = candidates[order[:elite_count]]
@@ -219,6 +245,38 @@ def command_state_residual_action(
         COMMAND_STATE_OUTPUT_SIZE,
     )
     leg_action = np.tanh(command_state_residual_features(observation) @ weights).astype(np.float32)
+    action = np.zeros(ACTION_SIZE, dtype=np.float32)
+    action[list(COMMAND_STATE_ACTION_INDICES)] = leg_action
+    return action
+
+
+def command_state_mlp_residual_action(
+    observation: np.ndarray | list[float],
+    parameters: np.ndarray | list[float],
+) -> np.ndarray:
+    features = command_state_residual_features(observation)
+    values = np.asarray(parameters, dtype=np.float32).reshape(COMMAND_STATE_MLP_PARAMETER_SIZE)
+    cursor = 0
+    linear_size = COMMAND_STATE_PARAMETER_SIZE
+    linear = values[cursor : cursor + linear_size].reshape(
+        COMMAND_STATE_FEATURE_SIZE,
+        COMMAND_STATE_OUTPUT_SIZE,
+    )
+    cursor += linear_size
+    input_hidden_size = COMMAND_STATE_FEATURE_SIZE * COMMAND_STATE_MLP_HIDDEN_SIZE
+    input_hidden = values[cursor : cursor + input_hidden_size].reshape(
+        COMMAND_STATE_FEATURE_SIZE,
+        COMMAND_STATE_MLP_HIDDEN_SIZE,
+    )
+    cursor += input_hidden_size
+    hidden_bias = values[cursor : cursor + COMMAND_STATE_MLP_HIDDEN_SIZE]
+    cursor += COMMAND_STATE_MLP_HIDDEN_SIZE
+    hidden_output = values[cursor:].reshape(
+        COMMAND_STATE_MLP_HIDDEN_SIZE,
+        COMMAND_STATE_OUTPUT_SIZE,
+    )
+    hidden = np.tanh(features @ input_hidden + hidden_bias)
+    leg_action = np.tanh(features @ linear + hidden @ hidden_output).astype(np.float32)
     action = np.zeros(ACTION_SIZE, dtype=np.float32)
     action[list(COMMAND_STATE_ACTION_INDICES)] = leg_action
     return action
@@ -317,6 +375,14 @@ def evaluate_command_state_residual_live(
         episodic_clearance_weight=episodic_clearance_weight,
         episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
     )
+
+
+def evaluate_command_state_mlp_residual_live(
+    parameters: np.ndarray,
+    **kwargs: Any,
+) -> float:
+    actor = lambda observation: command_state_mlp_residual_action(observation, parameters)
+    return _evaluate_residual_live(actor, **kwargs)
 
 
 def _evaluate_residual_live(
@@ -616,6 +682,123 @@ def export_command_state_residual_policy(
         )
 
 
+def export_command_state_mlp_residual_policy(
+    parameters: np.ndarray | list[float],
+    *,
+    output_onnx: Path,
+    output_checkpoint: Path | None = None,
+    input_size: int = 101,
+) -> None:
+    torch = _import_torch()
+    values = np.asarray(parameters, dtype=np.float32).reshape(COMMAND_STATE_MLP_PARAMETER_SIZE)
+    cursor = 0
+    linear_size = COMMAND_STATE_PARAMETER_SIZE
+    linear = values[cursor : cursor + linear_size].reshape(
+        COMMAND_STATE_FEATURE_SIZE,
+        COMMAND_STATE_OUTPUT_SIZE,
+    )
+    cursor += linear_size
+    input_hidden_size = COMMAND_STATE_FEATURE_SIZE * COMMAND_STATE_MLP_HIDDEN_SIZE
+    input_hidden = values[cursor : cursor + input_hidden_size].reshape(
+        COMMAND_STATE_FEATURE_SIZE,
+        COMMAND_STATE_MLP_HIDDEN_SIZE,
+    )
+    cursor += input_hidden_size
+    hidden_bias = values[cursor : cursor + COMMAND_STATE_MLP_HIDDEN_SIZE]
+    cursor += COMMAND_STATE_MLP_HIDDEN_SIZE
+    hidden_output = values[cursor:].reshape(
+        COMMAND_STATE_MLP_HIDDEN_SIZE,
+        COMMAND_STATE_OUTPUT_SIZE,
+    )
+
+    class CommandStateMlpResidualPolicy(torch.nn.Module):  # type: ignore[name-defined]
+        def __init__(self) -> None:
+            super().__init__()
+            self.register_buffer("linear", torch.as_tensor(linear, dtype=torch.float32))
+            self.register_buffer("input_hidden", torch.as_tensor(input_hidden, dtype=torch.float32))
+            self.register_buffer("hidden_bias", torch.as_tensor(hidden_bias, dtype=torch.float32))
+            self.register_buffer("hidden_output", torch.as_tensor(hidden_output, dtype=torch.float32))
+            projection = torch.zeros((COMMAND_STATE_OUTPUT_SIZE, ACTION_SIZE), dtype=torch.float32)
+            for source_index, action_index in enumerate(COMMAND_STATE_ACTION_INDICES):
+                projection[source_index, action_index] = 1.0
+            self.register_buffer("projection", projection)
+
+        def forward(self, obs: Any) -> Any:  # noqa: ANN401
+            batch = obs.shape[0]
+            ones = torch.ones((batch, 1), dtype=obs.dtype, device=obs.device)
+            features = torch.cat(
+                (
+                    ones,
+                    obs[:, COMMAND_STATE_COMMAND_SLICE],
+                    obs[:, COMMAND_STATE_CONTACT_PHASE_SLICE],
+                    obs[:, list(COMMAND_STATE_LEG_JOINT_OFFSET_INDICES)],
+                    obs[:, list(COMMAND_STATE_LAST_ACTION_INDICES)],
+                ),
+                dim=1,
+            )
+            hidden = torch.tanh(features @ self.input_hidden + self.hidden_bias)
+            leg_action = torch.tanh(features @ self.linear + hidden @ self.hidden_output)
+            return leg_action @ self.projection
+
+    resolved_input_size = int(input_size)
+    if resolved_input_size < PHASE_CONTACT_OBSERVATION_STOP:
+        raise ValueError(
+            f"command_state_mlp residual policy requires input_size >= {PHASE_CONTACT_OBSERVATION_STOP}"
+        )
+    module = CommandStateMlpResidualPolicy()
+    module.eval()
+    output_onnx.parent.mkdir(parents=True, exist_ok=True)
+    dummy = torch.zeros((1, resolved_input_size), dtype=torch.float32)
+    torch.onnx.export(
+        module,
+        dummy,
+        str(output_onnx),
+        input_names=["obs"],
+        output_names=["continuous_actions"],
+        dynamic_axes={"obs": {0: "batch"}, "continuous_actions": {0: "batch"}},
+        opset_version=17,
+        do_constant_folding=True,
+        dynamo=False,
+    )
+    if output_checkpoint is not None:
+        output_checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {
+                "schema_version": 1,
+                "model_kind": "command_state_mlp_residual_policy",
+                "parameters": values.tolist(),
+                "hidden_size": COMMAND_STATE_MLP_HIDDEN_SIZE,
+                "observation_size": resolved_input_size,
+                "action_size": ACTION_SIZE,
+                "controlled_action_indices": list(COMMAND_STATE_ACTION_INDICES),
+                "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            },
+            output_checkpoint,
+        )
+
+
+def load_residual_initial_parameters(
+    checkpoint_path: Path,
+    *,
+    actor_kind: str,
+) -> np.ndarray:
+    torch = _import_torch()
+    payload = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    source = np.asarray(payload.get("parameters", payload.get("residual", [])), dtype=np.float32).reshape(-1)
+    if actor_kind == RESIDUAL_ACTOR_COMMAND_STATE_MLP:
+        if source.size == COMMAND_STATE_PARAMETER_SIZE:
+            initialized = np.zeros(COMMAND_STATE_MLP_PARAMETER_SIZE, dtype=np.float32)
+            initialized[:COMMAND_STATE_PARAMETER_SIZE] = source
+            return initialized
+        return source.reshape(COMMAND_STATE_MLP_PARAMETER_SIZE)
+    expected = {
+        RESIDUAL_ACTOR_CONSTANT: ACTION_SIZE,
+        RESIDUAL_ACTOR_PHASE_CONTACT: PHASE_CONTACT_PARAMETER_SIZE,
+        RESIDUAL_ACTOR_COMMAND_STATE: COMMAND_STATE_PARAMETER_SIZE,
+    }[actor_kind]
+    return source.reshape(expected)
+
+
 def _write_residual_profile(
     *,
     profile_name: str,
@@ -678,6 +861,7 @@ def train_residual_policy(
     training_commands: Sequence[PolicyCommand] | None = None,
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
+    initial_checkpoint: Path | None = None,
 ) -> ResidualPolicyTrainResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -693,6 +877,11 @@ def train_residual_policy(
     try:
         teacher = PolicyProfile.load(teacher_profile)
         input_size = _profile_input_size(teacher)
+        initial_parameters = (
+            None
+            if initial_checkpoint is None
+            else load_residual_initial_parameters(initial_checkpoint, actor_kind=actor_kind)
+        )
         if actor_kind == RESIDUAL_ACTOR_CONSTANT:
             optimization = optimize_residual_bias(
                 lambda residual: evaluate_residual_bias_live(
@@ -763,6 +952,31 @@ def train_residual_policy(
                 output_checkpoint=checkpoint_path,
                 input_size=input_size,
             )
+        elif actor_kind == RESIDUAL_ACTOR_COMMAND_STATE_MLP:
+            optimization = optimize_command_state_mlp_residual(
+                lambda parameters: evaluate_command_state_mlp_residual_live(
+                    parameters,
+                    teacher_profile=teacher_profile,
+                    steps=steps_per_episode,
+                    residual_scale=residual_scale,
+                    residual_clip_abs=residual_clip_abs,
+                    final_action_clip_abs=final_action_clip_abs,
+                    reward_config=reward_config,
+                    host=host,
+                    port=port,
+                    training_commands=training_commands,
+                    episodic_clearance_weight=episodic_clearance_weight,
+                    episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+                ),
+                config=optimization_config,
+                initial_mean=initial_parameters,
+            )
+            export_command_state_mlp_residual_policy(
+                optimization.best_residual,
+                output_onnx=onnx_path,
+                output_checkpoint=checkpoint_path,
+                input_size=input_size,
+            )
         else:
             raise ValueError(f"unsupported residual actor kind: {actor_kind}")
         if profile_name:
@@ -797,6 +1011,7 @@ def train_residual_policy(
         "reward_config": asdict(reward_config),
         "episodic_clearance_weight": float(episodic_clearance_weight),
         "episodic_low_clearance_penalty_weight": float(episodic_low_clearance_penalty_weight),
+        "initial_checkpoint": None if initial_checkpoint is None else str(initial_checkpoint),
         "optimization_config": asdict(optimization_config),
         "optimization": None if optimization is None else asdict(optimization),
         "residual_onnx_path": str(onnx_path) if onnx_path.exists() else None,
@@ -901,6 +1116,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             RESIDUAL_ACTOR_CONSTANT,
             RESIDUAL_ACTOR_PHASE_CONTACT,
             RESIDUAL_ACTOR_COMMAND_STATE,
+            RESIDUAL_ACTOR_COMMAND_STATE_MLP,
         ],
         default=RESIDUAL_ACTOR_CONSTANT,
         help="Residual actor architecture",
@@ -942,6 +1158,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.0,
         help="Episode-level penalty weight for the fraction of swing samples below target clearance",
+    )
+    parser.add_argument(
+        "--initial-checkpoint",
+        type=Path,
+        default=None,
+        help="Warm-start actor parameters from an existing residual_policy.pt",
     )
     parser.add_argument("--host", default=os.environ.get("SIM_HOST", "127.0.0.1"), help="Simulator API host")
     parser.add_argument("--port", type=int, default=int(os.environ.get("SIM_PORT", "5555")), help="Simulator API port")
@@ -985,6 +1207,7 @@ def main() -> None:
             "reward_config": asdict(reward_cfg),
             "episodic_clearance_weight": args.episodic_clearance_weight,
             "episodic_low_clearance_penalty_weight": args.episodic_low_clearance_penalty_weight,
+            "initial_checkpoint": None if args.initial_checkpoint is None else str(args.initial_checkpoint),
             "residual_scale": args.residual_scale,
             "residual_clip_abs": args.residual_clip_abs,
             "final_action_clip_abs": final_clip,
@@ -1008,6 +1231,7 @@ def main() -> None:
         training_commands=training_commands,
         episodic_clearance_weight=args.episodic_clearance_weight,
         episodic_low_clearance_penalty_weight=args.episodic_low_clearance_penalty_weight,
+        initial_checkpoint=args.initial_checkpoint,
     )
     print("Soridormi residual policy fine-tuning")
     print("======================================")

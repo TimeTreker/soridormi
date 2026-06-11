@@ -240,6 +240,8 @@ The residual trainer supports three bounded cross-entropy-search actors:
 - `--actor-kind command_state`: a 120-parameter sagittal-leg actor over desired
   velocity, contacts, gait phase, hip/knee/ankle offsets, and previous
   hip/knee/ankle actions.
+- `--actor-kind command_state_mlp`: a nonlinear four-hidden-unit actor with the
+  same feature/output contract and a linear skip path.
 
 The phase/contact actor can be scored across multiple velocity conditions:
 
@@ -289,8 +291,27 @@ curve:      0.00632m -> 0.00759m
 
 Total three-scenario distance increased from `0.733m` to `1.070m`, but the
 candidate still failed the absolute `0.015m` gate. Further linear CEM scaling
-is not recommended; use a nonlinear learned residual or a higher-clearance
-teacher.
+is not recommended.
+
+The nonlinear actor can warm-start from that linear checkpoint:
+
+```bash
+--actor-kind command_state_mlp \
+--initial-checkpoint /data/rl_finetune/m10_command_state_gate_cem4x12_s67/residual_policy.pt
+```
+
+Candidate `m10_command_state_mlp_cem4x14_s79` produced the strongest result:
+
+```text
+flat:       0.01023m -> 0.01471m
+start-stop: 0.00759m -> 0.01152m
+curve:      0.00632m -> 0.01025m
+total distance: 0.733m -> 1.275m
+```
+
+It had no falls and a maximum stuck ratio of `0.0365`, but still failed G10.
+Flat walking is only `0.00029m` below the median-clearance target; start/stop
+and turning remain the larger blockers.
 
 ## M6 completion gate
 

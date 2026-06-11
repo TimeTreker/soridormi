@@ -10,6 +10,7 @@ from soridormi_runtime.policy_factory import normalize_policy_backend
 from soridormi_runtime.policy_profiles import PolicyModelSpec, PolicyProfile
 from soridormi_runtime.residual_policy import ResidualOnnxPolicy
 from soridormi_runtime.train_residual_policy import (
+    COMMAND_STATE_MLP_PARAMETER_SIZE,
     COMMAND_STATE_FEATURE_SIZE,
     COMMAND_STATE_PARAMETER_SIZE,
     RESIDUAL_ACTOR_COMMAND_STATE,
@@ -20,9 +21,11 @@ from soridormi_runtime.train_residual_policy import (
     _write_residual_profile,
     command_state_residual_action,
     command_state_residual_features,
+    command_state_mlp_residual_action,
     episodic_clearance_adjustment,
     optimize_residual_bias,
     optimize_command_state_residual,
+    optimize_command_state_mlp_residual,
     optimize_phase_contact_residual,
     phase_contact_residual_action,
 )
@@ -217,6 +220,32 @@ def test_command_state_optimizer_uses_full_parameter_vector() -> None:
     )
 
     assert len(result.best_residual) == COMMAND_STATE_PARAMETER_SIZE
+
+
+def test_command_state_mlp_actor_preserves_linear_warm_start() -> None:
+    observation = np.zeros(104, dtype=np.float32)
+    observation[6] = 0.2
+    linear = np.zeros(COMMAND_STATE_PARAMETER_SIZE, dtype=np.float32)
+    linear.reshape(COMMAND_STATE_FEATURE_SIZE, 6)[1, 0] = 2.0
+    parameters = np.zeros(COMMAND_STATE_MLP_PARAMETER_SIZE, dtype=np.float32)
+    parameters[:COMMAND_STATE_PARAMETER_SIZE] = linear
+
+    action = command_state_mlp_residual_action(observation, parameters)
+
+    assert action[2] == pytest.approx(np.tanh(0.4))
+    assert action[[0, 1, 5, 6, 7, 8, 9, 10]].tolist() == pytest.approx([0.0] * 8)
+
+
+def test_command_state_mlp_optimizer_accepts_warm_start() -> None:
+    initial = np.full(COMMAND_STATE_MLP_PARAMETER_SIZE, 0.1, dtype=np.float32)
+    result = optimize_command_state_mlp_residual(
+        lambda candidate: -float(np.mean((candidate - initial) ** 2)),
+        config=ResidualOptimizationConfig(iterations=1, population=3, seed=9),
+        initial_mean=initial,
+    )
+
+    assert result.best_score == pytest.approx(0.0)
+    assert result.best_residual == pytest.approx(initial.tolist())
 
 
 def test_episodic_clearance_adjustment_matches_gate_direction() -> None:

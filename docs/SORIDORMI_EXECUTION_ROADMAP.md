@@ -270,7 +270,19 @@ observation[101]
   - total distance: 0.733m -> 1.070m
   - no falls; maximum stuck ratio improved to 0.084
   - result: best candidate so far, but still blocked by G10
-- [ ] Replace linear CEM residual search with a nonlinear learned residual, or
+- [x] Add warm-started nonlinear command/state residual actor
+  - four hidden units plus a linear skip path
+  - warm-start preserves the best linear candidate exactly
+  - same bounded six-joint sagittal output contract
+- [x] Train and evaluate nonlinear residual candidate
+  - candidate: `m10_command_state_mlp_cem4x14_s79`
+  - flat: 0.01023m -> 0.01471m
+  - start-stop: 0.00759m -> 0.01152m
+  - curve: 0.00632m -> 0.01025m
+  - total distance: 0.733m -> 1.275m
+  - no falls; maximum stuck ratio: 0.0365
+  - result: strongest candidate, but all scenarios remain below G10
+- [ ] Focus the next training stage on start/stop and turning clearance, or
   acquire a higher-clearance teacher
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
 
@@ -456,9 +468,9 @@ depends on the hardware safety gate.
 2. Run the current candidate with `--viewer --follow-camera`.
 3. Record swing-clearance evidence for all three scenarios.
 4. Fill the M10 visual-review template and rebuild the evidence package.
-5. Implement a nonlinear bounded residual learner using the validated
-   command/state/history feature contract, or acquire a teacher that reaches
-   the clearance target.
+5. Focus training commands/objective on start-stop and turning clearance while
+   preserving the near-passing flat result, or acquire a higher-clearance
+   teacher.
 6. Pass the quantitative clearance readiness gate without regressing the
    original scenario suite.
 7. Compare the new candidate suite against the official teacher with
