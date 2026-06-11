@@ -7,7 +7,7 @@ import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 import numpy as np
 import yaml
@@ -22,6 +22,9 @@ from soridormi_runtime.walking_reward import WalkingRewardConfig
 DEFAULT_OUTPUT_ROOT = Path("/data/rl_finetune/residual_policy")
 DEFAULT_RESIDUAL_ONNX_NAME = "residual_policy.onnx"
 DEFAULT_RESIDUAL_PT_NAME = "residual_policy.pt"
+SCORE_NORMALIZATION_TOTAL = "total"
+SCORE_NORMALIZATION_PER_STEP = "per_step"
+SCORE_NORMALIZATION_CHOICES = (SCORE_NORMALIZATION_TOTAL, SCORE_NORMALIZATION_PER_STEP)
 RESIDUAL_ACTOR_CONSTANT = "constant"
 RESIDUAL_ACTOR_PHASE_CONTACT = "phase_contact"
 RESIDUAL_ACTOR_COMMAND_STATE = "command_state"
@@ -79,6 +82,30 @@ class ResidualTrainingCommand:
         if self.command is not None:
             payload.update(self.command.describe())
         return payload
+
+
+@dataclass(frozen=True)
+class ResidualTrainingSegment:
+    command: PolicyCommand
+    steps: int
+
+    def describe(self) -> dict[str, Any]:
+        payload = self.command.describe()
+        payload["steps"] = int(self.steps)
+        return payload
+
+
+@dataclass(frozen=True)
+class ResidualTrainingSequence:
+    segments: tuple[ResidualTrainingSegment, ...]
+    weight: float = 1.0
+
+    def describe(self) -> dict[str, Any]:
+        return {
+            "weight": float(self.weight),
+            "segments": [segment.describe() for segment in self.segments],
+            "total_steps": int(sum(segment.steps for segment in self.segments)),
+        }
 
 
 @dataclass(frozen=True)
@@ -306,8 +333,12 @@ def evaluate_residual_bias_live(
     host: str,
     port: int,
     training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None = None,
+    training_sequences: Sequence[ResidualTrainingSequence] | None = None,
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
+    episodic_clearance_gap_weight: float = 0.0,
+    worst_case_score_weight: float = 0.0,
+    score_normalization: str = SCORE_NORMALIZATION_TOTAL,
 ) -> float:
     return _evaluate_residual_live(
         residual,
@@ -320,8 +351,12 @@ def evaluate_residual_bias_live(
         host=host,
         port=port,
         training_commands=training_commands,
+        training_sequences=training_sequences,
         episodic_clearance_weight=episodic_clearance_weight,
         episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+        episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+        worst_case_score_weight=worst_case_score_weight,
+        score_normalization=score_normalization,
     )
 
 
@@ -337,8 +372,12 @@ def evaluate_phase_contact_residual_live(
     host: str,
     port: int,
     training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None = None,
+    training_sequences: Sequence[ResidualTrainingSequence] | None = None,
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
+    episodic_clearance_gap_weight: float = 0.0,
+    worst_case_score_weight: float = 0.0,
+    score_normalization: str = SCORE_NORMALIZATION_TOTAL,
 ) -> float:
     actor = lambda observation: phase_contact_residual_action(observation, parameters)
     return _evaluate_residual_live(
@@ -352,8 +391,12 @@ def evaluate_phase_contact_residual_live(
         host=host,
         port=port,
         training_commands=training_commands,
+        training_sequences=training_sequences,
         episodic_clearance_weight=episodic_clearance_weight,
         episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+        episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+        worst_case_score_weight=worst_case_score_weight,
+        score_normalization=score_normalization,
     )
 
 
@@ -369,8 +412,12 @@ def evaluate_command_state_residual_live(
     host: str,
     port: int,
     training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None = None,
+    training_sequences: Sequence[ResidualTrainingSequence] | None = None,
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
+    episodic_clearance_gap_weight: float = 0.0,
+    worst_case_score_weight: float = 0.0,
+    score_normalization: str = SCORE_NORMALIZATION_TOTAL,
 ) -> float:
     actor = lambda observation: command_state_residual_action(observation, parameters)
     return _evaluate_residual_live(
@@ -384,8 +431,12 @@ def evaluate_command_state_residual_live(
         host=host,
         port=port,
         training_commands=training_commands,
+        training_sequences=training_sequences,
         episodic_clearance_weight=episodic_clearance_weight,
         episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+        episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+        worst_case_score_weight=worst_case_score_weight,
+        score_normalization=score_normalization,
     )
 
 
@@ -409,55 +460,391 @@ def _evaluate_residual_live(
     host: str,
     port: int,
     training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None,
+    training_sequences: Sequence[ResidualTrainingSequence] | None = None,
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
+    episodic_clearance_gap_weight: float = 0.0,
+    worst_case_score_weight: float = 0.0,
+    score_normalization: str = SCORE_NORMALIZATION_TOTAL,
 ) -> float:
+    return float(
+        _evaluate_residual_live_breakdown(
+            residual_source,
+            teacher_profile=teacher_profile,
+            steps=steps,
+            residual_scale=residual_scale,
+            residual_clip_abs=residual_clip_abs,
+            final_action_clip_abs=final_action_clip_abs,
+            reward_config=reward_config,
+            host=host,
+            port=port,
+            training_commands=training_commands,
+            training_sequences=training_sequences,
+            episodic_clearance_weight=episodic_clearance_weight,
+            episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+            episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+            worst_case_score_weight=worst_case_score_weight,
+            score_normalization=score_normalization,
+        )["aggregate_score"]
+    )
+
+
+def _evaluate_residual_live_breakdown(
+    residual_source: np.ndarray | Callable[[np.ndarray], np.ndarray],
+    *,
+    teacher_profile: str,
+    steps: int,
+    residual_scale: float,
+    residual_clip_abs: float,
+    final_action_clip_abs: float | None,
+    reward_config: WalkingRewardConfig,
+    host: str,
+    port: int,
+    training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None,
+    training_sequences: Sequence[ResidualTrainingSequence] | None = None,
+    episodic_clearance_weight: float = 0.0,
+    episodic_low_clearance_penalty_weight: float = 0.0,
+    episodic_clearance_gap_weight: float = 0.0,
+    worst_case_score_weight: float = 0.0,
+    score_normalization: str = SCORE_NORMALIZATION_TOTAL,
+) -> dict[str, Any]:
+    score_normalization = _validate_score_normalization(score_normalization)
+    if not math.isfinite(float(worst_case_score_weight)) or not 0.0 <= float(worst_case_score_weight) <= 1.0:
+        raise ValueError(
+            "worst_case_score_weight must be finite and in [0, 1], "
+            f"got {worst_case_score_weight!r}"
+        )
+
+    score_items: list[dict[str, Any]] = []
     scores: list[float] = []
     weights: list[float] = []
     commands = _normalize_training_commands(training_commands)
-    for command_spec in commands:
-        env = RlFineTuneEnv(
-            profile=teacher_profile,
+    sequences = _normalize_training_sequences(training_sequences)
+
+    if not commands and not sequences:
+        commands = [ResidualTrainingCommand(command=None, weight=1.0)]
+
+    for command_index, command_spec in enumerate(commands):
+        episode = _evaluate_residual_episode_breakdown(
+            residual_source,
+            teacher_profile=teacher_profile,
             host=host,
             port=port,
-            command=command_spec.command,
-            residual_config=ResidualActionConfig(
-                residual_scale=residual_scale,
-                residual_clip_abs=residual_clip_abs,
-                final_action_clip_abs=final_action_clip_abs,
-            ),
+            residual_scale=residual_scale,
+            residual_clip_abs=residual_clip_abs,
+            final_action_clip_abs=final_action_clip_abs,
             reward_config=reward_config,
-            reset_on_start=True,
+            initial_command=command_spec.command,
+            segments=None,
+            steps=steps,
+            episodic_clearance_weight=episodic_clearance_weight,
+            episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+            episodic_clearance_gap_weight=episodic_clearance_gap_weight,
         )
-        total = 0.0
-        completed = 0
-        swing_clearances: list[float] = []
-        env.reset()
-        for _ in range(max(1, int(steps))):
+        score = float(episode["score"])
+        objective_score = _score_for_aggregation(episode, score_normalization=score_normalization)
+        scores.append(objective_score)
+        weights.append(float(command_spec.weight))
+        score_items.append(
+            {
+                "kind": "command",
+                "index": command_index,
+                "weight": float(command_spec.weight),
+                "score": float(score),
+                "objective_score": float(objective_score),
+                "score_normalization": score_normalization,
+                "command": None if command_spec.command is None else command_spec.command.describe(),
+                "episode": episode,
+            }
+        )
+
+    for sequence_index, sequence in enumerate(sequences):
+        episode = _evaluate_residual_episode_breakdown(
+            residual_source,
+            teacher_profile=teacher_profile,
+            host=host,
+            port=port,
+            residual_scale=residual_scale,
+            residual_clip_abs=residual_clip_abs,
+            final_action_clip_abs=final_action_clip_abs,
+            reward_config=reward_config,
+            initial_command=sequence.segments[0].command,
+            segments=sequence.segments,
+            steps=steps,
+            episodic_clearance_weight=episodic_clearance_weight,
+            episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+            episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+        )
+        score = float(episode["score"])
+        objective_score = _score_for_aggregation(episode, score_normalization=score_normalization)
+        scores.append(objective_score)
+        weights.append(float(sequence.weight))
+        score_items.append(
+            {
+                "kind": "sequence",
+                "index": sequence_index,
+                "weight": float(sequence.weight),
+                "score": float(score),
+                "objective_score": float(objective_score),
+                "score_normalization": score_normalization,
+                "sequence": sequence.describe(),
+                "episode": episode,
+            }
+        )
+
+    objective_values = np.asarray(scores, dtype=np.float64)
+    weight_values = np.asarray(weights, dtype=np.float64)
+    raw_values = np.asarray([float(item["score"]) for item in score_items], dtype=np.float64)
+    weighted_mean = float(np.average(objective_values, weights=weight_values))
+    raw_weighted_mean = float(np.average(raw_values, weights=weight_values))
+    worst_index = int(np.argmin(objective_values))
+    worst_score = float(scores[worst_index])
+    aggregate = aggregate_training_scores(scores, weights, worst_case_score_weight=worst_case_score_weight)
+    return {
+        "aggregate_score": float(aggregate),
+        "weighted_mean_score": weighted_mean,
+        "worst_score": worst_score,
+        "raw_weighted_mean_score": raw_weighted_mean,
+        "score_normalization": score_normalization,
+        "worst_case_score_weight": float(worst_case_score_weight),
+        "worst_item_index": worst_index,
+        "items": score_items,
+    }
+
+
+def _evaluate_residual_episode(
+    residual_source: np.ndarray | Callable[[np.ndarray], np.ndarray],
+    *,
+    teacher_profile: str,
+    host: str,
+    port: int,
+    residual_scale: float,
+    residual_clip_abs: float,
+    final_action_clip_abs: float | None,
+    reward_config: WalkingRewardConfig,
+    initial_command: PolicyCommand | None,
+    segments: Sequence[ResidualTrainingSegment] | None,
+    steps: int,
+    episodic_clearance_weight: float,
+    episodic_low_clearance_penalty_weight: float,
+    episodic_clearance_gap_weight: float = 0.0,
+) -> float:
+    return float(
+        _evaluate_residual_episode_breakdown(
+            residual_source,
+            teacher_profile=teacher_profile,
+            host=host,
+            port=port,
+            residual_scale=residual_scale,
+            residual_clip_abs=residual_clip_abs,
+            final_action_clip_abs=final_action_clip_abs,
+            reward_config=reward_config,
+            initial_command=initial_command,
+            segments=segments,
+            steps=steps,
+            episodic_clearance_weight=episodic_clearance_weight,
+            episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+            episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+        )["score"]
+    )
+
+
+def _evaluate_residual_episode_breakdown(
+    residual_source: np.ndarray | Callable[[np.ndarray], np.ndarray],
+    *,
+    teacher_profile: str,
+    host: str,
+    port: int,
+    residual_scale: float,
+    residual_clip_abs: float,
+    final_action_clip_abs: float | None,
+    reward_config: WalkingRewardConfig,
+    initial_command: PolicyCommand | None,
+    segments: Sequence[ResidualTrainingSegment] | None,
+    steps: int,
+    episodic_clearance_weight: float,
+    episodic_low_clearance_penalty_weight: float,
+    episodic_clearance_gap_weight: float = 0.0,
+) -> dict[str, Any]:
+    env = RlFineTuneEnv(
+        profile=teacher_profile,
+        host=host,
+        port=port,
+        command=initial_command,
+        residual_config=ResidualActionConfig(
+            residual_scale=residual_scale,
+            residual_clip_abs=residual_clip_abs,
+            final_action_clip_abs=final_action_clip_abs,
+        ),
+        reward_config=reward_config,
+        reset_on_start=True,
+    )
+    reward_sum = 0.0
+    completed = 0
+    swing_clearances: list[float] = []
+    segment_breakdowns: list[dict[str, Any]] = []
+    env.reset()
+
+    if segments is None:
+        step_commands: list[tuple[PolicyCommand | None, int]] = [(initial_command, max(1, int(steps)))]
+    else:
+        step_commands = [(segment.command, max(1, int(segment.steps))) for segment in segments]
+    requested_steps = int(sum(segment_steps for _, segment_steps in step_commands))
+
+    terminated = False
+    for segment_index, (command, segment_steps) in enumerate(step_commands):
+        if command is not None:
+            env.command = command
+        segment_reward_sum = 0.0
+        segment_completed = 0
+        segment_clearances: list[float] = []
+        segment_terminated = False
+        for _ in range(segment_steps):
             step = env.step(residual_source)
-            total += float(step.metrics.get("reward", 0.0))
+            step_reward = float(step.metrics.get("reward", 0.0))
+            reward_sum += step_reward
+            segment_reward_sum += step_reward
             completed += 1
+            segment_completed += 1
             diagnostics = step.metrics.get("reward_diagnostics", {})
             clearance = diagnostics.get("swing_clearance_m") if isinstance(diagnostics, dict) else None
             if clearance is not None and math.isfinite(float(clearance)):
-                swing_clearances.append(float(clearance))
+                clearance_value = float(clearance)
+                swing_clearances.append(clearance_value)
+                segment_clearances.append(clearance_value)
             if bool(step.metrics.get("terminated", False)):
+                terminated = True
+                segment_terminated = True
                 break
-        total += completed * episodic_clearance_adjustment(
-            swing_clearances,
-            target_clearance=reward_config.target_swing_clearance,
-            clearance_weight=episodic_clearance_weight,
-            low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+        segment_breakdowns.append(
+            _build_episode_segment_breakdown(
+                index=segment_index,
+                command=command,
+                reward_sum=segment_reward_sum,
+                requested_steps=segment_steps,
+                completed_steps=segment_completed,
+                terminated=segment_terminated,
+                swing_clearances=segment_clearances,
+                target_clearance=reward_config.target_swing_clearance,
+            )
         )
-        # Prefer policies that survive longer when total reward ties.
-        scores.append(float(total + 0.001 * completed))
-        weights.append(float(command_spec.weight))
-    return float(
-        np.average(
-            np.asarray(scores, dtype=np.float64),
-            weights=np.asarray(weights, dtype=np.float64),
-        )
+        if terminated:
+            break
+
+    clearance_adjustment = episodic_clearance_adjustment(
+        swing_clearances,
+        target_clearance=reward_config.target_swing_clearance,
+        clearance_weight=episodic_clearance_weight,
+        low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+        clearance_gap_weight=episodic_clearance_gap_weight,
     )
+    clearance_total = completed * clearance_adjustment
+    survival_bonus = 0.001 * completed
+    score = float(reward_sum + clearance_total + survival_bonus)
+    return _build_episode_score_breakdown(
+        score=score,
+        reward_sum=reward_sum,
+        requested_steps=requested_steps,
+        completed_steps=completed,
+        terminated=terminated,
+        swing_clearances=swing_clearances,
+        target_clearance=reward_config.target_swing_clearance,
+        clearance_adjustment_per_step=clearance_adjustment,
+        clearance_adjustment_total=clearance_total,
+        survival_bonus=survival_bonus,
+        segments=segment_breakdowns,
+    )
+
+
+def _build_episode_score_breakdown(
+    *,
+    score: float,
+    reward_sum: float,
+    requested_steps: int,
+    completed_steps: int,
+    terminated: bool,
+    swing_clearances: Sequence[float],
+    target_clearance: float,
+    clearance_adjustment_per_step: float,
+    clearance_adjustment_total: float,
+    survival_bonus: float,
+    segments: Sequence[Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "score": float(score),
+        "reward_sum": float(reward_sum),
+        "requested_steps": int(requested_steps),
+        "completed_steps": int(completed_steps),
+        "completion_ratio": float(completed_steps / requested_steps) if requested_steps > 0 else 0.0,
+        "terminated": bool(terminated),
+        "survival_bonus": float(survival_bonus),
+        "episodic_clearance_adjustment_per_step": float(clearance_adjustment_per_step),
+        "episodic_clearance_adjustment_total": float(clearance_adjustment_total),
+        "target_swing_clearance_m": float(target_clearance),
+    }
+    payload.update(_build_clearance_diagnostics(swing_clearances, target_clearance=target_clearance))
+    payload["segments"] = [dict(segment) for segment in segments] if segments is not None else []
+    return payload
+
+
+def _build_episode_segment_breakdown(
+    *,
+    index: int,
+    command: PolicyCommand | None,
+    reward_sum: float,
+    requested_steps: int,
+    completed_steps: int,
+    terminated: bool,
+    swing_clearances: Sequence[float],
+    target_clearance: float,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "index": int(index),
+        "command": None if command is None else command.describe(),
+        "reward_sum": float(reward_sum),
+        "requested_steps": int(requested_steps),
+        "completed_steps": int(completed_steps),
+        "completion_ratio": float(completed_steps / requested_steps) if requested_steps > 0 else 0.0,
+        "terminated": bool(terminated),
+        "target_swing_clearance_m": float(target_clearance),
+    }
+    payload.update(_build_clearance_diagnostics(swing_clearances, target_clearance=target_clearance))
+    return payload
+
+
+def _build_clearance_diagnostics(
+    swing_clearances: Sequence[float],
+    *,
+    target_clearance: float,
+) -> dict[str, Any]:
+    clearances = np.asarray(list(swing_clearances), dtype=np.float64)
+    payload: dict[str, Any] = {
+        "swing_clearance_sample_count": int(clearances.size),
+        "median_swing_clearance_m": None,
+        "mean_swing_clearance_m": None,
+        "min_swing_clearance_m": None,
+        "max_swing_clearance_m": None,
+        "low_clearance_ratio": None,
+        "mean_clearance_gap_ratio": None,
+        "median_clearance_gap_ratio": None,
+        "max_clearance_gap_ratio": None,
+    }
+    if clearances.size:
+        target = max(float(target_clearance), 1e-9)
+        gap_ratios = np.maximum(target - clearances, 0.0) / target
+        payload.update(
+            {
+                "median_swing_clearance_m": float(np.median(clearances)),
+                "mean_swing_clearance_m": float(np.mean(clearances)),
+                "min_swing_clearance_m": float(np.min(clearances)),
+                "max_swing_clearance_m": float(np.max(clearances)),
+                "low_clearance_ratio": float(np.mean(clearances < target)),
+                "mean_clearance_gap_ratio": float(np.mean(gap_ratios)),
+                "median_clearance_gap_ratio": float(np.median(gap_ratios)),
+                "max_clearance_gap_ratio": float(np.max(gap_ratios)),
+            }
+        )
+    return payload
 
 
 def episodic_clearance_adjustment(
@@ -466,6 +853,7 @@ def episodic_clearance_adjustment(
     target_clearance: float,
     clearance_weight: float,
     low_clearance_penalty_weight: float,
+    clearance_gap_weight: float = 0.0,
 ) -> float:
     if not swing_clearances:
         return 0.0
@@ -473,14 +861,19 @@ def episodic_clearance_adjustment(
     values = np.asarray(swing_clearances, dtype=np.float64)
     median_ratio = float(np.median(values)) / target
     low_ratio = float(np.mean(values < target))
-    return float(clearance_weight) * median_ratio - float(low_clearance_penalty_weight) * low_ratio
+    gap_ratio = float(np.mean(np.maximum(target - values, 0.0) / target))
+    return (
+        float(clearance_weight) * median_ratio
+        - float(low_clearance_penalty_weight) * low_ratio
+        - float(clearance_gap_weight) * gap_ratio
+    )
 
 
 def _normalize_training_commands(
     training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None,
 ) -> list[ResidualTrainingCommand]:
     if not training_commands:
-        return [ResidualTrainingCommand(command=None, weight=1.0)]
+        return []
     normalized: list[ResidualTrainingCommand] = []
     for item in training_commands:
         if isinstance(item, ResidualTrainingCommand):
@@ -498,6 +891,73 @@ def _normalize_training_commands(
         else:
             normalized.append(ResidualTrainingCommand(command=command, weight=float(weight)))
     return normalized
+
+
+def _normalize_training_sequences(
+    training_sequences: Sequence[ResidualTrainingSequence] | None,
+) -> list[ResidualTrainingSequence]:
+    if not training_sequences:
+        return []
+    normalized: list[ResidualTrainingSequence] = []
+    for sequence in training_sequences:
+        if not isinstance(sequence, ResidualTrainingSequence):
+            raise TypeError(f"training sequence must be ResidualTrainingSequence, got {type(sequence).__name__}")
+        if not math.isfinite(float(sequence.weight)) or float(sequence.weight) <= 0.0:
+            raise ValueError(f"training sequence weight must be positive and finite, got {sequence.weight!r}")
+        if not sequence.segments:
+            raise ValueError("training sequence must contain at least one segment")
+        segments: list[ResidualTrainingSegment] = []
+        for segment in sequence.segments:
+            if not isinstance(segment, ResidualTrainingSegment):
+                raise TypeError(f"training sequence segment must be ResidualTrainingSegment, got {type(segment).__name__}")
+            if not isinstance(segment.command, PolicyCommand):
+                raise TypeError(f"training sequence command must be PolicyCommand, got {type(segment.command).__name__}")
+            if int(segment.steps) <= 0:
+                raise ValueError(f"training sequence segment steps must be positive, got {segment.steps!r}")
+            segments.append(ResidualTrainingSegment(command=segment.command, steps=int(segment.steps)))
+        normalized.append(ResidualTrainingSequence(segments=tuple(segments), weight=float(sequence.weight)))
+    return normalized
+
+
+def _validate_score_normalization(score_normalization: str) -> str:
+    value = str(score_normalization).strip().lower()
+    if value not in SCORE_NORMALIZATION_CHOICES:
+        raise ValueError(
+            "score_normalization must be one of "
+            f"{', '.join(SCORE_NORMALIZATION_CHOICES)}, got {score_normalization!r}"
+        )
+    return value
+
+
+def _score_for_aggregation(episode: Mapping[str, Any], *, score_normalization: str) -> float:
+    score = float(episode.get("score", 0.0))
+    mode = _validate_score_normalization(score_normalization)
+    if mode == SCORE_NORMALIZATION_TOTAL:
+        return score
+    requested_steps = max(1, int(episode.get("requested_steps", 0)))
+    return float(score / requested_steps)
+
+
+def aggregate_training_scores(scores: Sequence[float], weights: Sequence[float], worst_case_score_weight: float = 0.0) -> float:
+    if len(scores) == 0:
+        raise ValueError("at least one score is required")
+    if len(scores) != len(weights):
+        raise ValueError("scores and weights must have the same length")
+    if not math.isfinite(float(worst_case_score_weight)) or not 0.0 <= float(worst_case_score_weight) <= 1.0:
+        raise ValueError(
+            "worst_case_score_weight must be finite and in [0, 1], "
+            f"got {worst_case_score_weight!r}"
+        )
+    score_values = np.asarray(scores, dtype=np.float64)
+    weight_values = np.asarray(weights, dtype=np.float64)
+    if np.any(~np.isfinite(score_values)):
+        raise ValueError("scores must be finite")
+    if np.any(~np.isfinite(weight_values)) or np.any(weight_values <= 0.0):
+        raise ValueError("weights must be positive and finite")
+    weighted_mean = float(np.average(score_values, weights=weight_values))
+    worst_score = float(np.min(score_values))
+    blend = float(worst_case_score_weight)
+    return float((1.0 - blend) * weighted_mean + blend * worst_score)
 
 
 class _ConstantResidualModule:  # created dynamically after torch import
@@ -842,6 +1302,25 @@ def load_residual_initial_parameters(
     return source.reshape(expected)
 
 
+def _residual_source_from_parameters(
+    actor_kind: str,
+    parameters: Sequence[float] | np.ndarray,
+) -> np.ndarray | Callable[[np.ndarray], np.ndarray]:
+    values = np.asarray(parameters, dtype=np.float32).reshape(-1)
+    if actor_kind == RESIDUAL_ACTOR_CONSTANT:
+        return values.reshape(ACTION_SIZE)
+    if actor_kind == RESIDUAL_ACTOR_PHASE_CONTACT:
+        shaped = values.reshape(PHASE_CONTACT_PARAMETER_SIZE)
+        return lambda observation: phase_contact_residual_action(observation, shaped)
+    if actor_kind == RESIDUAL_ACTOR_COMMAND_STATE:
+        shaped = values.reshape(COMMAND_STATE_PARAMETER_SIZE)
+        return lambda observation: command_state_residual_action(observation, shaped)
+    if actor_kind == RESIDUAL_ACTOR_COMMAND_STATE_MLP:
+        shaped = values.reshape(COMMAND_STATE_MLP_PARAMETER_SIZE)
+        return lambda observation: command_state_mlp_residual_action(observation, shaped)
+    raise ValueError(f"unsupported residual actor kind: {actor_kind}")
+
+
 def _write_residual_profile(
     *,
     profile_name: str,
@@ -902,9 +1381,14 @@ def train_residual_policy(
     port: int = 5555,
     actor_kind: str = RESIDUAL_ACTOR_CONSTANT,
     training_commands: Sequence[PolicyCommand | ResidualTrainingCommand] | None = None,
+    training_sequences: Sequence[ResidualTrainingSequence] | None = None,
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
+    episodic_clearance_gap_weight: float = 0.0,
+    worst_case_score_weight: float = 0.0,
+    score_normalization: str = SCORE_NORMALIZATION_TOTAL,
     initial_checkpoint: Path | None = None,
+    final_score_breakdown: bool = False,
 ) -> ResidualPolicyTrainResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -916,8 +1400,15 @@ def train_residual_policy(
     profile_path: Path | None = None
     optimization: ResidualOptimizationResult | None = None
     input_size: int | None = None
+    score_breakdown: dict[str, Any] | None = None
 
     try:
+        score_normalization = _validate_score_normalization(score_normalization)
+        if not math.isfinite(float(episodic_clearance_gap_weight)) or float(episodic_clearance_gap_weight) < 0.0:
+            raise ValueError(
+                "episodic_clearance_gap_weight must be non-negative and finite, "
+                f"got {episodic_clearance_gap_weight!r}"
+            )
         teacher = PolicyProfile.load(teacher_profile)
         input_size = _profile_input_size(teacher)
         initial_parameters = (
@@ -938,8 +1429,12 @@ def train_residual_policy(
                     host=host,
                     port=port,
                     training_commands=training_commands,
+                    training_sequences=training_sequences,
                     episodic_clearance_weight=episodic_clearance_weight,
                     episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+                    episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    worst_case_score_weight=worst_case_score_weight,
+                    score_normalization=score_normalization,
                 ),
                 config=optimization_config,
             )
@@ -962,6 +1457,12 @@ def train_residual_policy(
                     host=host,
                     port=port,
                     training_commands=training_commands,
+                    training_sequences=training_sequences,
+                    episodic_clearance_weight=episodic_clearance_weight,
+                    episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+                    episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    worst_case_score_weight=worst_case_score_weight,
+                    score_normalization=score_normalization,
                 ),
                 config=optimization_config,
             )
@@ -984,8 +1485,12 @@ def train_residual_policy(
                     host=host,
                     port=port,
                     training_commands=training_commands,
+                    training_sequences=training_sequences,
                     episodic_clearance_weight=episodic_clearance_weight,
                     episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+                    episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    worst_case_score_weight=worst_case_score_weight,
+                    score_normalization=score_normalization,
                 ),
                 config=optimization_config,
             )
@@ -1008,8 +1513,12 @@ def train_residual_policy(
                     host=host,
                     port=port,
                     training_commands=training_commands,
+                    training_sequences=training_sequences,
                     episodic_clearance_weight=episodic_clearance_weight,
                     episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+                    episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    worst_case_score_weight=worst_case_score_weight,
+                    score_normalization=score_normalization,
                 ),
                 config=optimization_config,
                 initial_mean=initial_parameters,
@@ -1035,6 +1544,28 @@ def train_residual_policy(
                 force=force_profile,
                 actor_kind=actor_kind,
             )
+        if final_score_breakdown and optimization is not None:
+            try:
+                score_breakdown = _evaluate_residual_live_breakdown(
+                    _residual_source_from_parameters(actor_kind, optimization.best_residual),
+                    teacher_profile=teacher_profile,
+                    steps=steps_per_episode,
+                    residual_scale=residual_scale,
+                    residual_clip_abs=residual_clip_abs,
+                    final_action_clip_abs=final_action_clip_abs,
+                    reward_config=reward_config,
+                    host=host,
+                    port=port,
+                    training_commands=training_commands,
+                    training_sequences=training_sequences,
+                    episodic_clearance_weight=episodic_clearance_weight,
+                    episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+                    episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    worst_case_score_weight=worst_case_score_weight,
+                    score_normalization=score_normalization,
+                )
+            except Exception as exc:  # pragma: no cover - diagnostic live simulator path
+                warnings.append(f"final score breakdown failed: {exc!r}")
     except Exception as exc:  # pragma: no cover - live simulator/training environment
         errors.append(repr(exc))
 
@@ -1045,6 +1576,9 @@ def train_residual_policy(
         "training_commands": []
         if not training_commands
         else [command.describe() for command in _normalize_training_commands(training_commands)],
+        "training_sequences": []
+        if not training_sequences
+        else [sequence.describe() for sequence in _normalize_training_sequences(training_sequences)],
         "policy_input_size": input_size,
         "output_dir": str(output_dir),
         "steps_per_episode": int(steps_per_episode),
@@ -1054,6 +1588,11 @@ def train_residual_policy(
         "reward_config": asdict(reward_config),
         "episodic_clearance_weight": float(episodic_clearance_weight),
         "episodic_low_clearance_penalty_weight": float(episodic_low_clearance_penalty_weight),
+        "episodic_clearance_gap_weight": float(episodic_clearance_gap_weight),
+        "worst_case_score_weight": float(worst_case_score_weight),
+        "score_normalization": score_normalization,
+        "final_score_breakdown_requested": bool(final_score_breakdown),
+        "score_breakdown": score_breakdown,
         "initial_checkpoint": None if initial_checkpoint is None else str(initial_checkpoint),
         "optimization_config": asdict(optimization_config),
         "optimization": None if optimization is None else asdict(optimization),
@@ -1090,6 +1629,9 @@ def _write_report(path: Path, payload: dict[str, Any]) -> None:
         f"Actor kind: `{payload['actor_kind']}`",
         f"Output directory: `{payload['output_dir']}`",
         f"Residual scale: `{payload['residual_scale']}`",
+        f"Worst-case score weight: `{payload.get('worst_case_score_weight', 0.0):.6g}`",
+        f"Episodic clearance gap weight: `{payload.get('episodic_clearance_gap_weight', 0.0):.6g}`",
+        f"Score normalization: `{payload.get('score_normalization', SCORE_NORMALIZATION_TOTAL)}`",
         f"Policy input size: `{payload.get('policy_input_size')}`",
         "",
     ]
@@ -1113,6 +1655,31 @@ def _write_report(path: Path, payload: dict[str, Any]) -> None:
                 )
             )
         lines.append("")
+    training_sequences = payload.get("training_sequences") or []
+    if training_sequences:
+        lines.extend(
+            [
+                "## Training sequences",
+                "",
+                "| sequence | segment | vx | vy | yaw | steps | weight |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+        for sequence_index, sequence in enumerate(training_sequences):
+            segments = sequence.get("segments") or []
+            for segment_index, segment in enumerate(segments):
+                lines.append(
+                    "| {sequence_index} | {segment_index} | {vx:.6g} | {vy:.6g} | {yaw:.6g} | {steps:d} | {weight:.6g} |".format(
+                        sequence_index=sequence_index,
+                        segment_index=segment_index,
+                        vx=float(segment.get("x_velocity", 0.0)),
+                        vy=float(segment.get("y_velocity", 0.0)),
+                        yaw=float(segment.get("yaw_velocity", 0.0)),
+                        steps=int(segment.get("steps", 0)),
+                        weight=float(sequence.get("weight", 1.0)),
+                    )
+                )
+        lines.append("")
     optimization = payload.get("optimization")
     if optimization:
         lines.extend(
@@ -1132,12 +1699,127 @@ def _write_report(path: Path, payload: dict[str, Any]) -> None:
                 f"{item['elite_mean_score']:.6g} | {item['distribution_std_mean']:.6g} |"
             )
         lines.append("")
+    score_breakdown = payload.get("score_breakdown")
+    if isinstance(score_breakdown, dict):
+        lines.extend(
+            [
+                "## Final score breakdown",
+                "",
+                f"Aggregate score: `{float(score_breakdown.get('aggregate_score', 0.0)):.6g}`",
+                f"Weighted mean score: `{float(score_breakdown.get('weighted_mean_score', 0.0)):.6g}`",
+                f"Worst score: `{float(score_breakdown.get('worst_score', 0.0)):.6g}`",
+                f"Score normalization: `{score_breakdown.get('score_normalization', SCORE_NORMALIZATION_TOTAL)}`",
+                "",
+                "| kind | index | weight | score | objective score | completed | terminated | median clearance m | low clearance | mean gap | objective |",
+                "| --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | --- |",
+            ]
+        )
+        has_segment_diagnostics = False
+        for item in score_breakdown.get("items", []):
+            if not isinstance(item, dict):
+                continue
+            objective = _describe_score_breakdown_item(item)
+            episode = item.get("episode") if isinstance(item.get("episode"), Mapping) else {}
+            completed = int(episode.get("completed_steps", 0)) if isinstance(episode, Mapping) else 0
+            terminated = bool(episode.get("terminated", False)) if isinstance(episode, Mapping) else False
+            median_clearance = _format_optional_float(episode.get("median_swing_clearance_m") if isinstance(episode, Mapping) else None)
+            low_clearance = _format_optional_float(episode.get("low_clearance_ratio") if isinstance(episode, Mapping) else None)
+            mean_gap = _format_optional_float(episode.get("mean_clearance_gap_ratio") if isinstance(episode, Mapping) else None)
+            lines.append(
+                "| {kind} | {index} | {weight:.6g} | {score:.6g} | {objective_score:.6g} | {completed:d} | {terminated} | {median_clearance} | {low_clearance} | {mean_gap} | {objective} |".format(
+                    kind=str(item.get("kind", "unknown")),
+                    index=int(item.get("index", 0)),
+                    weight=float(item.get("weight", 1.0)),
+                    score=float(item.get("score", 0.0)),
+                    objective_score=float(item.get("objective_score", item.get("score", 0.0))),
+                    completed=completed,
+                    terminated="yes" if terminated else "no",
+                    median_clearance=median_clearance,
+                    low_clearance=low_clearance,
+                    mean_gap=mean_gap,
+                    objective=objective,
+                )
+            )
+            if isinstance(episode, Mapping) and episode.get("segments"):
+                has_segment_diagnostics = True
+        lines.append("")
+        if has_segment_diagnostics:
+            lines.extend(
+                [
+                    "### Segment diagnostics",
+                    "",
+                    "| objective | segment | completed | terminated | samples | median clearance m | low clearance | mean gap | command |",
+                    "| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | --- |",
+                ]
+            )
+            for item in score_breakdown.get("items", []):
+                if not isinstance(item, dict):
+                    continue
+                episode = item.get("episode") if isinstance(item.get("episode"), Mapping) else {}
+                if not isinstance(episode, Mapping):
+                    continue
+                objective_label = f"{item.get('kind', 'unknown')} {int(item.get('index', 0))}"
+                for segment in episode.get("segments", []):
+                    if not isinstance(segment, Mapping):
+                        continue
+                    lines.append(
+                        "| {objective} | {segment_index} | {completed:d} | {terminated} | {samples:d} | {median_clearance} | {low_clearance} | {mean_gap} | {command} |".format(
+                            objective=objective_label,
+                            segment_index=int(segment.get("index", 0)),
+                            completed=int(segment.get("completed_steps", 0)),
+                            terminated="yes" if bool(segment.get("terminated", False)) else "no",
+                            samples=int(segment.get("swing_clearance_sample_count", 0)),
+                            median_clearance=_format_optional_float(segment.get("median_swing_clearance_m")),
+                            low_clearance=_format_optional_float(segment.get("low_clearance_ratio")),
+                            mean_gap=_format_optional_float(segment.get("mean_clearance_gap_ratio")),
+                            command=_describe_command_payload(segment["command"]) if isinstance(segment.get("command"), Mapping) else "default",
+                        )
+                    )
+            lines.append("")
+    if payload.get("warnings"):
+        lines.append("## Warnings")
+        lines.append("")
+        for warning in payload["warnings"]:
+            lines.append(f"- `{warning}`")
+        lines.append("")
     if payload.get("errors"):
         lines.append("## Errors")
         lines.append("")
         for error in payload["errors"]:
             lines.append(f"- `{error}`")
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+
+def _format_optional_float(value: Any, *, precision: int = 6) -> str:
+    if value is None:
+        return "n/a"
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return "n/a"
+    if not math.isfinite(numeric):
+        return "n/a"
+    return f"{numeric:.{precision}g}"
+
+def _describe_score_breakdown_item(item: Mapping[str, Any]) -> str:
+    command = item.get("command")
+    if isinstance(command, Mapping):
+        return _describe_command_payload(command)
+    sequence = item.get("sequence")
+    if isinstance(sequence, Mapping):
+        segments = sequence.get("segments") or []
+        total_steps = int(sequence.get("total_steps", 0))
+        return f"{len(segments)} segments / {total_steps} steps"
+    return "default command"
+
+
+def _describe_command_payload(command: Mapping[str, Any]) -> str:
+    return "vx={vx:.6g}, vy={vy:.6g}, yaw={yaw:.6g}".format(
+        vx=float(command.get("x_velocity", 0.0)),
+        vy=float(command.get("y_velocity", 0.0)),
+        yaw=float(command.get("yaw_velocity", 0.0)),
+    )
 
 
 def _profile_input_size(profile: PolicyProfile) -> int:
@@ -1178,6 +1860,60 @@ def _parse_training_command_spec(value: str) -> ResidualTrainingCommand:
     )
 
 
+def _parse_training_sequence(value: str) -> ResidualTrainingSequence:
+    text = str(value).strip()
+    if not text:
+        raise argparse.ArgumentTypeError("training sequence must not be empty")
+    weight = 1.0
+    body = text
+    if "|" in text:
+        prefix, body = text.split("|", 1)
+        try:
+            weight = float(prefix.strip())
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(
+                f"training sequence weight must be numeric in [WEIGHT|]VX,VY,YAW,STEPS;..., got {value!r}"
+            ) from exc
+    if not math.isfinite(weight) or weight <= 0.0:
+        raise argparse.ArgumentTypeError(f"training sequence weight must be positive and finite, got {value!r}")
+
+    segments: list[ResidualTrainingSegment] = []
+    for raw_segment in body.split(";"):
+        segment_text = raw_segment.strip()
+        if not segment_text:
+            continue
+        parts = [part.strip() for part in segment_text.split(",")]
+        if len(parts) != 4:
+            raise argparse.ArgumentTypeError(
+                f"training sequence segments must be VX,VY,YAW,STEPS, got {segment_text!r} in {value!r}"
+            )
+        try:
+            vx, vy, yaw = (float(part) for part in parts[:3])
+            raw_steps = float(parts[3])
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(
+                f"training sequence must contain numeric VX,VY,YAW,STEPS values, got {value!r}"
+            ) from exc
+        if not np.all(np.isfinite([vx, vy, yaw, raw_steps])):
+            raise argparse.ArgumentTypeError(
+                f"training sequence must contain finite VX,VY,YAW,STEPS values, got {value!r}"
+            )
+        steps = int(raw_steps)
+        if steps <= 0 or not math.isclose(raw_steps, float(steps)):
+            raise argparse.ArgumentTypeError(
+                f"training sequence steps must be a positive integer, got {parts[3]!r} in {value!r}"
+            )
+        segments.append(
+            ResidualTrainingSegment(
+                command=PolicyCommand(x_velocity=vx, y_velocity=vy, yaw_velocity=yaw),
+                steps=steps,
+            )
+        )
+    if not segments:
+        raise argparse.ArgumentTypeError(f"training sequence must contain at least one segment, got {value!r}")
+    return ResidualTrainingSequence(segments=tuple(segments), weight=weight)
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train a bounded residual policy on top of a teacher profile.")
     parser.add_argument("teacher_profile", nargs="?", default="open_duck_forward", help="Teacher policy profile")
@@ -1204,6 +1940,31 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help=(
             "Repeat to score every residual candidate across multiple velocity commands. "
             "Optional WEIGHT emphasizes harder commands such as start/stop or turning."
+        ),
+    )
+    parser.add_argument(
+        "--training-sequence",
+        action="append",
+        default=[],
+        metavar="[WEIGHT|]VX,VY,YAW,STEPS;...",
+        help=(
+            "Repeat to score a residual candidate on a command sequence in one reset, for example "
+            "'2.5|0,0,0,50;0.06,0,0,100;0,0,0,50'."
+        ),
+    )
+    parser.add_argument(
+        "--worst-case-score-weight",
+        type=float,
+        default=0.0,
+        help="Blend weighted mean candidate score with the worst scenario score; 0 disables, 1 uses only worst-case.",
+    )
+    parser.add_argument(
+        "--score-normalization",
+        choices=SCORE_NORMALIZATION_CHOICES,
+        default=SCORE_NORMALIZATION_TOTAL,
+        help=(
+            "Score used for weighted/worst-case aggregation. 'total' preserves historical total reward; "
+            "'per_step' divides each objective score by requested steps so shorter sequences do not dominate worst-case."
         ),
     )
     parser.add_argument("--steps-per-episode", type=int, default=300, help="Simulator steps per candidate residual episode")
@@ -1238,10 +1999,21 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Episode-level penalty weight for the fraction of swing samples below target clearance",
     )
     parser.add_argument(
+        "--episodic-clearance-gap-weight",
+        type=float,
+        default=0.0,
+        help="Episode-level penalty weight for the mean normalized swing-clearance shortfall below target",
+    )
+    parser.add_argument(
         "--initial-checkpoint",
         type=Path,
         default=None,
         help="Warm-start actor parameters from an existing residual_policy.pt",
+    )
+    parser.add_argument(
+        "--final-score-breakdown",
+        action="store_true",
+        help="After training, re-score the best residual per command/sequence and write a diagnostic breakdown.",
     )
     parser.add_argument("--host", default=os.environ.get("SIM_HOST", "127.0.0.1"), help="Simulator API host")
     parser.add_argument("--port", type=int, default=int(os.environ.get("SIM_PORT", "5555")), help="Simulator API port")
@@ -1253,6 +2025,11 @@ def main() -> None:
     args = _build_arg_parser().parse_args()
     final_clip = args.final_action_clip_abs if args.final_action_clip_abs > 0 else None
     training_commands = [_parse_training_command_spec(value) for value in args.training_command]
+    training_sequences = [_parse_training_sequence(value) for value in args.training_sequence]
+    if not math.isfinite(float(args.worst_case_score_weight)) or not 0.0 <= float(args.worst_case_score_weight) <= 1.0:
+        raise SystemExit("--worst-case-score-weight must be finite and in [0, 1]")
+    if not math.isfinite(float(args.episodic_clearance_gap_weight)) or float(args.episodic_clearance_gap_weight) < 0.0:
+        raise SystemExit("--episodic-clearance-gap-weight must be non-negative and finite")
     opt_cfg = ResidualOptimizationConfig(
         iterations=args.iterations,
         population=args.population,
@@ -1280,11 +2057,16 @@ def main() -> None:
             "profile_name": args.profile_name,
             "actor_kind": args.actor_kind,
             "training_commands": [command.describe() for command in training_commands],
+            "training_sequences": [sequence.describe() for sequence in training_sequences],
+            "worst_case_score_weight": args.worst_case_score_weight,
+            "score_normalization": args.score_normalization,
+            "final_score_breakdown_requested": bool(args.final_score_breakdown),
             "steps_per_episode": args.steps_per_episode,
             "optimization_config": asdict(opt_cfg),
             "reward_config": asdict(reward_cfg),
             "episodic_clearance_weight": args.episodic_clearance_weight,
             "episodic_low_clearance_penalty_weight": args.episodic_low_clearance_penalty_weight,
+            "episodic_clearance_gap_weight": args.episodic_clearance_gap_weight,
             "initial_checkpoint": None if args.initial_checkpoint is None else str(args.initial_checkpoint),
             "residual_scale": args.residual_scale,
             "residual_clip_abs": args.residual_clip_abs,
@@ -1307,9 +2089,14 @@ def main() -> None:
         port=args.port,
         actor_kind=args.actor_kind,
         training_commands=training_commands,
+        training_sequences=training_sequences,
         episodic_clearance_weight=args.episodic_clearance_weight,
         episodic_low_clearance_penalty_weight=args.episodic_low_clearance_penalty_weight,
+        episodic_clearance_gap_weight=args.episodic_clearance_gap_weight,
+        worst_case_score_weight=args.worst_case_score_weight,
+        score_normalization=args.score_normalization,
         initial_checkpoint=args.initial_checkpoint,
+        final_score_breakdown=bool(args.final_score_breakdown),
     )
     print("Soridormi residual policy fine-tuning")
     print("======================================")

@@ -5,11 +5,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+import soridormi_runtime.train_residual_policy as train_residual_policy_module
 from soridormi_api import IMUState, JointState, RobotState
 from soridormi_runtime.policy_command import PolicyCommand
 from soridormi_runtime.policy_factory import normalize_policy_backend
 from soridormi_runtime.policy_profiles import PolicyModelSpec, PolicyProfile
 from soridormi_runtime.residual_policy import ResidualOnnxPolicy
+from soridormi_runtime.walking_reward import WalkingRewardConfig
 from soridormi_runtime.train_residual_policy import (
     COMMAND_STATE_MLP_PARAMETER_SIZE,
     COMMAND_STATE_FEATURE_SIZE,
@@ -19,10 +21,20 @@ from soridormi_runtime.train_residual_policy import (
     RESIDUAL_ACTOR_PHASE_CONTACT,
     ResidualOptimizationConfig,
     ResidualTrainingCommand,
+    ResidualTrainingSegment,
+    ResidualTrainingSequence,
+    _build_episode_score_breakdown,
+    _build_episode_segment_breakdown,
     _normalize_training_commands,
+    _normalize_training_sequences,
     _parse_training_command,
     _parse_training_command_spec,
+    _parse_training_sequence,
+    _residual_source_from_parameters,
+    _score_for_aggregation,
+    _validate_score_normalization,
     _write_residual_profile,
+    aggregate_training_scores,
     command_state_residual_action,
     command_state_residual_features,
     command_state_mlp_residual_action,
@@ -275,6 +287,35 @@ def test_episodic_clearance_adjustment_matches_gate_direction() -> None:
     ) == 0.0
 
 
+
+
+def test_episodic_clearance_gap_weight_distinguishes_shortfall_size() -> None:
+    shallow = episodic_clearance_adjustment(
+        [0.013, 0.014],
+        target_clearance=0.015,
+        clearance_weight=0.0,
+        low_clearance_penalty_weight=0.0,
+        clearance_gap_weight=1.0,
+    )
+    deep = episodic_clearance_adjustment(
+        [0.006, 0.009],
+        target_clearance=0.015,
+        clearance_weight=0.0,
+        low_clearance_penalty_weight=0.0,
+        clearance_gap_weight=1.0,
+    )
+    passing = episodic_clearance_adjustment(
+        [0.015, 0.020],
+        target_clearance=0.015,
+        clearance_weight=0.0,
+        low_clearance_penalty_weight=0.0,
+        clearance_gap_weight=1.0,
+    )
+
+    assert shallow > deep
+    assert passing == pytest.approx(0.0)
+
+
 def test_parse_training_command_builds_velocity_command() -> None:
     command = _parse_training_command("0.09,0.0,0.12")
 
@@ -307,6 +348,237 @@ def test_normalize_training_commands_preserves_legacy_unweighted_commands() -> N
 def test_normalize_training_commands_rejects_nonpositive_weight() -> None:
     with pytest.raises(ValueError, match="positive"):
         _normalize_training_commands([ResidualTrainingCommand(command=PolicyCommand(), weight=0.0)])
+
+
+
+
+def test_parse_training_sequence_accepts_weighted_segments() -> None:
+    sequence = _parse_training_sequence("2.5|0,0,0,50;0.06,0,0,100;0,0,0,25")
+
+    assert sequence.weight == pytest.approx(2.5)
+    assert len(sequence.segments) == 3
+    assert sequence.segments[1].command.x_velocity == pytest.approx(0.06)
+    assert sequence.segments[1].steps == 100
+    assert sequence.describe()["total_steps"] == 175
+
+
+def test_parse_training_sequence_rejects_fractional_steps() -> None:
+    with pytest.raises(Exception, match="positive integer"):
+        _parse_training_sequence("0,0,0,1.5")
+
+
+def test_normalize_training_sequences_rejects_bad_weight_and_steps() -> None:
+    segment = ResidualTrainingSegment(command=PolicyCommand(), steps=5)
+
+    with pytest.raises(ValueError, match="positive"):
+        _normalize_training_sequences([ResidualTrainingSequence(segments=(segment,), weight=0.0)])
+    with pytest.raises(ValueError, match="steps"):
+        _normalize_training_sequences([ResidualTrainingSequence(segments=(ResidualTrainingSegment(PolicyCommand(), 0),))])
+
+
+
+def test_score_for_aggregation_can_normalize_by_requested_steps() -> None:
+    episode = {"score": 150.0, "requested_steps": 300, "completed_steps": 120}
+
+    assert _score_for_aggregation(episode, score_normalization="total") == pytest.approx(150.0)
+    assert _score_for_aggregation(episode, score_normalization="per_step") == pytest.approx(0.5)
+    with pytest.raises(ValueError, match="score_normalization"):
+        _validate_score_normalization("bad")
+
+def test_aggregate_training_scores_blends_weighted_mean_with_worst_case() -> None:
+    scores = [10.0, 2.0]
+    weights = [1.0, 3.0]
+
+    assert aggregate_training_scores(scores, weights, worst_case_score_weight=0.0) == pytest.approx(4.0)
+    assert aggregate_training_scores(scores, weights, worst_case_score_weight=1.0) == pytest.approx(2.0)
+    assert aggregate_training_scores(scores, weights, worst_case_score_weight=0.25) == pytest.approx(3.5)
+
+
+def test_aggregate_training_scores_rejects_invalid_worst_case_weight() -> None:
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        aggregate_training_scores([1.0], [1.0], worst_case_score_weight=1.1)
+
+
+def test_residual_live_breakdown_records_each_training_objective(monkeypatch) -> None:
+    calls = []
+
+    def fake_episode(residual_source, **kwargs):
+        calls.append(kwargs)
+        score = 10.0 if kwargs["segments"] is None else 2.0
+        return _build_episode_score_breakdown(
+            score=score,
+            reward_sum=score - 0.01,
+            requested_steps=10,
+            completed_steps=10 if kwargs["segments"] is None else 5,
+            terminated=kwargs["segments"] is not None,
+            swing_clearances=[0.010, 0.020] if kwargs["segments"] is None else [0.006],
+            target_clearance=0.015,
+            clearance_adjustment_per_step=0.0,
+            clearance_adjustment_total=0.0,
+            survival_bonus=0.01,
+        )
+
+    monkeypatch.setattr(train_residual_policy_module, "_evaluate_residual_episode_breakdown", fake_episode)
+    command = ResidualTrainingCommand(command=PolicyCommand(x_velocity=0.125), weight=1.0)
+    sequence = ResidualTrainingSequence(
+        segments=(ResidualTrainingSegment(command=PolicyCommand(x_velocity=0.06), steps=5),),
+        weight=3.0,
+    )
+
+    breakdown = train_residual_policy_module._evaluate_residual_live_breakdown(
+        np.zeros(14, dtype=np.float32),
+        teacher_profile="teacher",
+        steps=10,
+        residual_scale=0.05,
+        residual_clip_abs=1.0,
+        final_action_clip_abs=None,
+        reward_config=WalkingRewardConfig(),
+        host="127.0.0.1",
+        port=5555,
+        training_commands=[command],
+        training_sequences=[sequence],
+        worst_case_score_weight=0.25,
+    )
+
+    assert len(calls) == 2
+    assert breakdown["weighted_mean_score"] == pytest.approx(4.0)
+    assert breakdown["worst_score"] == pytest.approx(2.0)
+    assert breakdown["aggregate_score"] == pytest.approx(3.5)
+    assert [item["kind"] for item in breakdown["items"]] == ["command", "sequence"]
+    assert breakdown["items"][0]["episode"]["median_swing_clearance_m"] == pytest.approx(0.015)
+    assert breakdown["items"][1]["episode"]["completed_steps"] == 5
+    assert breakdown["items"][1]["episode"]["terminated"] is True
+    assert breakdown["items"][1]["sequence"]["total_steps"] == 5
+
+
+def test_residual_live_breakdown_per_step_normalization_uses_requested_steps(monkeypatch) -> None:
+    def fake_episode(residual_source, **kwargs):
+        if kwargs["segments"] is None:
+            return _build_episode_score_breakdown(
+                score=300.0,
+                reward_sum=300.0,
+                requested_steps=300,
+                completed_steps=300,
+                terminated=False,
+                swing_clearances=[],
+                target_clearance=0.015,
+                clearance_adjustment_per_step=0.0,
+                clearance_adjustment_total=0.0,
+                survival_bonus=0.0,
+            )
+        return _build_episode_score_breakdown(
+            score=150.0,
+            reward_sum=150.0,
+            requested_steps=100,
+            completed_steps=100,
+            terminated=False,
+            swing_clearances=[],
+            target_clearance=0.015,
+            clearance_adjustment_per_step=0.0,
+            clearance_adjustment_total=0.0,
+            survival_bonus=0.0,
+        )
+
+    monkeypatch.setattr(train_residual_policy_module, "_evaluate_residual_episode_breakdown", fake_episode)
+    command = ResidualTrainingCommand(command=PolicyCommand(x_velocity=0.125), weight=1.0)
+    sequence = ResidualTrainingSequence(
+        segments=(ResidualTrainingSegment(command=PolicyCommand(x_velocity=0.09), steps=100),),
+        weight=1.0,
+    )
+
+    breakdown = train_residual_policy_module._evaluate_residual_live_breakdown(
+        np.zeros(14, dtype=np.float32),
+        teacher_profile="teacher",
+        steps=300,
+        residual_scale=0.05,
+        residual_clip_abs=1.0,
+        final_action_clip_abs=None,
+        reward_config=WalkingRewardConfig(),
+        host="127.0.0.1",
+        port=5555,
+        training_commands=[command],
+        training_sequences=[sequence],
+        worst_case_score_weight=1.0,
+        score_normalization="per_step",
+    )
+
+    assert breakdown["score_normalization"] == "per_step"
+    assert breakdown["items"][0]["score"] == pytest.approx(300.0)
+    assert breakdown["items"][0]["objective_score"] == pytest.approx(1.0)
+    assert breakdown["items"][1]["score"] == pytest.approx(150.0)
+    assert breakdown["items"][1]["objective_score"] == pytest.approx(1.5)
+    assert breakdown["worst_item_index"] == 0
+    assert breakdown["aggregate_score"] == pytest.approx(1.0)
+
+
+def test_build_episode_score_breakdown_records_clearance_gate_metrics() -> None:
+    breakdown = _build_episode_score_breakdown(
+        score=12.0,
+        reward_sum=11.0,
+        requested_steps=10,
+        completed_steps=8,
+        terminated=True,
+        swing_clearances=[0.006, 0.012, 0.018],
+        target_clearance=0.015,
+        clearance_adjustment_per_step=-0.1,
+        clearance_adjustment_total=-0.8,
+        survival_bonus=0.008,
+    )
+
+    assert breakdown["completed_steps"] == 8
+    assert breakdown["completion_ratio"] == pytest.approx(0.8)
+    assert breakdown["terminated"] is True
+    assert breakdown["median_swing_clearance_m"] == pytest.approx(0.012)
+    assert breakdown["min_swing_clearance_m"] == pytest.approx(0.006)
+    assert breakdown["low_clearance_ratio"] == pytest.approx(2.0 / 3.0)
+    assert breakdown["mean_clearance_gap_ratio"] == pytest.approx(((0.015 - 0.006) / 0.015 + (0.015 - 0.012) / 0.015) / 3.0)
+    assert breakdown["median_clearance_gap_ratio"] == pytest.approx((0.015 - 0.012) / 0.015)
+    assert breakdown["max_clearance_gap_ratio"] == pytest.approx((0.015 - 0.006) / 0.015)
+    assert breakdown["episodic_clearance_adjustment_total"] == pytest.approx(-0.8)
+
+
+def test_build_episode_score_breakdown_records_segment_clearance_diagnostics() -> None:
+    segment = _build_episode_segment_breakdown(
+        index=1,
+        command=PolicyCommand(x_velocity=0.09, yaw_velocity=0.12),
+        reward_sum=3.0,
+        requested_steps=5,
+        completed_steps=4,
+        terminated=True,
+        swing_clearances=[0.004, 0.008],
+        target_clearance=0.015,
+    )
+    breakdown = _build_episode_score_breakdown(
+        score=4.0,
+        reward_sum=3.0,
+        requested_steps=5,
+        completed_steps=4,
+        terminated=True,
+        swing_clearances=[0.004, 0.008],
+        target_clearance=0.015,
+        clearance_adjustment_per_step=-0.4,
+        clearance_adjustment_total=-1.6,
+        survival_bonus=0.004,
+        segments=[segment],
+    )
+
+    assert breakdown["segments"][0]["index"] == 1
+    assert breakdown["segments"][0]["completed_steps"] == 4
+    assert breakdown["segments"][0]["terminated"] is True
+    assert breakdown["segments"][0]["command"]["x_velocity"] == pytest.approx(0.09)
+    assert breakdown["segments"][0]["swing_clearance_sample_count"] == 2
+    assert breakdown["segments"][0]["median_swing_clearance_m"] == pytest.approx(0.006)
+    assert breakdown["segments"][0]["low_clearance_ratio"] == pytest.approx(1.0)
+    assert breakdown["segments"][0]["mean_clearance_gap_ratio"] == pytest.approx(((0.015 - 0.004) / 0.015 + (0.015 - 0.008) / 0.015) / 2.0)
+
+def test_residual_source_from_parameters_matches_actor_kind() -> None:
+    constant = _residual_source_from_parameters("constant", [0.1] * 14)
+    assert isinstance(constant, np.ndarray)
+    assert constant.shape == (14,)
+
+    command_state = _residual_source_from_parameters(RESIDUAL_ACTOR_COMMAND_STATE, [0.0] * COMMAND_STATE_PARAMETER_SIZE)
+    assert callable(command_state)
+    assert command_state(np.zeros(104, dtype=np.float32)).shape == (14,)
 
 
 def test_write_residual_profile_sets_runtime_kind(tmp_path: Path, monkeypatch) -> None:

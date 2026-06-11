@@ -333,3 +333,47 @@ Do not start hardware walking until all of these pass:
 Treat any candidate as experimental until it passes a command-suite rollout comparison. A candidate must survive fixed commands and conservative command-switching scenarios before hardware work resumes. A good first acceptance report should include per-scenario pass/fail, survival time, termination reason, displacement, velocity tracking, lateral drift, yaw tracking, upright/height error, and action smoothness.
 
 See `docs/SORIDORMI_FREE_WALK_PLAN.md` for the updated Soridormi-first roadmap.
+
+## M10 sequence and worst-case residual training knobs
+
+The residual trainer can now score candidates against both fixed commands and
+single-reset command sequences. Use fixed commands to preserve nominal flat walk
+coverage, and use sequences to target start/stop or curve clearance:
+
+```bash
+--training-command 0.125,0,0,1.0 \
+--training-sequence '2.5|0,0,0,50;0.06,0,0,100;0,0,0,50' \
+--training-sequence '3.0|0.09,0,0,50;0.09,0,0.12,150;0.09,0,0,100'
+```
+
+The optional sequence prefix before `|` is the sequence weight. Each segment is
+`VX,VY,YAW,STEPS` and runs in order after one simulator reset.
+
+`--worst-case-score-weight` blends the weighted mean candidate score with the
+lowest scenario score. Use this when a new clearance objective improves the hard
+start/stop or turn case but risks regressing the near-passing flat case. A value
+such as `0.35` keeps average progress useful while making the weakest scenario
+visible to CEM selection.
+
+When commands and sequences have different lengths, add
+`--score-normalization per_step` so the optimizer compares each objective by
+score per requested simulator step. This prevents a shorter start/stop sequence
+from becoming the artificial worst case simply because it has fewer total reward
+steps, and keeps worst-case pressure on the true low-clearance objective.
+
+If the bottleneck objective has `low_clearance_ratio == 1.0`, add
+`--episodic-clearance-gap-weight` so CEM distinguishes shallow misses from deep
+misses. Unlike the low-clearance-ratio penalty, this gap term scales with the
+mean normalized distance below the target clearance, which is useful when both
+flat and turning are below the `0.015m` gate but turning is much lower.
+
+Add `--final-score-breakdown` to re-score the best residual after training and
+write a per-command/per-sequence score table into `residual_train_metrics.json`
+and `residual_train_report.md`. The breakdown now includes completed steps,
+termination state, median/min/max swing clearance, low-clearance ratio, and
+episode-level clearance adjustment for each training objective. Sequence
+objectives also include per-segment diagnostics, so the report can distinguish
+startup, cruise, turning, and stop segments without rerunning the whole
+experiment. This costs one extra evaluation pass over the configured objectives,
+but it makes the next bottleneck visible before running the full M10
+scenario-suite/clearance-readiness pipeline.

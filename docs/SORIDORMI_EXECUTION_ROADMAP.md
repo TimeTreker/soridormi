@@ -490,3 +490,34 @@ Soridormi succeeds when:
 - simulation and hardware share the same runtime concepts;
 - hardware rollout is staged and reversible; and
 - Chromie controls the body exclusively through safe structured skills.
+
+### M10 residual-training refinement notes
+
+- [x] Add weighted fixed-command residual training commands.
+- [x] Add single-reset training sequences for ramped start/stop and curve episodes.
+- [x] Add worst-case score blending so CEM cannot hide a scenario regression behind
+  a weighted-average improvement.
+- [x] Add optional final score breakdown for the best residual, so each run can
+  identify whether flat, start/stop, or curve-style training objectives remain
+  the limiting score before full scenario evaluation.
+- [x] Add per-objective episode diagnostics to the final breakdown, including
+  completed steps, termination state, median/min swing clearance, and
+  low-clearance ratio, so clearance failures are visible without rerunning a full
+  scenario-suite report.
+- [x] Add per-segment diagnostics for sequence objectives, so start, cruise,
+  turn, and stop segments can be compared directly when a sequence-level score
+  is low or has no swing-clearance samples.
+- [x] Add optional per-step score normalization for mixed-length objectives, so
+  worst-case selection is based on comparable objective scores instead of raw
+  total reward length.
+- [x] Add an episodic clearance-gap penalty so optimization can distinguish
+  shallow below-target swings from deep below-target swings when
+  `low_clearance_ratio` is saturated at 1.0.
+
+Recommended next M10 experiment: warm-start from
+`m10_command_state_mlp_cem4x14_s79`, keep one fixed flat-walk command, add
+weighted start/stop and curve sequences, use a nonzero worst-case score weight,
+set `--score-normalization per_step`, add a small nonzero
+`--episodic-clearance-gap-weight` when the turn objective has saturated
+low-clearance ratio, and enable `--final-score-breakdown` before accepting any
+clearance improvement for G10 evidence.
