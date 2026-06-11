@@ -90,14 +90,23 @@ def _quat_from_roll(roll: float) -> list[float]:
     return [math.cos(roll / 2.0), math.sin(roll / 2.0), 0.0, 0.0]
 
 
-def _state_with_pose(time: float, x: float, y: float, z: float = 0.30, quat: list[float] | None = None) -> RobotState:
+def _state_with_pose(
+    time: float,
+    x: float,
+    y: float,
+    z: float = 0.30,
+    quat: list[float] | None = None,
+    feet_position_xyz: list[list[float]] | None = None,
+    feet_contacts: list[float] | None = None,
+) -> RobotState:
     return RobotState(
         time=time,
         joints=JointState(names=JOINT_NAMES, positions=[0.0] * 14, velocities=[0.0] * 14, torques=[0.0] * 14),
         imu=IMUState(),
-        feet_contacts=[1.0, 1.0],
+        feet_contacts=feet_contacts or [1.0, 1.0],
         base_position_xyz=[x, y, z],
         base_quat_wxyz=quat or [1.0, 0.0, 0.0, 0.0],
+        feet_position_xyz=feet_position_xyz,
     )
 
 
@@ -159,6 +168,61 @@ def test_walking_reward_penalizes_large_residual_and_action_rate() -> None:
     assert large.reward < small.reward
     assert large.terms["residual_l2_penalty"] < small.terms["residual_l2_penalty"]
     assert large.terms["action_rate_penalty"] < small.terms["action_rate_penalty"]
+
+
+def test_walking_reward_prefers_target_swing_clearance() -> None:
+    before = _state_with_pose(0.0, 0.0, 0.0)
+    config = WalkingRewardConfig(
+        swing_clearance_weight=1.0,
+        low_clearance_penalty_weight=1.0,
+        target_swing_clearance=0.015,
+    )
+    low = compute_walking_reward(
+        before,
+        _state_with_pose(
+            0.02,
+            0.002,
+            0.0,
+            feet_position_xyz=[[0.0, 0.04, 0.006], [0.0, -0.04, 0.0]],
+            feet_contacts=[0.0, 1.0],
+        ),
+        command=PolicyCommand(x_velocity=0.1),
+        config=config,
+    )
+    target = compute_walking_reward(
+        before,
+        _state_with_pose(
+            0.02,
+            0.002,
+            0.0,
+            feet_position_xyz=[[0.0, 0.04, 0.015], [0.0, -0.04, 0.0]],
+            feet_contacts=[0.0, 1.0],
+        ),
+        command=PolicyCommand(x_velocity=0.1),
+        config=config,
+    )
+
+    assert target.reward > low.reward
+    assert target.terms["swing_clearance"] == pytest.approx(1.0)
+    assert target.terms["low_clearance_penalty"] == pytest.approx(0.0)
+    assert low.terms["low_clearance_penalty"] < 0.0
+    assert low.diagnostics["swing_clearance_m"] == pytest.approx(0.006)
+
+
+def test_walking_reward_clearance_terms_are_neutral_without_swing_metrics() -> None:
+    result = compute_walking_reward(
+        _state_with_pose(0.0, 0.0, 0.0),
+        _state_with_pose(0.02, 0.002, 0.0),
+        command=PolicyCommand(x_velocity=0.1),
+        config=WalkingRewardConfig(
+            swing_clearance_weight=1.0,
+            low_clearance_penalty_weight=1.0,
+        ),
+    )
+
+    assert result.terms["swing_clearance"] == 0.0
+    assert result.terms["low_clearance_penalty"] == 0.0
+    assert result.diagnostics["swing_clearance_available"] is False
 
 
 def test_rl_finetune_env_includes_reward_metrics(tmp_path: Path) -> None:

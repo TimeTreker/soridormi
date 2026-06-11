@@ -32,6 +32,8 @@ class WalkingRewardConfig:
     action_rate_weight: float = 0.02
     lateral_drift_weight: float = 0.05
     vertical_motion_weight: float = 0.02
+    swing_clearance_weight: float = 0.0
+    low_clearance_penalty_weight: float = 0.0
     fall_penalty: float = 5.0
     forward_velocity_sigma: float = 0.20
     lateral_velocity_sigma: float = 0.12
@@ -40,6 +42,8 @@ class WalkingRewardConfig:
     height_sigma: float = 0.08
     min_upright: float = 0.65
     fall_height: float = 0.14
+    target_swing_clearance: float = 0.015
+    foot_contact_threshold: float = 0.5
     terminate_on_fall: bool = True
 
     def as_dict(self) -> dict[str, Any]:
@@ -118,6 +122,13 @@ def compute_walking_reward(
     action_rate_l2 = _mean_square(final - previous) if final is not None and previous is not None else 0.0
     lateral_drift = abs(float(delta[1])) if delta.shape[0] > 1 else 0.0
     vertical_motion = abs(vz)
+    clearance = _swing_clearance(after, contact_threshold=cfg.foot_contact_threshold)
+    clearance_reward = 0.0
+    low_clearance = 0.0
+    if clearance is not None:
+        target_clearance = max(float(cfg.target_swing_clearance), _EPS)
+        clearance_reward = min(clearance / target_clearance, 1.0)
+        low_clearance = max(target_clearance - clearance, 0.0) / target_clearance
 
     terms = {
         "alive_bonus": cfg.alive_bonus,
@@ -131,6 +142,8 @@ def compute_walking_reward(
         "action_rate_penalty": -cfg.action_rate_weight * action_rate_l2,
         "lateral_drift_penalty": -cfg.lateral_drift_weight * lateral_drift,
         "vertical_motion_penalty": -cfg.vertical_motion_weight * vertical_motion,
+        "swing_clearance": cfg.swing_clearance_weight * clearance_reward,
+        "low_clearance_penalty": -cfg.low_clearance_penalty_weight * low_clearance,
         "fall_penalty": -cfg.fall_penalty if fallen else 0.0,
     }
     reward = float(sum(terms.values()))
@@ -150,6 +163,10 @@ def compute_walking_reward(
         "residual_l2": float(residual_l2),
         "action_rate_l2": float(action_rate_l2),
         "lateral_drift": float(lateral_drift),
+        "swing_clearance_m": clearance,
+        "target_swing_clearance_m": float(cfg.target_swing_clearance),
+        "swing_clearance_available": clearance is not None,
+        "low_clearance_fraction": float(low_clearance),
     }
     if motor_command is not None:
         diagnostics["motor_target_abs_max"] = max((abs(float(x)) for x in motor_command.positions), default=0.0)
@@ -177,6 +194,23 @@ def _position(state: RobotState, *, fallback: np.ndarray | None = None) -> np.nd
     if arr.shape != (3,):
         return np.zeros(3, dtype=np.float64) if fallback is None else np.asarray(fallback, dtype=np.float64)
     return arr
+
+
+def _swing_clearance(state: RobotState, *, contact_threshold: float) -> float | None:
+    feet = state.feet_position_xyz
+    contacts = state.feet_contacts
+    if feet is None or contacts is None or len(feet) != 2 or len(contacts) != 2:
+        return None
+    swing_heights: list[float] = []
+    for foot, contact in zip(feet, contacts):
+        if len(foot) != 3 or float(contact) >= float(contact_threshold):
+            continue
+        height = float(foot[2])
+        if math.isfinite(height):
+            swing_heights.append(height)
+    if not swing_heights:
+        return None
+    return max(0.0, float(sum(swing_heights) / len(swing_heights)))
 
 
 def _yaw_from_state(state: RobotState) -> float | None:

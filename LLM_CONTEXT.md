@@ -146,6 +146,103 @@ models failed, including the curve case. Do not call it hardware-ready yet:
 all three scenario reports still warn about low swing clearance, so the next
 checkpoint is visual/follow-camera inspection and clearance-focused refinement.
 
+M10 evidence commands:
+
+```bash
+./scripts/analyze_m10_clearance_readiness.sh \
+  --profile-name context_stage1_three_scenario_10ep_e80 \
+  --output-dir artifacts/m10_clearance_readiness/context_stage1_three_scenario_10ep_e80
+./scripts/plan_m10_visual_inspection.sh \
+  --profile-name context_stage1_three_scenario_10ep_e80 \
+  --output-dir artifacts/m10_visual_inspection/context_stage1_three_scenario_10ep_e80
+./scripts/build_m10_evidence_package.sh \
+  --profile-name context_stage1_three_scenario_10ep_e80 \
+  --output-dir artifacts/m10_evidence/context_stage1_three_scenario_10ep_e80
+./scripts/compare_m10_teacher_suite.sh \
+  artifacts/scenario_eval/open_duck_forward_m10_baseline_suite/suite_summary.json \
+  artifacts/scenario_eval/context_stage1_three_scenario_10ep_e80_suite/suite_summary.json \
+  --output-dir artifacts/m10_teacher_comparison/context_stage1_three_scenario_10ep_e80 \
+  --strict
+```
+
+Teacher comparison is a relative behavior check only. It does not replace the
+absolute `0.015 m` swing-clearance gate.
+
+Current stored teacher comparison:
+
+```text
+status: TEACHER_COMPARISON_PASS
+flat distance/speed ratio:       0.978
+start-stop distance/speed ratio: 0.939
+curve distance/speed ratio:      1.242
+candidate fallen_count:          0
+```
+
+The candidate remains blocked because all three absolute clearance checks fail
+and follow-camera visual review is still pending.
+
+The official teacher also fails the same absolute clearance target. Its stored
+scenario p50 clearances are approximately `0.0100`, `0.0079`, and `0.0056 m`.
+Therefore, more BC collection from the unchanged teacher is not the primary
+clearance solution. The residual/RL path now supports explicit swing-clearance
+reward terms through `--swing-clearance-weight`,
+`--low-clearance-penalty-weight`, and `--target-swing-clearance`.
+
+The residual path now inherits the teacher policy input width, so both the
+official 101D policy and the M10 104D context policy are supported. A live
+zero-residual smoke with the context candidate completed 40/40 steps and
+observed 9 swing samples with mean clearance about `0.00919 m`; all 9 were
+below `0.015 m`, confirming that the reward sees the M10 failure.
+
+First bounded clearance experiment:
+
+```bash
+./scripts/run_sim_server.sh \
+  --backend mujoco \
+  --profile open_duck_forward \
+  --no-viewer
+
+./scripts/train_residual_policy.sh \
+  context_stage1_three_scenario_10ep_e80 \
+  --output-dir /data/rl_finetune/m10_clearance_residual_smoke \
+  --profile-name m10_clearance_residual_smoke \
+  --iterations 2 \
+  --population 8 \
+  --steps-per-episode 150 \
+  --residual-scale 0.03 \
+  --swing-clearance-weight 0.75 \
+  --low-clearance-penalty-weight 1.0 \
+  --target-swing-clearance 0.015 \
+  --force-profile
+```
+
+This remains an experiment until the generated profile passes the original
+three-scenario suite, absolute clearance readiness, and teacher comparison.
+
+Constant-residual experiment result:
+
+```text
+profile: m10_clearance_residual_cem2x8_s31
+search: 2 iterations x 8 candidates x 100 steps
+residual scale: 0.03
+result: REJECTED
+
+baseline -> residual swing-clearance p50:
+flat:       0.01023m -> 0.00943m
+start-stop: 0.00759m -> 0.00759m
+curve:      0.00632m -> 0.00599m
+
+falls: 0
+clearance gate: 0/3 PASS
+```
+
+Conclusion: a constant 14D residual bias cannot target the swing phase without
+also perturbing stance behavior. Do not spend more search budget on this policy
+class. The next implementation should be a bounded phase/state-conditioned
+residual actor trained across multiple command conditions. The rejected model,
+metrics, and rollout evidence remain under `/data/rl_finetune/` and
+`artifacts/`; its generated runtime profile was removed.
+
 ## Read First
 
 ```text

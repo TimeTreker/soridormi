@@ -116,6 +116,7 @@ def test_readiness_blocks_low_clearance_with_manifest_thresholds(tmp_path: Path)
     assert any("flat_walk_varied_speed_v1" in blocker for blocker in report.blockers)
     flat = {item["scenario_id"]: item for item in report.scenarios}["flat_walk_varied_speed_v1"]
     assert flat["thresholds"]["max_low_clearance_ratio"] == 0.25
+    assert any("phase/state-conditioned residual" in item for item in report.recommendations)
     assert flat["status"] == "FAIL_CLEARANCE_GATE"
 
 

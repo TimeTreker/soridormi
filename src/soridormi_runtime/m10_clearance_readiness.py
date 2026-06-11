@@ -286,8 +286,9 @@ def _recommendations(blockers: Sequence[str]) -> list[str]:
     if blockers:
         return [
             "Keep the current context policy blocked from M10 promotion.",
-            "Collect clearance-focused teacher rollouts for flat, start/stop, and curve scenarios.",
-            "Retrain a candidate and rerun the required scenario suite before visual inspection.",
+            "Do not recollect unchanged teacher behavior when the teacher also fails the clearance target.",
+            "Use a teacher that demonstrates the target clearance or train a bounded phase/state-conditioned residual.",
+            "Rerun the required scenario suite before visual inspection.",
         ]
     return [
         "Run follow-camera visual inspection for all required M10 scenarios.",

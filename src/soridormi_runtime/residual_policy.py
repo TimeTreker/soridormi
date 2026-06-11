@@ -14,7 +14,6 @@ from soridormi_runtime.policy_profiles import DEFAULT_PROFILE_NAME, PolicyProfil
 
 
 ACTION_SIZE = 14
-OBS_SIZE = 101
 
 
 def _load_onnxruntime() -> Any:
@@ -81,8 +80,6 @@ class ResidualOnnxPolicy:
     """
 
     ACTION_SIZE = ACTION_SIZE
-    OBS_BATCH_SHAPE = (1, OBS_SIZE)
-
     def __init__(
         self,
         policy_path: str | os.PathLike[str] | None = None,
@@ -120,9 +117,11 @@ class ResidualOnnxPolicy:
         if teacher_policy is not None:
             self.teacher = teacher_policy
             self.teacher_profile: PolicyProfile | None = None
+            self.expected_input_size: int | None = None
         else:
             teacher_profile_name = teacher_profile or os.environ.get("SORIDORMI_RESIDUAL_TEACHER_PROFILE") or DEFAULT_PROFILE_NAME
             self.teacher_profile = teacher_profile_name if isinstance(teacher_profile_name, PolicyProfile) else PolicyProfile.load(teacher_profile_name)
+            self.expected_input_size = _profile_input_size(self.teacher_profile)
             with _temporary_env(self.teacher_profile.env()):
                 self.teacher = OnnxPolicy(
                     policy_path=self.teacher_profile.model.path,
@@ -200,10 +199,14 @@ class ResidualOnnxPolicy:
         if observation is None:
             raise RuntimeError("Teacher policy did not expose last_observation after compute_action")
         obs = np.asarray(observation, dtype=np.float32)
-        if obs.shape == (OBS_SIZE,):
-            obs = obs.reshape(1, OBS_SIZE)
-        if obs.shape != (1, OBS_SIZE):
-            raise RuntimeError(f"Teacher observation must have shape (1, {OBS_SIZE}), got {obs.shape}")
+        if obs.ndim == 1:
+            obs = obs.reshape(1, obs.shape[0])
+        if obs.ndim != 2 or obs.shape[0] != 1:
+            raise RuntimeError(f"Teacher observation must have shape (1, N), got {obs.shape}")
+        if self.expected_input_size is not None and obs.shape[1] != self.expected_input_size:
+            raise RuntimeError(
+                f"Teacher observation must have shape (1, {self.expected_input_size}), got {obs.shape}"
+            )
         return obs
 
     def set_command_vector(self, command: list[float]) -> None:
@@ -238,3 +241,10 @@ class ResidualOnnxPolicy:
         reset = getattr(self.teacher, "reset_state", None)
         if callable(reset):
             reset()
+
+
+def _profile_input_size(profile: PolicyProfile) -> int:
+    shape = list(profile.model.input_shape)
+    if len(shape) != 2 or not isinstance(shape[-1], int) or int(shape[-1]) <= 0:
+        raise ValueError(f"teacher profile input_shape must be [batch, positive_size], got {shape}")
+    return int(shape[-1])

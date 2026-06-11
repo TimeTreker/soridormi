@@ -13,6 +13,7 @@ import numpy as np
 import yaml
 
 from soridormi_runtime.create_policy_profile import build_replacement_profile_payload
+from soridormi_runtime.policy_profiles import PolicyProfile
 from soridormi_runtime.rl_finetune_env import ACTION_SIZE, ResidualActionConfig, RlFineTuneEnv
 from soridormi_runtime.walking_reward import WalkingRewardConfig
 
@@ -173,6 +174,7 @@ def export_constant_residual_policy(
     *,
     output_onnx: Path,
     output_checkpoint: Path | None = None,
+    input_size: int = 101,
 ) -> None:
     torch = _import_torch()
 
@@ -190,7 +192,10 @@ def export_constant_residual_policy(
     module = ConstantResidualPolicy(arr)
     module.eval()
     output_onnx.parent.mkdir(parents=True, exist_ok=True)
-    dummy = torch.zeros((1, 101), dtype=torch.float32)
+    resolved_input_size = int(input_size)
+    if resolved_input_size <= 0:
+        raise ValueError("input_size must be positive")
+    dummy = torch.zeros((1, resolved_input_size), dtype=torch.float32)
     torch.onnx.export(
         module,
         dummy,
@@ -211,7 +216,7 @@ def export_constant_residual_policy(
                 "schema_version": 1,
                 "model_kind": "constant_residual_policy",
                 "residual": arr.tolist(),
-                "observation_size": 101,
+                "observation_size": resolved_input_size,
                 "action_size": ACTION_SIZE,
                 "created_at_utc": datetime.now(timezone.utc).isoformat(),
             },
@@ -231,6 +236,8 @@ def _write_residual_profile(
     final_action_clip_abs: float | None,
     force: bool,
 ) -> Path:
+    teacher = PolicyProfile.load(teacher_profile)
+    input_shape = list(teacher.model.input_shape)
     payload = build_replacement_profile_payload(
         name=profile_name,
         model_path=residual_onnx_path,
@@ -238,7 +245,7 @@ def _write_residual_profile(
         description=description or f"Residual policy fine-tuned on top of {teacher_profile}.",
         input_name="obs",
         output_name="continuous_actions",
-        input_shape=[1, 101],
+        input_shape=input_shape,
         output_shape=[1, 14],
     )
     payload.setdefault("metadata", {})["generated_by"] = "soridormi_m619_residual_rl"
@@ -283,8 +290,11 @@ def train_residual_policy(
     report_path = output_dir / "residual_train_report.md"
     profile_path: Path | None = None
     optimization: ResidualOptimizationResult | None = None
+    input_size: int | None = None
 
     try:
+        teacher = PolicyProfile.load(teacher_profile)
+        input_size = _profile_input_size(teacher)
         optimization = optimize_residual_bias(
             lambda residual: evaluate_residual_bias_live(
                 residual,
@@ -303,6 +313,7 @@ def train_residual_policy(
             optimization.best_residual,
             output_onnx=onnx_path,
             output_checkpoint=checkpoint_path,
+            input_size=input_size,
         )
         if profile_name:
             profile_path = _write_residual_profile(
@@ -322,11 +333,13 @@ def train_residual_policy(
     payload = {
         "schema_version": 1,
         "teacher_profile": teacher_profile,
+        "policy_input_size": input_size,
         "output_dir": str(output_dir),
         "steps_per_episode": int(steps_per_episode),
         "residual_scale": float(residual_scale),
         "residual_clip_abs": float(residual_clip_abs),
         "final_action_clip_abs": final_action_clip_abs,
+        "reward_config": asdict(reward_config),
         "optimization_config": asdict(optimization_config),
         "optimization": None if optimization is None else asdict(optimization),
         "residual_onnx_path": str(onnx_path) if onnx_path.exists() else None,
@@ -361,6 +374,7 @@ def _write_report(path: Path, payload: dict[str, Any]) -> None:
         f"Teacher profile: `{payload['teacher_profile']}`",
         f"Output directory: `{payload['output_dir']}`",
         f"Residual scale: `{payload['residual_scale']}`",
+        f"Policy input size: `{payload.get('policy_input_size')}`",
         "",
     ]
     optimization = payload.get("optimization")
@@ -390,6 +404,13 @@ def _write_report(path: Path, payload: dict[str, Any]) -> None:
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
+def _profile_input_size(profile: PolicyProfile) -> int:
+    shape = list(profile.model.input_shape)
+    if len(shape) != 2 or not isinstance(shape[-1], int) or int(shape[-1]) <= 0:
+        raise ValueError(f"teacher profile input_shape must be [batch, positive_size], got {shape}")
+    return int(shape[-1])
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train a bounded residual policy on top of a teacher profile.")
     parser.add_argument("teacher_profile", nargs="?", default="open_duck_forward", help="Teacher policy profile")
@@ -412,6 +433,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fall-height", type=float, default=0.14, help="Fall termination height")
     parser.add_argument("--min-upright", type=float, default=0.65, help="Fall termination upright score")
     parser.add_argument("--forward-velocity-sigma", type=float, default=0.20, help="Forward velocity tracking sigma")
+    parser.add_argument("--swing-clearance-weight", type=float, default=0.0, help="Reward weight for reaching target swing-foot clearance")
+    parser.add_argument("--low-clearance-penalty-weight", type=float, default=0.0, help="Penalty weight for swing-foot clearance below target")
+    parser.add_argument("--target-swing-clearance", type=float, default=0.015, help="Target swing-foot world height in meters")
+    parser.add_argument("--foot-contact-threshold", type=float, default=0.5, help="Contact value at or above which a foot is in stance")
     parser.add_argument("--host", default=os.environ.get("SIM_HOST", "127.0.0.1"), help="Simulator API host")
     parser.add_argument("--port", type=int, default=int(os.environ.get("SIM_PORT", "5555")), help="Simulator API port")
     parser.add_argument("--dry-run", action="store_true", help="Print resolved config without connecting to simulator")
@@ -436,6 +461,10 @@ def main() -> None:
         fall_height=args.fall_height,
         min_upright=args.min_upright,
         forward_velocity_sigma=args.forward_velocity_sigma,
+        swing_clearance_weight=args.swing_clearance_weight,
+        low_clearance_penalty_weight=args.low_clearance_penalty_weight,
+        target_swing_clearance=args.target_swing_clearance,
+        foot_contact_threshold=args.foot_contact_threshold,
     )
     if args.dry_run:
         print(json.dumps({

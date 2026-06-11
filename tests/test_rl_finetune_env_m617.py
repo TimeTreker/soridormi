@@ -51,6 +51,9 @@ class FakePolicy:
     def set_motor_targets(self, joint_names: list[str], positions: list[float] | np.ndarray) -> None:
         self.targets.append([float(x) for x in positions])
 
+    def get_observation(self) -> list[float]:
+        return [0.0] * 101
+
 
 class FakeMapper:
     def __init__(self) -> None:
@@ -166,3 +169,33 @@ def test_run_zero_residual_smoke_writes_json(tmp_path: Path, monkeypatch) -> Non
     assert result.steps_completed == 2
     assert output.exists()
     assert "transitions" in output.read_text(encoding="utf-8")
+
+
+def test_rl_finetune_env_accepts_context_policy_input(tmp_path: Path) -> None:
+    profile = PolicyProfile(
+        name="context_teacher",
+        description="test context teacher",
+        path=tmp_path / "context_teacher.yaml",
+        payload={"runtime": {"control_hz": 50}},
+        model=PolicyModelSpec(
+            path=str(tmp_path / "context_teacher.onnx"),
+            input_shape=[1, 104],
+            input_mode="context_stage1_command",
+        ),
+    )
+    policy = FakePolicy()
+    policy.get_observation = lambda: [0.0] * 104  # type: ignore[method-assign]
+    env = RlFineTuneEnv(
+        profile=profile,
+        robot=FakeRobot(),
+        policy=policy,
+        mapper=FakeMapper(),
+        command=SimpleNamespace(as_list=lambda: [0.15, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+        phase_generator=SimpleNamespace(advance_and_as_list=lambda: [0.0, 1.0]),
+    )
+
+    env.reset()
+    step = env.step([0.0] * 14)
+
+    assert step.observation is not None
+    assert len(step.observation) == 104

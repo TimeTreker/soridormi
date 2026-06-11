@@ -174,6 +174,7 @@ class RlFineTuneEnv:
     ) -> None:
         self.profile = profile if isinstance(profile, PolicyProfile) else PolicyProfile.load(profile)
         self.profile_env = self.profile.env()
+        self.policy_input_size = _profile_input_size(self.profile)
         self.control_hz = float(control_hz or self.profile_env.get("CONTROL_HZ", "50"))
         self.dt = 1.0 / self.control_hz
         self.robot = robot or SimRobot(host=host, port=port)
@@ -226,7 +227,7 @@ class RlFineTuneEnv:
 
         self._set_policy_inputs()
         teacher_action = _action_array(self.policy.compute_action(state), "teacher_action")
-        observation = _policy_observation(self.policy)
+        observation = _policy_observation(self.policy, expected_size=self.policy_input_size)
         teacher_action = _action_array(
             self.postprocessor.apply(teacher_action, list(state.joints.names)),
             "teacher_action",
@@ -343,7 +344,14 @@ def run_zero_residual_smoke(
     return result
 
 
-def _policy_observation(policy: Any) -> list[float] | None:
+def _profile_input_size(profile: PolicyProfile) -> int:
+    shape = list(profile.model.input_shape)
+    if len(shape) != 2 or not isinstance(shape[-1], int) or int(shape[-1]) <= 0:
+        raise ValueError(f"policy profile input_shape must be [batch, positive_size], got {shape}")
+    return int(shape[-1])
+
+
+def _policy_observation(policy: Any, *, expected_size: int) -> list[float] | None:
     getter = getattr(policy, "get_observation", None)
     observation: Any = None
     if callable(getter):
@@ -353,10 +361,13 @@ def _policy_observation(policy: Any) -> list[float] | None:
     if observation is None:
         return None
     arr = np.asarray(observation, dtype=np.float32)
-    if arr.shape == (1, 101):
-        arr = arr.reshape(101)
-    if arr.shape != (101,):
-        raise ValueError(f"policy observation must have shape (101,) or (1, 101), got {arr.shape}")
+    if arr.shape == (1, expected_size):
+        arr = arr.reshape(expected_size)
+    if arr.shape != (expected_size,):
+        raise ValueError(
+            "policy observation must have shape "
+            f"({expected_size},) or (1, {expected_size}), got {arr.shape}"
+        )
     if not np.all(np.isfinite(arr)):
         raise ValueError("policy observation must contain only finite values")
     return [float(x) for x in arr.tolist()]
@@ -383,6 +394,11 @@ def _state_summary(state: RobotState) -> dict[str, Any]:
         "base_position_xyz": None if state.base_position_xyz is None else [float(x) for x in state.base_position_xyz],
         "base_quat_wxyz": None if state.base_quat_wxyz is None else [float(x) for x in state.base_quat_wxyz],
         "feet_contacts": None if state.feet_contacts is None else [float(x) for x in state.feet_contacts],
+        "feet_position_xyz": (
+            None
+            if state.feet_position_xyz is None
+            else [[float(value) for value in foot] for foot in state.feet_position_xyz]
+        ),
         "joint_position_abs_max": max((abs(float(x)) for x in state.joints.positions), default=0.0),
         "joint_velocity_abs_max": max((abs(float(x)) for x in state.joints.velocities), default=0.0),
     }
@@ -427,6 +443,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fall-height", type=float, default=0.14, help="Base height below which reward terminates")
     parser.add_argument("--min-upright", type=float, default=0.65, help="Minimum upright score before reward terminates")
     parser.add_argument("--forward-velocity-sigma", type=float, default=0.20, help="Velocity tracking sigma for commanded x velocity")
+    parser.add_argument("--swing-clearance-weight", type=float, default=0.0, help="Reward weight for reaching target swing-foot clearance")
+    parser.add_argument("--low-clearance-penalty-weight", type=float, default=0.0, help="Penalty weight for swing-foot clearance below target")
+    parser.add_argument("--target-swing-clearance", type=float, default=0.015, help="Target swing-foot world height in meters")
+    parser.add_argument("--foot-contact-threshold", type=float, default=0.5, help="Contact value at or above which a foot is in stance")
     parser.add_argument("--no-reset", action="store_true", help="Do not call simulator reset before stepping")
     parser.add_argument("--dry-run", action="store_true", help="Print resolved config without connecting to simulator")
     return parser
@@ -446,6 +466,10 @@ def main() -> None:
         fall_height=args.fall_height,
         min_upright=args.min_upright,
         forward_velocity_sigma=args.forward_velocity_sigma,
+        swing_clearance_weight=args.swing_clearance_weight,
+        low_clearance_penalty_weight=args.low_clearance_penalty_weight,
+        target_swing_clearance=args.target_swing_clearance,
+        foot_contact_threshold=args.foot_contact_threshold,
     )
 
     if args.dry_run:

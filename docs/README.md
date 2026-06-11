@@ -20,6 +20,10 @@ be committed.
 - `docs/SORIDORMI_NEURAL_PARAMETER_ADAPTIVE_MPC_WBC.md`: future
   neural parameter-adaptive MPC/WBC controller design; NN estimates model
   error while MPC/WBC enforces physics.
+- `scripts/build_m10_evidence_package.sh`: packages M10 clearance readiness,
+  follow-camera planning, and visual review evidence.
+- `scripts/compare_m10_teacher_suite.sh`: compares the candidate and official
+  teacher scenario-suite summaries after visual review.
 
 ## Active locomotion/data docs
 

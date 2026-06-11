@@ -230,7 +230,19 @@ observation[101]
 - [ ] Perform follow-camera visual inspection
 - [x] Define clearance-focused promotion thresholds
 - [x] Add threshold-aligned M10 clearance readiness report
-- [ ] Re-evaluate against the official teacher
+- [x] Add an M10 evidence package and visual-review template
+- [x] Add scenario-suite comparison against the official teacher
+- [x] Re-evaluate the current candidate against the official teacher
+  - flat distance/speed ratio: 0.978
+  - start-stop distance/speed ratio: 0.939
+  - curve distance/speed ratio: 1.242
+  - no falls; stuck-ratio regression within 0.10
+- [x] Test clearance-aware constant residual bias
+  - result: rejected; clearance regressed or remained unchanged
+  - flat: 0.01023m -> 0.00943m
+  - start-stop: 0.00759m -> 0.00759m
+  - curve: 0.00632m -> 0.00599m
+- [ ] Implement a bounded phase/state-conditioned residual policy
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
 
 **Gate G10:**
@@ -242,7 +254,7 @@ required scenario suite: PASS
 fall/reset limits: PASS
 foot-clearance threshold: ✗ FAIL (all scenarios < 0.015m)
 visual inspection: PENDING
-teacher comparison: PENDING
+teacher comparison: PASS (relative behavior only; does not replace clearance)
 ```
 
 > **Current status:** The candidate passes 3/3 scenarios but does not pass G10
@@ -414,11 +426,16 @@ depends on the hardware safety gate.
    dataset.
 2. Run the current candidate with `--viewer --follow-camera`.
 3. Record swing-clearance evidence for all three scenarios.
-4. Add a quantitative clearance acceptance gate.
-5. Collect clearance-focused and wider turn/yaw data.
-6. Retrain the context candidate.
-7. Compare the new candidate against the official teacher.
-8. Begin M11 held-out scenario development only after G10 passes.
+4. Fill the M10 visual-review template and rebuild the evidence package.
+5. Replace the rejected constant residual bias with a bounded
+   phase/state-conditioned residual actor.
+6. Train the actor with explicit swing-clearance reward across multiple command
+   conditions.
+7. Pass the quantitative clearance readiness gate without regressing the
+   original scenario suite.
+8. Compare the new candidate suite against the official teacher with
+   `compare_m10_teacher_suite.sh`.
+9. Begin M11 held-out scenario development only after G10 passes.
 
 ## Project success criteria
 
