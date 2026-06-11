@@ -10,9 +10,21 @@ from soridormi_runtime.policy_factory import normalize_policy_backend
 from soridormi_runtime.policy_profiles import PolicyModelSpec, PolicyProfile
 from soridormi_runtime.residual_policy import ResidualOnnxPolicy
 from soridormi_runtime.train_residual_policy import (
+    COMMAND_STATE_FEATURE_SIZE,
+    COMMAND_STATE_PARAMETER_SIZE,
+    RESIDUAL_ACTOR_COMMAND_STATE,
+    PHASE_CONTACT_PARAMETER_SIZE,
+    RESIDUAL_ACTOR_PHASE_CONTACT,
     ResidualOptimizationConfig,
+    _parse_training_command,
     _write_residual_profile,
+    command_state_residual_action,
+    command_state_residual_features,
+    episodic_clearance_adjustment,
     optimize_residual_bias,
+    optimize_command_state_residual,
+    optimize_phase_contact_residual,
+    phase_contact_residual_action,
 )
 
 
@@ -147,6 +159,97 @@ def test_cem_residual_optimizer_improves_toward_target() -> None:
     assert len(result.iterations) == 6
 
 
+def test_phase_contact_residual_actor_uses_canonical_observation_fields() -> None:
+    observation = np.zeros(104, dtype=np.float32)
+    observation[97:101] = [1.0, 0.0, 0.5, -0.5]
+    weights = np.zeros((5, 14), dtype=np.float32)
+    weights[1, 0] = 0.4
+    weights[3, 1] = 0.6
+
+    action = phase_contact_residual_action(observation, weights.reshape(-1))
+
+    assert action[0] == pytest.approx(np.tanh(0.4))
+    assert action[1] == pytest.approx(np.tanh(0.3))
+    assert action[2:].tolist() == pytest.approx([0.0] * 12)
+
+
+def test_phase_contact_optimizer_uses_full_actor_parameter_vector() -> None:
+    target = np.asarray([0.1] * PHASE_CONTACT_PARAMETER_SIZE, dtype=np.float32)
+
+    result = optimize_phase_contact_residual(
+        lambda candidate: -float(np.mean((candidate - target) ** 2)),
+        config=ResidualOptimizationConfig(
+            iterations=2,
+            population=8,
+            initial_std=0.2,
+            seed=3,
+            include_zero_candidate=False,
+        ),
+    )
+
+    assert len(result.best_residual) == PHASE_CONTACT_PARAMETER_SIZE
+    assert len(result.final_mean) == PHASE_CONTACT_PARAMETER_SIZE
+
+
+def test_command_state_actor_uses_command_joint_state_and_history() -> None:
+    observation = np.zeros(104, dtype=np.float32)
+    observation[6:9] = [0.2, -0.1, 0.3]
+    observation[97:101] = [1.0, 0.0, 0.5, -0.5]
+    observation[[15, 16, 17, 24, 25, 26]] = [0.1, 0.2, 0.3, -0.1, -0.2, -0.3]
+    observation[[43, 44, 45, 52, 53, 54]] = [0.4, 0.5, 0.6, -0.4, -0.5, -0.6]
+    features = command_state_residual_features(observation)
+    weights = np.zeros((COMMAND_STATE_FEATURE_SIZE, 6), dtype=np.float32)
+    weights[1, 0] = 2.0
+    weights[-1, 1] = 1.0
+
+    action = command_state_residual_action(observation, weights.reshape(-1))
+
+    assert features.shape == (COMMAND_STATE_FEATURE_SIZE,)
+    assert action[2] == pytest.approx(np.tanh(0.4))
+    assert action[3] == pytest.approx(np.tanh(-0.6))
+    assert action[[0, 1, 5, 6, 7, 8, 9, 10]].tolist() == pytest.approx([0.0] * 8)
+
+
+def test_command_state_optimizer_uses_full_parameter_vector() -> None:
+    result = optimize_command_state_residual(
+        lambda candidate: -float(np.mean(candidate**2)),
+        config=ResidualOptimizationConfig(iterations=1, population=3, seed=5),
+    )
+
+    assert len(result.best_residual) == COMMAND_STATE_PARAMETER_SIZE
+
+
+def test_episodic_clearance_adjustment_matches_gate_direction() -> None:
+    low = episodic_clearance_adjustment(
+        [0.005, 0.010],
+        target_clearance=0.015,
+        clearance_weight=2.0,
+        low_clearance_penalty_weight=1.0,
+    )
+    passing = episodic_clearance_adjustment(
+        [0.015, 0.020],
+        target_clearance=0.015,
+        clearance_weight=2.0,
+        low_clearance_penalty_weight=1.0,
+    )
+
+    assert passing > low
+    assert episodic_clearance_adjustment(
+        [],
+        target_clearance=0.015,
+        clearance_weight=2.0,
+        low_clearance_penalty_weight=1.0,
+    ) == 0.0
+
+
+def test_parse_training_command_builds_velocity_command() -> None:
+    command = _parse_training_command("0.09,0.0,0.12")
+
+    assert command.x_velocity == pytest.approx(0.09)
+    assert command.y_velocity == pytest.approx(0.0)
+    assert command.yaw_velocity == pytest.approx(0.12)
+
+
 def test_write_residual_profile_sets_runtime_kind(tmp_path: Path, monkeypatch) -> None:
     template_path = tmp_path / "teacher.yaml"
     template_path.write_text(
@@ -205,11 +308,13 @@ logging: {}
         residual_clip_abs=1.0,
         final_action_clip_abs=None,
         force=False,
+        actor_kind=RESIDUAL_ACTOR_COMMAND_STATE,
     )
 
     text = path.read_text(encoding="utf-8")
     assert "kind: residual_onnx" in text
     assert "teacher_profile: teacher" in text
+    assert "actor_kind: command_state" in text
     assert "residual_scale: 0.05" in text
 
 

@@ -7,12 +7,13 @@ import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 import numpy as np
 import yaml
 
 from soridormi_runtime.create_policy_profile import build_replacement_profile_payload
+from soridormi_runtime.policy_command import PolicyCommand
 from soridormi_runtime.policy_profiles import PolicyProfile
 from soridormi_runtime.rl_finetune_env import ACTION_SIZE, ResidualActionConfig, RlFineTuneEnv
 from soridormi_runtime.walking_reward import WalkingRewardConfig
@@ -21,6 +22,21 @@ from soridormi_runtime.walking_reward import WalkingRewardConfig
 DEFAULT_OUTPUT_ROOT = Path("/data/rl_finetune/residual_policy")
 DEFAULT_RESIDUAL_ONNX_NAME = "residual_policy.onnx"
 DEFAULT_RESIDUAL_PT_NAME = "residual_policy.pt"
+RESIDUAL_ACTOR_CONSTANT = "constant"
+RESIDUAL_ACTOR_PHASE_CONTACT = "phase_contact"
+RESIDUAL_ACTOR_COMMAND_STATE = "command_state"
+PHASE_CONTACT_OBSERVATION_START = 97
+PHASE_CONTACT_OBSERVATION_STOP = 101
+PHASE_CONTACT_FEATURE_SIZE = 5
+PHASE_CONTACT_PARAMETER_SIZE = PHASE_CONTACT_FEATURE_SIZE * ACTION_SIZE
+COMMAND_STATE_COMMAND_SLICE = slice(6, 9)
+COMMAND_STATE_CONTACT_PHASE_SLICE = slice(97, 101)
+COMMAND_STATE_LEG_JOINT_OFFSET_INDICES = (15, 16, 17, 24, 25, 26)
+COMMAND_STATE_LAST_ACTION_INDICES = (43, 44, 45, 52, 53, 54)
+COMMAND_STATE_ACTION_INDICES = (2, 3, 4, 11, 12, 13)
+COMMAND_STATE_FEATURE_SIZE = 20
+COMMAND_STATE_OUTPUT_SIZE = len(COMMAND_STATE_ACTION_INDICES)
+COMMAND_STATE_PARAMETER_SIZE = COMMAND_STATE_FEATURE_SIZE * COMMAND_STATE_OUTPUT_SIZE
 
 
 @dataclass(frozen=True)
@@ -84,17 +100,44 @@ def optimize_residual_bias(
     with PPO/SAC or a recurrent residual actor without changing the deployment
     contract.
     """
+    return _optimize_parameter_vector(evaluate, parameter_size=ACTION_SIZE, config=config)
+
+
+def optimize_phase_contact_residual(
+    evaluate: Callable[[np.ndarray], float],
+    *,
+    config: ResidualOptimizationConfig | None = None,
+) -> ResidualOptimizationResult:
+    """Optimize a bounded linear actor over bias, foot contacts, and gait phase."""
+    return _optimize_parameter_vector(evaluate, parameter_size=PHASE_CONTACT_PARAMETER_SIZE, config=config)
+
+
+def optimize_command_state_residual(
+    evaluate: Callable[[np.ndarray], float],
+    *,
+    config: ResidualOptimizationConfig | None = None,
+) -> ResidualOptimizationResult:
+    """Optimize a compact actor over command, gait state, and action history."""
+    return _optimize_parameter_vector(evaluate, parameter_size=COMMAND_STATE_PARAMETER_SIZE, config=config)
+
+
+def _optimize_parameter_vector(
+    evaluate: Callable[[np.ndarray], float],
+    *,
+    parameter_size: int,
+    config: ResidualOptimizationConfig | None,
+) -> ResidualOptimizationResult:
     cfg = config or ResidualOptimizationConfig()
     rng = np.random.default_rng(int(cfg.seed))
-    mean = np.zeros(ACTION_SIZE, dtype=np.float32)
-    std = np.full(ACTION_SIZE, float(cfg.initial_std), dtype=np.float32)
+    mean = np.zeros(parameter_size, dtype=np.float32)
+    std = np.full(parameter_size, float(cfg.initial_std), dtype=np.float32)
     elite_count = max(1, int(math.ceil(float(cfg.population) * float(cfg.elite_fraction))))
     best_residual = mean.copy()
     best_score = float("-inf")
     history: list[dict[str, Any]] = []
 
     for iteration in range(max(1, int(cfg.iterations))):
-        candidates = rng.normal(mean, std, size=(max(1, int(cfg.population)), ACTION_SIZE)).astype(np.float32)
+        candidates = rng.normal(mean, std, size=(max(1, int(cfg.population)), parameter_size)).astype(np.float32)
         candidates = np.clip(candidates, -float(cfg.residual_clip_abs), float(cfg.residual_clip_abs))
         if cfg.include_zero_candidate:
             candidates[0, :] = 0.0
@@ -128,6 +171,59 @@ def optimize_residual_bias(
     )
 
 
+def phase_contact_residual_action(
+    observation: np.ndarray | list[float],
+    parameters: np.ndarray | list[float],
+) -> np.ndarray:
+    """Compute a 14D residual from canonical contact and imitation-phase fields."""
+    obs = np.asarray(observation, dtype=np.float32).reshape(-1)
+    if obs.size < PHASE_CONTACT_OBSERVATION_STOP:
+        raise ValueError(
+            "phase_contact actor requires an observation with at least "
+            f"{PHASE_CONTACT_OBSERVATION_STOP} values, got {obs.size}"
+        )
+    weights = np.asarray(parameters, dtype=np.float32).reshape(PHASE_CONTACT_FEATURE_SIZE, ACTION_SIZE)
+    features = np.concatenate(
+        (
+            np.ones(1, dtype=np.float32),
+            obs[PHASE_CONTACT_OBSERVATION_START:PHASE_CONTACT_OBSERVATION_STOP],
+        )
+    )
+    return np.tanh(features @ weights).astype(np.float32)
+
+
+def command_state_residual_features(observation: np.ndarray | list[float]) -> np.ndarray:
+    obs = np.asarray(observation, dtype=np.float32).reshape(-1)
+    if obs.size < PHASE_CONTACT_OBSERVATION_STOP:
+        raise ValueError(
+            "command_state actor requires an observation with at least "
+            f"{PHASE_CONTACT_OBSERVATION_STOP} values, got {obs.size}"
+        )
+    return np.concatenate(
+        (
+            np.ones(1, dtype=np.float32),
+            obs[COMMAND_STATE_COMMAND_SLICE],
+            obs[COMMAND_STATE_CONTACT_PHASE_SLICE],
+            obs[list(COMMAND_STATE_LEG_JOINT_OFFSET_INDICES)],
+            obs[list(COMMAND_STATE_LAST_ACTION_INDICES)],
+        )
+    ).astype(np.float32)
+
+
+def command_state_residual_action(
+    observation: np.ndarray | list[float],
+    parameters: np.ndarray | list[float],
+) -> np.ndarray:
+    weights = np.asarray(parameters, dtype=np.float32).reshape(
+        COMMAND_STATE_FEATURE_SIZE,
+        COMMAND_STATE_OUTPUT_SIZE,
+    )
+    leg_action = np.tanh(command_state_residual_features(observation) @ weights).astype(np.float32)
+    action = np.zeros(ACTION_SIZE, dtype=np.float32)
+    action[list(COMMAND_STATE_ACTION_INDICES)] = leg_action
+    return action
+
+
 def evaluate_residual_bias_live(
     residual: np.ndarray,
     *,
@@ -139,30 +235,160 @@ def evaluate_residual_bias_live(
     reward_config: WalkingRewardConfig,
     host: str,
     port: int,
+    training_commands: Sequence[PolicyCommand] | None = None,
+    episodic_clearance_weight: float = 0.0,
+    episodic_low_clearance_penalty_weight: float = 0.0,
 ) -> float:
-    env = RlFineTuneEnv(
-        profile=teacher_profile,
+    return _evaluate_residual_live(
+        residual,
+        teacher_profile=teacher_profile,
+        steps=steps,
+        residual_scale=residual_scale,
+        residual_clip_abs=residual_clip_abs,
+        final_action_clip_abs=final_action_clip_abs,
+        reward_config=reward_config,
         host=host,
         port=port,
-        residual_config=ResidualActionConfig(
-            residual_scale=residual_scale,
-            residual_clip_abs=residual_clip_abs,
-            final_action_clip_abs=final_action_clip_abs,
-        ),
-        reward_config=reward_config,
-        reset_on_start=True,
+        training_commands=training_commands,
+        episodic_clearance_weight=episodic_clearance_weight,
+        episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
     )
-    total = 0.0
-    completed = 0
-    env.reset()
-    for _ in range(max(1, int(steps))):
-        step = env.step(residual)
-        total += float(step.metrics.get("reward", 0.0))
-        completed += 1
-        if bool(step.metrics.get("terminated", False)):
-            break
-    # Prefer policies that survive longer when total reward ties.
-    return float(total + 0.001 * completed)
+
+
+def evaluate_phase_contact_residual_live(
+    parameters: np.ndarray,
+    *,
+    teacher_profile: str,
+    steps: int,
+    residual_scale: float,
+    residual_clip_abs: float,
+    final_action_clip_abs: float | None,
+    reward_config: WalkingRewardConfig,
+    host: str,
+    port: int,
+    training_commands: Sequence[PolicyCommand] | None = None,
+    episodic_clearance_weight: float = 0.0,
+    episodic_low_clearance_penalty_weight: float = 0.0,
+) -> float:
+    actor = lambda observation: phase_contact_residual_action(observation, parameters)
+    return _evaluate_residual_live(
+        actor,
+        teacher_profile=teacher_profile,
+        steps=steps,
+        residual_scale=residual_scale,
+        residual_clip_abs=residual_clip_abs,
+        final_action_clip_abs=final_action_clip_abs,
+        reward_config=reward_config,
+        host=host,
+        port=port,
+        training_commands=training_commands,
+        episodic_clearance_weight=episodic_clearance_weight,
+        episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+    )
+
+
+def evaluate_command_state_residual_live(
+    parameters: np.ndarray,
+    *,
+    teacher_profile: str,
+    steps: int,
+    residual_scale: float,
+    residual_clip_abs: float,
+    final_action_clip_abs: float | None,
+    reward_config: WalkingRewardConfig,
+    host: str,
+    port: int,
+    training_commands: Sequence[PolicyCommand] | None = None,
+    episodic_clearance_weight: float = 0.0,
+    episodic_low_clearance_penalty_weight: float = 0.0,
+) -> float:
+    actor = lambda observation: command_state_residual_action(observation, parameters)
+    return _evaluate_residual_live(
+        actor,
+        teacher_profile=teacher_profile,
+        steps=steps,
+        residual_scale=residual_scale,
+        residual_clip_abs=residual_clip_abs,
+        final_action_clip_abs=final_action_clip_abs,
+        reward_config=reward_config,
+        host=host,
+        port=port,
+        training_commands=training_commands,
+        episodic_clearance_weight=episodic_clearance_weight,
+        episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+    )
+
+
+def _evaluate_residual_live(
+    residual_source: np.ndarray | Callable[[np.ndarray], np.ndarray],
+    *,
+    teacher_profile: str,
+    steps: int,
+    residual_scale: float,
+    residual_clip_abs: float,
+    final_action_clip_abs: float | None,
+    reward_config: WalkingRewardConfig,
+    host: str,
+    port: int,
+    training_commands: Sequence[PolicyCommand] | None,
+    episodic_clearance_weight: float = 0.0,
+    episodic_low_clearance_penalty_weight: float = 0.0,
+) -> float:
+    scores: list[float] = []
+    commands: Sequence[PolicyCommand | None] = training_commands or [None]
+    for command in commands:
+        env = RlFineTuneEnv(
+            profile=teacher_profile,
+            host=host,
+            port=port,
+            command=command,
+            residual_config=ResidualActionConfig(
+                residual_scale=residual_scale,
+                residual_clip_abs=residual_clip_abs,
+                final_action_clip_abs=final_action_clip_abs,
+            ),
+            reward_config=reward_config,
+            reset_on_start=True,
+        )
+        total = 0.0
+        completed = 0
+        swing_clearances: list[float] = []
+        env.reset()
+        for _ in range(max(1, int(steps))):
+            step = env.step(residual_source)
+            total += float(step.metrics.get("reward", 0.0))
+            completed += 1
+            diagnostics = step.metrics.get("reward_diagnostics", {})
+            clearance = diagnostics.get("swing_clearance_m") if isinstance(diagnostics, dict) else None
+            if clearance is not None and math.isfinite(float(clearance)):
+                swing_clearances.append(float(clearance))
+            if bool(step.metrics.get("terminated", False)):
+                break
+        total += completed * episodic_clearance_adjustment(
+            swing_clearances,
+            target_clearance=reward_config.target_swing_clearance,
+            clearance_weight=episodic_clearance_weight,
+            low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+        )
+        # Prefer policies that survive longer when total reward ties.
+        scores.append(float(total + 0.001 * completed))
+    return float(np.mean(scores))
+
+
+def episodic_clearance_adjustment(
+    swing_clearances: Sequence[float],
+    *,
+    target_clearance: float,
+    clearance_weight: float,
+    low_clearance_penalty_weight: float,
+) -> float:
+    if not swing_clearances:
+        return 0.0
+    target = max(float(target_clearance), 1e-9)
+    values = np.asarray(swing_clearances, dtype=np.float64)
+    median_ratio = float(np.median(values)) / target
+    low_ratio = float(np.mean(values < target))
+    return float(clearance_weight) * median_ratio - float(low_clearance_penalty_weight) * low_ratio
 
 
 class _ConstantResidualModule:  # created dynamically after torch import
@@ -224,6 +450,172 @@ def export_constant_residual_policy(
         )
 
 
+def export_phase_contact_residual_policy(
+    parameters: np.ndarray | list[float],
+    *,
+    output_onnx: Path,
+    output_checkpoint: Path | None = None,
+    input_size: int = 101,
+) -> None:
+    torch = _import_torch()
+
+    class PhaseContactResidualPolicy(torch.nn.Module):  # type: ignore[name-defined]
+        def __init__(self, parameter_values: np.ndarray) -> None:
+            super().__init__()
+            tensor = torch.as_tensor(
+                parameter_values.reshape(PHASE_CONTACT_FEATURE_SIZE, ACTION_SIZE),
+                dtype=torch.float32,
+            )
+            self.weights = torch.nn.Parameter(tensor, requires_grad=False)
+
+        def forward(self, obs: Any) -> Any:  # noqa: ANN401 - torch module signature
+            batch = obs.shape[0]
+            ones = torch.ones((batch, 1), dtype=obs.dtype, device=obs.device)
+            features = torch.cat(
+                (ones, obs[:, PHASE_CONTACT_OBSERVATION_START:PHASE_CONTACT_OBSERVATION_STOP]),
+                dim=1,
+            )
+            return torch.tanh(features @ self.weights)
+
+    arr = np.asarray(parameters, dtype=np.float32).reshape(PHASE_CONTACT_PARAMETER_SIZE)
+    resolved_input_size = int(input_size)
+    if resolved_input_size < PHASE_CONTACT_OBSERVATION_STOP:
+        raise ValueError(
+            f"phase_contact residual policy requires input_size >= {PHASE_CONTACT_OBSERVATION_STOP}"
+        )
+    module = PhaseContactResidualPolicy(arr)
+    module.eval()
+    output_onnx.parent.mkdir(parents=True, exist_ok=True)
+    dummy = torch.zeros((1, resolved_input_size), dtype=torch.float32)
+    torch.onnx.export(
+        module,
+        dummy,
+        str(output_onnx),
+        input_names=["obs"],
+        output_names=["continuous_actions"],
+        dynamic_axes={"obs": {0: "batch"}, "continuous_actions": {0: "batch"}},
+        opset_version=17,
+        do_constant_folding=True,
+        dynamo=False,
+    )
+    if output_checkpoint is not None:
+        output_checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {
+                "schema_version": 1,
+                "model_kind": "phase_contact_residual_policy",
+                "parameters": arr.tolist(),
+                "feature_names": ["bias", "left_contact", "right_contact", "phase_cos", "phase_sin"],
+                "observation_slice": [
+                    PHASE_CONTACT_OBSERVATION_START,
+                    PHASE_CONTACT_OBSERVATION_STOP,
+                ],
+                "observation_size": resolved_input_size,
+                "action_size": ACTION_SIZE,
+                "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            },
+            output_checkpoint,
+        )
+
+
+def export_command_state_residual_policy(
+    parameters: np.ndarray | list[float],
+    *,
+    output_onnx: Path,
+    output_checkpoint: Path | None = None,
+    input_size: int = 101,
+) -> None:
+    torch = _import_torch()
+
+    class CommandStateResidualPolicy(torch.nn.Module):  # type: ignore[name-defined]
+        def __init__(self, parameter_values: np.ndarray) -> None:
+            super().__init__()
+            tensor = torch.as_tensor(
+                parameter_values.reshape(COMMAND_STATE_FEATURE_SIZE, COMMAND_STATE_OUTPUT_SIZE),
+                dtype=torch.float32,
+            )
+            self.weights = torch.nn.Parameter(tensor, requires_grad=False)
+            projection = torch.zeros((COMMAND_STATE_OUTPUT_SIZE, ACTION_SIZE), dtype=torch.float32)
+            for source_index, action_index in enumerate(COMMAND_STATE_ACTION_INDICES):
+                projection[source_index, action_index] = 1.0
+            self.register_buffer("projection", projection)
+
+        def forward(self, obs: Any) -> Any:  # noqa: ANN401 - torch module signature
+            batch = obs.shape[0]
+            ones = torch.ones((batch, 1), dtype=obs.dtype, device=obs.device)
+            leg_offsets = obs[:, list(COMMAND_STATE_LEG_JOINT_OFFSET_INDICES)]
+            last_actions = obs[:, list(COMMAND_STATE_LAST_ACTION_INDICES)]
+            features = torch.cat(
+                (
+                    ones,
+                    obs[:, COMMAND_STATE_COMMAND_SLICE],
+                    obs[:, COMMAND_STATE_CONTACT_PHASE_SLICE],
+                    leg_offsets,
+                    last_actions,
+                ),
+                dim=1,
+            )
+            return torch.tanh(features @ self.weights) @ self.projection
+
+    arr = np.asarray(parameters, dtype=np.float32).reshape(COMMAND_STATE_PARAMETER_SIZE)
+    resolved_input_size = int(input_size)
+    if resolved_input_size < PHASE_CONTACT_OBSERVATION_STOP:
+        raise ValueError(
+            f"command_state residual policy requires input_size >= {PHASE_CONTACT_OBSERVATION_STOP}"
+        )
+    module = CommandStateResidualPolicy(arr)
+    module.eval()
+    output_onnx.parent.mkdir(parents=True, exist_ok=True)
+    dummy = torch.zeros((1, resolved_input_size), dtype=torch.float32)
+    torch.onnx.export(
+        module,
+        dummy,
+        str(output_onnx),
+        input_names=["obs"],
+        output_names=["continuous_actions"],
+        dynamic_axes={"obs": {0: "batch"}, "continuous_actions": {0: "batch"}},
+        opset_version=17,
+        do_constant_folding=True,
+        dynamo=False,
+    )
+    if output_checkpoint is not None:
+        output_checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {
+                "schema_version": 1,
+                "model_kind": "command_state_residual_policy",
+                "parameters": arr.tolist(),
+                "feature_names": [
+                    "bias",
+                    "command_vx",
+                    "command_vy",
+                    "command_yaw",
+                    "left_contact",
+                    "right_contact",
+                    "phase_cos",
+                    "phase_sin",
+                    "left_hip_pitch_offset",
+                    "left_knee_offset",
+                    "left_ankle_offset",
+                    "right_hip_pitch_offset",
+                    "right_knee_offset",
+                    "right_ankle_offset",
+                    "left_hip_pitch_last_action",
+                    "left_knee_last_action",
+                    "left_ankle_last_action",
+                    "right_hip_pitch_last_action",
+                    "right_knee_last_action",
+                    "right_ankle_last_action",
+                ],
+                "observation_size": resolved_input_size,
+                "action_size": ACTION_SIZE,
+                "controlled_action_indices": list(COMMAND_STATE_ACTION_INDICES),
+                "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            },
+            output_checkpoint,
+        )
+
+
 def _write_residual_profile(
     *,
     profile_name: str,
@@ -235,6 +627,7 @@ def _write_residual_profile(
     residual_clip_abs: float,
     final_action_clip_abs: float | None,
     force: bool,
+    actor_kind: str = RESIDUAL_ACTOR_CONSTANT,
 ) -> Path:
     teacher = PolicyProfile.load(teacher_profile)
     input_shape = list(teacher.model.input_shape)
@@ -252,6 +645,7 @@ def _write_residual_profile(
     payload["model"]["kind"] = "residual_onnx"
     payload["residual_policy"] = {
         "teacher_profile": teacher_profile,
+        "actor_kind": actor_kind,
         "residual_scale": float(residual_scale),
         "residual_clip_abs": float(residual_clip_abs),
         "final_action_clip_abs": 0.0 if final_action_clip_abs is None else float(final_action_clip_abs),
@@ -280,6 +674,10 @@ def train_residual_policy(
     force_profile: bool = False,
     host: str = "127.0.0.1",
     port: int = 5555,
+    actor_kind: str = RESIDUAL_ACTOR_CONSTANT,
+    training_commands: Sequence[PolicyCommand] | None = None,
+    episodic_clearance_weight: float = 0.0,
+    episodic_low_clearance_penalty_weight: float = 0.0,
 ) -> ResidualPolicyTrainResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -295,26 +693,78 @@ def train_residual_policy(
     try:
         teacher = PolicyProfile.load(teacher_profile)
         input_size = _profile_input_size(teacher)
-        optimization = optimize_residual_bias(
-            lambda residual: evaluate_residual_bias_live(
-                residual,
-                teacher_profile=teacher_profile,
-                steps=steps_per_episode,
-                residual_scale=residual_scale,
-                residual_clip_abs=residual_clip_abs,
-                final_action_clip_abs=final_action_clip_abs,
-                reward_config=reward_config,
-                host=host,
-                port=port,
-            ),
-            config=optimization_config,
-        )
-        export_constant_residual_policy(
-            optimization.best_residual,
-            output_onnx=onnx_path,
-            output_checkpoint=checkpoint_path,
-            input_size=input_size,
-        )
+        if actor_kind == RESIDUAL_ACTOR_CONSTANT:
+            optimization = optimize_residual_bias(
+                lambda residual: evaluate_residual_bias_live(
+                    residual,
+                    teacher_profile=teacher_profile,
+                    steps=steps_per_episode,
+                    residual_scale=residual_scale,
+                    residual_clip_abs=residual_clip_abs,
+                    final_action_clip_abs=final_action_clip_abs,
+                    reward_config=reward_config,
+                    host=host,
+                    port=port,
+                    training_commands=training_commands,
+                    episodic_clearance_weight=episodic_clearance_weight,
+                    episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+                ),
+                config=optimization_config,
+            )
+            export_constant_residual_policy(
+                optimization.best_residual,
+                output_onnx=onnx_path,
+                output_checkpoint=checkpoint_path,
+                input_size=input_size,
+            )
+        elif actor_kind == RESIDUAL_ACTOR_PHASE_CONTACT:
+            optimization = optimize_phase_contact_residual(
+                lambda parameters: evaluate_phase_contact_residual_live(
+                    parameters,
+                    teacher_profile=teacher_profile,
+                    steps=steps_per_episode,
+                    residual_scale=residual_scale,
+                    residual_clip_abs=residual_clip_abs,
+                    final_action_clip_abs=final_action_clip_abs,
+                    reward_config=reward_config,
+                    host=host,
+                    port=port,
+                    training_commands=training_commands,
+                ),
+                config=optimization_config,
+            )
+            export_phase_contact_residual_policy(
+                optimization.best_residual,
+                output_onnx=onnx_path,
+                output_checkpoint=checkpoint_path,
+                input_size=input_size,
+            )
+        elif actor_kind == RESIDUAL_ACTOR_COMMAND_STATE:
+            optimization = optimize_command_state_residual(
+                lambda parameters: evaluate_command_state_residual_live(
+                    parameters,
+                    teacher_profile=teacher_profile,
+                    steps=steps_per_episode,
+                    residual_scale=residual_scale,
+                    residual_clip_abs=residual_clip_abs,
+                    final_action_clip_abs=final_action_clip_abs,
+                    reward_config=reward_config,
+                    host=host,
+                    port=port,
+                    training_commands=training_commands,
+                    episodic_clearance_weight=episodic_clearance_weight,
+                    episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+                ),
+                config=optimization_config,
+            )
+            export_command_state_residual_policy(
+                optimization.best_residual,
+                output_onnx=onnx_path,
+                output_checkpoint=checkpoint_path,
+                input_size=input_size,
+            )
+        else:
+            raise ValueError(f"unsupported residual actor kind: {actor_kind}")
         if profile_name:
             profile_path = _write_residual_profile(
                 profile_name=profile_name,
@@ -326,6 +776,7 @@ def train_residual_policy(
                 residual_clip_abs=residual_clip_abs,
                 final_action_clip_abs=final_action_clip_abs,
                 force=force_profile,
+                actor_kind=actor_kind,
             )
     except Exception as exc:  # pragma: no cover - live simulator/training environment
         errors.append(repr(exc))
@@ -333,6 +784,10 @@ def train_residual_policy(
     payload = {
         "schema_version": 1,
         "teacher_profile": teacher_profile,
+        "actor_kind": actor_kind,
+        "training_commands": (
+            [] if not training_commands else [command.describe() for command in training_commands]
+        ),
         "policy_input_size": input_size,
         "output_dir": str(output_dir),
         "steps_per_episode": int(steps_per_episode),
@@ -340,6 +795,8 @@ def train_residual_policy(
         "residual_clip_abs": float(residual_clip_abs),
         "final_action_clip_abs": final_action_clip_abs,
         "reward_config": asdict(reward_config),
+        "episodic_clearance_weight": float(episodic_clearance_weight),
+        "episodic_low_clearance_penalty_weight": float(episodic_low_clearance_penalty_weight),
         "optimization_config": asdict(optimization_config),
         "optimization": None if optimization is None else asdict(optimization),
         "residual_onnx_path": str(onnx_path) if onnx_path.exists() else None,
@@ -372,6 +829,7 @@ def _write_report(path: Path, payload: dict[str, Any]) -> None:
         "# Residual Policy Fine-Tuning Report",
         "",
         f"Teacher profile: `{payload['teacher_profile']}`",
+        f"Actor kind: `{payload['actor_kind']}`",
         f"Output directory: `{payload['output_dir']}`",
         f"Residual scale: `{payload['residual_scale']}`",
         f"Policy input size: `{payload.get('policy_input_size')}`",
@@ -382,7 +840,7 @@ def _write_report(path: Path, payload: dict[str, Any]) -> None:
         lines.extend(
             [
                 f"Best score: `{optimization['best_score']:.6g}`",
-                f"Best residual abs max: `{max(abs(float(x)) for x in optimization['best_residual']):.6g}`",
+                f"Best parameter abs max: `{max(abs(float(x)) for x in optimization['best_residual']):.6g}`",
                 "",
                 "## Iterations",
                 "",
@@ -411,6 +869,25 @@ def _profile_input_size(profile: PolicyProfile) -> int:
     return int(shape[-1])
 
 
+def _parse_training_command(value: str) -> PolicyCommand:
+    parts = [part.strip() for part in str(value).split(",")]
+    if len(parts) != 3:
+        raise argparse.ArgumentTypeError(
+            f"training command must be VX,VY,YAW, got {value!r}"
+        )
+    try:
+        vx, vy, yaw = (float(part) for part in parts)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            f"training command must contain numeric VX,VY,YAW values, got {value!r}"
+        ) from exc
+    if not np.all(np.isfinite([vx, vy, yaw])):
+        raise argparse.ArgumentTypeError(
+            f"training command must contain finite VX,VY,YAW values, got {value!r}"
+        )
+    return PolicyCommand(x_velocity=vx, y_velocity=vy, yaw_velocity=yaw)
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Train a bounded residual policy on top of a teacher profile.")
     parser.add_argument("teacher_profile", nargs="?", default="open_duck_forward", help="Teacher policy profile")
@@ -418,6 +895,23 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--profile-name", default=None, help="Optional runtime profile name to write")
     parser.add_argument("--profile-output-dir", type=Path, default=Path("configs/policies"), help="Profile YAML output directory")
     parser.add_argument("--force-profile", action="store_true", help="Overwrite existing generated profile")
+    parser.add_argument(
+        "--actor-kind",
+        choices=[
+            RESIDUAL_ACTOR_CONSTANT,
+            RESIDUAL_ACTOR_PHASE_CONTACT,
+            RESIDUAL_ACTOR_COMMAND_STATE,
+        ],
+        default=RESIDUAL_ACTOR_CONSTANT,
+        help="Residual actor architecture",
+    )
+    parser.add_argument(
+        "--training-command",
+        action="append",
+        default=[],
+        metavar="VX,VY,YAW",
+        help="Repeat to score every residual candidate across multiple velocity commands",
+    )
     parser.add_argument("--steps-per-episode", type=int, default=300, help="Simulator steps per candidate residual episode")
     parser.add_argument("--iterations", type=int, default=5, help="CEM iterations")
     parser.add_argument("--population", type=int, default=16, help="Candidates per CEM iteration")
@@ -437,6 +931,18 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--low-clearance-penalty-weight", type=float, default=0.0, help="Penalty weight for swing-foot clearance below target")
     parser.add_argument("--target-swing-clearance", type=float, default=0.015, help="Target swing-foot world height in meters")
     parser.add_argument("--foot-contact-threshold", type=float, default=0.5, help="Contact value at or above which a foot is in stance")
+    parser.add_argument(
+        "--episodic-clearance-weight",
+        type=float,
+        default=0.0,
+        help="Episode-level weight for median swing clearance divided by target clearance",
+    )
+    parser.add_argument(
+        "--episodic-low-clearance-penalty-weight",
+        type=float,
+        default=0.0,
+        help="Episode-level penalty weight for the fraction of swing samples below target clearance",
+    )
     parser.add_argument("--host", default=os.environ.get("SIM_HOST", "127.0.0.1"), help="Simulator API host")
     parser.add_argument("--port", type=int, default=int(os.environ.get("SIM_PORT", "5555")), help="Simulator API port")
     parser.add_argument("--dry-run", action="store_true", help="Print resolved config without connecting to simulator")
@@ -446,6 +952,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 def main() -> None:
     args = _build_arg_parser().parse_args()
     final_clip = args.final_action_clip_abs if args.final_action_clip_abs > 0 else None
+    training_commands = [_parse_training_command(value) for value in args.training_command]
     opt_cfg = ResidualOptimizationConfig(
         iterations=args.iterations,
         population=args.population,
@@ -471,9 +978,13 @@ def main() -> None:
             "teacher_profile": args.teacher_profile,
             "output_dir": str(args.output_dir),
             "profile_name": args.profile_name,
+            "actor_kind": args.actor_kind,
+            "training_commands": [command.describe() for command in training_commands],
             "steps_per_episode": args.steps_per_episode,
             "optimization_config": asdict(opt_cfg),
             "reward_config": asdict(reward_cfg),
+            "episodic_clearance_weight": args.episodic_clearance_weight,
+            "episodic_low_clearance_penalty_weight": args.episodic_low_clearance_penalty_weight,
             "residual_scale": args.residual_scale,
             "residual_clip_abs": args.residual_clip_abs,
             "final_action_clip_abs": final_clip,
@@ -493,6 +1004,10 @@ def main() -> None:
         force_profile=args.force_profile,
         host=args.host,
         port=args.port,
+        actor_kind=args.actor_kind,
+        training_commands=training_commands,
+        episodic_clearance_weight=args.episodic_clearance_weight,
+        episodic_low_clearance_penalty_weight=args.episodic_low_clearance_penalty_weight,
     )
     print("Soridormi residual policy fine-tuning")
     print("======================================")

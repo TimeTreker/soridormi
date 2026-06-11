@@ -6,7 +6,7 @@ import os
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Protocol
+from typing import Any, Callable, Iterable, Protocol
 
 import numpy as np
 
@@ -21,6 +21,7 @@ from soridormi_runtime.walking_reward import WalkingRewardConfig, compute_walkin
 
 ACTION_SIZE = 14
 DEFAULT_OUTPUT = Path("/data/rl_finetune_env/m617_smoke.json")
+ResidualActionSource = np.ndarray | list[float] | Callable[[np.ndarray], np.ndarray | list[float]] | None
 
 
 class PolicyLike(Protocol):
@@ -221,7 +222,7 @@ class RlFineTuneEnv:
         self.previous_final_action = None
         return self.current_state
 
-    def step(self, residual_action: np.ndarray | list[float] | None = None) -> RlFineTuneStep:
+    def step(self, residual_action: ResidualActionSource = None) -> RlFineTuneStep:
         state = self.current_state or self.robot.read_state()
         self._bootstrap_defaults_once(state)
 
@@ -232,7 +233,12 @@ class RlFineTuneEnv:
             self.postprocessor.apply(teacher_action, list(state.joints.names)),
             "teacher_action",
         )
-        residual_applied, final_action = self.residual_config.apply(teacher_action, residual_action)
+        resolved_residual = residual_action
+        if callable(residual_action):
+            if observation is None:
+                raise ValueError("observation-conditioned residual action requires the teacher policy observation")
+            resolved_residual = residual_action(np.asarray(observation, dtype=np.float32))
+        residual_applied, final_action = self.residual_config.apply(teacher_action, resolved_residual)
 
         command = self.mapper.action_to_command(final_action, state=state, dt=self.dt)
         setter = getattr(self.policy, "set_motor_targets", None)

@@ -143,6 +143,27 @@ def test_rl_finetune_env_steps_teacher_plus_residual(tmp_path: Path) -> None:
     assert policy.phases[-1] == [0.0, 1.0]
 
 
+def test_rl_finetune_env_resolves_observation_conditioned_residual(tmp_path: Path) -> None:
+    policy = FakePolicy()
+    policy.get_observation = lambda: [0.25] * 101  # type: ignore[method-assign]
+    mapper = FakeMapper()
+    env = RlFineTuneEnv(
+        profile=_profile(tmp_path),
+        robot=FakeRobot(),
+        policy=policy,
+        mapper=mapper,
+        command=SimpleNamespace(as_list=lambda: [0.15, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+        phase_generator=SimpleNamespace(advance_and_as_list=lambda: [0.0, 1.0]),
+        residual_config=ResidualActionConfig(residual_scale=0.2),
+    )
+
+    env.reset()
+    step = env.step(lambda observation: [float(observation[-1])] * 14)
+
+    assert step.residual_action == pytest.approx([0.05] * 14)
+    assert step.final_action == pytest.approx([0.15] * 14)
+
+
 def test_run_zero_residual_smoke_writes_json(tmp_path: Path, monkeypatch) -> None:
     def fake_env(**kwargs):
         return RlFineTuneEnv(

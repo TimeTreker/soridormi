@@ -232,7 +232,65 @@ For improvement, use the residual path after the teacher BC loop is validated:
   --steps 1000
 ```
 
-The current residual trainer is a safe cross-entropy search over a bounded constant residual. It is a training scaffold, not full PPO/SAC yet. Replace it with a larger residual actor only after the teacher dataset loop and rollout comparison are reliable.
+The residual trainer supports three bounded cross-entropy-search actors:
+
+- `--actor-kind constant`: the original 14D residual bias scaffold.
+- `--actor-kind phase_contact`: a 70-parameter linear actor over bias, left/right
+  foot contact, and cosine/sine imitation phase, followed by `tanh`.
+- `--actor-kind command_state`: a 120-parameter sagittal-leg actor over desired
+  velocity, contacts, gait phase, hip/knee/ankle offsets, and previous
+  hip/knee/ankle actions.
+
+The phase/contact actor can be scored across multiple velocity conditions:
+
+```bash
+./scripts/train_residual_policy.sh context_stage1_three_scenario_10ep_e80 \
+  --actor-kind phase_contact \
+  --training-command 0.125,0,0 \
+  --training-command 0.06,0,0 \
+  --training-command 0.09,0,0.12 \
+  --swing-clearance-weight 0.5 \
+  --low-clearance-penalty-weight 0.5
+```
+
+This remains a conservative training scaffold, not full PPO/SAC. Both actors
+share the same residual ONNX deployment contract and action safety envelope.
+
+The first clearance-focused phase/contact candidate improved median swing
+clearance and locomotion metrics but did not pass the absolute M10 gate:
+
+```text
+candidate: m10_phase_contact_clearance_cem3x8_s53
+flat:       0.01023m -> 0.01134m
+start-stop: 0.00759m -> 0.00973m
+curve:      0.00632m -> 0.00724m
+```
+
+All three scenarios remained below `0.015m`, so this candidate is experimental
+and must not be promoted.
+
+The gate-aligned revision adds episode median-clearance and low-clearance-ratio
+terms:
+
+```bash
+--actor-kind command_state \
+--episodic-clearance-weight 5 \
+--episodic-low-clearance-penalty-weight 4
+```
+
+Its first larger candidate, `m10_command_state_gate_cem4x12_s67`, improved
+every scenario without falling:
+
+```text
+flat:       0.01023m -> 0.01314m
+start-stop: 0.00759m -> 0.01080m
+curve:      0.00632m -> 0.00759m
+```
+
+Total three-scenario distance increased from `0.733m` to `1.070m`, but the
+candidate still failed the absolute `0.015m` gate. Further linear CEM scaling
+is not recommended; use a nonlinear learned residual or a higher-clearance
+teacher.
 
 ## M6 completion gate
 

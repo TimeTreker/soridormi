@@ -242,7 +242,36 @@ observation[101]
   - flat: 0.01023m -> 0.00943m
   - start-stop: 0.00759m -> 0.00759m
   - curve: 0.00632m -> 0.00599m
-- [ ] Implement a bounded phase/state-conditioned residual policy
+- [x] Implement a bounded phase/state-conditioned residual policy
+  - actor inputs: bias + left/right foot contact + cosine/sine gait phase
+  - bounded by `tanh` plus the existing residual scale and clipping envelope
+  - supports repeated `--training-command VX,VY,YAW` conditions
+  - 104D ONNX contract and 100-step MuJoCo deployment smoke: PASS
+- [x] Train and evaluate a phase/contact candidate across the three M10 scenarios
+  - candidate: `m10_phase_contact_clearance_cem3x8_s53`
+  - no falls; distance and stuck ratio improved across all three scenarios
+  - clearance improved over the context candidate:
+    - flat: 0.01023m -> 0.01134m
+    - start-stop: 0.00759m -> 0.00973m
+    - curve: 0.00632m -> 0.00724m
+  - result: useful experimental improvement, but rejected for promotion
+  - all scenarios remain below 0.015m and low-clearance ratio remains 1.0
+- [x] Add gate-aligned episodic clearance scoring
+  - rewards episode median clearance relative to the target
+  - penalizes the fraction of swing samples below the target
+- [x] Add compact command/state/history residual actor
+  - desired velocity + contacts + phase + sagittal joint offsets/history
+  - bounded output to six sagittal leg joints only
+- [x] Train and evaluate gate-aligned command/state candidate
+  - candidate: `m10_command_state_gate_cem4x12_s67`
+  - flat: 0.01023m -> 0.01314m
+  - start-stop: 0.00759m -> 0.01080m
+  - curve: 0.00632m -> 0.00759m
+  - total distance: 0.733m -> 1.070m
+  - no falls; maximum stuck ratio improved to 0.084
+  - result: best candidate so far, but still blocked by G10
+- [ ] Replace linear CEM residual search with a nonlinear learned residual, or
+  acquire a higher-clearance teacher
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
 
 **Gate G10:**
@@ -427,15 +456,14 @@ depends on the hardware safety gate.
 2. Run the current candidate with `--viewer --follow-camera`.
 3. Record swing-clearance evidence for all three scenarios.
 4. Fill the M10 visual-review template and rebuild the evidence package.
-5. Replace the rejected constant residual bias with a bounded
-   phase/state-conditioned residual actor.
-6. Train the actor with explicit swing-clearance reward across multiple command
-   conditions.
-7. Pass the quantitative clearance readiness gate without regressing the
+5. Implement a nonlinear bounded residual learner using the validated
+   command/state/history feature contract, or acquire a teacher that reaches
+   the clearance target.
+6. Pass the quantitative clearance readiness gate without regressing the
    original scenario suite.
-8. Compare the new candidate suite against the official teacher with
+7. Compare the new candidate suite against the official teacher with
    `compare_m10_teacher_suite.sh`.
-9. Begin M11 held-out scenario development only after G10 passes.
+8. Begin M11 held-out scenario development only after G10 passes.
 
 ## Project success criteria
 
