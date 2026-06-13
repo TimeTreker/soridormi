@@ -9,7 +9,7 @@ from .manifest import build_soridormi_capability_bundle
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Export Soridormi MCP-ready capability manifest JSON.")
-    parser.add_argument("--mode", default="sim", choices=["sim", "hardware_dry_run", "hardware"], help="Runtime mode to include in manifest status details.")
+    parser.add_argument("--mode", default="sim", choices=["sim", "hardware_shadow", "hardware_dry_run", "hardware"], help="Runtime mode to include in manifest status details.")
     parser.add_argument("--compact", action="store_true", help="Emit compact JSON.")
     parser.add_argument("--dag-contract-only", action="store_true", help="Emit only Soridormi task-graph integration hints.")
     args = parser.parse_args()

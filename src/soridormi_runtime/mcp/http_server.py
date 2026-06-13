@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import contextlib
 import inspect
 import logging
@@ -21,7 +22,7 @@ from .manifest import CapabilityBundle, build_soridormi_capability_bundle
 from .runtime_tools import SoridormiRuntimeToolService
 
 logger = logging.getLogger(__name__)
-_SERVER_MODES = {"sim", "hardware_dry_run"}
+_SERVER_MODES = {"sim", "hardware_shadow", "hardware_dry_run"}
 
 
 class _StreamableHttpApp:
@@ -59,7 +60,8 @@ def create_mcp_server(
 ) -> Server:
     if mode not in _SERVER_MODES:
         raise ValueError(
-            "the current MCP server supports only sim and hardware_dry_run modes"
+            "the current MCP server supports only sim, hardware_shadow, and "
+            "hardware_dry_run modes"
         )
     if adapter not in {"dry_run", "runtime"}:
         raise ValueError("adapter must be 'dry_run' or 'runtime'")
@@ -82,7 +84,7 @@ def create_mcp_server(
     async def call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         if name not in tool_names:
             raise ValueError(f"unknown Soridormi MCP tool: {name}")
-        result = tool_service.call_tool(name, arguments)
+        result = await asyncio.to_thread(tool_service.call_tool, name, arguments)
         if inspect.isawaitable(result):
             return await result
         return result

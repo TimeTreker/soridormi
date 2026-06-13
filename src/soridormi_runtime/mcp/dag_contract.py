@@ -22,9 +22,11 @@ def build_soridormi_dag_contract(*, mode: str = "sim") -> dict[str, Any]:
         ],
         "physical_motion_tools": [
             "soridormi.motion.execute_plan",
+            "soridormi.skill.execute_plan",
         ],
         "planning_tools": [
             "soridormi.motion.create_plan",
+            "soridormi.skill.create_plan",
         ],
         "safety_tools": [
             "soridormi.safety.monitor_motion",
@@ -44,11 +46,18 @@ def build_soridormi_dag_contract(*, mode: str = "sim") -> dict[str, Any]:
             "Chromie must use chromie.ask_confirmation before physical-motion execution unless the action is stop/cancel/emergency_stop.",
             "Chromie must cover soridormi.motion.execute_plan with soridormi.safety.monitor_motion.",
             "Chromie must use soridormi.motion.create_plan before soridormi.motion.execute_plan.",
+            "Chromie must cover soridormi.skill.execute_plan with soridormi.safety.monitor_motion.",
+            "Chromie must use soridormi.skill.create_plan before soridormi.skill.execute_plan.",
             "Do not expose raw motor, joint, or torque controls to LLM-generated graphs.",
             "stop and emergency_stop may preempt any running motion task.",
         ],
         "fallback_recommendations": {
             "soridormi.motion.execute_plan": {
+                "on_failure": "soridormi.motion.stop then chromie.report",
+                "on_timeout": "soridormi.motion.stop then chromie.report",
+                "on_safety_event": "soridormi.safety.emergency_stop then chromie.report",
+            },
+            "soridormi.skill.execute_plan": {
                 "on_failure": "soridormi.motion.stop then chromie.report",
                 "on_timeout": "soridormi.motion.stop then chromie.report",
                 "on_safety_event": "soridormi.safety.emergency_stop then chromie.report",

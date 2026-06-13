@@ -133,6 +133,7 @@ class CapabilityBundle(BaseModel):
     source: str = "soridormi"
     agents: list[AgentManifest] = Field(default_factory=list)
     dag_contract: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 def _object_schema(properties: dict[str, Any], required: list[str] | None = None) -> dict[str, Any]:
@@ -150,6 +151,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
     `chromie.speak` or user-confirmation tools here.
     """
 
+    safe_modes = ["sim", "hardware_shadow", "hardware_dry_run"]
     robot_agent = AgentManifest(
         agent_id="soridormi.robot",
         display_name="Soridormi Robot State Agent",
@@ -173,7 +175,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 }),
                 effects=["read_only"],
                 safety_class="safe_read",
-                availability=ToolAvailability(modes=["sim", "hardware_dry_run", "hardware"]),
+                availability=ToolAvailability(modes=[*safe_modes, "hardware"]),
                 execution=ExecutionPolicy(can_run_parallel=True, timeout_s=1.0, idempotent=True, side_effect_free=True),
                 default_failure_policy=FailurePolicy(strategy="abort_task"),
                 llm_hints={"when_to_use": "Use before planning or executing robot movement."},
@@ -186,7 +188,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 output_schema=_object_schema({"mode": {"type": "string"}}, required=["mode"]),
                 effects=["read_only"],
                 safety_class="safe_read",
-                availability=ToolAvailability(modes=["sim", "hardware_dry_run", "hardware"]),
+                availability=ToolAvailability(modes=[*safe_modes, "hardware"]),
                 execution=ExecutionPolicy(can_run_parallel=True, timeout_s=1.0, idempotent=True, side_effect_free=True),
             ),
             ToolCapability(
@@ -197,7 +199,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 output_schema=_object_schema({"percent": {"type": ["number", "null"]}, "critical": {"type": "boolean"}}),
                 effects=["read_only"],
                 safety_class="safe_read",
-                availability=ToolAvailability(modes=["sim", "hardware_dry_run", "hardware"], reason="Sim may return null battery percent."),
+                availability=ToolAvailability(modes=[*safe_modes, "hardware"], reason="Sim may return null battery percent."),
                 execution=ExecutionPolicy(can_run_parallel=True, timeout_s=1.0, idempotent=True, side_effect_free=True),
             ),
         ],
@@ -241,7 +243,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 }, required=["plan_id", "summary"]),
                 effects=["planning_only", "creates_plan"],
                 safety_class="planning_only",
-                availability=ToolAvailability(modes=["sim", "hardware_dry_run"]),
+                availability=ToolAvailability(modes=safe_modes),
                 execution=ExecutionPolicy(can_run_parallel=True, timeout_s=2.0, idempotent=True, side_effect_free=False),
                 confirmation=ConfirmationPolicy(required=False),
                 failure_modes=["invalid_command", "duration_too_long", "velocity_limit_exceeded"],
@@ -260,7 +262,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 output_schema=_object_schema({"completed": {"type": "boolean"}, "summary": {"type": "string"}}),
                 effects=["physical_motion"],
                 safety_class="physical_motion",
-                availability=ToolAvailability(modes=["sim", "hardware_dry_run"], requires=["robot_standing", "not_emergency_stopped"]),
+                availability=ToolAvailability(modes=safe_modes, requires=["robot_standing", "not_emergency_stopped"]),
                 execution=ExecutionPolicy(can_run_parallel=False, exclusive_group="soridormi.robot_motion", timeout_s=15.0, idempotent=False, side_effect_free=False),
                 confirmation=ConfirmationPolicy(required=True, reason="This tool can move the robot.", required_in_modes=["hardware_dry_run", "hardware"], skippable_in_modes=["sim"]),
                 monitoring=MonitoringPolicy(
@@ -280,7 +282,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 output_schema=_object_schema({"stopped": {"type": "boolean"}}),
                 effects=["physical_motion", "safety_control"],
                 safety_class="safety_critical",
-                availability=ToolAvailability(modes=["sim", "hardware_dry_run", "hardware"]),
+                availability=ToolAvailability(modes=[*safe_modes, "hardware"]),
                 execution=ExecutionPolicy(can_run_parallel=False, exclusive_group="soridormi.robot_motion", timeout_s=1.0, idempotent=True, side_effect_free=False),
                 confirmation=ConfirmationPolicy(required=False),
                 failure_modes=["runtime_unreachable"],
@@ -294,7 +296,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 output_schema=_object_schema({"cancelled": {"type": "boolean"}}),
                 effects=["physical_motion", "safety_control"],
                 safety_class="safety_critical",
-                availability=ToolAvailability(modes=["sim", "hardware_dry_run", "hardware"]),
+                availability=ToolAvailability(modes=[*safe_modes, "hardware"]),
                 execution=ExecutionPolicy(can_run_parallel=False, exclusive_group="soridormi.robot_motion", timeout_s=1.0, idempotent=True, side_effect_free=False),
                 confirmation=ConfirmationPolicy(required=False),
                 default_failure_policy=FailurePolicy(strategy="emergency_stop"),
@@ -318,7 +320,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 output_schema=_object_schema({"event": {"type": ["string", "null"]}, "ok": {"type": "boolean"}}),
                 effects=["read_only", "safety_control"],
                 safety_class="safety_critical",
-                availability=ToolAvailability(modes=["sim", "hardware_dry_run", "hardware"]),
+                availability=ToolAvailability(modes=[*safe_modes, "hardware"]),
                 execution=ExecutionPolicy(can_run_parallel=True, exclusive_group=None, timeout_s=60.0, idempotent=False, side_effect_free=False),
                 monitoring=MonitoringPolicy(requires_safety_monitor=False),
                 failure_modes=["monitor_unavailable", "fall_detected", "emergency_stop", "collision_risk"],
@@ -332,7 +334,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 output_schema=_object_schema({"stopped": {"type": "boolean"}}),
                 effects=["physical_motion", "safety_control"],
                 safety_class="safety_critical",
-                availability=ToolAvailability(modes=["sim", "hardware_dry_run", "hardware"]),
+                availability=ToolAvailability(modes=[*safe_modes, "hardware"]),
                 execution=ExecutionPolicy(can_run_parallel=False, exclusive_group="soridormi.robot_motion", timeout_s=1.0, idempotent=True, side_effect_free=False),
                 confirmation=ConfirmationPolicy(required=False),
                 failure_modes=["runtime_unreachable"],
@@ -342,8 +344,210 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
         ],
     )
 
+    skill_agent = AgentManifest(
+        agent_id="soridormi.skill",
+        display_name="Soridormi Named Skill Agent",
+        description=(
+            "Discover, plan, and exercise named body skills through opaque "
+            "no-motion commissioning plans."
+        ),
+        transport=TransportSpec(
+            kind="local_cli",
+            command="python",
+            args=["-m", "soridormi_runtime.mcp.call_tool"],
+        ),
+        status=AgentStatus(available=True, details={"mode": mode}),
+        tags=["soridormi", "skill", "commissioning"],
+        tools=[
+            ToolCapability(
+                name="soridormi.skill.list",
+                agent_id="soridormi.skill",
+                description="List versioned named skills and parameter schemas.",
+                input_schema=_object_schema({}),
+                output_schema=_object_schema(
+                    {
+                        "mode": {"type": "string"},
+                        "skills": {"type": "array", "items": {"type": "object"}},
+                    },
+                    required=["mode", "skills"],
+                ),
+                effects=["read_only"],
+                safety_class="safe_read",
+                availability=ToolAvailability(modes=safe_modes),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=2.0,
+                    idempotent=True,
+                    side_effect_free=True,
+                ),
+            ),
+            ToolCapability(
+                name="soridormi.skill.create_plan",
+                agent_id="soridormi.skill",
+                description=(
+                    "Validate a named skill and create an opaque no-motion "
+                    "commissioning plan."
+                ),
+                input_schema=_object_schema(
+                    {
+                        "skill_id": {"type": "string", "minLength": 1},
+                        "parameters": {
+                            "type": "object",
+                            "additionalProperties": True,
+                        },
+                        "profile": {"type": "string"},
+                    },
+                    required=["skill_id"],
+                ),
+                output_schema=_object_schema(
+                    {
+                        "plan_id": {"type": "string"},
+                        "skill_id": {"type": "string"},
+                        "mode": {"type": "string"},
+                        "summary": {"type": "string"},
+                    },
+                    required=["plan_id", "skill_id", "summary"],
+                ),
+                effects=["planning_only", "creates_plan"],
+                safety_class="planning_only",
+                availability=ToolAvailability(modes=safe_modes),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=2.0,
+                    idempotent=False,
+                    side_effect_free=False,
+                ),
+            ),
+            ToolCapability(
+                name="soridormi.skill.execute_plan",
+                agent_id="soridormi.skill",
+                description=(
+                    "Exercise an opaque named-skill plan without sending robot "
+                    "or simulator actuator commands."
+                ),
+                input_schema=_object_schema(
+                    {"plan_id": {"type": "string", "minLength": 1}},
+                    required=["plan_id"],
+                ),
+                output_schema=_object_schema(
+                    {
+                        "completed": {"type": "boolean"},
+                        "skill_id": {"type": "string"},
+                        "mode": {"type": "string"},
+                        "no_motion": {"type": "boolean"},
+                        "recommendation_only": {"type": "boolean"},
+                        "summary": {"type": "string"},
+                    },
+                    required=["completed", "skill_id", "no_motion"],
+                ),
+                effects=["commissioning_no_motion"],
+                safety_class="low_risk_action",
+                availability=ToolAvailability(modes=safe_modes),
+                execution=ExecutionPolicy(
+                    can_run_parallel=False,
+                    exclusive_group="soridormi.robot_motion",
+                    timeout_s=30.0,
+                    idempotent=False,
+                    side_effect_free=False,
+                ),
+                confirmation=ConfirmationPolicy(
+                    required=True,
+                    reason="This exercises a body-skill provider contract.",
+                    required_in_modes=["hardware_shadow", "hardware_dry_run"],
+                    skippable_in_modes=["sim"],
+                ),
+                monitoring=MonitoringPolicy(
+                    requires_safety_monitor=True,
+                    recommended_monitor_tools=[
+                        "soridormi.safety.monitor_motion"
+                    ],
+                    hard_interrupt_events=["emergency_stop"],
+                ),
+                default_failure_policy=FailurePolicy(strategy="stop_and_report"),
+            ),
+        ],
+    )
+
+    scenario_ids = [
+        "success",
+        "catalog_restart",
+        "skill_unavailable",
+        "plan_jitter",
+        "plan_timeout",
+        "plan_disconnect",
+        "malformed_plan",
+        "monitor_refused",
+        "monitor_timeout",
+        "monitor_status_drop",
+        "execute_incomplete",
+        "execute_skill_mismatch",
+        "execute_timeout",
+        "execute_disconnect",
+        "runtime_timeout_cancel",
+        "operator_cancel",
+    ]
+    testing_agent = AgentManifest(
+        agent_id="soridormi.testing",
+        display_name="Soridormi Test Control Agent",
+        description="Test-only provider fault injection; never model visible.",
+        llm_visible=False,
+        transport=TransportSpec(
+            kind="local_cli",
+            command="python",
+            args=["-m", "soridormi_runtime.mcp.call_tool"],
+        ),
+        status=AgentStatus(available=True, details={"mode": mode}),
+        tags=["soridormi", "testing", "fault-injection"],
+        tools=[
+            ToolCapability(
+                name="soridormi.testing.configure_fault",
+                agent_id="soridormi.testing",
+                description="Configure one deterministic provider fault.",
+                llm_visible=False,
+                input_schema=_object_schema(
+                    {"scenario_id": {"type": "string", "enum": scenario_ids}},
+                    required=["scenario_id"],
+                ),
+                output_schema=_object_schema(
+                    {
+                        "configured": {"type": "boolean"},
+                        "scenario_id": {"type": "string"},
+                    },
+                    required=["configured", "scenario_id"],
+                ),
+                effects=["test_control"],
+                safety_class="restricted",
+                availability=ToolAvailability(modes=safe_modes),
+            ),
+            ToolCapability(
+                name="soridormi.testing.clear_faults",
+                agent_id="soridormi.testing",
+                description="Clear all configured provider faults.",
+                llm_visible=False,
+                input_schema=_object_schema({}),
+                output_schema=_object_schema(
+                    {"cleared": {"type": "boolean"}},
+                    required=["cleared"],
+                ),
+                effects=["test_control"],
+                safety_class="restricted",
+                availability=ToolAvailability(modes=safe_modes),
+            ),
+        ],
+    )
+
     return CapabilityBundle(
         source="soridormi",
-        agents=[robot_agent, motion_agent, safety_agent],
+        agents=[robot_agent, motion_agent, skill_agent, safety_agent, testing_agent],
         dag_contract=build_soridormi_dag_contract(mode=mode),
+        metadata={
+            "provider_readiness": {
+                "safe_modes": safe_modes,
+                "fault_injection": {
+                    "configure_tool": "soridormi.testing.configure_fault",
+                    "clear_tool": "soridormi.testing.clear_faults",
+                    "supported_scenarios": scenario_ids,
+                },
+            }
+        },
     )

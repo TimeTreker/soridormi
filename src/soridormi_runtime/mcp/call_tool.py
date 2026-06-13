@@ -11,7 +11,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Call a Soridormi local MCP-style tool in dry-run mode.")
     parser.add_argument("tool", help="Tool name, for example soridormi.robot.get_status")
     parser.add_argument("--args-json", default="{}", help="JSON object passed as tool arguments.")
-    parser.add_argument("--mode", default="sim", choices=["sim", "hardware_dry_run", "hardware"], help="Runtime mode reported by status tools.")
+    parser.add_argument("--mode", default="sim", choices=["sim", "hardware_shadow", "hardware_dry_run", "hardware"], help="Runtime mode reported by status tools.")
     parser.add_argument("--compact", action="store_true", help="Emit compact JSON.")
     args = parser.parse_args()
 
