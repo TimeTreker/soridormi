@@ -198,13 +198,30 @@ class SoridormiLocalToolService:
         }:
             raise ConnectionError(f"injected {scenario_id}")
         if scenario_id == "malformed_plan":
-            return {"skill_id": "nod_yes"}
+            return {
+                "plan_id": "",
+                "skill_id": "nod_yes",
+                "mode": self.mode,
+                "summary": "injected empty plan identity",
+            }
         if scenario_id == "monitor_refused":
             return {"ok": False, "event": "injected blocked workspace"}
         if scenario_id == "execute_incomplete":
-            return {"completed": False, "skill_id": "nod_yes"}
+            return {
+                "completed": False,
+                "skill_id": "nod_yes",
+                "mode": self.mode,
+                "no_motion": True,
+                "recommendation_only": self.mode == "hardware_shadow",
+            }
         if scenario_id == "execute_skill_mismatch":
-            return {"completed": True, "skill_id": "wave_hand"}
+            return {
+                "completed": True,
+                "skill_id": "wave_hand",
+                "mode": self.mode,
+                "no_motion": True,
+                "recommendation_only": self.mode == "hardware_shadow",
+            }
         if scenario_id in {"runtime_timeout_cancel", "operator_cancel"}:
             time.sleep(5)
             return _NO_FAULT_RESULT
