@@ -4,12 +4,12 @@ services:
       context: .
       dockerfile: docker/runtime/Dockerfile
       args:
-        BASE_IMAGE: ${ORIN_RUNTIME_BASE:-nvcr.io/nvidia/l4t-jetpack:r36.4.0}
+        BASE_IMAGE: ${ORIN_RUNTIME_BASE:?Set ORIN_RUNTIME_BASE in .env}
         RUNTIME_EXTRA: ${ORIN_RUNTIME_EXTRA:-runtime}
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
         USERNAME: ${CONTAINER_USER:-chromie}
-    image: soridormi-runtime:orin
+    image: ${SORIDORMI_ORIN_RUNTIME_IMAGE:?Set SORIDORMI_ORIN_RUNTIME_IMAGE in .env}
     container_name: soridormi-runtime-orin
     stdin_open: true
     tty: true

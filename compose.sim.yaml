@@ -4,13 +4,13 @@ services:
       context: .
       dockerfile: docker/runtime/Dockerfile
       args:
-        BASE_IMAGE: ${RUNTIME_DEV_BASE:-nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04}
+        BASE_IMAGE: ${RUNTIME_DEV_BASE:?Set RUNTIME_DEV_BASE in .env}
         RUNTIME_EXTRA: ${RUNTIME_DEV_EXTRA:-runtime-gpu}
         PYTORCH_INDEX_URL: ${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu128}
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
         USERNAME: ${CONTAINER_USER:-chromie}
-    image: soridormi-runtime:cuda13.1-cudnn-dev
+    image: ${SORIDORMI_RUNTIME_IMAGE:?Set SORIDORMI_RUNTIME_IMAGE in .env}
     container_name: soridormi-runtime-dev
     stdin_open: true
     tty: true
@@ -118,7 +118,7 @@ services:
     build:
       args:
         RUNTIME_EXTRA: ${RUNTIME_MCP_EXTRA:-runtime-gpu,mcp}
-    image: soridormi-runtime-mcp:cuda13.1-cudnn-dev
+    image: ${SORIDORMI_RUNTIME_MCP_IMAGE:?Set SORIDORMI_RUNTIME_MCP_IMAGE in .env}
     container_name: soridormi-runtime-mcp
     stdin_open: false
     tty: false
@@ -144,11 +144,11 @@ services:
       context: .
       dockerfile: docker/simulator/Dockerfile
       args:
-        BASE_IMAGE: ${SIM_BASE:-nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04}
+        BASE_IMAGE: ${SIM_BASE:?Set SIM_BASE in .env}
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
         USERNAME: ${CONTAINER_USER:-chromie}
-    image: soridormi-sim:cuda13.1-cudnn
+    image: ${SORIDORMI_SIM_IMAGE:?Set SORIDORMI_SIM_IMAGE in .env}
     container_name: soridormi-sim
     stdin_open: true
     tty: true
@@ -203,7 +203,7 @@ services:
     command: bash
 
   tensorboard:
-    image: soridormi-sim:cuda13.1-cudnn
+    image: ${SORIDORMI_SIM_IMAGE:?Set SORIDORMI_SIM_IMAGE in .env}
     container_name: soridormi-tensorboard
     depends_on:
       - sim

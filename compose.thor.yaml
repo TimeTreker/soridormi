@@ -4,12 +4,12 @@ services:
       context: .
       dockerfile: docker/runtime/Dockerfile
       args:
-        BASE_IMAGE: ${THOR_RUNTIME_BASE:-nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04}
+        BASE_IMAGE: ${THOR_RUNTIME_BASE:?Set THOR_RUNTIME_BASE in .env}
         RUNTIME_EXTRA: ${THOR_RUNTIME_EXTRA:-runtime}
         USER_ID: ${UID:-1000}
         GROUP_ID: ${GID:-1000}
         USERNAME: ${CONTAINER_USER:-chromie}
-    image: soridormi-runtime:thor
+    image: ${SORIDORMI_THOR_RUNTIME_IMAGE:?Set SORIDORMI_THOR_RUNTIME_IMAGE in .env}
     container_name: soridormi-runtime-thor
     stdin_open: true
     tty: true

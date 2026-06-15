@@ -179,6 +179,18 @@ workspace/Open_Duck_Playground
 ./scripts/setup_env.sh
 ```
 
+`scripts/setup_env.sh` is the single source of truth for Docker image
+references. It writes both the Soridormi output-image names and their base
+images to `.env`; all Compose files consume those variables without carrying
+their own fallback tags.
+
+To customize an image, edit the generated `.env`, or pass an override when
+regenerating it, for example:
+
+```bash
+SORIDORMI_SIM_IMAGE=soridormi-sim:local ./scripts/setup_env.sh
+```
+
 ### 4. Build PC simulation stack
 
 ```bash
