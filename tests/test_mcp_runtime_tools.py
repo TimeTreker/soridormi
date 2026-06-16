@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 
 import pytest
 
@@ -30,6 +31,30 @@ class FakeRobot:
     def send_motor_command(self, command: MotorCommand) -> None:
         self.commands.append(command)
         self.time += 0.01
+
+
+
+
+class ThreadAffineRobot(FakeRobot):
+    def __init__(self) -> None:
+        super().__init__()
+        self.owner_thread_id = threading.get_ident()
+
+    def _assert_owner_thread(self) -> None:
+        assert threading.get_ident() == self.owner_thread_id
+
+    def read_state(self) -> RobotState:
+        self._assert_owner_thread()
+        return super().read_state()
+
+    def send_motor_command(self, command: MotorCommand) -> None:
+        self._assert_owner_thread()
+        super().send_motor_command(command)
+
+    def step_motor_command(self, command: MotorCommand) -> RobotState:
+        self._assert_owner_thread()
+        self.send_motor_command(command)
+        return self.read_state()
 
 
 class HeadFakeRobot:
@@ -216,6 +241,45 @@ def test_runtime_service_rejects_hardware_until_backend_exists() -> None:
             robot_factory=FakeRobot,
             controller_factory=FakeController,
         )
+
+
+
+
+def test_runtime_from_env_keeps_robot_on_one_worker_thread() -> None:
+    service = SoridormiRuntimeToolService.from_env(
+        mode="sim",
+        robot_factory=ThreadAffineRobot,
+        controller_factory=FakeController,
+    )
+
+    async def exercise() -> None:
+        status = await service.call_tool("soridormi.robot.get_status", {})
+        assert status["mode"] == "sim"
+
+        plan = await service.call_tool(
+            "soridormi.motion.create_plan",
+            {
+                "commands": [
+                    {
+                        "vx": 0.05,
+                        "vy": 0.0,
+                        "yaw": 0.0,
+                        "duration_s": 0.05,
+                    }
+                ]
+            },
+        )
+        result = await service.call_tool(
+            "soridormi.motion.execute_plan",
+            {"plan_id": plan["plan_id"]},
+        )
+        assert result["completed"] is True
+
+    try:
+        asyncio.run(exercise())
+    finally:
+        assert service._robot_executor is not None
+        service._robot_executor.shutdown(wait=True)
 
 
 def test_runtime_service_lists_velocity_and_scripted_head_skills() -> None:

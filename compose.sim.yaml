@@ -34,7 +34,7 @@ services:
       SORIDORMI_RUNTIME_LOG_EVERY_N_OVERRIDE: ${SORIDORMI_RUNTIME_LOG_EVERY_N_OVERRIDE:-}
       SORIDORMI_RUNTIME_LOG_PREFIX_OVERRIDE: ${SORIDORMI_RUNTIME_LOG_PREFIX_OVERRIDE:-}
       POLICY_PATH: /workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx
-      SORIDORMI_POLICY_PROFILE: ${SORIDORMI_POLICY_PROFILE:-}
+      SORIDORMI_POLICY_PROFILE: ${SORIDORMI_POLICY_PROFILE:?Set SORIDORMI_POLICY_PROFILE in .env}
       SORIDORMI_POLICY_PROFILE_FILE: ${SORIDORMI_POLICY_PROFILE_FILE:-}
       SORIDORMI_POLICY_PATH: ${SORIDORMI_POLICY_PATH:-/workspaces/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx}
       SORIDORMI_POLICY_INPUT_NAME: ${SORIDORMI_POLICY_INPUT_NAME:-obs}
@@ -133,9 +133,7 @@ services:
     command:
       - python
       - -m
-      - soridormi_runtime.mcp.http_server
-      - --adapter
-      - runtime
+      - soridormi_runtime.mcp.profiled_server
     profiles:
       - mcp-runtime
 

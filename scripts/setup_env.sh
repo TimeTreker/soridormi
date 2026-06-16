@@ -43,6 +43,7 @@ RENDER_GID_VALUE="$(detect_render_gid)"
 : "${ORIN_RUNTIME_BASE:=nvcr.io/nvidia/l4t-jetpack:r36.4.0}"
 : "${THOR_RUNTIME_BASE:=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04}"
 : "${SIM_BASE:=nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04}"
+: "${SORIDORMI_POLICY_PROFILE:=open_duck_forward}"
 
 cat > .env <<EOF_ENV
 UID=${UID_VALUE}
@@ -73,6 +74,7 @@ SIM_PORT=5555
 CONTROL_HZ=50
 SORIDORMI_ONNXRUNTIME_GPU=1
 SORIDORMI_USE_CUDA_PROVIDER=1
+SORIDORMI_POLICY_PROFILE=${SORIDORMI_POLICY_PROFILE}
 
 SORIDORMI_SIM_BACKEND=fake
 SORIDORMI_ROBOT_CONFIG=/app/configs/robots/open_duck_mini_v2.yaml
@@ -94,5 +96,6 @@ echo "  RUNTIME_DEV_BASE=${RUNTIME_DEV_BASE}"
 echo "  ORIN_RUNTIME_BASE=${ORIN_RUNTIME_BASE}"
 echo "  THOR_RUNTIME_BASE=${THOR_RUNTIME_BASE}"
 echo "  SIM_BASE=${SIM_BASE}"
+echo "  SORIDORMI_POLICY_PROFILE=${SORIDORMI_POLICY_PROFILE}"
 echo "  SORIDORMI_SIM_BACKEND=fake"
 echo "  SORIDORMI_ROBOT_CONFIG=/app/configs/robots/open_duck_mini_v2.yaml"

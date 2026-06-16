@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -65,6 +67,7 @@ class SoridormiRuntimeToolService:
     _motion_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
     _robot_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
     _last_state: RobotState | None = field(default=None, init=False, repr=False)
+    _robot_executor: ThreadPoolExecutor | None = field(default=None, init=False, repr=False)
 
     @classmethod
     def from_env(
@@ -84,13 +87,30 @@ class SoridormiRuntimeToolService:
             raise ValueError(
                 "the runtime MCP adapter requires SORIDORMI_RUNTIME_MODE=onnx_policy"
             )
-        return cls(
-            robot=robot_factory(),
-            controller=controller,
-            mode=mode,
-            backend="runtime",
-            control_hz=float(os.environ.get("CONTROL_HZ", "50")),
+
+        # RobotApiClient owns a ZeroMQ REQ socket. ZeroMQ sockets are strictly
+        # thread-affine, so both construction and every subsequent robot call
+        # must happen on the same worker thread. Repeated asyncio.to_thread()
+        # calls are unsafe because the default pool may select a different
+        # thread for each operation.
+        executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="soridormi-robot",
         )
+        try:
+            robot = executor.submit(robot_factory).result()
+            service = cls(
+                robot=robot,
+                controller=controller,
+                mode=mode,
+                backend="runtime",
+                control_hz=float(os.environ.get("CONTROL_HZ", "50")),
+            )
+            service._robot_executor = executor
+            return service
+        except BaseException:
+            executor.shutdown(wait=False, cancel_futures=True)
+            raise
 
     async def call_tool(
         self,
@@ -382,6 +402,19 @@ class SoridormiRuntimeToolService:
             finally:
                 self.active_task = None
 
+    async def _call_robot(self, func: Callable[..., Any], *args: Any) -> Any:
+        """Run one robot operation without violating ZeroMQ thread affinity."""
+
+        if self._robot_executor is None:
+            # Directly constructed services in unit tests may use thread-safe
+            # fake robots and do not require a persistent worker.
+            return await asyncio.to_thread(func, *args)
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            self._robot_executor,
+            partial(func, *args),
+        )
+
     async def _step_head_target(
         self,
         state: RobotState,
@@ -391,10 +424,10 @@ class SoridormiRuntimeToolService:
         async with self._robot_lock:
             stepper = getattr(self.robot, "step_motor_command", None)
             if callable(stepper):
-                self._last_state = await asyncio.to_thread(stepper, command)
+                self._last_state = await self._call_robot(stepper, command)
             else:
-                await asyncio.to_thread(self.robot.send_motor_command, command)
-                self._last_state = await asyncio.to_thread(self.robot.read_state)
+                await self._call_robot(self.robot.send_motor_command, command)
+                self._last_state = await self._call_robot(self.robot.read_state)
             return self._last_state
 
     def create_motion_plan(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -502,24 +535,24 @@ class SoridormiRuntimeToolService:
 
     async def _step_controller(self) -> None:
         async with self._robot_lock:
-            state = await asyncio.to_thread(self.robot.read_state)
+            state = await self._call_robot(self.robot.read_state)
             command = self.controller.compute(state)
             stepper = getattr(self.robot, "step_motor_command", None)
             if callable(stepper):
-                self._last_state = await asyncio.to_thread(stepper, command)
+                self._last_state = await self._call_robot(stepper, command)
             else:
-                await asyncio.to_thread(self.robot.send_motor_command, command)
+                await self._call_robot(self.robot.send_motor_command, command)
                 self._last_state = state
 
     async def _read_state(self) -> RobotState:
         async with self._robot_lock:
-            self._last_state = await asyncio.to_thread(self.robot.read_state)
+            self._last_state = await self._call_robot(self.robot.read_state)
             return self._last_state
 
     async def _apply_safe_hold(self) -> None:
         self.controller.command = PolicyCommand()
         async with self._robot_lock:
-            state = await asyncio.to_thread(self.robot.read_state)
+            state = await self._call_robot(self.robot.read_state)
             command = HoldPositionController().compute(state)
-            await asyncio.to_thread(self.robot.send_motor_command, command)
+            await self._call_robot(self.robot.send_motor_command, command)
             self._last_state = state
