@@ -10,6 +10,8 @@ VIEWER=1
 FOLLOW_CAMERA=1
 BUILD_IMAGES=0
 KEEP_RUNNING=0
+REUSE_EXISTING_SIM=0
+RESTART_MCP=0
 
 usage() {
   cat <<'USAGE'
@@ -33,6 +35,9 @@ Options:
   --follow-camera      Follow the robot; default
   --no-follow-camera   Disable follow camera
   --keep-running       Leave services running after launcher exits
+  --reuse-existing-sim Reuse a simulator already listening on SIM_PORT
+  --restart-existing-sim
+                       Restart an existing Soridormi sim first; default
   -h, --help           Show this help
 USAGE
 }
@@ -46,6 +51,8 @@ while [ "$#" -gt 0 ]; do
     --follow-camera) FOLLOW_CAMERA=1; shift ;;
     --no-follow-camera) FOLLOW_CAMERA=0; shift ;;
     --keep-running) KEEP_RUNNING=1; shift ;;
+    --reuse-existing-sim) REUSE_EXISTING_SIM=1; shift ;;
+    --restart-existing-sim) REUSE_EXISTING_SIM=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[soridormi][error] Unknown option: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -158,6 +165,25 @@ container_running() {
   [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null || true)" = "true" ]
 }
 
+stop_existing_sim_containers() {
+  local names=()
+  local name
+
+  while IFS= read -r name; do
+    case "$name" in
+      soridormi-sim|soridormi-sim-*) names+=("$name") ;;
+    esac
+  done < <(docker ps --format '{{.Names}}')
+
+  if [ "${#names[@]}" -eq 0 ]; then
+    echo "[soridormi][warn] No Soridormi simulator container name found for active SIM_PORT." >&2
+    return 0
+  fi
+
+  echo "[soridormi] Stopping existing simulator container(s): ${names[*]}"
+  docker stop "${names[@]}" >/dev/null
+}
+
 RUN_DIR="${SORIDORMI_CHROMIE_RUN_DIR:-${XDG_RUNTIME_DIR:-/tmp}/soridormi-chromie-${UID:-$(id -u)}}"
 mkdir -p "$RUN_DIR"
 SIM_LOG="$RUN_DIR/mujoco.log"
@@ -196,8 +222,22 @@ export SORIDORMI_MCP_PORT="$MCP_PORT"
 export SORIDORMI_MCP_PATH="$MCP_PATH"
 
 if python_tcp_check 127.0.0.1 "$SIM_PORT"; then
-  echo "[soridormi] Reusing existing simulator at 127.0.0.1:$SIM_PORT."
-else
+  if [ "$REUSE_EXISTING_SIM" = "1" ]; then
+    echo "[soridormi] Reusing existing simulator at 127.0.0.1:$SIM_PORT."
+    echo "[soridormi][warn] Viewer, profile, and follow-camera options are not reapplied to reused simulators." >&2
+  else
+    echo "[soridormi] Existing simulator detected at 127.0.0.1:$SIM_PORT; restarting so viewer/profile options are applied."
+    stop_existing_sim_containers
+    RESTART_MCP=1
+    if python_tcp_check 127.0.0.1 "$SIM_PORT"; then
+      echo "[soridormi][error] SIM_PORT $SIM_PORT is still in use after stopping known Soridormi simulator containers." >&2
+      echo "[soridormi][hint] Stop the process using the port, pass --reuse-existing-sim, or choose another SIM_PORT." >&2
+      exit 1
+    fi
+  fi
+fi
+
+if ! python_tcp_check 127.0.0.1 "$SIM_PORT"; then
   echo "[soridormi] Starting MuJoCo with the repository launcher..."
   : > "$SIM_LOG"
   sim_args=(--backend mujoco --profile "$PROFILE")
@@ -218,7 +258,13 @@ else
   fi
 fi
 
-if container_running soridormi-runtime-mcp && python_tcp_check 127.0.0.1 "$MCP_PORT"; then
+if { [ "$RESTART_MCP" = "1" ] || [ "$OWN_SIM" = "1" ]; } && container_running soridormi-runtime-mcp; then
+  echo "[soridormi] Restarting runtime MCP so it reconnects to this simulator."
+  RESTART_MCP=1
+  docker compose "${COMPOSE_ARGS[@]}" stop mcp-runtime >/dev/null 2>&1 || true
+fi
+
+if [ "$RESTART_MCP" = "0" ] && container_running soridormi-runtime-mcp && python_tcp_check 127.0.0.1 "$MCP_PORT"; then
   echo "[soridormi] Reusing existing runtime MCP server."
 else
   echo "[soridormi] Starting runtime MCP without build or pull..."
@@ -232,6 +278,18 @@ else
   fi
 fi
 
+if [ "$VIEWER" = "1" ]; then
+  VIEWER_STATUS="enabled"
+else
+  VIEWER_STATUS="disabled"
+fi
+
+if [ "$FOLLOW_CAMERA" = "1" ]; then
+  FOLLOW_CAMERA_STATUS="enabled"
+else
+  FOLLOW_CAMERA_STATUS="disabled"
+fi
+
 cat <<EOF_READY
 
 ======================================================================
@@ -240,6 +298,8 @@ Soridormi is ready for Chromie
 MuJoCo:  127.0.0.1:${SIM_PORT}
 MCP:     http://127.0.0.1:${MCP_PORT}${MCP_PATH}
 Profile: ${PROFILE}
+Viewer:  ${VIEWER_STATUS}
+Follow camera: ${FOLLOW_CAMERA_STATUS}
 Docker policy: Compose-defined local images only; no image pulling
 Logs: ${RUN_DIR}
 

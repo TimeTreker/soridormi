@@ -57,6 +57,45 @@ class ThreadAffineRobot(FakeRobot):
         return self.read_state()
 
 
+class StartupSyncRobot(ThreadAffineRobot):
+    def __init__(self) -> None:
+        super().__init__()
+        self.reset_count = 0
+        self.step_count = 0
+
+    def reset(self) -> str:
+        self._assert_owner_thread()
+        self.reset_count += 1
+        self.time = 0.0
+        return "reset"
+
+    def step_motor_command(self, command: MotorCommand) -> RobotState:
+        self._assert_owner_thread()
+        self.step_count += 1
+        return super().step_motor_command(command)
+
+
+class AdvancingReadSyncRobot(FakeRobot):
+    """Model the simulator API: both get_state and step_command advance time."""
+
+    def __init__(self, *, dt: float = 0.02) -> None:
+        super().__init__()
+        self.dt = dt
+        self.read_count = 0
+        self.step_count = 0
+
+    def read_state(self) -> RobotState:
+        self.read_count += 1
+        self.time += self.dt
+        return super().read_state()
+
+    def step_motor_command(self, command: MotorCommand) -> RobotState:
+        self.step_count += 1
+        self.commands.append(command)
+        self.time += self.dt
+        return super().read_state()
+
+
 class HeadFakeRobot:
     def __init__(self) -> None:
         self.time = 0.0
@@ -92,9 +131,11 @@ class FakeController:
     def __init__(self) -> None:
         self.command = PolicyCommand()
         self.seen_commands: list[PolicyCommand] = []
+        self.seen_state_times: list[float] = []
 
     def compute(self, state: RobotState) -> MotorCommand:
         self.seen_commands.append(self.command)
+        self.seen_state_times.append(float(state.time))
         return MotorCommand(
             names=state.joints.names,
             positions=state.joints.positions,
@@ -280,6 +321,60 @@ def test_runtime_from_env_keeps_robot_on_one_worker_thread() -> None:
     finally:
         assert service._robot_executor is not None
         service._robot_executor.shutdown(wait=True)
+
+
+def test_runtime_from_env_applies_profile_reset_and_sync_preroll(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SORIDORMI_RESET_AT_START", "1")
+    monkeypatch.setenv("SORIDORMI_SIM_SYNC_STEP", "1")
+    monkeypatch.setenv("SORIDORMI_SIM_PREROLL_STEPS", "2")
+
+    robots: list[StartupSyncRobot] = []
+
+    def robot_factory() -> StartupSyncRobot:
+        robot = StartupSyncRobot()
+        robots.append(robot)
+        return robot
+
+    service = SoridormiRuntimeToolService.from_env(
+        mode="sim",
+        robot_factory=robot_factory,
+        controller_factory=FakeController,
+    )
+
+    try:
+        robot = robots[0]
+        assert robot.reset_count == 1
+        assert robot.step_count == 2
+        assert len(robot.commands) == 2
+        assert service._last_state is not None
+        assert service._last_state.time == pytest.approx(0.02)
+    finally:
+        assert service._robot_executor is not None
+        service._robot_executor.shutdown(wait=True)
+
+
+def test_sync_step_controller_reuses_previous_step_state() -> None:
+    async def exercise() -> None:
+        robot = AdvancingReadSyncRobot()
+        controller = FakeController()
+        service = SoridormiRuntimeToolService(
+            robot=robot,
+            controller=controller,
+            control_hz=50.0,
+        )
+        service._last_state = robot.read_state()
+
+        await service._step_controller()
+        await service._step_controller()
+
+        assert robot.read_count == 1
+        assert robot.step_count == 2
+        assert robot.time == pytest.approx(0.06)
+        assert controller.seen_state_times == pytest.approx([0.02, 0.04])
+
+    asyncio.run(exercise())
 
 
 def test_runtime_service_lists_velocity_and_scripted_head_skills() -> None:

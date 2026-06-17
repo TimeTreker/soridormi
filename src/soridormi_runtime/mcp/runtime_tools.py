@@ -29,6 +29,7 @@ from soridormi_runtime.scripted_head_skill import (
 )
 from soridormi_runtime.skill_execution import SkillExecutionRegistry
 from soridormi_runtime.skill_manifest import DEFAULT_SKILL_MANIFEST
+from soridormi_runtime.sync_preroll import preroll_sync_simulator
 
 from .local_tools import MotionPlan, NamedSkillPlan, SoridormiLocalToolService
 
@@ -43,6 +44,20 @@ class RuntimeController(Protocol):
     command: PolicyCommand
 
     def compute(self, state: RobotState) -> MotorCommand: ...
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on", "y"}
+
+
+def _env_int(name: str, default: int = 0) -> int:
+    value = os.environ.get(name)
+    if value is None or value.strip() == "":
+        return default
+    return int(value)
 
 
 @dataclass
@@ -99,6 +114,27 @@ class SoridormiRuntimeToolService:
         )
         try:
             robot = executor.submit(robot_factory).result()
+            last_state: RobotState | None = None
+
+            if _env_bool("SORIDORMI_RESET_AT_START", default=False):
+                resetter = getattr(robot, "reset", None)
+                if callable(resetter):
+                    executor.submit(resetter).result()
+
+            if _env_bool("SORIDORMI_SIM_SYNC_STEP", default=False):
+                last_state = executor.submit(robot.read_state).result()
+                preroll_steps = max(
+                    0,
+                    _env_int("SORIDORMI_SIM_PREROLL_STEPS", default=0),
+                )
+                if preroll_steps:
+                    last_state = executor.submit(
+                        preroll_sync_simulator,
+                        robot,
+                        last_state,
+                        preroll_steps,
+                    ).result()
+
             service = cls(
                 robot=robot,
                 controller=controller,
@@ -107,6 +143,7 @@ class SoridormiRuntimeToolService:
                 control_hz=float(os.environ.get("CONTROL_HZ", "50")),
             )
             service._robot_executor = executor
+            service._last_state = last_state
             return service
         except BaseException:
             executor.shutdown(wait=False, cancel_futures=True)
@@ -535,14 +572,16 @@ class SoridormiRuntimeToolService:
 
     async def _step_controller(self) -> None:
         async with self._robot_lock:
-            state = await self._call_robot(self.robot.read_state)
+            state = self._last_state
+            if state is None:
+                state = await self._call_robot(self.robot.read_state)
             command = self.controller.compute(state)
             stepper = getattr(self.robot, "step_motor_command", None)
             if callable(stepper):
                 self._last_state = await self._call_robot(stepper, command)
             else:
                 await self._call_robot(self.robot.send_motor_command, command)
-                self._last_state = state
+                self._last_state = await self._call_robot(self.robot.read_state)
 
     async def _read_state(self) -> RobotState:
         async with self._robot_lock:
