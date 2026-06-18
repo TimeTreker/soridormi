@@ -821,9 +821,13 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 input_schema=_object_schema(
                     {
                         "task_id": {"type": "string", "minLength": 1},
+                        "client_task_ref": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                        },
                         "after_sequence": {"type": "integer", "minimum": 0},
-                    },
-                    required=["task_id"],
+                    }
                 ),
                 output_schema=_object_schema(
                     {

@@ -145,7 +145,10 @@ def test_task_events_schema_exposes_monitoring_cursor_contract() -> None:
     tools = {tool.name: tool for agent in bundle.agents for tool in agent.tools}
     events = tools["soridormi.task.events"]
     properties = events.output_schema["properties"]
+    input_properties = events.input_schema["properties"]
 
+    assert input_properties["client_task_ref"]["maxLength"] == 128
+    assert "task_id" not in events.input_schema.get("required", [])
     assert properties["schema_version"]["type"] == "string"
     assert properties["client_task_ref"]["type"] == ["string", "null"]
     assert properties["terminal"]["type"] == "boolean"
