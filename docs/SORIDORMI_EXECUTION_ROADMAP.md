@@ -42,6 +42,9 @@ M9 Context BC data pipeline --> M10 Runtime context policy
                                       |
                                       v
                                M14 Chromie integration
+                                      |
+                                      v
+                               M15 Navigation goal pipeline
 ```
 
 Current position:
@@ -50,6 +53,10 @@ Current position:
 M4-M9: substantially complete
 M10: functional Stage 1 candidate available
 Current blocker: low swing-foot clearance and limited held-out generalization
+M11A task-agent contract foundation: no-motion gate available
+M11B task event cursor: monitorable event stream available
+M11C retry-safe task refs: client idempotency available
+M11D task timeout expiry: planning-hold timeout available
 Hardware: intentionally not started
 ```
 
@@ -311,6 +318,144 @@ teacher comparison: PASS (relative behavior only; does not replace clearance)
 
 ---
 
+## M11A - Task-agent contract foundation [Current: gate ready]
+
+**Goal:** Make the Chromie-to-Soridormi embodied task boundary executable as a
+validated contract before adding real navigation, perception, manipulation, or
+hardware execution.
+
+- [x] Add task-level MCP tools:
+  `soridormi.task.get_capabilities`, `preview`, `submit`, `status`, `events`,
+  and `cancel`
+- [x] Keep the task API no-motion while the body task executor is still
+  contract-first
+- [x] Store Soridormi-owned task readiness in
+  `configs/task_capabilities/open_duck_mini_v2_task_capabilities.json`
+- [x] Add structured plan steps, blocked subsystems, and
+  `recommended_next_actions`
+- [x] Add a derived Soridormi `task_graph` with stable node IDs and
+  `raw_control_allowed=false`
+- [x] Add no-motion acceptance cases for successful skill dry-runs,
+  fail-closed navigation/manipulation/perception paths, stop redirection, and
+  unsafe physical requests
+- [x] Add navigation-goal training and contract cases without claiming that
+  navigation is executable
+- [x] Add the host validation gate:
+  `./scripts/validate_m11_task_agent_contract.sh`
+
+**Gate G11A:**
+
+```text
+./scripts/validate_m11_task_agent_contract.sh
+```
+
+This gate passes when:
+
+- the MCP task capability manifest exports successfully;
+- the task capability readiness table validates;
+- task preview/submit/status/events/cancel tests pass;
+- acceptance cases preserve `no_motion=true`;
+- unsupported or unsafe embodied tasks fail closed;
+- task responses expose `task_graph` without low-level control fields;
+- training cases and navigation-goal contracts remain schema-valid;
+- task-agent docs contain the required contract references and balanced
+  Markdown fences.
+
+> **Status:** G11A proves the Chromie-facing embodied task contract, not robot
+> autonomy. It does not claim that Soridormi can route to a house, fetch water,
+> manipulate objects, or execute task-level goals physically in MuJoCo or on
+> hardware. Those remain later milestones behind explicit simulator gates.
+
+---
+
+## M11B - Task event cursor and monitoring contract [Current: gate ready]
+
+**Goal:** Give Chromie a stable polling loop for Soridormi-owned embodied tasks
+before task-level physical execution exists.
+
+- [x] Add a versioned `soridormi.task_events.v1` response from
+  `soridormi.task.events`
+- [x] Report `status`, `phase`, `terminal`, and `safe_idle` directly in the
+  event response
+- [x] Preserve the cursor contract with `after_sequence`,
+  `next_after_sequence`, and `latest_sequence`
+- [x] Add `returned_count` and `has_more` for future pagination compatibility
+- [x] Add `poll_recommendation` so Chromie can continue polling, cancel, or
+  stop polling after terminal states
+- [x] Reject invalid negative cursors
+- [x] Declare the monitoring cursor fields in the MCP capability manifest
+
+**Gate G11B:**
+
+```text
+./scripts/validate_m11_task_agent_contract.sh
+```
+
+This gate passes when task event cursor behavior works for active planning-hold
+tasks, terminal dry-run tasks, and terminal safe-idle tasks, and the manifest
+exports the monitoring fields Chromie needs.
+
+> **Status:** G11B improves observability only. It does not add real-time
+> asynchronous execution, physical task execution, or navigation autonomy.
+
+---
+
+## M11C - Retry-safe task identity [Current: gate ready]
+
+**Goal:** Let Chromie safely retry task submission and monitor/cancel by its own
+task reference without creating duplicate Soridormi records.
+
+- [x] Add optional `client_task_ref` to task preview/submit payloads
+- [x] Index submitted tasks by `client_task_ref`
+- [x] Return the original Soridormi `task_id` when the same
+  `client_task_ref` and payload are submitted again
+- [x] Mark duplicate retries with `idempotent_replay=true`
+- [x] Reject reuse of the same `client_task_ref` with a different payload
+- [x] Allow `task.status`, `task.events`, and `task.cancel` lookup by either
+  `task_id` or `client_task_ref`
+
+**Gate G11C:**
+
+```text
+./scripts/validate_m11_task_agent_contract.sh
+```
+
+This gate passes when duplicate submits do not duplicate records, conflicting
+payloads fail closed, and the MCP manifest exposes the retry identity fields.
+
+---
+
+## M11D - Task timeout expiry [Current: gate ready]
+
+**Goal:** Prevent no-motion planning-hold tasks from remaining active forever
+after Chromie has stopped waiting.
+
+- [x] Add `deadline_at`, `expired`, and `timeout_elapsed_s` to task status
+  payloads
+- [x] Expire non-terminal tasks during `task.status`, `task.events`, or
+  `task.cancel` reads after `timeout_s`
+- [x] Transition expired tasks to terminal `failed`
+- [x] Emit a `task_timed_out` lifecycle event
+- [x] Return timeout-specific recommended actions, including an emergency-stop
+  hint when the task requested `emergency_stop_on_timeout`
+- [x] Keep already-terminal dry-run and refused tasks unchanged
+
+**Gate G11D:**
+
+```text
+./scripts/validate_m11_task_agent_contract.sh
+```
+
+This gate passes when planning-hold tasks expire deterministically, timeout
+events are cursor-visible, and terminal timeout status does not emit duplicate
+timeout events on repeated reads.
+
+> **Status:** G11C/G11D improve reliability and lifecycle hygiene only. They do
+> not add asynchronous execution, real navigation, manipulation, or physical
+> task motion.
+
+---
+
 ## M11 - Broader locomotion generalization
 
 **Goal:** Generalize beyond the initial three training scenarios.
@@ -421,6 +566,29 @@ without producing low-level motor or policy actions.
 
 ---
 
+## M15 - Navigation goal pipeline
+
+**Goal:** Convert destination requests such as "walk forward to the house" into
+safe, bounded local motion plans without feeding raw language or raw perception
+into the low-level policy.
+
+- [x] Declare `navigate_to_target` as a future, non-executable skill
+- [x] Define the navigation goal contract and refusal conditions
+- [ ] Add target-resolution adapters for structured place/object/person refs
+- [ ] Add MuJoCo localization and route fixtures
+- [ ] Add body-frame waypoint and short-route evaluators
+- [ ] Add stop-before-obstacle and lost-target acceptance gates
+- [ ] Promote `trajectory_follow` only after route tracking gates pass
+- [ ] Promote `navigate_to_target` only after target resolution, routing, local
+  obstacle checks, cancellation, timeout, and safe-idle evidence pass
+
+**Gate G15:** Soridormi either refuses unresolved destination language before
+motion, or executes a structured navigation goal through target resolution,
+localization, routing, local planning, monitored execution, and safe-idle
+verification in MuJoCo.
+
+---
+
 ## Critical path
 
 ```text
@@ -430,6 +598,7 @@ M9 training-ready evidence
   -> M12 targeted improvement
   -> M13 staged hardware transfer
   -> M14 physical Chromie integration
+  -> M15 navigation goal pipeline
 ```
 
 M14 API work may begin in MuJoCo before M13 finishes, but physical integration
@@ -446,6 +615,7 @@ depends on the hardware safety gate.
 | Simulator contention | Empty or corrupted datasets | Preserve collector-owned simulator lifecycle |
 | Premature hardware testing | Damage or unsafe motion | Enforce staged H0-H5 hardware gates |
 | Brain/body boundary erosion | Unsafe planner-generated control | Accept only structured skills and bounded context |
+| Unresolved navigation goals | Robot walks without knowing target, route, or obstacles | Refuse raw destination language until target resolution, localization, route, and local safety checks exist |
 
 ## Milestone-to-gate map
 
@@ -462,6 +632,7 @@ depends on the hardware safety gate.
 | M12 | G12 | Frozen-baseline comparison and non-regression evidence |
 | M13 | G13 | H0-H5 hardware safety and execution logs |
 | M14 | G14 | Structured integration and safety-refusal tests |
+| M15 | G15 | Navigation contract, target-resolution refusal, route/local-planning evidence |
 
 ## Immediate execution plan
 

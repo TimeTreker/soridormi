@@ -108,7 +108,7 @@ def test_streamable_http_preserves_plan_state_across_requests() -> None:
                     async with ClientSession(read, write) as session:
                         await session.initialize()
                         listed = await session.list_tools()
-                        assert len(listed.tools) == 14
+                        assert len(listed.tools) == 20
                         plan = await session.call_tool(
                             "soridormi.motion.create_plan",
                             {

@@ -1,0 +1,305 @@
+schema_version: soridormi.training_cases.v1
+suite_id: chromie_interaction_commands
+title: Chromie interaction command acceptance cases
+robot_profile: open_duck_mini_v2
+owner: soridormi
+purpose: Acceptance-style natural-language commands that Chromie should translate into structured Soridormi body skills.
+policy_boundary:
+  natural_language_to_low_level_policy: false
+  low_level_output: action_14d
+  planner_role: Chromie owns language, speech, memory, and task selection; Soridormi owns embodied execution and safety gates.
+cases:
+  - id: chromie_interaction.walk_forward_10_seconds
+    status: planned
+    priority: 10
+    natural_language_command: Walk forward for 10 seconds.
+    target_skill: walk_velocity
+    scenario_id: flat_walk_varied_speed_v1
+    chromie_translation:
+      skill: walk_velocity
+      parameters:
+        vx_mps: 0.10
+        vy_mps: 0.0
+        yaw_radps: 0.0
+        duration_s: 10.0
+    parameters:
+      vx_mps: 0.10
+      duration_s: 10.0
+    task_context:
+      skill_family: interaction_acceptance
+      intent: timed_forward_walk
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: forward_progress_for_requested_duration_or_safe_timeout
+      final_state: safe_idle
+    safety_checks:
+      - no_fall
+      - duration_timeout_enforced
+      - natural_language_not_sent_to_policy
+      - no_hardware_actuation
+    timeout_s: 12.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: execution_duration_s
+        operator: between
+        value:
+          - 9.0
+          - 11.0
+      - name: forward_progress_m
+        operator: greater_equal
+        value: 0.15
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":0.10,"duration_s":10.0}'
+
+  - id: chromie_interaction.turn_left_then_nod_twice
+    status: planned
+    priority: 20
+    natural_language_command: Turn left then nod twice.
+    target_skill: turn_left
+    scenario_id: curve_turn_walk_v1
+    chromie_translation:
+      sequence:
+        - skill: turn_in_place
+          parameters:
+            yaw_radps: 0.14
+            duration_s: 3.0
+        - skill: nod_yes
+          parameters:
+            count: 2
+            amplitude: medium
+            duration_s: 2.0
+    sequence:
+      - skill: turn_in_place
+        parameters:
+          yaw_radps: 0.14
+          duration_s: 3.0
+      - skill: nod_yes
+        parameters:
+          count: 2
+          amplitude: medium
+          duration_s: 2.0
+    parameters:
+      interruptible: true
+    task_context:
+      skill_family: interaction_acceptance
+      intent: turn_then_affirm
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: left_turn_then_stable_head_nod
+      final_state: stable_neutral_head
+    safety_checks:
+      - no_fall
+      - second_skill_waits_for_stable_base
+      - natural_language_not_sent_to_policy
+      - no_hardware_actuation
+    timeout_s: 8.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: nod_count
+        operator: equals
+        value: 2
+      - name: sequence_completed
+        operator: equals
+        value: true
+    validation:
+      dry_run: ./scripts/evaluate_scripted_social_skills.sh --skill nod_yes --json
+
+  - id: chromie_interaction.sing_while_walking
+    status: planned
+    priority: 30
+    natural_language_command: Sing while walking.
+    target_skill: walk_velocity
+    scenario_id: flat_walk_varied_speed_v1
+    external_capabilities:
+      - chromie.speech
+      - chromie.audio
+    chromie_translation:
+      body_skill: walk_velocity
+      body_parameters:
+        vx_mps: 0.06
+        duration_s: 6.0
+      speech_owned_by: chromie
+    parameters:
+      vx_mps: 0.06
+      duration_s: 6.0
+      speech_owned_by: chromie
+    task_context:
+      skill_family: interaction_acceptance
+      intent: locomotion_with_external_song
+      speech_text_to_policy: false
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: slow_forward_progress
+      audio: chromie_sings_without_affecting_low_level_body_policy
+      final_state: safe_idle
+    safety_checks:
+      - no_fall
+      - speech_separate_from_low_level_policy
+      - locomotion_can_cancel_speech_overlay_on_instability
+      - no_hardware_actuation
+    timeout_s: 9.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: forward_progress_m
+        operator: greater_equal
+        value: 0.08
+      - name: speech_payload_absent_from_policy_input
+        operator: equals
+        value: true
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":0.06,"duration_s":6.0}'
+
+  - id: chromie_interaction.come_closer_slowly
+    status: planned
+    priority: 40
+    natural_language_command: Come closer slowly.
+    target_skill: walk_velocity
+    scenario_id: flat_walk_varied_speed_v1
+    chromie_translation:
+      skill: walk_velocity
+      parameters:
+        vx_mps: 0.06
+        duration_s: 4.0
+      stop_condition: target_distance_threshold
+    parameters:
+      vx_mps: 0.06
+      duration_s: 4.0
+      stop_condition: target_distance_threshold
+    task_context:
+      skill_family: interaction_acceptance
+      intent: approach_person_slowly
+      raw_perception_to_policy: false
+    environment_context:
+      terrain_type: flat
+      person_target_required: true
+      target_representation: bounded_distance_or_stop_condition
+    expected_outcome:
+      base_motion: slow_approach_then_stop
+      final_state: safe_attention_idle
+    safety_checks:
+      - no_fall
+      - approach_speed_within_safe_limit
+      - target_condition_structured_not_raw_perception
+      - no_hardware_actuation
+    timeout_s: 7.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: mean_forward_speed_mps
+        operator: less_equal
+        value: 0.08
+      - name: final_speed_mps
+        operator: less_equal
+        value: 0.03
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":0.06,"duration_s":4.0}'
+
+  - id: chromie_interaction.stop_now
+    status: mujoco_eval_ready
+    priority: 50
+    natural_language_command: Stop now.
+    target_skill: stop
+    scenario_id: start_stop_velocity_ramp_v1
+    chromie_translation:
+      skill: stop
+      parameters:
+        preemptive: true
+        stop_ramp_s: 0.8
+    parameters:
+      preemptive: true
+      stop_ramp_s: 0.8
+    task_context:
+      skill_family: interaction_acceptance
+      intent: immediate_stop
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: prompt_controlled_stop
+      final_state: safe_idle
+    safety_checks:
+      - no_fall
+      - stop_preempts_current_action
+      - natural_language_not_sent_to_policy
+      - no_hardware_actuation
+    timeout_s: 4.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: stop_latency_s
+        operator: less_equal
+        value: 1.5
+      - name: final_speed_mps
+        operator: less_equal
+        value: 0.03
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh stop --args '{"duration_s":1.0}'
+
+  - id: chromie_interaction.look_at_me_and_say_hello
+    status: mujoco_eval_ready
+    priority: 60
+    natural_language_command: Look at me and say hello.
+    target_skill: look_at_person
+    scenario_id: look_direction_stationary_v1
+    external_capabilities:
+      - chromie.speech
+    chromie_translation:
+      body_skill: look_at_person
+      body_parameters:
+        target_source: structured_person_target
+        target_yaw_rad: 0.0
+        target_pitch_rad: -0.03
+        duration_s: 2.0
+      speech_owned_by: chromie
+      utterance_intent: greeting
+    parameters:
+      target_source: structured_person_target
+      target_yaw_rad: 0.0
+      target_pitch_rad: -0.03
+      duration_s: 2.0
+      speech_owned_by: chromie
+    task_context:
+      skill_family: interaction_acceptance
+      intent: attend_and_greet
+      speech_text_to_policy: false
+      raw_perception_to_policy: false
+    environment_context:
+      terrain_type: flat
+      person_target_required: true
+      target_representation: bounded_yaw_pitch
+    expected_outcome:
+      head_motion: looks_toward_structured_person_target
+      audio: chromie_says_hello
+      final_state: stable_attention_pose
+    safety_checks:
+      - no_fall
+      - structured_target_only
+      - speech_separate_from_low_level_policy
+      - no_hardware_actuation
+    timeout_s: 5.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: target_yaw_error_rad
+        operator: less_equal
+        value: 0.08
+      - name: speech_payload_absent_from_policy_input
+        operator: equals
+        value: true
+    validation:
+      dry_run: ./scripts/evaluate_scripted_social_skills.sh --skill look_at_person --json

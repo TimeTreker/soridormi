@@ -1,0 +1,217 @@
+schema_version: soridormi.training_cases.v1
+suite_id: head_gestures
+title: Head and body interaction skills
+robot_profile: open_duck_mini_v2
+owner: soridormi
+purpose: Safe head/neck and body-social behaviors that remain separate from speech and perception.
+policy_boundary:
+  natural_language_to_low_level_policy: false
+  low_level_output: action_14d
+  planner_role: Resolve language, person targets, and speech timing before invoking Soridormi skills.
+cases:
+  - id: head_gestures.nod_yes_natural
+    status: mujoco_eval_ready
+    priority: 10
+    natural_language_command: Nod yes naturally.
+    target_skill: nod_yes
+    scenario_id: look_direction_stationary_v1
+    parameters:
+      count: 2
+      amplitude: medium
+      duration_s: 2.0
+    task_context:
+      skill_family: social
+      intent: affirmative_head_gesture
+    environment_context:
+      terrain_type: flat
+      person_target_required: false
+    expected_outcome:
+      head_motion: pitch_nod_returns_to_neutral
+      final_state: stable_neutral_head
+    safety_checks:
+      - no_fall
+      - head_pitch_within_limits
+      - yaw_and_roll_remain_bounded
+      - no_hardware_actuation
+    timeout_s: 4.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: head_pitch_range_rad
+        operator: greater_equal
+        value: 0.16
+      - name: head_yaw_range_rad
+        operator: less_equal
+        value: 0.05
+    validation:
+      dry_run: ./scripts/evaluate_scripted_social_skills.sh --skill nod_yes --json
+
+  - id: head_gestures.shake_no_natural
+    status: mujoco_eval_ready
+    priority: 20
+    natural_language_command: Shake no naturally.
+    target_skill: shake_no
+    scenario_id: look_direction_stationary_v1
+    parameters:
+      count: 2
+      amplitude: medium
+      duration_s: 2.0
+    task_context:
+      skill_family: social
+      intent: negative_head_gesture
+    environment_context:
+      terrain_type: flat
+      person_target_required: false
+    expected_outcome:
+      head_motion: yaw_shake_returns_to_neutral
+      final_state: stable_neutral_head
+    safety_checks:
+      - no_fall
+      - head_yaw_within_limits
+      - pitch_and_roll_remain_bounded
+      - no_hardware_actuation
+    timeout_s: 4.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: head_yaw_range_rad
+        operator: greater_equal
+        value: 0.50
+      - name: head_pitch_range_rad
+        operator: less_equal
+        value: 0.05
+    validation:
+      dry_run: ./scripts/evaluate_scripted_social_skills.sh --skill shake_no --json
+
+  - id: head_gestures.look_cardinal_directions
+    status: mujoco_eval_ready
+    priority: 30
+    natural_language_command: Look left, right, up, and down.
+    target_skill: look_direction
+    scenario_id: look_direction_stationary_v1
+    parameters:
+      targets:
+        - label: left
+          head_yaw_rad: 0.30
+          head_pitch_rad: 0.0
+        - label: right
+          head_yaw_rad: -0.30
+          head_pitch_rad: 0.0
+        - label: up
+          head_yaw_rad: 0.0
+          head_pitch_rad: 0.14
+        - label: down
+          head_yaw_rad: 0.0
+          head_pitch_rad: -0.14
+      duration_s: 1.2
+    task_context:
+      skill_family: social
+      intent: directional_gaze
+    environment_context:
+      terrain_type: flat
+      person_target_required: false
+    expected_outcome:
+      head_motion: reaches_each_bounded_direction
+      final_state: stable_neutral_head
+    safety_checks:
+      - no_fall
+      - head_joint_limits_respected
+      - body_base_stable
+      - no_hardware_actuation
+    timeout_s: 8.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: commanded_target_count
+        operator: equals
+        value: 4
+      - name: final_head_error_rad
+        operator: less_equal
+        value: 0.08
+    validation:
+      dry_run: ./scripts/evaluate_scripted_social_skills.sh --skill look_direction --json
+
+  - id: head_gestures.look_at_person
+    status: mujoco_eval_ready
+    priority: 40
+    natural_language_command: Look at the person.
+    target_skill: look_at_person
+    scenario_id: look_direction_stationary_v1
+    parameters:
+      target_source: structured_person_target
+      target_yaw_rad: 0.25
+      target_pitch_rad: -0.05
+      duration_s: 2.0
+    task_context:
+      skill_family: social
+      intent: attend_to_person
+      raw_perception_to_policy: false
+    environment_context:
+      terrain_type: flat
+      person_target_required: true
+      target_representation: bounded_yaw_pitch
+    expected_outcome:
+      head_motion: tracks_structured_target_then_returns_safe
+      final_state: stable_attention_pose
+    safety_checks:
+      - no_fall
+      - target_is_structured_not_raw_perception
+      - head_joint_limits_respected
+      - no_hardware_actuation
+    timeout_s: 4.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: target_yaw_error_rad
+        operator: less_equal
+        value: 0.08
+      - name: target_pitch_error_rad
+        operator: less_equal
+        value: 0.08
+    validation:
+      dry_run: ./scripts/evaluate_scripted_social_skills.sh --skill look_at_person --json
+
+  - id: head_gestures.expressive_idle_while_speaking
+    status: mujoco_eval_ready
+    priority: 50
+    natural_language_command: Use expressive idle while speaking.
+    target_skill: express_attention
+    scenario_id: look_direction_stationary_v1
+    external_capabilities:
+      - chromie.speech
+    parameters:
+      style: curious
+      duration_s: 5.0
+      speech_owned_by: chromie
+    task_context:
+      skill_family: social
+      intent: speech_synchronized_body_idle
+      speech_text_to_policy: false
+    environment_context:
+      terrain_type: flat
+      person_target_required: false
+    expected_outcome:
+      head_motion: subtle_bounded_attention_motion
+      final_state: stable_neutral_head
+    safety_checks:
+      - no_fall
+      - speech_does_not_change_low_level_policy_input
+      - head_joint_limits_respected
+      - no_hardware_actuation
+    timeout_s: 7.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: head_yaw_range_rad
+        operator: greater_equal
+        value: 0.12
+      - name: head_roll_range_rad
+        operator: less_equal
+        value: 0.05
+    validation:
+      dry_run: ./scripts/evaluate_scripted_social_skills.sh --skill express_attention --json

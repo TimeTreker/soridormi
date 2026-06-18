@@ -95,6 +95,8 @@ services:
     volumes:
       - ./src:/app/src
       - ./configs:/app/configs:${SORIDORMI_CONFIGS_MOUNT_MODE:-ro}
+      - ./training_cases:/app/training_cases:ro
+      - ./task_acceptance_cases:/app/task_acceptance_cases:ro
       - ./tests:/app/tests:ro
       - ./scripts:/app/scripts:ro
       - ./pyproject.toml:/app/pyproject.toml:ro
@@ -178,6 +180,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./configs:/app/configs:${SORIDORMI_CONFIGS_MOUNT_MODE:-ro}
+      - ./task_acceptance_cases:/app/task_acceptance_cases:ro
       - ./tests:/app/tests:ro
       - ./scripts:/app/scripts:ro
       - ./pyproject.toml:/app/pyproject.toml:ro

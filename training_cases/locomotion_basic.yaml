@@ -1,0 +1,251 @@
+schema_version: soridormi.training_cases.v1
+suite_id: locomotion_basic
+title: Basic locomotion curriculum
+robot_profile: open_duck_mini_v2
+owner: soridormi
+purpose: Bounded MuJoCo-first locomotion cases for standing, walking, turning, stopping, and tiny reverse motion.
+policy_boundary:
+  natural_language_to_low_level_policy: false
+  low_level_output: action_14d
+  planner_role: Translate user commands into structured skill parameters and scenario context.
+cases:
+  - id: locomotion_basic.stand_still_safe
+    status: mujoco_eval_ready
+    priority: 10
+    natural_language_command: Stand still safely.
+    target_skill: stand_idle
+    scenario_id: start_stop_velocity_ramp_v1
+    parameters:
+      duration_s: 5.0
+    task_context:
+      skill_family: posture
+      intent: stable_idle
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: remain_near_start
+      final_state: neutral_standing_idle
+    safety_checks:
+      - no_fall
+      - base_height_above_threshold
+      - joint_limits_respected
+      - no_hardware_actuation
+    timeout_s: 8.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: max_xy_drift_m
+        operator: less_equal
+        value: 0.05
+      - name: final_speed_mps
+        operator: less_equal
+        value: 0.03
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh stand_idle --args '{"duration_s":5.0}'
+      mujoco: ./scripts/run_skill_in_sim.sh stand_idle --backend mujoco --profile open_duck_forward
+
+  - id: locomotion_basic.walk_forward_slow_medium_fast
+    status: training_ready
+    priority: 20
+    natural_language_command: Walk forward at slow, medium, and fast safe speeds.
+    target_skill: walk_velocity
+    scenario_id: flat_walk_varied_speed_v1
+    parameters:
+      speed_bands:
+        - label: slow
+          vx_mps: 0.06
+        - label: medium
+          vx_mps: 0.14
+        - label: fast_safe
+          vx_mps: 0.22
+      vy_mps: 0.0
+      yaw_radps: 0.0
+      duration_s: 6.0
+      ramp: smooth_start
+    task_context:
+      skill_family: locomotion
+      intent: forward_progress
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: forward_progress_with_bounded_speed_tracking
+      final_state: walking_or_ready_to_stop
+    safety_checks:
+      - no_fall
+      - speed_within_manifest_command_space
+      - stuck_ratio_below_threshold
+      - no_hardware_actuation
+    timeout_s: 9.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: forward_progress_m
+        operator: greater_equal
+        value: 0.15
+      - name: stuck_ratio
+        operator: less_equal
+        value: 0.2
+    validation:
+      mujoco: ./scripts/evaluate_scenario_rollout.sh --scenario flat_walk_varied_speed_v1 --backend mujoco --profile open_duck_forward
+
+  - id: locomotion_basic.stop_cleanly
+    status: training_ready
+    priority: 30
+    natural_language_command: Stop cleanly.
+    target_skill: stop
+    scenario_id: start_stop_velocity_ramp_v1
+    parameters:
+      initial_vx_mps: 0.12
+      stop_ramp_s: 1.5
+      hold_after_stop_s: 2.0
+    task_context:
+      skill_family: locomotion
+      intent: commanded_stop
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: decelerate_without_fall
+      final_state: stable_standing_idle
+    safety_checks:
+      - no_fall
+      - terminal_speed_below_threshold
+      - no_overshoot_after_stop
+      - no_hardware_actuation
+    timeout_s: 7.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: terminal_speed_mps
+        operator: less_equal
+        value: 0.03
+      - name: settle_time_s
+        operator: less_equal
+        value: 2.0
+    validation:
+      mujoco: ./scripts/evaluate_scenario_rollout.sh --scenario start_stop_velocity_ramp_v1 --backend mujoco --profile open_duck_forward
+
+  - id: locomotion_basic.turn_left_right_in_place
+    status: mujoco_eval_ready
+    priority: 40
+    natural_language_command: Turn left and right in place.
+    target_skill: turn_in_place
+    scenario_id: curve_turn_walk_v1
+    parameters:
+      yaw_radps_values:
+        - -0.18
+        - 0.18
+      vx_mps: 0.0
+      duration_s: 4.0
+      ramp: turn_stop
+    task_context:
+      skill_family: locomotion
+      intent: yaw_rotation
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: bounded_yaw_change_with_low_translation
+      final_state: stable_ready_pose
+    safety_checks:
+      - no_fall
+      - yaw_command_within_manifest_command_space
+      - lateral_drift_below_threshold
+      - no_hardware_actuation
+    timeout_s: 7.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: yaw_tracking_error_rad
+        operator: less_equal
+        value: 0.35
+      - name: max_xy_drift_m
+        operator: less_equal
+        value: 0.12
+    validation:
+      mujoco: ./scripts/evaluate_scenario_rollout.sh --scenario curve_turn_walk_v1 --backend mujoco --profile open_duck_forward
+
+  - id: locomotion_basic.curve_walk
+    status: training_ready
+    priority: 50
+    natural_language_command: Curve walk.
+    target_skill: curve_walk
+    scenario_id: curve_turn_walk_v1
+    parameters:
+      vx_mps: 0.10
+      yaw_radps: 0.12
+      duration_s: 6.0
+      ramp: straight_curve_straight
+    task_context:
+      skill_family: locomotion
+      intent: curved_forward_progress
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: forward_progress_with_heading_change
+      final_state: stable_ready_pose
+    safety_checks:
+      - no_fall
+      - forward_progress_required
+      - stuck_ratio_below_threshold
+      - no_hardware_actuation
+    timeout_s: 9.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: forward_progress_m
+        operator: greater_equal
+        value: 0.06
+      - name: stuck_ratio
+        operator: less_equal
+        value: 0.3
+    validation:
+      mujoco: ./scripts/evaluate_scenario_rollout.sh --scenario curve_turn_walk_v1 --backend mujoco --profile open_duck_forward
+
+  - id: locomotion_basic.backward_tiny_step
+    status: planned
+    priority: 60
+    natural_language_command: Take a tiny step backward.
+    target_skill: walk_backward
+    scenario_id: flat_walk_varied_speed_v1
+    parameters:
+      vx_mps: -0.02
+      duration_s: 2.0
+      ramp: smooth_start
+    task_context:
+      skill_family: locomotion
+      intent: tiny_reverse_reposition
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: small_reverse_displacement_without_fall
+      final_state: stable_standing_idle
+    safety_checks:
+      - no_fall
+      - reverse_speed_within_manifest_command_space
+      - stop_after_step
+      - no_hardware_actuation
+    timeout_s: 5.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: reverse_displacement_m
+        operator: between
+        value:
+          - 0.01
+          - 0.08
+      - name: terminal_speed_mps
+        operator: less_equal
+        value: 0.03
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh walk_backward --args '{"vx_mps":-0.02,"duration_s":2.0}'

@@ -32,6 +32,7 @@
     "trajectory_policy",
     "residual_policy",
     "future_policy",
+    "navigation_pipeline",
     "future_hardware_extension",
     "composite"
   ],
@@ -95,6 +96,10 @@
     {
       "id": "M7F_obstacle_and_terrain",
       "goal": "Trajectory tracking and obstacle-aware clearance via evaluation and residual/RL."
+    },
+    {
+      "id": "M7F2_navigation_goal_pipeline",
+      "goal": "Resolve world goals into bounded local route segments before any locomotion controller runs."
     },
     {
       "id": "M7G_fast_locomotion",
@@ -754,6 +759,68 @@
         "stuck_ratio"
       ],
       "notes": "This is the correct target for interactive movement: not merely survive, but follow the requested trajectory."
+    },
+    {
+      "id": "navigate_to_target",
+      "category": "navigation",
+      "display_name": "Navigate To Target",
+      "description": "Move toward a resolved world target by sensing, localizing, routing, planning short local trajectory segments, and executing only bounded locomotion skills. This skill must refuse raw natural-language goals such as 'the house' until a trusted target resolver supplies structured target and route data.",
+      "status": "future_perception",
+      "execution": "navigation_pipeline",
+      "implementation_phase": "M7F2_navigation_goal_pipeline",
+      "parameters": {
+        "target_ref": {
+          "type": "string"
+        },
+        "max_distance_m": {
+          "min": 0.1,
+          "max": 3.0,
+          "default": 0.5
+        },
+        "max_duration_s": {
+          "min": 1.0,
+          "max": 30.0,
+          "default": 10.0
+        },
+        "goal_tolerance_m": {
+          "min": 0.05,
+          "max": 0.5,
+          "default": 0.2
+        }
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen",
+        "target_resolved",
+        "robot_localized",
+        "route_validated",
+        "local_obstacle_check_clear",
+        "validated_local_trajectory"
+      ],
+      "required_actuator_groups": [
+        "legs",
+        "head_neck"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "target_resolution_required",
+        "route_validity",
+        "local_obstacle_clearance",
+        "progress_to_goal_m",
+        "cross_track_error",
+        "stuck_ratio",
+        "safe_stop_on_unknown_target"
+      ],
+      "notes": "This is the missing bridge between Chromie language goals and Soridormi body control. Chromie may say the user asked for a house, but Soridormi must only receive a structured navigation goal with target pose/bearing, confidence, route segments, and local safety context."
     },
     {
       "id": "step_over_obstacle",

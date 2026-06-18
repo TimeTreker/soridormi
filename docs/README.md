@@ -17,6 +17,20 @@ be committed.
   boundary, milestone direction, and current policy evidence.
 - `docs/SORIDORMI_EXECUTION_ROADMAP.md`: gated milestone sequence, acceptance
   criteria, major risks, and immediate execution plan.
+- `docs/CHROMIE_SORIDORMI_MULTI_AGENT_ARCHITECTURE.md`: agreed Chromie brain
+  and Soridormi body-agent boundary.
+- `docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md`: staged plan for
+  adding Soridormi task-level MCP APIs, embodied task schemas, and the internal
+  task state machine.
+- `task_acceptance_cases/mcp_task_acceptance.yaml`: no-motion acceptance cases
+  for Chromie-facing Soridormi task submissions and fail-closed embodied goals.
+- `configs/task_capabilities/open_duck_mini_v2_task_capabilities.json`:
+  Soridormi-owned readiness table for task-level MCP capabilities.
+- `scripts/validate_m11_task_agent_contract.sh`: one-command M11A gate for the
+  no-motion Chromie/Soridormi task-agent contract, task graph surface, task
+  capability manifest, and acceptance cases.
+- `scripts/demo_task_mcp_contract.sh`: local no-motion demo for the
+  Chromie-to-Soridormi task MCP boundary.
 - `docs/SORIDORMI_NEURAL_PARAMETER_ADAPTIVE_MPC_WBC.md`: future
   neural parameter-adaptive MPC/WBC controller design; NN estimates model
   error while MPC/WBC enforces physics.

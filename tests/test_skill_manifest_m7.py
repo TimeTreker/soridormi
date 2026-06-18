@@ -24,6 +24,7 @@ REQUIRED_SKILLS = {
     "sidestep_left",
     "sidestep_right",
     "trajectory_follow",
+    "navigate_to_target",
     "step_over_obstacle",
     "rough_ground_walk",
     "run",
@@ -82,7 +83,7 @@ def test_skill_ids_are_unique_and_categorized() -> None:
     assert len(skill_ids) == len(set(skill_ids))
 
     categories = {skill["category"] for skill in manifest["skills"]}
-    assert {"locomotion", "posture", "social", "hardware_extension"} <= categories
+    assert {"locomotion", "navigation", "posture", "social", "hardware_extension"} <= categories
 
 
 def test_status_and_execution_values_are_declared() -> None:
@@ -172,6 +173,8 @@ def test_head_social_skills_are_planned_without_arm_requirement() -> None:
 
 def test_obstacle_run_and_posture_remain_future_not_executable() -> None:
     skills = _skills_by_id()
+    assert skills["navigate_to_target"]["status"] == "future_perception"
+    assert skills["navigate_to_target"]["execution"] == "navigation_pipeline"
     assert skills["step_over_obstacle"]["status"] == "future_residual_rl"
     assert skills["rough_ground_walk"]["status"] == "future_residual_rl"
     assert skills["run"]["status"] == "future"

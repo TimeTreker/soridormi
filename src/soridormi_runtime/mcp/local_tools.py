@@ -9,6 +9,8 @@ from typing import Any
 from soridormi_runtime.skill_execution import SkillExecutionRegistry, SkillPlan
 from soridormi_runtime.skill_manifest import DEFAULT_SKILL_MANIFEST
 
+from .task_tools import EmbodiedTaskStore, task_capabilities_payload
+
 _MAX_COMMANDS = 8
 _MAX_TOTAL_DURATION_S = 20.0
 _NO_FAULT_RESULT = object()
@@ -120,6 +122,7 @@ class SoridormiLocalToolService:
             DEFAULT_SKILL_MANIFEST
         )
     )
+    task_store: EmbodiedTaskStore = field(default_factory=EmbodiedTaskStore)
     faults: FaultInjection = field(default_factory=FaultInjection)
     _lock: RLock = field(default_factory=RLock, init=False, repr=False)
 
@@ -147,15 +150,61 @@ class SoridormiLocalToolService:
             if tool_name == "soridormi.motion.execute_plan":
                 return self.execute_motion_plan(str(args.get("plan_id", "")))
             if tool_name == "soridormi.motion.stop":
-                return {"stopped": True, "summary": "Soridormi local dry-run stop accepted."}
+                return {
+                    "stopped": True,
+                    "safe_idle": not self.emergency_stop,
+                    "summary": "Soridormi local dry-run stop accepted.",
+                }
             if tool_name == "soridormi.motion.cancel":
-                return {"cancelled": True, "summary": "Soridormi local dry-run motion cancel accepted."}
+                return {
+                    "cancelled": True,
+                    "safe_idle": not self.emergency_stop,
+                    "summary": "Soridormi local dry-run motion cancel accepted.",
+                }
             if tool_name == "soridormi.skill.list":
                 return self.list_skills()
             if tool_name == "soridormi.skill.create_plan":
                 return self.create_skill_plan(args)
             if tool_name == "soridormi.skill.execute_plan":
                 return self.execute_skill_plan(str(args.get("plan_id", "")))
+            if tool_name == "soridormi.task.get_capabilities":
+                return task_capabilities_payload(
+                    mode=self.mode,
+                    backend=self.backend,
+                    emergency_stop=self.emergency_stop,
+                    skill_registry=self.skill_registry,
+                )
+            if tool_name == "soridormi.task.preview":
+                return self.task_store.preview_task(
+                    args,
+                    mode=self.mode,
+                    backend=self.backend,
+                    emergency_stop=self.emergency_stop,
+                    skill_registry=self.skill_registry,
+                )
+            if tool_name == "soridormi.task.submit":
+                return self.task_store.submit_task(
+                    args,
+                    mode=self.mode,
+                    backend=self.backend,
+                    emergency_stop=self.emergency_stop,
+                    skill_registry=self.skill_registry,
+                )
+            if tool_name == "soridormi.task.status":
+                return self.task_store.task_status(
+                    args,
+                    emergency_stop=self.emergency_stop,
+                )
+            if tool_name == "soridormi.task.events":
+                return self.task_store.task_events(
+                    args,
+                    emergency_stop=self.emergency_stop,
+                )
+            if tool_name == "soridormi.task.cancel":
+                return self.task_store.cancel_task(
+                    args,
+                    emergency_stop=self.emergency_stop,
+                )
             if tool_name == "soridormi.safety.monitor_motion":
                 return {
                     "ok": not self.emergency_stop,
@@ -166,6 +215,7 @@ class SoridormiLocalToolService:
                 return {
                     "stopped": True,
                     "emergency": True,
+                    "safe_idle": False,
                     "reason": args.get("reason", "unspecified"),
                 }
             raise KeyError(f"unknown Soridormi local tool: {tool_name}")
@@ -235,6 +285,7 @@ class SoridormiLocalToolService:
             "fallen": False,
             "emergency_stop": self.emergency_stop,
             "active_task": None,
+            "safe_idle": not self.emergency_stop,
         }
 
     def list_skills(self) -> dict[str, Any]:

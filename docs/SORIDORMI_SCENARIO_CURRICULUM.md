@@ -4,6 +4,47 @@ This document defines the first MuJoCo-first scenario curriculum for Soridormi, 
 
 The curriculum is intentionally broader than the skills that are currently executable. The registry can include future scenarios, but only scenarios that pass static checks, simulation checks, and dataset coverage checks should be promoted into collector or evaluator defaults.
 
+## Training and acceptance case library
+
+Soridormi also keeps a structured training/evaluation case library in `training_cases/`.
+These YAML suites map natural-language interaction requests to bounded Soridormi
+skills, parameters, expected outcomes, safety checks, timeouts, and pass/fail
+metrics:
+
+- `training_cases/locomotion_basic.yaml`
+- `training_cases/head_gestures.yaml`
+- `training_cases/compound_skills.yaml`
+- `training_cases/safety_recovery.yaml`
+- `training_cases/chromie_interaction_commands.yaml`
+- `training_cases/navigation_goals.yaml`
+
+The library is intentionally an acceptance contract, not a license to pass raw
+language into the low-level policy. Chromie or another planner may translate a
+request such as "turn left then nod twice" into structured skill invocations,
+but Soridormi still consumes bounded skill parameters and scenario context.
+Cases with `planned` status document the desired curriculum without making them
+eligible for training promotion.
+
+Task-level MCP acceptance cases live separately in
+`task_acceptance_cases/mcp_task_acceptance.yaml`. Those cases replay against
+`soridormi.task.preview` and `soridormi.task.submit` and validate the
+brain/body boundary for examples such as "walk forward for 10 seconds", "turn
+left then nod twice", "bring me water", and "walk forward to the house". They
+are no-motion contract tests, not low-level locomotion training data. The task
+outputs may include `plan_steps` and `blocked_subsystems` to document the
+embodied layers that are executable, held, or missing.
+They also include `task_graph`, a derived body-DAG view for monitoring the
+Soridormi-owned task skeleton without exposing raw robot control.
+They also assert `recommended_next_actions` so the examples preserve the safe
+Chromie routing behavior: report blocked goals, call stop tools for immediate
+stop, and never lower rich missing-capability goals into velocity recipes.
+
+The readiness surface behind those cases is `soridormi.task.get_capabilities`.
+It is Soridormi-owned and backed by
+`configs/task_capabilities/open_duck_mini_v2_task_capabilities.json`. Update
+that config when new sensing, localization, routing, manipulation, recovery, or
+execution subsystems become real.
+
 ## Policy contract
 
 Soridormi's low-level policy should remain structured and bounded:

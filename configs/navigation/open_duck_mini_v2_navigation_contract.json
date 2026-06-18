@@ -1,0 +1,125 @@
+{
+  "schema_version": "soridormi.navigation_contract.v1",
+  "robot_profile": "open_duck_mini_v2",
+  "purpose": "Define the missing navigation-goal layer between Chromie language requests and Soridormi low-level body control.",
+  "natural_language_allowed": false,
+  "example_rejected_request": "walk forward to the house",
+  "reason": "The robot body runtime cannot infer house identity, location, route, obstacles, or stopping conditions from raw language.",
+  "pipeline": [
+    {
+      "stage": "target_resolution",
+      "owner": "chromie_or_perception_adapter",
+      "input": "natural language, object memory, map labels, perception detections",
+      "output": "structured target_ref plus candidate target pose or bearing",
+      "required": true
+    },
+    {
+      "stage": "localization",
+      "owner": "soridormi_navigation",
+      "input": "robot state and approved localization source",
+      "output": "bounded robot pose estimate with confidence",
+      "required": true
+    },
+    {
+      "stage": "route_planning",
+      "owner": "soridormi_navigation",
+      "input": "target pose, robot pose, map or local traversability context",
+      "output": "short route or body-frame waypoint segments",
+      "required": true
+    },
+    {
+      "stage": "local_motion_planning",
+      "owner": "soridormi_navigation",
+      "input": "route segment, obstacle context, gait limits",
+      "output": "bounded local trajectory or velocity segment",
+      "required": true
+    },
+    {
+      "stage": "body_execution",
+      "owner": "soridormi_runtime",
+      "input": "bounded trajectory segment or velocity command",
+      "output": "motor-safe skill execution and telemetry",
+      "required": true
+    }
+  ],
+  "structured_goal_schema": {
+    "type": "object",
+    "required": [
+      "goal_id",
+      "target_ref",
+      "target_type",
+      "target_confidence",
+      "max_distance_m",
+      "max_duration_s",
+      "stop_condition"
+    ],
+    "properties": {
+      "goal_id": {"type": "string"},
+      "target_ref": {"type": "string"},
+      "target_type": {
+        "type": "string",
+        "enum": ["person", "object", "place", "waypoint", "relative_pose"]
+      },
+      "target_confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+      "target_pose": {
+        "type": ["object", "null"],
+        "properties": {
+          "frame_id": {"type": "string"},
+          "x_m": {"type": "number"},
+          "y_m": {"type": "number"},
+          "yaw_rad": {"type": "number"}
+        }
+      },
+      "target_bearing": {
+        "type": ["object", "null"],
+        "properties": {
+          "frame_id": {"type": "string"},
+          "distance_m": {"type": "number"},
+          "yaw_rad": {"type": "number"}
+        }
+      },
+      "max_distance_m": {"type": "number", "minimum": 0.1, "maximum": 3.0},
+      "max_duration_s": {"type": "number", "minimum": 1.0, "maximum": 30.0},
+      "stop_condition": {
+        "type": "string",
+        "enum": [
+          "goal_tolerance",
+          "obstacle_detected",
+          "lost_target",
+          "timeout",
+          "operator_cancel"
+        ]
+      }
+    }
+  },
+  "refusal_conditions": [
+    "raw_natural_language_goal",
+    "unknown_target_ref",
+    "target_confidence_below_threshold",
+    "missing_robot_localization",
+    "missing_route",
+    "route_intersects_unknown_obstacle",
+    "requested_distance_exceeds_bound",
+    "requested_duration_exceeds_bound",
+    "emergency_stop_active",
+    "fallen_or_unstable"
+  ],
+  "low_level_policy_boundary": {
+    "natural_language_to_policy": false,
+    "raw_perception_to_policy": false,
+    "allowed_policy_inputs": [
+      "robot_state",
+      "desired_command_or_local_trajectory",
+      "task_context",
+      "environment_context",
+      "short_history"
+    ],
+    "low_level_output": "action_14d"
+  },
+  "current_status": {
+    "navigate_to_target": "future_perception",
+    "trajectory_follow": "future_evaluation",
+    "hardware_enabled": false,
+    "mujoco_first": true
+  }
+}

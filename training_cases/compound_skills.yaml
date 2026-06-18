@@ -1,0 +1,237 @@
+schema_version: soridormi.training_cases.v1
+suite_id: compound_skills
+title: Combined task curriculum
+robot_profile: open_duck_mini_v2
+owner: soridormi
+purpose: Multi-skill cases that verify composition, sequencing, cancellation, and speech/body separation.
+policy_boundary:
+  natural_language_to_low_level_policy: false
+  low_level_output: action_14d
+  planner_role: Convert compound language into ordered, interruptible Soridormi skill invocations.
+cases:
+  - id: compound_skills.walk_while_speaking
+    status: planned
+    priority: 10
+    natural_language_command: Walk while speaking.
+    target_skill: walk_velocity
+    scenario_id: flat_walk_varied_speed_v1
+    external_capabilities:
+      - chromie.speech
+    parameters:
+      vx_mps: 0.08
+      duration_s: 6.0
+      concurrent_body_overlay: express_attention
+      speech_owned_by: chromie
+    task_context:
+      skill_family: compound
+      intent: locomotion_with_speech
+      speech_text_to_policy: false
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: slow_forward_progress
+      head_motion: subtle_attention_motion_only_if_stability_allows
+      final_state: stable_ready_pose
+    safety_checks:
+      - no_fall
+      - locomotion_priority_over_expression
+      - speech_separate_from_low_level_policy
+      - no_hardware_actuation
+    timeout_s: 9.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: forward_progress_m
+        operator: greater_equal
+        value: 0.10
+      - name: body_overlay_cancelled_on_instability
+        operator: equals
+        value: true
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":0.08,"duration_s":6.0}'
+
+  - id: compound_skills.walk_then_nod
+    status: planned
+    priority: 20
+    natural_language_command: Walk then nod.
+    target_skill: walk_velocity
+    scenario_id: start_stop_velocity_ramp_v1
+    sequence:
+      - skill: walk_velocity
+        parameters:
+          vx_mps: 0.10
+          duration_s: 4.0
+      - skill: stop
+        parameters:
+          stop_ramp_s: 1.0
+      - skill: nod_yes
+        parameters:
+          count: 1
+          amplitude: small
+          duration_s: 1.2
+    parameters:
+      interruptible: true
+    task_context:
+      skill_family: compound
+      intent: sequential_locomotion_social_ack
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: walk_stop_then_head_gesture
+      final_state: stable_neutral_head
+    safety_checks:
+      - no_fall
+      - nod_only_after_stop_or_stable_velocity
+      - terminal_speed_before_nod_below_threshold
+      - no_hardware_actuation
+    timeout_s: 8.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: terminal_speed_before_nod_mps
+        operator: less_equal
+        value: 0.04
+      - name: sequence_completed
+        operator: equals
+        value: true
+    validation:
+      dry_run: ./scripts/evaluate_scripted_social_skills.sh --skill nod_yes --json
+
+  - id: compound_skills.turn_then_look_at_person
+    status: planned
+    priority: 30
+    natural_language_command: Turn, then look at the person.
+    target_skill: turn_in_place
+    scenario_id: curve_turn_walk_v1
+    sequence:
+      - skill: turn_in_place
+        parameters:
+          yaw_radps: 0.14
+          duration_s: 3.0
+      - skill: look_at_person
+        parameters:
+          target_source: structured_person_target
+          target_yaw_rad: 0.10
+          target_pitch_rad: -0.04
+          duration_s: 1.5
+    parameters:
+      interruptible: true
+    task_context:
+      skill_family: compound
+      intent: reorient_then_attend
+      raw_perception_to_policy: false
+    environment_context:
+      terrain_type: flat
+      person_target_required: true
+      target_representation: bounded_yaw_pitch
+    expected_outcome:
+      base_motion: bounded_turn_then_stable_attention
+      final_state: stable_attention_pose
+    safety_checks:
+      - no_fall
+      - structured_target_only
+      - look_starts_after_turn_settles
+      - no_hardware_actuation
+    timeout_s: 8.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: turn_settle_speed_mps
+        operator: less_equal
+        value: 0.04
+      - name: target_yaw_error_rad
+        operator: less_equal
+        value: 0.10
+    validation:
+      dry_run: ./scripts/evaluate_scripted_social_skills.sh --skill look_at_person --json
+
+  - id: compound_skills.stop_during_walking
+    status: mujoco_eval_ready
+    priority: 40
+    natural_language_command: Stop during walking.
+    target_skill: stop
+    scenario_id: start_stop_velocity_ramp_v1
+    parameters:
+      initial_vx_mps: 0.12
+      interrupt_at_s: 2.0
+      stop_ramp_s: 0.8
+      hold_after_stop_s: 2.0
+    task_context:
+      skill_family: compound
+      intent: interrupt_locomotion_to_stop
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: stop_promptly_without_fall
+      final_state: stable_standing_idle
+    safety_checks:
+      - no_fall
+      - stop_command_preempts_walk
+      - terminal_speed_below_threshold
+      - no_hardware_actuation
+    timeout_s: 7.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: stop_latency_s
+        operator: less_equal
+        value: 1.5
+      - name: terminal_speed_mps
+        operator: less_equal
+        value: 0.03
+    validation:
+      mujoco: ./scripts/evaluate_scenario_rollout.sh --scenario start_stop_velocity_ramp_v1 --backend mujoco --profile open_duck_forward
+
+  - id: compound_skills.cancel_during_multi_step_action
+    status: planned
+    priority: 50
+    natural_language_command: Cancel during a multi-step action.
+    target_skill: stop
+    scenario_id: start_stop_velocity_ramp_v1
+    sequence:
+      - skill: walk_velocity
+        parameters:
+          vx_mps: 0.10
+          duration_s: 5.0
+      - skill: nod_yes
+        parameters:
+          count: 2
+          duration_s: 2.0
+    parameters:
+      cancel_at_s: 2.5
+      fallback_skill: stop
+    task_context:
+      skill_family: compound
+      intent: cancel_interrupt_recovery
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: controlled_stop
+      final_state: safe_idle
+      skipped_steps_after_cancel: true
+    safety_checks:
+      - no_fall
+      - cancel_preempts_remaining_sequence
+      - fallback_stop_or_stand_idle
+      - no_hardware_actuation
+    timeout_s: 7.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: post_cancel_action_count
+        operator: equals
+        value: 0
+      - name: final_speed_mps
+        operator: less_equal
+        value: 0.03
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh stop --args '{"duration_s":2.0}'

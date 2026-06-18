@@ -12,6 +12,12 @@ Soridormi exports robot tools such as:
 - `soridormi.motion.create_plan`
 - `soridormi.motion.execute_plan`
 - `soridormi.motion.stop`
+- `soridormi.task.get_capabilities`
+- `soridormi.task.preview`
+- `soridormi.task.submit`
+- `soridormi.task.status`
+- `soridormi.task.events`
+- `soridormi.task.cancel`
 - `soridormi.safety.monitor_motion`
 - `soridormi.safety.emergency_stop`
 
@@ -52,6 +58,43 @@ A safe short-motion DAG should follow this shape:
 `stop` and `emergency_stop` may preempt any running motion task. Raw motor,
 joint, and torque APIs must remain outside LLM-visible manifests.
 
+A rich embodied task DAG should keep global reasoning in Chromie and submit only
+structured body goals to Soridormi:
+
+1. `chromie` resolves the user request, ambiguity, and confirmation.
+2. `soridormi.task.get_capabilities` reads Soridormi-owned embodied readiness when Chromie needs current support/missing-subsystem state.
+3. `soridormi.task.preview` inspects Soridormi's no-motion embodied interpretation when clarification, refusal explanation, or pre-confirmation planning is useful.
+4. `soridormi.task.submit` records the structured embodied goal when Chromie decides to create the task.
+5. `soridormi.task.status` or `soridormi.task.events` reports progress.
+6. `soridormi.task.cancel`, `soridormi.motion.stop`, or
+   `soridormi.safety.emergency_stop` handles cancellation or safety stop.
+7. `chromie.report` tells the user the result.
+
+In M11, `soridormi.task.preview` and `soridormi.task.submit` are contract-only
+and no-motion. Preview uses `preview_id` and does not persist a task record.
+Submit uses `task_id` and records lifecycle state. They are schema and lifecycle
+boundaries, not navigation, manipulation, or autonomous execution claims.
+`soridormi.task.get_capabilities` is the body-runtime readiness source for
+which task types are dry-run ready, held, safety-redirected, or future-blocked.
+That readiness source is the Soridormi config file
+`configs/task_capabilities/open_duck_mini_v2_task_capabilities.json`; Chromie
+should treat the MCP response as the runtime view of that body-owned contract.
+`soridormi.task.status` reports `phase`, `terminal`, and
+`allowed_next_phases`; simple supported tasks may complete as `skill_dry_run`,
+and bounded multi-step requests may complete as `skill_sequence_dry_run`.
+Cross-agent tasks currently stop at the Soridormi-owned `planning` hold.
+Blocked tasks can expose `plan_steps` and `blocked_subsystems` so Chromie's
+global DAG can report why Soridormi refused or held the request without
+inventing a lower-level workaround.
+They also expose `task_graph`, which is Soridormi's body-side DAG view with
+node IDs, sequence edges, current phase, terminal state, and
+`raw_control_allowed=false`. Chromie can read this graph for monitoring, but it
+must not merge Soridormi's body graph into raw motor or policy outputs.
+`recommended_next_actions` provides the routing bridge back to Chromie: preview
+may recommend `submit_task_when_confirmed`, stop requests recommend the
+dedicated stop tools, and missing navigation/manipulation/perception recommends
+reporting or clarifying instead of lowering to `walk_velocity`.
+
 ## Tool services
 
 Soridormi includes a small in-process dry-run tool service:
@@ -62,8 +105,8 @@ from soridormi_runtime.mcp.local_tools import SoridormiLocalToolService
 
 It implements the robot-body tools declared in the manifest, but motion execution
 is dry-run only. It validates bounded velocity commands, creates short-lived plan
-IDs, and refuses execution after an emergency stop. It never sends motor, joint,
-or torque commands.
+IDs, records contract-only task requests, and refuses execution after an
+emergency stop. It never sends motor, joint, or torque commands.
 
 A CLI wrapper is available for smoke tests and future adapter work:
 

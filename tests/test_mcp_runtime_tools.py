@@ -197,6 +197,7 @@ def test_runtime_stop_preempts_long_running_plan() -> None:
         result = await asyncio.wait_for(execution, timeout=1.0)
 
         assert stopped["stopped"] is True
+        assert stopped["safe_idle"] is True
         assert result["completed"] is False
         assert result["stopped"] is True
         assert service.active_task is None
@@ -228,13 +229,105 @@ def test_runtime_emergency_stop_preempts_and_persists() -> None:
         status = await service.call_tool("soridormi.robot.get_status", {})
 
         assert emergency["stopped"] is True
+        assert emergency["safe_idle"] is False
         assert result["completed"] is False
         assert status["emergency_stop"] is True
+        assert status["safe_idle"] is False
         with pytest.raises(RuntimeError, match="emergency_stop"):
             await service.call_tool(
                 "soridormi.motion.execute_plan",
                 {"plan_id": plan["plan_id"]},
             )
+
+    asyncio.run(exercise())
+
+
+def test_runtime_task_api_completes_skill_dry_run_without_motion() -> None:
+    async def exercise() -> None:
+        service = _service()
+
+        submitted = await service.call_tool(
+            "soridormi.task.submit",
+            {
+                "task_type": "perform_gesture",
+                "summary": "nod twice",
+                "parameters": {"gesture": "nod_yes", "count": 2},
+            },
+        )
+        status = await service.call_tool(
+            "soridormi.task.status",
+            {"task_id": submitted["task_id"]},
+        )
+        events = await service.call_tool(
+            "soridormi.task.events",
+            {"task_id": submitted["task_id"]},
+        )
+
+        assert submitted["accepted"] is True
+        assert submitted["status"] == "completed"
+        assert submitted["phase"] == "completed"
+        assert submitted["terminal"] is True
+        assert submitted["execution_mode"] == "skill_dry_run"
+        assert submitted["no_motion"] is True
+        assert submitted["skill_id"] == "nod_yes"
+        assert status["task_type"] == "perform_gesture"
+        assert status["phase"] == "completed"
+        assert events["schema_version"] == "soridormi.task_events.v1"
+        assert events["terminal"] is True
+        assert events["safe_idle"] is True
+        assert events["latest_sequence"] == events["next_after_sequence"]
+        assert events["poll_recommendation"]["action"] == "stop_polling"
+        assert service.active_task is None
+
+    asyncio.run(exercise())
+
+
+def test_runtime_task_preview_does_not_create_status_record() -> None:
+    async def exercise() -> None:
+        service = _service()
+
+        preview = await service.call_tool(
+            "soridormi.task.preview",
+            {
+                "task_type": "navigate_to_location",
+                "summary": "walk forward to the house",
+                "parameters": {"target_label": "house"},
+            },
+        )
+
+        assert preview["preview_id"].startswith("soridormi-preview-")
+        assert preview["persistent"] is False
+        assert preview["reason_code"] == "missing_navigation_pipeline"
+        assert preview["plan_steps"]
+        assert preview["task_graph"]["schema_version"] == "soridormi.task_graph.v1"
+        assert preview["task_graph"]["task_ref"] == preview["preview_id"]
+        assert preview["task_graph"]["raw_control_allowed"] is False
+        with pytest.raises(KeyError, match="task not found"):
+            await service.call_tool(
+                "soridormi.task.status",
+                {"task_id": preview["preview_id"]},
+            )
+
+    asyncio.run(exercise())
+
+
+def test_runtime_task_get_capabilities_reports_readiness() -> None:
+    async def exercise() -> None:
+        service = _service()
+
+        payload = await service.call_tool("soridormi.task.get_capabilities", {})
+        by_type = {
+            task["task_type"]: task
+            for task in payload["task_types"]
+        }
+
+        assert payload["schema_version"] == "soridormi.task_capabilities.v1"
+        assert payload["mode"] == "sim"
+        assert payload["task_api_no_motion"] is True
+        assert "nod_yes" in payload["executable_skill_ids"]
+        assert by_type["perform_gesture"]["readiness"] == "skill_dry_run_ready"
+        assert by_type["deliver_object"]["readiness"] == "future_blocked"
+        assert "manipulation_capability" in by_type["deliver_object"]["missing_subsystems"]
 
     asyncio.run(exercise())
 

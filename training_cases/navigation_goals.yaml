@@ -1,0 +1,133 @@
+schema_version: soridormi.training_cases.v1
+suite_id: navigation_goals
+title: Navigation goal resolution curriculum
+robot_profile: open_duck_mini_v2
+owner: soridormi
+purpose: Acceptance cases for resolving place/object goals into safe local motion plans before body control.
+policy_boundary:
+  natural_language_to_low_level_policy: false
+  low_level_output: action_14d
+  planner_role: Chromie may parse language, but Soridormi must refuse unresolved navigation goals and only execute bounded local route segments.
+cases:
+  - id: navigation_goals.reject_unresolved_house_goal
+    status: planned
+    priority: 10
+    natural_language_command: Walk forward to the house.
+    target_skill: navigate_to_target
+    parameters:
+      raw_goal: house
+      target_ref: null
+      target_confidence: 0.0
+    task_context:
+      skill_family: navigation
+      intent: place_goal_navigation
+      raw_language_to_policy: false
+    environment_context:
+      terrain_type: unknown
+      target_resolution_required: true
+      route_required: true
+    expected_outcome:
+      planning: refuse_before_motion
+      final_state: safe_idle
+    safety_checks:
+      - no_low_level_action_from_raw_language
+      - unresolved_target_refused
+      - no_hardware_actuation
+      - safe_idle_after_refusal
+    timeout_s: 2.0
+    pass_fail_metrics:
+      - name: invalid_goal_rejected
+        operator: equals
+        value: true
+      - name: low_level_steps_after_rejection
+        operator: equals
+        value: 0
+      - name: safe_idle
+        operator: equals
+        value: true
+    validation:
+      contract: configs/navigation/open_duck_mini_v2_navigation_contract.json
+
+  - id: navigation_goals.relative_short_goal_then_stop
+    status: planned
+    priority: 20
+    natural_language_command: Move forward a short distance and stop.
+    target_skill: trajectory_follow
+    parameters:
+      local_goal:
+        frame_id: body
+        x_m: 0.3
+        y_m: 0.0
+        yaw_rad: 0.0
+      max_duration_s: 6.0
+      stop_condition: goal_tolerance
+    task_context:
+      skill_family: navigation
+      intent: relative_local_goal
+      raw_language_to_policy: false
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+      localization_required: true
+    expected_outcome:
+      base_motion: bounded_forward_progress_then_stop
+      final_state: safe_idle
+    safety_checks:
+      - no_fall
+      - local_goal_within_distance_bound
+      - terminal_speed_below_threshold
+      - no_hardware_actuation
+    timeout_s: 8.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: final_distance_error_m
+        operator: less_equal
+        value: 0.12
+      - name: final_speed_mps
+        operator: less_equal
+        value: 0.03
+    validation:
+      contract: configs/navigation/open_duck_mini_v2_navigation_contract.json
+
+  - id: navigation_goals.stop_before_unknown_obstacle
+    status: planned
+    priority: 30
+    natural_language_command: Go to the target, but stop if something is in the way.
+    target_skill: navigate_to_target
+    parameters:
+      target_ref: structured_test_target
+      target_confidence: 0.9
+      stop_condition: obstacle_detected
+    task_context:
+      skill_family: navigation
+      intent: obstacle_aware_goal_navigation
+      raw_perception_to_policy: false
+    environment_context:
+      terrain_type: flat
+      obstacle_check_required: true
+      obstacles:
+        - type: unknown_obstacle
+          distance_m: 0.35
+    expected_outcome:
+      base_motion: stop_before_obstacle
+      final_state: safe_idle
+    safety_checks:
+      - no_fall
+      - obstacle_contact_count_zero
+      - stop_before_obstacle
+      - no_hardware_actuation
+    timeout_s: 8.0
+    pass_fail_metrics:
+      - name: obstacle_contact_count
+        operator: equals
+        value: 0
+      - name: stopped_before_obstacle
+        operator: equals
+        value: true
+      - name: safe_idle
+        operator: equals
+        value: true
+    validation:
+      contract: configs/navigation/open_duck_mini_v2_navigation_contract.json

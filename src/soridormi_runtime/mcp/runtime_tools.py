@@ -32,6 +32,7 @@ from soridormi_runtime.skill_manifest import DEFAULT_SKILL_MANIFEST
 from soridormi_runtime.sync_preroll import preroll_sync_simulator
 
 from .local_tools import MotionPlan, NamedSkillPlan, SoridormiLocalToolService
+from .task_tools import EmbodiedTaskStore, task_capabilities_payload
 
 
 class RuntimeRobot(Protocol):
@@ -76,6 +77,7 @@ class SoridormiRuntimeToolService:
             DEFAULT_SKILL_MANIFEST
         )
     )
+    task_store: EmbodiedTaskStore = field(default_factory=EmbodiedTaskStore)
     emergency_stop: bool = False
     active_task: dict[str, Any] | None = None
     _motion_stop_requested: bool = field(default=False, init=False, repr=False)
@@ -186,11 +188,50 @@ class SoridormiRuntimeToolService:
             return await self.execute_runtime_skill_plan(
                 str(args.get("plan_id", ""))
             )
+        if tool_name == "soridormi.task.get_capabilities":
+            return task_capabilities_payload(
+                mode=self.mode,
+                backend=self.backend,
+                emergency_stop=self.emergency_stop,
+                skill_registry=self.skill_registry,
+            )
+        if tool_name == "soridormi.task.preview":
+            return self.task_store.preview_task(
+                args,
+                mode=self.mode,
+                backend=self.backend,
+                emergency_stop=self.emergency_stop,
+                skill_registry=self.skill_registry,
+            )
+        if tool_name == "soridormi.task.submit":
+            return self.task_store.submit_task(
+                args,
+                mode=self.mode,
+                backend=self.backend,
+                emergency_stop=self.emergency_stop,
+                skill_registry=self.skill_registry,
+            )
+        if tool_name == "soridormi.task.status":
+            return self.task_store.task_status(
+                args,
+                emergency_stop=self.emergency_stop,
+            )
+        if tool_name == "soridormi.task.events":
+            return self.task_store.task_events(
+                args,
+                emergency_stop=self.emergency_stop,
+            )
+        if tool_name == "soridormi.task.cancel":
+            return self.task_store.cancel_task(
+                args,
+                emergency_stop=self.emergency_stop,
+            )
         if tool_name == "soridormi.safety.monitor_motion":
             return {
                 "ok": not self.emergency_stop,
                 "active": self.active_task is not None,
                 "event": "emergency_stop" if self.emergency_stop else None,
+                "safe_idle": self.active_task is None and not self.emergency_stop,
             }
         if tool_name == "soridormi.safety.emergency_stop":
             return await self.emergency_stop_motion(
@@ -488,6 +529,7 @@ class SoridormiRuntimeToolService:
             "fallen": False,
             "emergency_stop": self.emergency_stop,
             "active_task": dict(self.active_task) if self.active_task is not None else None,
+            "safe_idle": self.active_task is None and not self.emergency_stop,
             "robot_time": float(state.time),
         }
 
@@ -545,6 +587,7 @@ class SoridormiRuntimeToolService:
         key = "cancelled" if cancelled else "stopped"
         return {
             key: True,
+            "safe_idle": not self.emergency_stop,
             "summary": "Soridormi runtime motion transitioned to safe hold.",
         }
 
@@ -555,6 +598,7 @@ class SoridormiRuntimeToolService:
         return {
             "stopped": True,
             "emergency": True,
+            "safe_idle": False,
             "reason": reason,
         }
 

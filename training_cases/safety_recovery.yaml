@@ -1,0 +1,206 @@
+schema_version: soridormi.training_cases.v1
+suite_id: safety_recovery
+title: Robustness and recovery curriculum
+robot_profile: open_duck_mini_v2
+owner: soridormi
+purpose: Failure detection, safe fallback, timeout behavior, and recovery planning before hardware execution.
+policy_boundary:
+  natural_language_to_low_level_policy: false
+  low_level_output: action_14d
+  planner_role: Route unsafe or invalid requests to bounded Soridormi recovery and stop skills.
+cases:
+  - id: safety_recovery.stumble_or_fall_detection
+    status: planned
+    priority: 10
+    natural_language_command: Detect a stumble or fall.
+    target_skill: balance_recover
+    scenario_id: recovery_after_push_v1
+    parameters:
+      detection_sources:
+        - base_height
+        - roll_pitch
+        - stuck_ratio
+      fall_height_m: 0.14
+      max_abs_roll_pitch_rad: 0.90
+    task_context:
+      skill_family: recovery
+      intent: detect_instability
+    environment_context:
+      terrain_type: flat
+      disturbance: push_or_bad_state
+    expected_outcome:
+      detection: instability_flagged_before_more_commands
+      final_state: safe_idle_or_recovery_requested
+    safety_checks:
+      - no_new_locomotion_after_fall
+      - recovery_does_not_hide_failure
+      - telemetry_recorded
+      - no_hardware_actuation
+    timeout_s: 4.0
+    pass_fail_metrics:
+      - name: fall_detected
+        operator: equals
+        value: true
+      - name: command_suppressed_after_fall
+        operator: equals
+        value: true
+      - name: telemetry_fields_present
+        operator: equals
+        value: true
+    validation:
+      dry_run: ./scripts/evaluate_scripted_social_skills.sh --skill shake_no --json
+
+  - id: safety_recovery.safe_idle_after_task
+    status: mujoco_eval_ready
+    priority: 20
+    natural_language_command: Return to safe idle after the task.
+    target_skill: stand_idle
+    scenario_id: start_stop_velocity_ramp_v1
+    parameters:
+      prior_skill: walk_velocity
+      hold_after_task_s: 3.0
+    task_context:
+      skill_family: recovery
+      intent: post_task_safe_idle
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: settles_without_drift
+      final_state: stable_standing_idle
+    safety_checks:
+      - no_fall
+      - terminal_speed_below_threshold
+      - neutral_or_safe_joint_targets
+      - no_hardware_actuation
+    timeout_s: 6.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: final_speed_mps
+        operator: less_equal
+        value: 0.03
+      - name: max_idle_drift_m
+        operator: less_equal
+        value: 0.05
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh stand_idle --args '{"duration_s":3.0}'
+
+  - id: safety_recovery.emergency_stop
+    status: planned
+    priority: 30
+    natural_language_command: Emergency stop.
+    target_skill: stop
+    scenario_id: start_stop_velocity_ramp_v1
+    parameters:
+      preemptive: true
+      stop_ramp_s: 0.4
+      fallback_skill: stand_idle
+    task_context:
+      skill_family: recovery
+      intent: emergency_stop
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: fastest_safe_stop_without_fall
+      final_state: safe_idle
+    safety_checks:
+      - emergency_stop_preempts_all_non_recovery_skills
+      - no_fall
+      - terminal_speed_below_threshold
+      - no_hardware_actuation
+    timeout_s: 3.0
+    pass_fail_metrics:
+      - name: stop_latency_s
+        operator: less_equal
+        value: 0.8
+      - name: fallen
+        operator: equals
+        value: false
+      - name: final_speed_mps
+        operator: less_equal
+        value: 0.03
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh stop --args '{"duration_s":1.0}'
+
+  - id: safety_recovery.recovery_from_bad_command
+    status: planned
+    priority: 40
+    natural_language_command: Recover from a bad command.
+    target_skill: stop
+    scenario_id: start_stop_velocity_ramp_v1
+    parameters:
+      rejected_command:
+        target_skill: walk_velocity
+        vx_mps: 2.0
+        yaw_radps: 3.0
+      fallback_skill: stand_idle
+    task_context:
+      skill_family: recovery
+      intent: reject_out_of_range_command
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      validation: command_rejected_before_policy_step
+      final_state: safe_idle
+    safety_checks:
+      - reject_out_of_range_parameters
+      - no_low_level_action_from_bad_command
+      - fallback_to_safe_idle
+      - no_hardware_actuation
+    timeout_s: 3.0
+    pass_fail_metrics:
+      - name: invalid_command_rejected
+        operator: equals
+        value: true
+      - name: low_level_steps_after_rejection
+        operator: equals
+        value: 0
+      - name: final_state_safe
+        operator: equals
+        value: true
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":2.0,"yaw_radps":3.0}'
+
+  - id: safety_recovery.timeout_partial_execution
+    status: planned
+    priority: 50
+    natural_language_command: Timeout and partial execution.
+    target_skill: stop
+    scenario_id: start_stop_velocity_ramp_v1
+    parameters:
+      requested_skill: walk_velocity
+      requested_duration_s: 30.0
+      timeout_s: 5.0
+      fallback_skill: stop
+    task_context:
+      skill_family: recovery
+      intent: timeout_partial_execution
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: partial_walk_then_controlled_stop
+      final_state: safe_idle
+      partial_execution_reported: true
+    safety_checks:
+      - timeout_enforced
+      - partial_execution_reported
+      - fallback_stop_or_stand_idle
+      - no_hardware_actuation
+    timeout_s: 7.0
+    pass_fail_metrics:
+      - name: timeout_triggered
+        operator: equals
+        value: true
+      - name: partial_execution_reported
+        operator: equals
+        value: true
+      - name: final_speed_mps
+        operator: less_equal
+        value: 0.03
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":0.08,"duration_s":30.0}'

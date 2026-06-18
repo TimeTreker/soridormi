@@ -3,7 +3,9 @@
 This document defines the system target, ownership boundaries, milestone
 direction, and current candidate evidence. For the gated execution sequence,
 acceptance criteria, risks, and immediate work queue, see
-`docs/SORIDORMI_EXECUTION_ROADMAP.md`.
+`docs/SORIDORMI_EXECUTION_ROADMAP.md`. For the agreed Chromie/Soridormi
+multi-agent split, see
+`docs/CHROMIE_SORIDORMI_MULTI_AGENT_ARCHITECTURE.md`.
 
 ## System target
 
@@ -54,6 +56,12 @@ Soridormi validates command ranges, skill availability, task context,
 environment context, runtime state, and safety limits before running any body
 controller.
 
+Destination language such as "walk forward to the house" is not a locomotion
+command. It is a navigation goal. Soridormi must refuse it until a sensing and
+navigation layer resolves the target, localizes the robot, plans a route,
+checks local obstacles, and produces bounded local trajectory or velocity
+segments. See `docs/SORIDORMI_NAVIGATION_GOAL_CONTRACT.md`.
+
 Low-level policy direction:
 
 ```text
@@ -61,6 +69,9 @@ robot_state + desired_command + task_context + environment_context + short_histo
 ```
 
 Natural language belongs to Chromie. Physical execution belongs to Soridormi.
+Both systems may use a DAG engine: Chromie for global human-facing
+orchestration, Soridormi for embodied task execution and safety-critical local
+planning.
 
 ## Main milestones
 
@@ -226,6 +237,37 @@ reports still warn about low swing clearance. The next checkpoint is visual
 follow-camera inspection plus clearance-focused refinement before any broader
 promotion.
 
+### M11A: task-agent contract foundation
+
+Expose rich embodied goals to Chromie without pretending that full autonomy is
+implemented. This milestone adds a no-motion task-level MCP contract above the
+existing named-skill surface:
+
+```text
+soridormi.task.get_capabilities
+soridormi.task.preview
+soridormi.task.submit
+soridormi.task.status
+soridormi.task.events
+soridormi.task.cancel
+```
+
+Soridormi keeps its own task readiness table in
+`configs/task_capabilities/open_duck_mini_v2_task_capabilities.json`, returns
+structured `plan_steps`, `blocked_subsystems`, `recommended_next_actions`, and
+a Soridormi-owned `task_graph`, and refuses missing navigation, perception,
+manipulation, unsafe physical tasks, and stop-through-task requests by default.
+
+Validation:
+
+```bash
+./scripts/validate_m11_task_agent_contract.sh
+```
+
+Passing this gate means Chromie can inspect and monitor Soridormi's embodied
+interpretation safely. It does not mean Soridormi can physically navigate,
+fetch objects, or execute task-level plans yet.
+
 ### M11: broader locomotion generalization
 
 Expand scenario coverage to start/stop transitions, turning, curves, lateral
@@ -251,6 +293,19 @@ Expose Soridormi skills and status as a structured API for Chromie. Chromie
 chooses high-level actions such as talking, walking, looking, nodding, or
 stopping; Soridormi validates and executes body actions. The first integration
 target is MuJoCo-only.
+
+Current integration direction: Chromie now treats Soridormi as a named-skill
+provider through MCP. The intended body path is `soridormi.skill.list`,
+`soridormi.skill.create_plan`, safety monitoring, `soridormi.skill.execute_plan`,
+and post-action `soridormi.robot.get_status` safe-idle confirmation. The older
+bounded `soridormi.motion.*` tools remain useful for low-level velocity-plan
+tests and stop/cancel controls, but Chromie-facing body behavior should be
+expressed as named skills.
+
+Soridormi remains authoritative for availability, command bounds, cancellation,
+safe hold, emergency stop, MuJoCo execution, and future hardware execution.
+Chromie remains authoritative for conversation, confirmation, speech, task
+choice, and interaction-scoped scheduling.
 
 Status feedback should include at least:
 

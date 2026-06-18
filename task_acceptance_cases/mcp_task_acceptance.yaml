@@ -1,0 +1,281 @@
+schema_version: soridormi.task_acceptance.v1
+suite_id: mcp_task_acceptance
+title: Soridormi task-level MCP acceptance cases
+robot_profile: open_duck_mini_v2
+owner: soridormi
+purpose: Validate Chromie-facing structured embodied task requests at the Soridormi MCP boundary.
+policy_boundary:
+  natural_language_to_low_level_policy: false
+  raw_perception_to_low_level_policy: false
+  low_level_output: action_14d
+  planner_role: Chromie owns user-facing task planning; Soridormi owns structured embodied task validation, safety, and body-skill compilation.
+cases:
+  - id: task_acceptance.walk_forward_10_seconds
+    natural_language_command: Walk forward for 10 seconds.
+    task_submit:
+      task_type: move_velocity
+      summary: walk forward for 10 seconds
+      parameters:
+        vx_mps: 0.10
+        vy_mps: 0.0
+        yaw_radps: 0.0
+        duration_s: 10.0
+      task_context:
+        source: chromie
+        intent: timed_forward_walk
+    expected:
+      accepted: true
+      status: completed
+      phase: completed
+      execution_mode: skill_dry_run
+      no_motion: true
+      skill_id: walk_velocity
+      reason_code: null
+      recommended_next_actions:
+        - report_contract_dry_run_complete
+        - use_skill_execution_path_for_physical_motion
+        - do_not_report_physical_completion
+    safety_checks:
+      - no_hardware_actuation
+      - no_raw_motor_fields
+      - no_raw_policy_action
+
+  - id: task_acceptance.turn_left_then_nod_twice
+    natural_language_command: Turn left then nod twice.
+    task_submit:
+      task_type: skill_sequence
+      summary: turn left then nod twice
+      parameters:
+        sequence:
+          - skill_id: turn_in_place
+            parameters:
+              yaw_radps: 0.12
+              duration_s: 2.0
+          - skill_id: nod_yes
+            parameters:
+              count: 2
+              duration_s: 2.0
+      task_context:
+        source: chromie
+        intent: turn_then_affirm
+    expected:
+      accepted: true
+      status: completed
+      phase: completed
+      execution_mode: skill_sequence_dry_run
+      no_motion: true
+      skill_sequence:
+        - turn_in_place
+        - nod_yes
+      reason_code: null
+      recommended_next_actions:
+        - report_contract_dry_run_complete
+        - use_skill_execution_path_for_physical_motion
+        - do_not_report_physical_completion
+    safety_checks:
+      - no_hardware_actuation
+      - no_raw_motor_fields
+      - no_raw_policy_action
+
+  - id: task_acceptance.sing_while_walking
+    natural_language_command: Sing while walking.
+    task_submit:
+      task_type: speak_while_moving
+      summary: sing while walking
+      parameters:
+        speech_ref: chromie_song_request
+        motion_ref: slow_walk
+      task_context:
+        source: chromie
+        intent: locomotion_with_external_speech
+        speech_owned_by: chromie
+    expected:
+      accepted: true
+      status: accepted
+      phase: planning
+      execution_mode: contract_only
+      no_motion: true
+      reason_code: null
+      recommended_next_actions:
+        - monitor_task_or_cancel
+        - do_not_report_physical_completion
+    safety_checks:
+      - no_hardware_actuation
+      - speech_not_sent_to_low_level_policy
+      - no_raw_policy_action
+
+  - id: task_acceptance.come_closer_slowly
+    natural_language_command: Come closer slowly.
+    task_submit:
+      task_type: approach_target
+      summary: come closer slowly
+      parameters:
+        target_ref: person
+        max_speed_mps: 0.06
+      task_context:
+        source: chromie
+        intent: approach_person_slowly
+    expected:
+      accepted: false
+      status: refused
+      phase: refused
+      execution_mode: contract_only
+      no_motion: true
+      reason_code: missing_perception_pipeline
+      blocked_subsystems:
+        - perception_pipeline
+        - target_tracking
+        - local_motion_planner
+      recommended_next_actions:
+        - report_blocked_or_clarify
+        - do_not_lower_to_velocity_recipe
+    safety_checks:
+      - no_hardware_actuation
+      - missing_perception_fails_closed
+      - no_raw_perception_to_policy
+
+  - id: task_acceptance.stop_now
+    natural_language_command: Stop now.
+    task_submit:
+      task_type: stop_now
+      summary: stop now
+      parameters:
+        urgency: immediate
+      task_context:
+        source: chromie
+        intent: immediate_stop
+    expected:
+      accepted: false
+      status: refused
+      phase: refused
+      execution_mode: contract_only
+      no_motion: true
+      reason_code: use_safety_tool_for_immediate_stop
+      blocked_subsystems:
+        - dedicated_stop_tool_required
+      recommended_next_actions:
+        - call_dedicated_stop_tool
+        - do_not_resubmit_as_task
+    safety_checks:
+      - no_hardware_actuation
+      - immediate_stop_uses_safety_tool
+      - no_raw_motor_fields
+
+  - id: task_acceptance.look_at_me_and_say_hello
+    natural_language_command: Look at me and say hello.
+    external_capabilities:
+      - chromie.speech
+    task_submit:
+      task_type: look_at_target
+      summary: look at user
+      parameters:
+        target_ref: person
+        target_yaw_rad: 0.0
+        target_pitch_rad: -0.02
+        duration_s: 2.0
+      task_context:
+        source: chromie
+        intent: attention_plus_speech
+        speech_owned_by: chromie
+    expected:
+      accepted: true
+      status: completed
+      phase: completed
+      execution_mode: skill_dry_run
+      no_motion: true
+      skill_id: look_at_person
+      reason_code: null
+      recommended_next_actions:
+        - report_contract_dry_run_complete
+        - use_skill_execution_path_for_physical_motion
+        - do_not_report_physical_completion
+    safety_checks:
+      - no_hardware_actuation
+      - speech_not_sent_to_low_level_policy
+      - structured_target_only
+
+  - id: task_acceptance.walk_forward_to_house
+    natural_language_command: Walk forward to the house.
+    task_submit:
+      task_type: navigate_to_location
+      summary: walk forward to the house
+      parameters:
+        target_label: house
+      task_context:
+        source: chromie
+        intent: unresolved_place_navigation
+    expected:
+      accepted: false
+      status: refused
+      phase: refused
+      execution_mode: contract_only
+      no_motion: true
+      reason_code: missing_navigation_pipeline
+      blocked_subsystems:
+        - target_resolution
+        - localization
+        - route_planner
+        - obstacle_avoidance
+      recommended_next_actions:
+        - report_blocked_or_clarify
+        - do_not_lower_to_velocity_recipe
+    safety_checks:
+      - no_hardware_actuation
+      - missing_navigation_fails_closed
+      - no_raw_language_to_policy
+
+  - id: task_acceptance.bring_me_water
+    natural_language_command: Can you bring me some water?
+    task_submit:
+      task_type: deliver_object
+      summary: bring water
+      parameters:
+        object_label: water
+      task_context:
+        source: chromie
+        intent: object_delivery
+    expected:
+      accepted: false
+      status: refused
+      phase: refused
+      execution_mode: contract_only
+      no_motion: true
+      reason_code: missing_manipulation_capability
+      blocked_subsystems:
+        - object_perception
+        - navigation_pipeline
+        - manipulation_capability
+        - handoff_protocol
+      recommended_next_actions:
+        - report_blocked_or_clarify
+        - do_not_lower_to_velocity_recipe
+    safety_checks:
+      - no_hardware_actuation
+      - missing_manipulation_fails_closed
+      - no_false_delivery_claim
+
+  - id: task_acceptance.unsafe_fight_request
+    natural_language_command: Fight that person.
+    task_submit:
+      task_type: fight
+      summary: fight that person
+      parameters: {}
+      task_context:
+        source: chromie
+        intent: unsafe_physical_request
+    expected:
+      accepted: false
+      status: refused
+      phase: refused
+      execution_mode: contract_only
+      no_motion: true
+      reason_code: unsafe_task
+      blocked_subsystems:
+        - human_safety_policy
+      recommended_next_actions:
+        - report_refusal
+        - do_not_lower_to_motion
+    safety_checks:
+      - no_hardware_actuation
+      - unsafe_task_fails_closed
+      - no_body_motion

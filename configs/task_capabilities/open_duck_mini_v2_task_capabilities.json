@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "robot": "open_duck_mini_v2",
+  "milestone": "M11_task_capability_readiness",
+  "task_api_no_motion": true,
+  "physical_execution_note": "Task preview/submit are contract surfaces. Physical motion must use Soridormi skill/motion execution tools with their safety gates.",
+  "ready_subsystems": [
+    "skill_registry",
+    "policy_velocity_skill_contract",
+    "scripted_head_skill_contract",
+    "scripted_social_skill_contract",
+    "task_sequence_compiler",
+    "task_lifecycle_store",
+    "safe_idle_contract",
+    "dedicated_stop_tool_boundary"
+  ],
+  "unsafe_task_types": [
+    "attack",
+    "fight",
+    "harm_person",
+    "push_person"
+  ],
+  "readiness_vocab": [
+    "skill_dry_run_ready",
+    "contract_planning_hold",
+    "safety_redirect",
+    "safe_idle_contract",
+    "future_blocked"
+  ],
+  "task_types": [
+    {
+      "task_type": "move_velocity",
+      "description": "Bounded explicit velocity task that can dry-run to walk_velocity.",
+      "readiness": "skill_dry_run_ready",
+      "execution_modes": ["skill_dry_run"],
+      "persistent_submit_allowed": true,
+      "required_subsystems": ["skill_registry", "policy_velocity_skill_contract"],
+      "external_dependencies": [],
+      "missing_subsystems": [],
+      "reason_code": null,
+      "recommended_actions": ["preview_task", "submit_task_when_confirmed", "use_skill_execution_path_for_physical_motion"]
+    },
+    {
+      "task_type": "turn_to_heading",
+      "description": "Bounded explicit turn task that can dry-run to turn_in_place.",
+      "readiness": "skill_dry_run_ready",
+      "execution_modes": ["skill_dry_run"],
+      "persistent_submit_allowed": true,
+      "required_subsystems": ["skill_registry", "policy_velocity_skill_contract"],
+      "external_dependencies": [],
+      "missing_subsystems": [],
+      "reason_code": null,
+      "recommended_actions": ["preview_task", "submit_task_when_confirmed", "use_skill_execution_path_for_physical_motion"]
+    },
+    {
+      "task_type": "approach_target",
+      "description": "Approach a perceived target; blocked until perception and local approach planning exist.",
+      "readiness": "future_blocked",
+      "execution_modes": ["contract_only"],
+      "persistent_submit_allowed": false,
+      "required_subsystems": ["perception_pipeline", "target_tracking", "local_motion_planner"],
+      "external_dependencies": [],
+      "missing_subsystems": ["perception_pipeline", "target_tracking", "local_motion_planner"],
+      "reason_code": "missing_perception_pipeline",
+      "recommended_actions": ["preview_task", "report_blocked_or_clarify", "do_not_lower_to_velocity_recipe"]
+    },
+    {
+      "task_type": "navigate_to_location",
+      "description": "Navigate to a resolved place; blocked until target resolution, localization, routing, and obstacle handling exist.",
+      "readiness": "future_blocked",
+      "execution_modes": ["contract_only"],
+      "persistent_submit_allowed": false,
+      "required_subsystems": ["target_resolution", "localization", "route_planner", "obstacle_avoidance"],
+      "external_dependencies": [],
+      "missing_subsystems": ["target_resolution", "localization", "route_planner", "obstacle_avoidance"],
+      "reason_code": "missing_navigation_pipeline",
+      "recommended_actions": ["preview_task", "report_blocked_or_clarify", "do_not_lower_to_velocity_recipe"]
+    },
+    {
+      "task_type": "look_at_target",
+      "description": "Head/body attention task that can dry-run to look-at skills.",
+      "readiness": "skill_dry_run_ready",
+      "execution_modes": ["skill_dry_run"],
+      "persistent_submit_allowed": true,
+      "required_subsystems": ["skill_registry", "scripted_head_skill_contract"],
+      "external_dependencies": [],
+      "missing_subsystems": [],
+      "reason_code": null,
+      "recommended_actions": ["preview_task", "submit_task_when_confirmed", "use_skill_execution_path_for_physical_motion"]
+    },
+    {
+      "task_type": "perform_gesture",
+      "description": "Scripted social gesture task that can dry-run to known gesture skills.",
+      "readiness": "skill_dry_run_ready",
+      "execution_modes": ["skill_dry_run"],
+      "persistent_submit_allowed": true,
+      "required_subsystems": ["skill_registry", "scripted_social_skill_contract"],
+      "external_dependencies": [],
+      "missing_subsystems": [],
+      "reason_code": null,
+      "recommended_actions": ["preview_task", "submit_task_when_confirmed", "use_skill_execution_path_for_physical_motion"]
+    },
+    {
+      "task_type": "skill_sequence",
+      "description": "Bounded ordered sequence of Soridormi named skills.",
+      "readiness": "skill_dry_run_ready",
+      "execution_modes": ["skill_sequence_dry_run"],
+      "persistent_submit_allowed": true,
+      "required_subsystems": ["skill_registry", "task_sequence_compiler"],
+      "external_dependencies": [],
+      "missing_subsystems": [],
+      "reason_code": null,
+      "recommended_actions": ["preview_task", "submit_task_when_confirmed", "use_skill_execution_path_for_physical_motion"]
+    },
+    {
+      "task_type": "speak_while_moving",
+      "description": "Cross-agent coordination task; Chromie owns speech and Soridormi holds body planning.",
+      "readiness": "contract_planning_hold",
+      "execution_modes": ["contract_only"],
+      "persistent_submit_allowed": true,
+      "required_subsystems": ["chromie_speech_coordination", "validated_motion_skill_or_task_executor"],
+      "external_dependencies": ["chromie_speech_coordination"],
+      "missing_subsystems": ["validated_motion_skill_or_task_executor"],
+      "reason_code": null,
+      "recommended_actions": ["preview_task", "submit_task_when_confirmed", "monitor_task_or_cancel"]
+    },
+    {
+      "task_type": "stop_now",
+      "description": "Immediate stop request redirected to dedicated stop/cancel/emergency tools.",
+      "readiness": "safety_redirect",
+      "execution_modes": ["contract_only"],
+      "persistent_submit_allowed": false,
+      "required_subsystems": ["dedicated_stop_tool_boundary"],
+      "external_dependencies": [],
+      "missing_subsystems": ["dedicated_stop_tool_required"],
+      "reason_code": "use_safety_tool_for_immediate_stop",
+      "recommended_actions": ["call_dedicated_stop_tool"]
+    },
+    {
+      "task_type": "recover_safe_idle",
+      "description": "Contract-level safe-idle check and recovery placeholder.",
+      "readiness": "safe_idle_contract",
+      "execution_modes": ["contract_only"],
+      "persistent_submit_allowed": true,
+      "required_subsystems": ["task_lifecycle_store", "safe_idle_contract"],
+      "external_dependencies": [],
+      "missing_subsystems": [],
+      "reason_code": null,
+      "recommended_actions": ["preview_task", "submit_task_when_confirmed"]
+    },
+    {
+      "task_type": "deliver_object",
+      "description": "Object delivery; blocked until perception, navigation, manipulation, and handoff exist.",
+      "readiness": "future_blocked",
+      "execution_modes": ["contract_only"],
+      "persistent_submit_allowed": false,
+      "required_subsystems": ["object_perception", "navigation_pipeline", "manipulation_capability", "handoff_protocol"],
+      "external_dependencies": [],
+      "missing_subsystems": ["object_perception", "navigation_pipeline", "manipulation_capability", "handoff_protocol"],
+      "reason_code": "missing_manipulation_capability",
+      "recommended_actions": ["preview_task", "report_blocked_or_clarify", "do_not_lower_to_velocity_recipe"]
+    }
+  ]
+}
