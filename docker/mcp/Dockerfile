@@ -12,8 +12,9 @@ RUN groupadd --gid "${GROUP_ID}" "${USERNAME}" \
 
 WORKDIR /app
 COPY pyproject.toml README.md /app/
+COPY configs /app/configs
 COPY src /app/src
-RUN pip install --no-cache-dir ".[mcp]"
+RUN pip install --no-cache-dir -e ".[mcp]"
 
 USER ${USERNAME}
 

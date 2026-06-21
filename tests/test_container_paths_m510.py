@@ -58,3 +58,13 @@ def test_container_data_arg_translation_preserves_flags() -> None:
         "CUDAExecutionProvider",
         "/data/policy_packages/example.policy.tar.gz",
     ]
+
+
+def test_mcp_image_keeps_repo_config_manifests_available() -> None:
+    repo = Path(__file__).resolve().parents[1]
+    dockerfile = (repo / "docker" / "mcp" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+
+    assert "COPY configs /app/configs" in dockerfile
+    assert 'pip install --no-cache-dir -e ".[mcp]"' in dockerfile
