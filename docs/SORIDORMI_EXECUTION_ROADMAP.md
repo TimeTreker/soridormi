@@ -547,22 +547,34 @@ H0 read-only state
 
 ---
 
-## M14 - Chromie integration
+## M14 - Chromie integration [Current: contract surface complete]
 
 **Goal:** Connect the Chromie brain to Soridormi through structured skills.
 
-- [ ] Publish Soridormi capability and availability data
-- [ ] Define versioned request/response schemas
-- [ ] Add execution status and failure reasons
-- [ ] Add cancellation and stop semantics
-- [ ] Validate integration in MuJoCo
-- [ ] Add bounded locomotion requests
-- [ ] Add bounded social and attention requests
-- [ ] Add safety refusal tests
-- [ ] Keep raw joint and `action_14d` interfaces inaccessible
+- [x] Publish Soridormi capability and availability data
+- [x] Define versioned request/response schemas
+- [x] Add execution status and failure reasons
+- [x] Add cancellation and stop semantics
+- [x] Validate named-skill integration in MuJoCo
+- [x] Add bounded locomotion requests
+- [x] Add bounded social and attention requests
+- [x] Add safety refusal tests
+- [x] Keep raw joint and `action_14d` interfaces inaccessible
 
 **Gate G14:** Chromie can select, monitor, cancel, and recover from body skills
 without producing low-level motor or policy actions.
+
+> **Contract evidence:** Soridormi now exports task-level capability readiness,
+> versioned preview/submit/status/events/cancel schemas, structured
+> `plan_steps`, `blocked_subsystems`, `recommended_next_actions`, and a
+> `raw_control_allowed=false` body-task graph. The M14 contract surface is
+> validated by `./scripts/validate_task_agent_contract.sh`,
+> `tests/test_mcp_capability_manifest.py`,
+> `tests/test_task_acceptance_cases_m11.py`,
+> `tests/test_mcp_local_tools.py`, and `tests/test_mcp_runtime_tools.py`.
+> Broad natural-language routing into those declared task types is Chromie-side
+> follow-up; missing navigation, approach, and manipulation goals remain
+> structured refusals until M15 proves the required simulator pipelines.
 
 ---
 
@@ -636,8 +648,10 @@ depends on the hardware safety gate.
 
 ## Immediate execution plan
 
-1. Generate the M9 training-ready report for the current three-scenario
-   dataset.
+1. Restore or regenerate the current three-scenario prepared dataset and gate
+   outputs, then generate the M9 training-ready report. The checked-out repo
+   currently retains only `data/.gitkeep` and `artifacts/.gitkeep`, so the
+   report command exists but the source evidence is not present locally.
 2. Run the current candidate with `--viewer --follow-camera`.
 3. Record swing-clearance evidence for all three scenarios.
 4. Fill the visual-review template and rebuild the evidence package.

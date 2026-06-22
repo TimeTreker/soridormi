@@ -113,8 +113,9 @@ scenario suite: FAIL, 2/3 scenarios accepted
 Interpretation: the E80 context candidate is a better runnable experimental
 profile and fixes the low-speed command threshold seen in the initial model,
 but it is still not promotable because the curve/turning scenario gets stuck.
-Next work should add curve/yaw context coverage and retrain against a broader
-multi-scenario Stage 1 dataset before promotion.
+That recommendation was superseded by the three-scenario candidate below,
+which added curve/yaw coverage and passed the initial flat/start-stop/curve
+suite before the remaining clearance blocker was identified.
 
 Latest three-scenario candidate checkpoint:
 
@@ -243,10 +244,14 @@ clearance gate: 0/3 PASS
 
 Conclusion: a constant 14D residual bias cannot target the swing phase without
 also perturbing stance behavior. Do not spend more search budget on this policy
-class. The next implementation should be a bounded phase/state-conditioned
-residual actor trained across multiple command conditions. The rejected model,
-metrics, and rollout evidence remain under `/data/rl_finetune/` and
-`artifacts/`; its generated runtime profile was removed.
+class. That follow-up has already been implemented: phase/contact,
+command/state, and warm-started nonlinear residual candidates were trained and
+evaluated. The strongest retained experimental candidate is
+`m10_command_state_mlp_cem4x14_s79`; it improves distance, stuck ratio, and
+clearance relative to the context candidate, but still fails the absolute G10
+`0.015 m` clearance threshold. The rejected constant-bias model, metrics, and
+rollout evidence remain under `/data/rl_finetune/` and `artifacts/`; its
+generated runtime profile was removed.
 
 ## Read First
 
