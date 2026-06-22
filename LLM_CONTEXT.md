@@ -257,11 +257,9 @@ clearance_gap_sequence_scale_preserved_s89:
 ```
 
 `clearance_lowratio_sequence_s97` warm-started from `s89` with stronger
-low-clearance pressure. Treat `s97` as the current best retained
-clearance-refinement candidate, not promotable. It improves total distance,
-stuck ratio, and curve clearance over `s79`, `s83`, and `s89`, but still fails
-the low-clearance-ratio gate in all three scenarios and misses the start/stop
-and curve p50 gates.
+low-clearance pressure. It improved total distance, stuck ratio, and curve
+clearance over `s79`, `s83`, and `s89`, but still failed the low-clearance-ratio
+gate in all three scenarios and missed the start/stop and curve p50 gates.
 
 ```text
 clearance_lowratio_sequence_s97:
@@ -272,6 +270,29 @@ clearance_lowratio_sequence_s97:
   flat:       p50 ~= 0.01560m, low-clearance ratio ~= 0.437
   start-stop: p50 ~= 0.01466m, low-clearance ratio ~= 0.520
   curve:      p50 ~= 0.01341m, low-clearance ratio ~= 0.754
+```
+
+`clearance_lowratio_turnfocus_s101` was a stricter turn-focused continuation
+from `s97`, but the exported ONNX was byte-identical to `s97`; treat it as a
+failed probe, not a retained candidate.
+
+`clearance_lowratio_refine_s103` warm-started from `s97` with the retained
+`residual_scale 0.1`, tighter CEM search (`initial_std 0.12`), and moderately
+stronger clearance/low-ratio pressure. Treat `s103` as the current best
+retained clearance-refinement candidate, not promotable. It improves total
+distance, start-stop p50, curve p50, and max low-clearance ratio over `s97`,
+but still fails the G10 low-clearance-ratio gate in all three scenarios and
+misses curve p50 clearance.
+
+```text
+clearance_lowratio_refine_s103:
+  initial checkpoint: clearance_lowratio_sequence_s97
+  residual_scale: 0.1
+  suite: 0/3, BLOCKED_BY_CLEARANCE_GATE
+  total distance ~= 1.838m
+  flat:       p50 ~= 0.01634m, low-clearance ratio ~= 0.438
+  start-stop: p50 ~= 0.01559m, low-clearance ratio ~= 0.456
+  curve:      p50 ~= 0.01451m, low-clearance ratio ~= 0.662
 ```
 
 clearance evidence commands:

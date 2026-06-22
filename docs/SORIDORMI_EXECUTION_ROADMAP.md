@@ -374,6 +374,18 @@ observation[101]
   - curve: distance 0.45424m, p50 clearance 0.01341m, low-clearance ratio 0.754
   - result: best retained candidate so far, but still blocked by low-clearance
     ratio and start/stop plus curve p50 clearance
+- [x] Train and evaluate a tighter low-ratio continuation
+  - rejected probe: `clearance_lowratio_turnfocus_s101` re-exported the same
+    ONNX as `clearance_lowratio_sequence_s97`
+  - candidate: `clearance_lowratio_refine_s103`
+  - initial checkpoint: `clearance_lowratio_sequence_s97`
+  - model/profile contract: PASS
+  - required scenario suite: FAIL, 0/3 under current clearance gate
+  - flat: distance 0.62978m, p50 clearance 0.01634m, low-clearance ratio 0.438
+  - start-stop: distance 0.74535m, p50 clearance 0.01559m, low-clearance ratio 0.456
+  - curve: distance 0.46317m, p50 clearance 0.01451m, low-clearance ratio 0.662
+  - result: best retained candidate so far, but still blocked by low-clearance
+    ratio in all scenarios and curve p50 clearance
 - [ ] Focus the next training stage on start/stop and turning clearance, or
   acquire a higher-clearance teacher
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
@@ -403,11 +415,11 @@ teacher comparison: PASS (relative behavior only; does not replace clearance)
 > but failed the `0.015 m` swing-clearance gate. A direct human follow-camera
 > inspection remains pending before any promotion.
 > The current best retained residual candidate is
-> `clearance_lowratio_sequence_s97`: it improves total distance to `1.729 m`,
-> gets flat p50 clearance over the `0.015 m` threshold, and reduces max
-> low-clearance ratio to `0.754`, but it remains blocked because all scenarios
-> still exceed the `0.25` low-clearance-ratio limit and start/stop plus curve
-> p50 clearance remain below target.
+> `clearance_lowratio_refine_s103`: it improves total distance to `1.838 m`,
+> gets flat and start/stop p50 clearance over the `0.015 m` threshold, and
+> reduces max low-clearance ratio to `0.662`, but it remains blocked because
+> all scenarios still exceed the `0.25` low-clearance-ratio limit and curve p50
+> clearance remains below target.
 >
 > **Clearance readiness:** Generate with `./scripts/analyze_clearance_readiness.sh --profile-name context_stage1_three_scenario_10ep_e80 --output-dir artifacts/clearance_readiness/context_stage1_three_scenario_10ep_e80`.
 >
@@ -748,9 +760,10 @@ depends on the hardware safety gate.
 
 ## Immediate execution plan
 
-1. Use `clearance_lowratio_sequence_s97` as the best retained residual
-   reference and reject `clearance_gap_sequence_restored_s83` for promotion.
-2. Train the next clearance candidate to beat `s97` on low-clearance ratio and
+1. Use `clearance_lowratio_refine_s103` as the best retained residual reference
+   and reject `clearance_gap_sequence_restored_s83`, `clearance_lowratio_sequence_s97`,
+   and `clearance_lowratio_turnfocus_s101` for promotion.
+2. Train the next clearance candidate to beat `s103` on low-clearance ratio and
    p50 clearance in all three scenarios, not only movement distance.
 3. Run the candidate with `--viewer --follow-camera` for human visual review.
 4. Record swing-clearance evidence for all three scenarios.
@@ -813,10 +826,13 @@ three-scenario clearance gate and did not improve on
 `m10_command_state_mlp_cem4x14_s79` because the wrapper used `residual_scale
 0.05` instead of the retained checkpoint's `0.1`. The wrapper now defaults to
 `0.1`. The corrected `clearance_gap_sequence_scale_preserved_s89` improved
-movement and flat p50 clearance, and the continuation
-`clearance_lowratio_sequence_s97` is the best retained blocked candidate so
-far. The next run should compare against `s97` before consuming full G10
-evidence time.
+movement and flat p50 clearance. The first low-ratio continuation,
+`clearance_lowratio_sequence_s97`, improved curve clearance and total distance.
+The stricter turn-focused `clearance_lowratio_turnfocus_s101` re-exported the
+same ONNX as `s97`, so it is a rejected probe. The tighter-search continuation
+`clearance_lowratio_refine_s103` is the best retained blocked candidate so far.
+The next run should compare against `s103` before consuming full G10 evidence
+time.
 
 Host wrapper:
 
