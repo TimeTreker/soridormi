@@ -311,6 +311,19 @@ observation[101]
   - start-stop: distance 0.32191m, p50 clearance 0.00855m, stuck 0.012
   - curve: distance 0.15236m, p50 clearance 0.00649m, stuck 0.277
   - result: runnable but not equivalent to the historical retained candidate
+- [x] Run `context_stage1_three_scenario_10ep_e80` with MuJoCo viewer
+  follow-camera and rebuild clearance evidence
+  - command: `./scripts/run_sim_server.sh --backend mujoco --profile context_stage1_three_scenario_10ep_e80 --viewer --follow-camera`
+  - viewer-backed scenario rollouts matched the headless result: no falls, but
+    all three scenarios failed clearance
+  - filled review:
+    `artifacts/clearance_evidence/context_stage1_three_scenario_10ep_e80/visual_review.json`
+  - evidence package status: `BLOCKED_BY_CLEARANCE_READINESS`
+- [x] Run a bounded fresh clearance-residual probe without the missing
+  historical warm-start checkpoint
+  - output: `/data/rl_finetune/clearance_gap_probe_s91`
+  - best score: `0.26074`
+  - result: zero residual selected; not a promotion candidate
 - [ ] Focus the next training stage on start/stop and turning clearance, or
   acquire a higher-clearance teacher
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
@@ -323,7 +336,7 @@ bounded rollout: PASS
 required scenario suite: FAIL for the local regenerated E80 ONNX
 fall/reset limits: PASS
 foot-clearance threshold: ✗ FAIL (all scenarios < 0.015m)
-visual inspection: PENDING
+visual inspection: ✗ FAIL (metric-grounded review from viewer-backed rollouts)
 teacher comparison: PASS (relative behavior only; does not replace clearance)
 ```
 
@@ -334,6 +347,10 @@ teacher comparison: PASS (relative behavior only; does not replace clearance)
 > and model-contract valid, but fails all three scenario acceptance gates. Treat
 > the regenerated model as blocked; restore the historical ONNX or train a new
 > candidate before using it for promotion decisions.
+> Follow-camera MuJoCo rollouts were rerun on 2026-06-22 and the clearance
+> evidence package now includes a filled metric-grounded visual review. It is
+> intentionally blocked, not a visual PASS: all scenarios remained upright but
+> failed the `0.015 m` swing-clearance gate.
 >
 > **Clearance readiness:** Generate with `./scripts/analyze_clearance_readiness.sh --profile-name context_stage1_three_scenario_10ep_e80 --output-dir artifacts/clearance_readiness/context_stage1_three_scenario_10ep_e80`.
 >

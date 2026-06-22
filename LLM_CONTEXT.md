@@ -171,6 +171,27 @@ historical retained candidate. It remains blocked before promotion and before
 visual-review claims. Restore the historical ONNX or train a new candidate that
 passes the flat/start-stop/curve suite before using it as the M10 baseline.
 
+2026-06-22 follow-camera update: `context_stage1_three_scenario_10ep_e80` was
+run with MuJoCo viewer follow-camera and all three required scenarios were
+replayed. The viewer-backed rollouts stayed upright but reproduced the
+clearance failure:
+
+```text
+flat:       p50 clearance 0.01006m, low-clearance ratio 1.0
+start-stop: p50 clearance 0.00855m, low-clearance ratio 1.0
+curve:      p50 clearance 0.00649m, low-clearance ratio 1.0
+```
+
+The rebuilt clearance package includes
+`artifacts/clearance_evidence/context_stage1_three_scenario_10ep_e80/visual_review.json`
+and remains `BLOCKED_BY_CLEARANCE_READINESS`.
+
+2026-06-22 clearance-refinement probe:
+`/data/rl_finetune/clearance_gap_probe_s91` trained successfully from the local
+E80 teacher without the missing historical warm-start checkpoint, but selected
+the zero residual (`Best parameter abs max: 0`). Treat it as a workflow probe,
+not a candidate.
+
 clearance evidence commands:
 
 ```bash
