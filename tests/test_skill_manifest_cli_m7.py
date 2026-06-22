@@ -43,7 +43,7 @@ def test_iter_skills_filters_available_and_category() -> None:
 def test_llm_skill_context_mentions_rules_in_chinese() -> None:
     manifest = load_skill_manifest(DEFAULT_SKILL_MANIFEST)
     text = build_llm_skill_context(manifest, language="zh")
-    assert "Soridormi M7 技能能力摘要" in text
+    assert "Soridormi 技能能力摘要" in text
     assert "不要调用 status=unsupported_current_robot" in text
     assert "wave_hand" in text
     assert "Chromie" in text
@@ -79,4 +79,4 @@ def test_list_skills_shell_wrapper_help() -> None:
         text=True,
         capture_output=True,
     )
-    assert "List and validate Soridormi M7 skill manifests" in proc.stdout
+    assert "List and validate Soridormi skill manifests" in proc.stdout

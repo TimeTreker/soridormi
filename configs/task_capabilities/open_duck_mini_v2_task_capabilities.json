@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "robot": "open_duck_mini_v2",
-  "milestone": "M11_task_capability_readiness",
+  "readiness_profile": "open_duck_mini_v2_task_capability_readiness",
   "task_api_no_motion": true,
   "physical_execution_note": "Task preview/submit are contract surfaces. Physical motion must use Soridormi skill/motion execution tools with their safety gates.",
   "ready_subsystems": [

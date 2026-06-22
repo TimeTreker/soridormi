@@ -46,6 +46,8 @@ def validate_task_capability_manifest(
         errors.append("schema_version must be 1")
     if manifest.get("robot") != "open_duck_mini_v2":
         errors.append("robot must be open_duck_mini_v2")
+    if not manifest.get("readiness_profile") and not manifest.get("milestone"):
+        errors.append("readiness_profile is required")
     if manifest.get("task_api_no_motion") is not True:
         errors.append("task_api_no_motion must be true")
     if not isinstance(manifest.get("physical_execution_note"), str) or not manifest.get(

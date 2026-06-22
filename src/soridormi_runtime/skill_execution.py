@@ -1,4 +1,4 @@
-"""Dry-run skill execution registry for Soridormi M7.
+"""Dry-run skill execution registry for Soridormi body skills.
 
 This module is intentionally conservative: it resolves manifest-declared skills
 into safe, inspectable command plans, but it does not connect to MuJoCo,
@@ -141,7 +141,7 @@ def _resolve_parameters(skill: dict[str, Any], provided: Mapping[str, Any] | Non
             raise SkillExecutionError(f"skill {skill.get('id')}: missing required parameter {name}")
 
         param_type = rule.get("type")
-        # Existing M7 manifests often declare numeric parameters with min/max/default
+        # Existing manifests often declare numeric parameters with min/max/default
         # only. Treat those as number parameters to keep the manifest compact.
         if param_type is None and any(key in rule for key in ("min", "max")):
             param_type = "number"
@@ -180,7 +180,7 @@ def _require_available(skill: dict[str, Any]) -> None:
         )
     safety = skill.get("safety", {})
     if not isinstance(safety, dict) or safety.get("hardware_enabled") is not False:
-        raise SkillExecutionError(f"skill {skill.get('id')} is not safe for M7 sim-first execution")
+        raise SkillExecutionError(f"skill {skill.get('id')} is not safe for sim-first execution")
 
 
 def _velocity_skill_plan(
@@ -620,7 +620,8 @@ def _load_json_args(raw: str | None) -> dict[str, Any]:
 def plan_shell_exports(plan: SkillPlan) -> str:
     """Return shell exports that bind a one-segment skill plan to runtime command overrides.
 
-    M7D intentionally supports only single-segment locomotion skill execution.
+    The direct shell-export path intentionally supports only single-segment
+    locomotion skill execution.
     Multi-segment choreography should be added through a later skill scheduler so
     each segment can be logged, interrupted, and safety-gated separately.
     """
@@ -628,7 +629,7 @@ def plan_shell_exports(plan: SkillPlan) -> str:
     if len(plan.commands) != 1:
         raise SkillExecutionError(
             f"skill {plan.skill_id} produced {len(plan.commands)} command segments; "
-            "M7D sim execution supports exactly one segment"
+            "sim skill execution supports exactly one segment"
         )
     command = plan.commands[0]
     exports = {
@@ -645,7 +646,7 @@ def plan_shell_exports(plan: SkillPlan) -> str:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Dry-run a Soridormi M7 skill into a safe high-level command plan."
+        description="Dry-run a Soridormi skill into a safe high-level command plan."
     )
     parser.add_argument("skill", nargs="?", help="Skill id to dry-run, e.g. walk_velocity.")
     parser.add_argument("--manifest", default=str(DEFAULT_SKILL_MANIFEST), help="Path to skill manifest JSON.")

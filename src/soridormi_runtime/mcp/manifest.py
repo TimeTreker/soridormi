@@ -627,6 +627,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                         "backend": {"type": "string"},
                         "emergency_stop": {"type": "boolean"},
                         "safe_idle": {"type": "boolean"},
+                        "readiness_profile": {"type": "string"},
                         "task_api_no_motion": {"type": "boolean"},
                         "physical_execution_note": {"type": "string"},
                         "ready_subsystems": {
@@ -647,6 +648,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                         "schema_version",
                         "mode",
                         "backend",
+                        "readiness_profile",
                         "task_api_no_motion",
                         "ready_subsystems",
                         "task_types",
@@ -735,7 +737,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 agent_id="soridormi.task",
                 display_name="Submit Soridormi embodied task",
                 description=(
-                    "Submit a structured embodied task goal. The M11 contract "
+                    "Submit a structured embodied task goal. The contract "
                     "surface validates and records the request, but returns "
                     "no_motion=true until task execution is implemented."
                 ),

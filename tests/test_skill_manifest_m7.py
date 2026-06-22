@@ -65,7 +65,7 @@ def test_skill_manifest_is_valid_json_and_declares_full_universe() -> None:
     manifest = _load_manifest()
     assert manifest["schema_version"] == 1
     assert manifest["robot"] == "open_duck_mini_v2"
-    assert manifest["milestone"] == "M7_skill_platform"
+    assert manifest["capability_profile"] == "open_duck_mini_v2_skill_platform"
     assert manifest["strategy"]["define_all_skills_first"] is True
     assert manifest["strategy"]["land_implementation_incrementally"] is True
     assert isinstance(manifest["skills"], list)
@@ -95,6 +95,7 @@ def test_status_and_execution_values_are_declared() -> None:
         assert skill["status"] in statuses
         assert skill["execution"] in executions
         assert skill["implementation_phase"]
+        assert not str(skill["implementation_phase"]).startswith("M")
 
 
 def test_no_skill_enables_hardware_by_default() -> None:

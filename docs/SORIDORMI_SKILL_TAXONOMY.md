@@ -1,4 +1,4 @@
-# Soridormi M7 Skill Taxonomy and Behavior Platform
+# Soridormi Skill Taxonomy and Behavior Platform
 
 Status: M7 bootstrap proposal.
 
@@ -72,9 +72,9 @@ Speech/TTS belongs outside Soridormi, in Chromie. Soridormi owns the body
 action and may reject a requested skill if it is unsupported, unsafe,
 unavailable, or outside validated ranges.
 
-## M7 milestone structure
+## Skill capability structure
 
-### M7A: full skill manifest
+### skill_manifest: full skill manifest
 
 Add the machine-readable skill universe:
 
@@ -84,7 +84,7 @@ configs/skills/open_duck_mini_v2_skills.json
 
 The manifest is both documentation and a future runtime contract. It describes which behaviors exist, which are currently executable in simulation, which are planned, which are future work, and which are unsupported on the current hardware.
 
-### M7B: skill listing and validation
+### skill_listing_validation: skill listing and validation
 
 Add tools so Soridormi can report:
 
@@ -95,7 +95,7 @@ Add tools so Soridormi can report:
 - which require missing hardware;
 - which require policy, keyframe, residual/RL, perception, or external speech.
 
-### M7C: locomotion wrappers
+### locomotion_wrappers: locomotion wrappers
 
 Wrap existing command-conditioned locomotion as skills:
 
@@ -118,7 +118,7 @@ sidestep_right
 
 These should lower to the existing velocity-command policy path and continue to use MuJoCo acceptance gates.
 
-### M7D: head/neck social skills
+### head_social: head/neck social skills
 
 Implement safe scripted/keyframe social behaviors in MuJoCo first:
 
@@ -135,7 +135,7 @@ greeting as a composition
 
 These should be interruptible, bounded by joint limits, and default to simulation first.
 
-### M7E: posture transitions
+### posture_transitions: posture transitions
 
 Implement and evaluate:
 
@@ -149,7 +149,7 @@ balance_recover
 
 These should start as scripted pose/keyframe teachers or separate teacher controllers, not as random walking data.
 
-### M7F: obstacle and terrain skills
+### obstacle_and_terrain: obstacle and terrain skills
 
 Evaluate and eventually train:
 
@@ -161,11 +161,11 @@ rough_ground_walk
 
 The target is not merely surviving rough terrain. A pass requires following the requested trajectory, maintaining progress, and clearing obstacles.
 
-### M7G: fast locomotion
+### fast_locomotion: fast locomotion
 
 Declare `run` as future. Do not expose it as executable until fast walking is proven in MuJoCo with velocity tracking, fall-rate, and thermal/actuator-margin acceptance gates.
 
-### M7H: future hardware extensions
+### future_hardware_extensions: future hardware extensions
 
 Declare arm/hand gestures but reject them on current Open Duck Mini v2:
 

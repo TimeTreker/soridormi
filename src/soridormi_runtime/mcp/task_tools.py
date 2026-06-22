@@ -273,6 +273,11 @@ def task_capabilities_payload(
         "backend": backend,
         "emergency_stop": emergency_stop,
         "safe_idle": not emergency_stop,
+        "readiness_profile": str(
+            _TASK_CAPABILITY_MANIFEST.get("readiness_profile")
+            or _TASK_CAPABILITY_MANIFEST.get("milestone")
+            or ""
+        ),
         "task_api_no_motion": bool(_TASK_CAPABILITY_MANIFEST["task_api_no_motion"]),
         "physical_execution_note": str(_TASK_CAPABILITY_MANIFEST["physical_execution_note"]),
         "ready_subsystems": list(TASK_READY_SUBSYSTEMS),

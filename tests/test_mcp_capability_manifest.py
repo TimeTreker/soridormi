@@ -125,6 +125,7 @@ def test_task_get_capabilities_is_read_only_soridormi_readiness_surface() -> Non
     assert "task_capability_readiness" in capabilities.effects
     assert "task_types" in capabilities.output_schema["properties"]
     assert "ready_subsystems" in capabilities.output_schema["properties"]
+    assert "readiness_profile" in capabilities.output_schema["properties"]
     assert "physical_execution_boundary" in capabilities.llm_hints
 
 

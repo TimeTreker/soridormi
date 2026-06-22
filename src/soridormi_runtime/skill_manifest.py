@@ -1,4 +1,4 @@
-"""Skill manifest loader and CLI for the Soridormi M7 skill platform.
+"""Skill manifest loader and CLI for Soridormi body skills.
 
 The skill manifest is intentionally JSON-only for now so it can be read from
 host scripts, runtime containers, and future MCP servers without optional YAML
@@ -80,8 +80,10 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
         errors.append("schema_version must be 1")
     if not manifest.get("robot"):
         errors.append("robot is required")
-    if not manifest.get("milestone"):
-        errors.append("milestone is required")
+    if not manifest.get("capability_profile") and not manifest.get("milestone"):
+        errors.append("capability_profile is required")
+    if manifest.get("milestone") and not manifest.get("capability_profile"):
+        warnings.append("milestone is deprecated; use capability_profile")
 
     statuses = _as_set(manifest.get("status_vocab"))
     executions = _as_set(manifest.get("execution_vocab"))
@@ -104,7 +106,7 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
     if not isinstance(defaults, dict):
         errors.append("defaults must be an object")
     elif defaults.get("hardware_enabled") is not False:
-        errors.append("defaults.hardware_enabled must remain false for M7 sim-first skill work")
+        errors.append("defaults.hardware_enabled must remain false for sim-first skill work")
 
     phases = {phase.get("id") for phase in manifest.get("implementation_phases", []) if isinstance(phase, dict)}
     if not phases:
@@ -225,7 +227,7 @@ def summarize_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         ) + 1
     return {
         "robot": manifest.get("robot"),
-        "milestone": manifest.get("milestone"),
+        "capability_profile": manifest.get("capability_profile") or manifest.get("milestone"),
         "skill_count": len(skills),
         "available_sim_count": sum(1 for skill in skills if skill.get("status") in AVAILABLE_STATUSES),
         "unsupported_count": sum(1 for skill in skills if skill.get("status") in UNSUPPORTED_STATUSES),
@@ -243,8 +245,8 @@ def build_llm_skill_context(manifest: dict[str, Any], *, language: str = "en") -
 
     if language.lower().startswith("zh"):
         lines = [
-            "Soridormi M7 技能能力摘要",
-            "==========================",
+            "Soridormi 技能能力摘要",
+            "======================",
             "Soridormi 现在把完整技能宇宙先声明出来，但只允许少量安全的 MuJoCo/sim 技能先落地。",
             "",
             "当前可执行/可包装的仿真技能：",
@@ -270,8 +272,8 @@ def build_llm_skill_context(manifest: dict[str, Any], *, language: str = "en") -
         return "\n".join(lines)
 
     lines = [
-        "Soridormi M7 skill capability summary",
-        "=====================================",
+        "Soridormi skill capability summary",
+        "==================================",
         "Soridormi declares the full skill universe up front, but only a small safe MuJoCo/sim subset is executable now.",
         "",
         "Currently available or wrapper-ready simulation skills:",
@@ -302,7 +304,7 @@ def _print_text_summary(manifest: dict[str, Any], skills: Iterable[dict[str, Any
     print("Soridormi skill manifest")
     print("=========================")
     print(f"Robot: {summary['robot']}")
-    print(f"Milestone: {summary['milestone']}")
+    print(f"Capability profile: {summary['capability_profile']}")
     print(f"Skills: {summary['skill_count']}")
     print(f"Available sim skills: {summary['available_sim_count']}")
     print(f"Unsupported current robot skills: {summary['unsupported_count']}")
@@ -314,7 +316,7 @@ def _print_text_summary(manifest: dict[str, Any], skills: Iterable[dict[str, Any
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="List and validate Soridormi M7 skill manifests.")
+    parser = argparse.ArgumentParser(description="List and validate Soridormi skill manifests.")
     parser.add_argument("--manifest", default=str(DEFAULT_SKILL_MANIFEST), help="Path to skill manifest JSON.")
     parser.add_argument("--validate-only", action="store_true", help="Validate manifest and print validation result.")
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")

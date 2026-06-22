@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "robot": "open_duck_mini_v2",
-  "milestone": "M7_skill_platform",
+  "capability_profile": "open_duck_mini_v2_skill_platform",
   "description": "Full Soridormi skill universe for Open Duck Mini v2. Skills are declared up front, but execution lands one-by-one through status and implementation phases. This manifest does not grant hardware execution.",
   "strategy": {
     "define_all_skills_first": true,
@@ -74,39 +74,39 @@
   },
   "implementation_phases": [
     {
-      "id": "M7A_skill_manifest",
+      "id": "skill_manifest",
       "goal": "Declare full skill universe and validate manifest."
     },
     {
-      "id": "M7B_skill_listing_validation",
+      "id": "skill_listing_validation",
       "goal": "CLI/runtime listing, status filters, and schema validation."
     },
     {
-      "id": "M7C_locomotion_wrappers",
+      "id": "locomotion_wrappers",
       "goal": "Expose existing policy velocity skills through safe wrappers."
     },
     {
-      "id": "M7D_head_social",
+      "id": "head_social",
       "goal": "Implement head/neck social gestures in MuJoCo."
     },
     {
-      "id": "M7E_posture_transitions",
+      "id": "posture_transitions",
       "goal": "Add scripted or teacher-driven sit/stand/crouch/recover."
     },
     {
-      "id": "M7F_obstacle_and_terrain",
+      "id": "obstacle_and_terrain",
       "goal": "Trajectory tracking and obstacle-aware clearance via evaluation and residual/RL."
     },
     {
-      "id": "M7F2_navigation_goal_pipeline",
+      "id": "navigation_goal_pipeline",
       "goal": "Resolve world goals into bounded local route segments before any locomotion controller runs."
     },
     {
-      "id": "M7G_fast_locomotion",
+      "id": "fast_locomotion",
       "goal": "Fast walk/run after speed tracking is proven."
     },
     {
-      "id": "M7H_future_hardware_extensions",
+      "id": "future_hardware_extensions",
       "goal": "Arm/hand gestures only if matching hardware exists."
     }
   ],
@@ -118,7 +118,7 @@
       "description": "Hold a stable standing posture with zero velocity command.",
       "status": "available_sim",
       "execution": "policy_velocity",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {},
       "preconditions": [
         "not_fallen",
@@ -151,7 +151,7 @@
       "description": "Cancel active locomotion and command zero velocity.",
       "status": "available_sim",
       "execution": "policy_velocity",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {},
       "preconditions": [
         "not_emergency_stopped"
@@ -182,7 +182,7 @@
       "description": "Track a bounded body velocity command vx, vy, and yaw.",
       "status": "available_sim",
       "execution": "policy_velocity",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "vx_mps": {
           "min": -0.03,
@@ -238,7 +238,7 @@
       "description": "Human-facing wrapper for walk_velocity with positive vx.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "speed": {
           "enum": [
@@ -285,7 +285,7 @@
       "description": "Human-facing wrapper for walk_velocity with small negative vx.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "speed": {
           "enum": [
@@ -330,7 +330,7 @@
       "description": "Rotate left or right with near-zero forward velocity.",
       "status": "available_sim",
       "execution": "policy_velocity",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "yaw_radps": {
           "min": -0.2,
@@ -375,7 +375,7 @@
       "description": "Human-facing wrapper for positive-yaw turn_in_place.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "angle_deg": {
           "min": 5,
@@ -421,7 +421,7 @@
       "description": "Human-facing wrapper for negative-yaw turn_in_place.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "angle_deg": {
           "min": 5,
@@ -467,7 +467,7 @@
       "description": "Walk forward while tracking a yaw command.",
       "status": "available_sim",
       "execution": "policy_velocity",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "vx_mps": {
           "min": 0.03,
@@ -517,7 +517,7 @@
       "description": "Human-facing wrapper for forward walk with positive yaw.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "radius": {
           "enum": [
@@ -562,7 +562,7 @@
       "description": "Human-facing wrapper for forward walk with negative yaw.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "radius": {
           "enum": [
@@ -607,7 +607,7 @@
       "description": "Track a small lateral velocity command.",
       "status": "available_sim_experimental",
       "execution": "policy_velocity",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "vy_mps": {
           "min": -0.03,
@@ -651,7 +651,7 @@
       "description": "Human-facing wrapper for positive lateral sidestep.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "distance_m": {
           "min": 0.02,
@@ -688,7 +688,7 @@
       "description": "Human-facing wrapper for negative lateral sidestep.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "M7C_locomotion_wrappers",
+      "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "distance_m": {
           "min": 0.02,
@@ -725,7 +725,7 @@
       "description": "Follow a short body-frame trajectory composed of velocity or waypoint segments.",
       "status": "future_evaluation",
       "execution": "trajectory_policy",
-      "implementation_phase": "M7F_obstacle_and_terrain",
+      "implementation_phase": "obstacle_and_terrain",
       "parameters": {
         "max_duration_s": {
           "min": 1.0,
@@ -767,7 +767,7 @@
       "description": "Move toward a resolved world target by sensing, localizing, routing, planning short local trajectory segments, and executing only bounded locomotion skills. This skill must refuse raw natural-language goals such as 'the house' until a trusted target resolver supplies structured target and route data.",
       "status": "future_perception",
       "execution": "navigation_pipeline",
-      "implementation_phase": "M7F2_navigation_goal_pipeline",
+      "implementation_phase": "navigation_goal_pipeline",
       "parameters": {
         "target_ref": {
           "type": "string"
@@ -829,7 +829,7 @@
       "description": "Track trajectory while lifting swing foot to clear a detected or specified obstacle.",
       "status": "future_residual_rl",
       "execution": "residual_policy",
-      "implementation_phase": "M7F_obstacle_and_terrain",
+      "implementation_phase": "obstacle_and_terrain",
       "parameters": {
         "obstacle_height_m": {
           "min": 0.005,
@@ -876,7 +876,7 @@
       "description": "Maintain trajectory progress on low rough terrain.",
       "status": "future_residual_rl",
       "execution": "residual_policy",
-      "implementation_phase": "M7F_obstacle_and_terrain",
+      "implementation_phase": "obstacle_and_terrain",
       "parameters": {
         "max_stone_height_m": {
           "min": 0.005,
@@ -916,7 +916,7 @@
       "description": "Fast locomotion beyond current walking envelope.",
       "status": "future",
       "execution": "future_policy",
-      "implementation_phase": "M7G_fast_locomotion",
+      "implementation_phase": "fast_locomotion",
       "parameters": {
         "vx_mps": {
           "min": 0.25,
@@ -955,7 +955,7 @@
       "description": "Transition from stable standing to sitting/rest pose.",
       "status": "future_pose_teacher",
       "execution": "pose_transition",
-      "implementation_phase": "M7E_posture_transitions",
+      "implementation_phase": "posture_transitions",
       "parameters": {
         "duration_s": {
           "min": 0.5,
@@ -995,7 +995,7 @@
       "description": "Transition from sitting/rest pose to stable standing.",
       "status": "future_pose_teacher",
       "execution": "pose_transition",
-      "implementation_phase": "M7E_posture_transitions",
+      "implementation_phase": "posture_transitions",
       "parameters": {
         "duration_s": {
           "min": 0.5,
@@ -1035,7 +1035,7 @@
       "description": "Lower the body height while maintaining balance.",
       "status": "future_pose_teacher",
       "execution": "pose_transition",
-      "implementation_phase": "M7E_posture_transitions",
+      "implementation_phase": "posture_transitions",
       "parameters": {
         "duration_s": {
           "min": 0.5,
@@ -1075,7 +1075,7 @@
       "description": "Recover from a safe fallen/crouched pose to standing.",
       "status": "future_pose_teacher",
       "execution": "pose_transition",
-      "implementation_phase": "M7E_posture_transitions",
+      "implementation_phase": "posture_transitions",
       "parameters": {
         "duration_s": {
           "min": 0.5,
@@ -1115,7 +1115,7 @@
       "description": "Small corrective recovery after disturbance without a full fall.",
       "status": "future_pose_teacher",
       "execution": "pose_transition",
-      "implementation_phase": "M7E_posture_transitions",
+      "implementation_phase": "posture_transitions",
       "parameters": {
         "duration_s": {
           "min": 0.5,
@@ -1155,7 +1155,7 @@
       "description": "Slowly return supported head/neck joints to the neutral straight-ahead pose using a scripted MuJoCo trajectory.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "M7D_head_social",
+      "implementation_phase": "head_social",
       "parameters": {
         "duration_s": {
           "min": 1.0,
@@ -1193,7 +1193,7 @@
       "description": "Turn head/neck toward a specified yaw/pitch direction using a scripted MuJoCo keyframe plan.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "M7D_head_social",
+      "implementation_phase": "head_social",
       "parameters": {
         "head_yaw_rad": {
           "min": -0.6,
@@ -1239,7 +1239,7 @@
       "description": "Turn head toward a structured person target direction provided by an external planner/perception layer and, by default, hold gaze on that target. Soridormi does not run perception here; it only executes bounded yaw/pitch offsets.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "M7D_head_social",
+      "implementation_phase": "head_social",
       "parameters": {
         "target_yaw_rad": {
           "min": -0.55,
@@ -1297,7 +1297,7 @@
         "joint_limit_margin",
         "base_stability"
       ],
-      "notes": "M8K implementation consumes structured target_yaw_rad/target_pitch_rad only. M8M changes the default gaze behavior to hold_target so the robot does not immediately return to neutral after looking at somebody. It does not run camera perception, person detection, raw natural language parsing, arms, hands, torso, or hardware."
+      "notes": "This implementation consumes structured target_yaw_rad/target_pitch_rad only. It uses the default gaze behavior to hold_target so the robot does not immediately return to neutral after looking at somebody. It does not run camera perception, person detection, raw natural language parsing, arms, hands, torso, or hardware."
     },
     {
       "id": "track_person",
@@ -1306,7 +1306,7 @@
       "description": "Continuously track a person with head/neck while body remains safe.",
       "status": "future_perception",
       "execution": "scripted_tracking",
-      "implementation_phase": "M7D_head_social",
+      "implementation_phase": "head_social",
       "parameters": {
         "max_duration_s": {
           "min": 1.0,
@@ -1344,7 +1344,7 @@
       "description": "Visible repeated bounded head pitch motion for yes/acknowledgement using scripted MuJoCo keyframes.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "M7D_head_social",
+      "implementation_phase": "head_social",
       "parameters": {
         "count": {
           "min": 2,
@@ -1393,7 +1393,7 @@
       "description": "Visible repeated bounded head yaw motion for no/decline using scripted MuJoCo keyframes.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "M7D_head_social",
+      "implementation_phase": "head_social",
       "parameters": {
         "count": {
           "min": 2,
@@ -1442,7 +1442,7 @@
       "description": "Gentle head/neck-only bow gesture using a neutral-home scripted MuJoCo trajectory. No torso or leg bow is attempted.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "M7D_head_social",
+      "implementation_phase": "head_social",
       "parameters": {
         "depth": {
           "enum": [
@@ -1483,7 +1483,7 @@
         "tracking_error",
         "base_stability"
       ],
-      "notes": "M8I implementation is intentionally head/neck only. Whole-body torso bow remains future work until posture control is validated."
+      "notes": "This implementation is intentionally head/neck only. Whole-body torso bow remains future work until posture control is validated."
     },
     {
       "id": "greeting",
@@ -1492,7 +1492,7 @@
       "description": "Composite social behavior for greeting a person.",
       "status": "future_composite",
       "execution": "composite",
-      "implementation_phase": "M7D_head_social",
+      "implementation_phase": "head_social",
       "parameters": {},
       "preconditions": [
         "not_fallen"
@@ -1528,7 +1528,7 @@
       "description": "Small head-only attention/listening gesture using a bounded neutral-home MuJoCo trajectory.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "M7D_head_social",
+      "implementation_phase": "head_social",
       "parameters": {
         "style": {
           "type": "string",
@@ -1570,7 +1570,7 @@
         "tracking_error",
         "base_stability"
       ],
-      "notes": "M8J implementation is a subtle listening/attention cue. It does not use perception, speech, arms, hands, torso, or hardware."
+      "notes": "This implementation is a subtle listening/attention cue. It does not use perception, speech, arms, hands, torso, or hardware."
     },
     {
       "id": "wave_hand",
@@ -1579,7 +1579,7 @@
       "description": "Arm/hand wave greeting. Current Open Duck Mini v2 actuator map has no arm/hand actuators, so this is a future hardware-extension skill.",
       "status": "unsupported_current_robot",
       "execution": "future_hardware_extension",
-      "implementation_phase": "M7H_future_hardware_extensions",
+      "implementation_phase": "future_hardware_extensions",
       "parameters": {},
       "preconditions": [
         "future_arm_actuators_available"
@@ -1609,7 +1609,7 @@
       "description": "Point toward an object or direction. Requires arm/hand hardware not present in the current actuator map.",
       "status": "unsupported_current_robot",
       "execution": "future_hardware_extension",
-      "implementation_phase": "M7H_future_hardware_extensions",
+      "implementation_phase": "future_hardware_extensions",
       "parameters": {},
       "preconditions": [
         "future_arm_actuators_available"
@@ -1639,7 +1639,7 @@
       "description": "Interactive arm/hand contact gesture. Requires future arm/hand hardware and contact safety.",
       "status": "unsupported_current_robot",
       "execution": "future_hardware_extension",
-      "implementation_phase": "M7H_future_hardware_extensions",
+      "implementation_phase": "future_hardware_extensions",
       "parameters": {},
       "preconditions": [
         "future_arm_actuators_available"

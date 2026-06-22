@@ -15,6 +15,7 @@ def test_default_task_capability_manifest_is_valid() -> None:
 
     assert validation.ok is True, validation.errors
     assert manifest["robot"] == "open_duck_mini_v2"
+    assert manifest["readiness_profile"] == "open_duck_mini_v2_task_capability_readiness"
     assert manifest["task_api_no_motion"] is True
     assert "attack" in manifest["unsafe_task_types"]
     assert "skill_registry" in manifest["ready_subsystems"]
@@ -44,6 +45,7 @@ def test_task_capabilities_payload_projects_manifest_readiness() -> None:
     }
 
     assert payload["task_api_no_motion"] is manifest["task_api_no_motion"]
+    assert payload["readiness_profile"] == manifest["readiness_profile"]
     assert payload["physical_execution_note"] == manifest["physical_execution_note"]
     assert payload["ready_subsystems"] == manifest["ready_subsystems"]
     assert payload["unsafe_task_types"] == sorted(manifest["unsafe_task_types"])
