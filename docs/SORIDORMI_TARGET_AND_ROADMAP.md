@@ -238,13 +238,19 @@ locally regenerated ONNX was preserved separately because it did not reproduce
 the historical pass. The restored model reproduces the old movement behavior,
 but all three scenarios remain below the `0.015 m` swing-clearance target.
 
-The strongest retained residual reference is
-`m10_command_state_mlp_cem4x14_s79`: it improves distance and clearance over the
-restored context-BC baseline but still fails the absolute clearance gate. A
-new restored warm-start candidate, `clearance_gap_sequence_restored_s83`, is
-reproducible and profile-contract valid, but it also fails `0/3` scenarios and
-does not beat `m10_command_state_mlp_cem4x14_s79`. The next M10 work is
-clearance refinement against that retained residual reference, followed by
+The strongest retained residual reference has advanced beyond
+`m10_command_state_mlp_cem4x14_s79`. The first restored warm-start candidate,
+`clearance_gap_sequence_restored_s83`, was reproducible and profile-contract
+valid, but failed `0/3` scenarios and did not beat `s79` because the wrapper
+changed residual scale from the retained checkpoint's `0.1` to `0.05`. The
+wrapper now preserves `0.1` by default.
+
+The current best retained residual candidate is `clearance_lowratio_sequence_s97`.
+It is still blocked from promotion, but it improves total distance to about
+`1.729 m`, gets flat p50 swing clearance above `0.015 m`, and reduces max
+low-clearance ratio to about `0.754`. Remaining blockers are the
+low-clearance-ratio gate in all three scenarios plus start/stop and curve p50
+clearance. The next M10 work is clearance refinement against `s97`, followed by
 quantitative clearance readiness and a direct human follow-camera visual pass
 before any broader promotion.
 

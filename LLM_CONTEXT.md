@@ -236,6 +236,44 @@ m10_command_state_mlp_cem4x14_s79:
   required suite: 0/3 under current G10 clearance gate
 ```
 
+Important correction found after `s83`: the clearance wrapper was intended to
+preserve the retained warm-start candidate, but it hardcoded
+`--residual-scale 0.05` while `m10_command_state_mlp_cem4x14_s79` was trained
+and evaluated with `residual_scale 0.1`. The wrapper now defaults to `0.1` and
+exposes `--residual-scale` so future warm starts preserve the checkpoint unless
+the caller deliberately changes scale.
+
+2026-06-22 scale-preserved and low-ratio continuation candidates:
+
+```text
+clearance_gap_sequence_scale_preserved_s89:
+  initial checkpoint: m10_command_state_mlp_cem4x14_s79
+  residual_scale: 0.1
+  suite: 0/3, BLOCKED_BY_CLEARANCE_GATE
+  total distance ~= 1.673m
+  flat:       p50 ~= 0.01532m, low-clearance ratio ~= 0.445
+  start-stop: p50 ~= 0.01481m, low-clearance ratio ~= 0.514
+  curve:      p50 ~= 0.01192m, low-clearance ratio ~= 0.992
+```
+
+`clearance_lowratio_sequence_s97` warm-started from `s89` with stronger
+low-clearance pressure. Treat `s97` as the current best retained
+clearance-refinement candidate, not promotable. It improves total distance,
+stuck ratio, and curve clearance over `s79`, `s83`, and `s89`, but still fails
+the low-clearance-ratio gate in all three scenarios and misses the start/stop
+and curve p50 gates.
+
+```text
+clearance_lowratio_sequence_s97:
+  initial checkpoint: clearance_gap_sequence_scale_preserved_s89
+  residual_scale: 0.1
+  suite: 0/3, BLOCKED_BY_CLEARANCE_GATE
+  total distance ~= 1.729m
+  flat:       p50 ~= 0.01560m, low-clearance ratio ~= 0.437
+  start-stop: p50 ~= 0.01466m, low-clearance ratio ~= 0.520
+  curve:      p50 ~= 0.01341m, low-clearance ratio ~= 0.754
+```
+
 clearance evidence commands:
 
 ```bash

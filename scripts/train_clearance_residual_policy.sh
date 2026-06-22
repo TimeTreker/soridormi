@@ -24,6 +24,7 @@ Options:
   --population N                  CEM population (default: 14).
   --steps-per-episode N           Simulator steps per objective (default: 300).
   --seed N                        Random seed (default: 83).
+  --residual-scale S              Runtime residual scale (default: 0.1, matching the retained warm-start checkpoint).
   --worst-case-score-weight W     Weakest-objective blend weight (default: 0.35).
   --episodic-clearance-gap-weight W
                                   Gap penalty for below-target clearance (default: 1.0).
@@ -43,6 +44,7 @@ iterations="4"
 population="14"
 steps_per_episode="300"
 seed="83"
+residual_scale="0.1"
 worst_case_score_weight="0.35"
 episodic_clearance_gap_weight="1.0"
 force_profile="0"
@@ -81,6 +83,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --seed)
       seed="${2:?--seed requires a value}"
+      shift 2
+      ;;
+    --residual-scale)
+      residual_scale="${2:?--residual-scale requires a value}"
       shift 2
       ;;
     --worst-case-score-weight)
@@ -138,7 +144,7 @@ cmd=(
   --population "${population}"
   --steps-per-episode "${steps_per_episode}"
   --seed "${seed}"
-  --residual-scale 0.05
+  --residual-scale "${residual_scale}"
   --final-score-breakdown
 )
 

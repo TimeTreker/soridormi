@@ -386,8 +386,10 @@ For the current documented clearance-refinement recipe, use the host wrapper:
 ./scripts/train_clearance_residual_policy.sh
 ```
 
-The wrapper warm-starts from `m10_command_state_mlp_cem4x14_s79`, preserves a
-flat command, emphasizes start/stop and curve sequences, uses per-step
-normalization, adds the clearance-gap term, and writes the final score
-breakdown. It does not replace the full scenario-suite and clearance-readiness
-promotion gates.
+The wrapper warm-starts from `m10_command_state_mlp_cem4x14_s79`, preserves the
+retained checkpoint's `residual_scale 0.1` by default, preserves a flat command,
+emphasizes start/stop and curve sequences, uses per-step normalization, adds the
+clearance-gap term, and writes the final score breakdown. Override
+`--residual-scale` only when deliberately changing the deployed residual scale.
+It does not replace the full scenario-suite and clearance-readiness promotion
+gates.

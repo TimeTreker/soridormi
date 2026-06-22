@@ -28,5 +28,7 @@ def test_clearance_residual_training_wrapper_tracks_recommended_recipe() -> None
     assert '--training-sequence "2.5|0,0,0,50;0.06,0,0,100;0,0,0,50"' in source
     assert '--training-sequence "3.0|0.09,0,0,50;0.09,0,0.12,150;0.09,0,0,100"' in source
     assert "--score-normalization per_step" in source
+    assert 'residual_scale="0.1"' in source
+    assert '--residual-scale "${residual_scale}"' in source
     assert "--episodic-clearance-gap-weight" in source
     assert "--final-score-breakdown" in source
