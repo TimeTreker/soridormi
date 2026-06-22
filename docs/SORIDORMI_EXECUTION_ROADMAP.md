@@ -204,7 +204,7 @@ observation[101]
 - [x] Gate prepared train/validation/test datasets
 - [x] Reject empty or invalid upstream outputs
 - [x] Add a training-ready manifest and report command
-- [ ] Generate and retain a training-ready report for the current
+- [x] Generate and retain a training-ready report for the current
   three-scenario dataset
 
 **Gate G9:**
@@ -215,6 +215,16 @@ observation[101]
 - Contracts and file hashes are recorded.
 - Both dataset gates pass.
 - A training-ready manifest is generated before training.
+
+> **Retained local evidence:** Regenerated on 2026-06-22 under
+> `data/training_datasets/` and `artifacts/`, which are intentionally ignored
+> runtime-output directories. The final report is
+> `artifacts/training/context_bc/training_ready/context_stage1_three_scenario_10ep/training_ready_report.md`.
+> It records `9000` total samples, balanced `7200/900/900` splits,
+> `3000` samples each for `flat_walk_varied_speed_v1`,
+> `start_stop_velocity_ramp_v1`, and `curve_turn_walk_v1`, passing scenario and
+> prepared gates, no rollout-group leakage, and file hashes for the prepared
+> manifest, gates, contract, and splits.
 
 ---
 
@@ -291,6 +301,16 @@ observation[101]
   - total distance: 0.733m -> 1.275m
   - no falls; maximum stuck ratio: 0.0365
   - result: strongest candidate, but all scenarios remain below G10
+- [x] Regenerate local `context_stage1_three_scenario_10ep_e80` ONNX from the
+  retained M9 dataset
+  - model/profile contract: PASS
+  - offline MAE: train 0.01088, val 0.01179, test 0.01167
+  - required scenario suite: FAIL, 0/3 scenarios accepted
+  - no falls; all three scenarios fail clearance
+  - flat: distance 0.31755m, p50 clearance 0.01006m, stuck 0.016
+  - start-stop: distance 0.32191m, p50 clearance 0.00855m, stuck 0.012
+  - curve: distance 0.15236m, p50 clearance 0.00649m, stuck 0.277
+  - result: runnable but not equivalent to the historical retained candidate
 - [ ] Focus the next training stage on start/stop and turning clearance, or
   acquire a higher-clearance teacher
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
@@ -300,15 +320,20 @@ observation[101]
 ```text
 profile/model contract: PASS
 bounded rollout: PASS
-required scenario suite: PASS
+required scenario suite: FAIL for the local regenerated E80 ONNX
 fall/reset limits: PASS
 foot-clearance threshold: ✗ FAIL (all scenarios < 0.015m)
 visual inspection: PENDING
 teacher comparison: PASS (relative behavior only; does not replace clearance)
 ```
 
-> **Current status:** The candidate passes 3/3 scenarios but does not pass G10
-> due to swing clearance deficit across all three scenarios.
+> **Current status:** Historical retained evidence for
+> `context_stage1_three_scenario_10ep_e80` passed the three-scenario suite but
+> failed G10 due to swing clearance deficit. The locally regenerated ONNX from
+> the 2026-06-22 M9 dataset does **not** reproduce that pass: it is runnable
+> and model-contract valid, but fails all three scenario acceptance gates. Treat
+> the regenerated model as blocked; restore the historical ONNX or train a new
+> candidate before using it for promotion decisions.
 >
 > **Clearance readiness:** Generate with `./scripts/analyze_clearance_readiness.sh --profile-name context_stage1_three_scenario_10ep_e80 --output-dir artifacts/clearance_readiness/context_stage1_three_scenario_10ep_e80`.
 >
@@ -648,11 +673,9 @@ depends on the hardware safety gate.
 
 ## Immediate execution plan
 
-1. Restore or regenerate the current three-scenario prepared dataset and gate
-   outputs, then generate the M9 training-ready report. The checked-out repo
-   currently retains only `data/.gitkeep` and `artifacts/.gitkeep`, so the
-   report command exists but the source evidence is not present locally.
-2. Run the current candidate with `--viewer --follow-camera`.
+1. Restore the historical E80 ONNX or train a new candidate that passes the
+   original flat/start-stop/curve scenario suite.
+2. Run the candidate with `--viewer --follow-camera`.
 3. Record swing-clearance evidence for all three scenarios.
 4. Fill the visual-review template and rebuild the evidence package.
 5. Focus training commands/objective on start-stop and turning clearance while

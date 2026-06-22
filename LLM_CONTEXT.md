@@ -117,7 +117,7 @@ That recommendation was superseded by the three-scenario candidate below,
 which added curve/yaw coverage and passed the initial flat/start-stop/curve
 suite before the remaining clearance blocker was identified.
 
-Latest three-scenario candidate checkpoint:
+Historical three-scenario candidate checkpoint:
 
 ```text
 profile: context_stage1_three_scenario_10ep_e80
@@ -141,11 +141,35 @@ scenario suite: PASS, 3/3 scenarios accepted
   fallen_count: 0
 ```
 
-Interpretation: the three-scenario candidate is the current best MuJoCo
-candidate. It passes the same flat/start-stop/curve suite that the flat-only
-models failed, including the curve case. Do not call it hardware-ready yet:
-all three scenario reports still warn about low swing clearance, so the next
-checkpoint is visual/follow-camera inspection and clearance-focused refinement.
+Interpretation: this historical three-scenario candidate was the best retained
+MuJoCo candidate. It passed the same flat/start-stop/curve suite that the
+flat-only models failed, including the curve case. Do not call it
+hardware-ready: all three scenario reports still warned about low swing
+clearance, so the next checkpoint was visual/follow-camera inspection and
+clearance-focused refinement.
+
+Local 2026-06-22 regeneration from the retained M9 dataset:
+
+```text
+profile: context_stage1_three_scenario_10ep_e80
+prepared dataset: /data/training_datasets/context_bc/prepared/context_stage1_three_scenario_10ep/prepared_manifest.json
+training output: /data/training_runs/context_stage1_three_scenario_10ep_neural_bc_m10_e80/neural_behavior_clone.onnx
+check_policy_model: OK
+offline evaluation:
+  train MAE ~= 0.01088
+  val MAE ~= 0.01179
+  test MAE ~= 0.01167
+scenario suite: FAIL, 0/3 scenarios accepted
+  flat_walk_varied_speed_v1: forward_distance ~= 0.318 m, p50 clearance ~= 0.0101 m, stuck ~= 0.016
+  start_stop_velocity_ramp_v1: forward_distance ~= 0.322 m, p50 clearance ~= 0.0086 m, stuck ~= 0.012
+  curve_turn_walk_v1: forward_distance ~= 0.152 m, p50 clearance ~= 0.0065 m, stuck ~= 0.277
+  fallen_count: 0
+```
+
+Interpretation: the regenerated ONNX is runnable but is not equivalent to the
+historical retained candidate. It remains blocked before promotion and before
+visual-review claims. Restore the historical ONNX or train a new candidate that
+passes the flat/start-stop/curve suite before using it as the M10 baseline.
 
 clearance evidence commands:
 
