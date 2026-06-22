@@ -692,3 +692,15 @@ set `--score-normalization per_step`, add a small nonzero
 `--episodic-clearance-gap-weight` when the turn objective has saturated
 low-clearance ratio, and enable `--final-score-breakdown` before accepting any
 clearance improvement for G10 evidence.
+
+Host wrapper:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
+./scripts/run_m10_clearance_refinement.sh --dry-run
+./scripts/run_m10_clearance_refinement.sh
+```
+
+The wrapper is a reproducible experiment launcher only. Promotion still requires
+the scenario-suite, clearance-readiness, visual inspection, and teacher
+comparison gates above.

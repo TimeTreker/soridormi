@@ -377,3 +377,18 @@ startup, cruise, turning, and stop segments without rerunning the whole
 experiment. This costs one extra evaluation pass over the configured objectives,
 but it makes the next bottleneck visible before running the full M10
 scenario-suite/clearance-readiness pipeline.
+
+For the current documented M10 clearance-refinement recipe, use the host
+wrapper:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
+./scripts/run_m10_clearance_refinement.sh --dry-run
+./scripts/run_m10_clearance_refinement.sh
+```
+
+The wrapper warm-starts from `m10_command_state_mlp_cem4x14_s79`, preserves a
+flat command, emphasizes start/stop and curve sequences, uses per-step
+normalization, adds the clearance-gap term, and writes the final score
+breakdown. It does not replace the full scenario-suite and clearance-readiness
+promotion gates.
