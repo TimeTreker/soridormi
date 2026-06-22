@@ -378,13 +378,12 @@ experiment. This costs one extra evaluation pass over the configured objectives,
 but it makes the next bottleneck visible before running the full M10
 scenario-suite/clearance-readiness pipeline.
 
-For the current documented M10 clearance-refinement recipe, use the host
-wrapper:
+For the current documented clearance-refinement recipe, use the host wrapper:
 
 ```bash
 ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
-./scripts/run_m10_clearance_refinement.sh --dry-run
-./scripts/run_m10_clearance_refinement.sh
+./scripts/train_clearance_residual_policy.sh --dry-run
+./scripts/train_clearance_residual_policy.sh
 ```
 
 The wrapper warm-starts from `m10_command_state_mlp_cem4x14_s79`, preserves a

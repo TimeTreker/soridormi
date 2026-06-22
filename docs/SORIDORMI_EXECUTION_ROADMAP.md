@@ -697,8 +697,8 @@ Host wrapper:
 
 ```bash
 ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
-./scripts/run_m10_clearance_refinement.sh --dry-run
-./scripts/run_m10_clearance_refinement.sh
+./scripts/train_clearance_residual_policy.sh --dry-run
+./scripts/train_clearance_residual_policy.sh
 ```
 
 The wrapper is a reproducible experiment launcher only. Promotion still requires

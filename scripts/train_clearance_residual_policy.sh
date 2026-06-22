@@ -5,19 +5,19 @@ cd "$(dirname "$0")/.."
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/run_m10_clearance_refinement.sh [options] [-- extra trainer args...]
+Usage: ./scripts/train_clearance_residual_policy.sh [options] [-- extra trainer args...]
 
-Run the documented next M10 clearance-refinement residual experiment. The
+Run the documented clearance-focused residual policy training recipe. The
 simulator server must already be running.
 
-Defaults warm-start from the strongest retained M10 residual candidate, preserve
-one flat command, emphasize start/stop plus turning sequences, use per-step
-objective normalization, keep worst-case pressure on the weakest objective, and
-write a final per-objective score breakdown.
+Defaults warm-start from the strongest retained clearance residual candidate,
+preserve one flat command, emphasize start/stop plus turning sequences, use
+per-step objective normalization, keep worst-case pressure on the weakest
+objective, and write a final per-objective score breakdown.
 
 Options:
   --teacher-profile PROFILE       Teacher profile (default: context_stage1_three_scenario_10ep_e80).
-  --profile-name NAME             Generated residual profile name (default: m10_gap_sequence_clearance_s83).
+  --profile-name NAME             Generated residual profile name (default: clearance_gap_sequence_s83).
   --output-dir DIR                Training output dir (default: /data/rl_finetune/PROFILE_NAME).
   --initial-checkpoint PATH       Warm-start checkpoint (default: /data/rl_finetune/m10_command_state_mlp_cem4x14_s79/residual_policy.pt).
   --iterations N                  CEM iterations (default: 4).
@@ -36,7 +36,7 @@ EOF
 }
 
 teacher_profile="context_stage1_three_scenario_10ep_e80"
-profile_name="m10_gap_sequence_clearance_s83"
+profile_name="clearance_gap_sequence_s83"
 output_dir=""
 initial_checkpoint="/data/rl_finetune/m10_command_state_mlp_cem4x14_s79/residual_policy.pt"
 iterations="4"
@@ -150,8 +150,8 @@ if [ "${dry_run}" = "1" ]; then
 fi
 cmd+=("${extra_args[@]}")
 
-echo "Soridormi M10 clearance refinement"
-echo "=================================="
+echo "Soridormi clearance residual training"
+echo "====================================="
 echo "Teacher profile: ${teacher_profile}"
 echo "Profile name:    ${profile_name}"
 echo "Output dir:      ${output_dir}"
