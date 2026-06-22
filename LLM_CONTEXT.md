@@ -146,22 +146,22 @@ models failed, including the curve case. Do not call it hardware-ready yet:
 all three scenario reports still warn about low swing clearance, so the next
 checkpoint is visual/follow-camera inspection and clearance-focused refinement.
 
-M10 evidence commands:
+clearance evidence commands:
 
 ```bash
-./scripts/analyze_m10_clearance_readiness.sh \
+./scripts/analyze_clearance_readiness.sh \
   --profile-name context_stage1_three_scenario_10ep_e80 \
-  --output-dir artifacts/m10_clearance_readiness/context_stage1_three_scenario_10ep_e80
-./scripts/plan_m10_visual_inspection.sh \
+  --output-dir artifacts/clearance_readiness/context_stage1_three_scenario_10ep_e80
+./scripts/plan_policy_visual_inspection.sh \
   --profile-name context_stage1_three_scenario_10ep_e80 \
-  --output-dir artifacts/m10_visual_inspection/context_stage1_three_scenario_10ep_e80
-./scripts/build_m10_evidence_package.sh \
+  --output-dir artifacts/policy_visual_inspection/context_stage1_three_scenario_10ep_e80
+./scripts/build_clearance_evidence_package.sh \
   --profile-name context_stage1_three_scenario_10ep_e80 \
-  --output-dir artifacts/m10_evidence/context_stage1_three_scenario_10ep_e80
-./scripts/compare_m10_teacher_suite.sh \
+  --output-dir artifacts/clearance_evidence/context_stage1_three_scenario_10ep_e80
+./scripts/compare_policy_teacher_suite.sh \
   artifacts/scenario_eval/open_duck_forward_m10_baseline_suite/suite_summary.json \
   artifacts/scenario_eval/context_stage1_three_scenario_10ep_e80_suite/suite_summary.json \
-  --output-dir artifacts/m10_teacher_comparison/context_stage1_three_scenario_10ep_e80 \
+  --output-dir artifacts/policy_teacher_comparison/context_stage1_three_scenario_10ep_e80 \
   --strict
 ```
 

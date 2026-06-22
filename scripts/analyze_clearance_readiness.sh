@@ -5,9 +5,9 @@ cd "$(dirname "$0")/.."
 
 usage() {
   cat <<'USAGE'
-Usage: ./scripts/analyze_m10_clearance_readiness.sh [options]
+Usage: ./scripts/analyze_clearance_readiness.sh [options]
 
-Analyze M10 swing-foot clearance readiness from required scenario rollout reports.
+Analyze swing-foot clearance readiness from required scenario rollout reports.
 By default it reads:
   artifacts/scenario_eval/<profile>_suite/<scenario>/scenario_rollout_report.json
 
@@ -23,9 +23,9 @@ Options:
   -h, --help                Show this help
 
 Example:
-  ./scripts/analyze_m10_clearance_readiness.sh \
+  ./scripts/analyze_clearance_readiness.sh \
     --profile-name context_stage1_three_scenario_10ep_e80 \
-    --output-dir artifacts/m10_clearance_readiness/context_stage1_three_scenario_10ep_e80
+    --output-dir artifacts/clearance_readiness/context_stage1_three_scenario_10ep_e80
 USAGE
 }
 

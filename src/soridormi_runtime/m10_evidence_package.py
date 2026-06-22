@@ -10,10 +10,10 @@ from typing import Any, Mapping, Sequence
 from soridormi_runtime.m10_clearance_readiness import DEFAULT_PROFILE, DEFAULT_REQUIRED_SCENARIOS
 from soridormi_runtime.scenario_curriculum import DEFAULT_SCENARIO_MANIFEST
 
-DEFAULT_OUTPUT_ROOT = Path("artifacts/m10_evidence")
-DEFAULT_READINESS_ROOT = Path("artifacts/m10_clearance_readiness")
-DEFAULT_VISUAL_ROOT = Path("artifacts/m10_visual_inspection")
-DEFAULT_REVIEW_NAME = "m10_visual_review.json"
+DEFAULT_OUTPUT_ROOT = Path("artifacts/clearance_evidence")
+DEFAULT_READINESS_ROOT = Path("artifacts/clearance_readiness")
+DEFAULT_VISUAL_ROOT = Path("artifacts/policy_visual_inspection")
+DEFAULT_REVIEW_NAME = "visual_review.json"
 VISUAL_REVIEW_FIELDS = (
     "foot_clearance",
     "base_stability",
@@ -98,11 +98,11 @@ def _command_text(command: Sequence[str]) -> str:
 
 
 def _default_readiness_report(profile: str) -> Path:
-    return DEFAULT_READINESS_ROOT / profile / "m10_clearance_readiness.json"
+    return DEFAULT_READINESS_ROOT / profile / "clearance_readiness.json"
 
 
 def _default_visual_plan(profile: str) -> Path:
-    return DEFAULT_VISUAL_ROOT / profile / "m10_visual_inspection_plan.json"
+    return DEFAULT_VISUAL_ROOT / profile / "policy_visual_inspection_plan.json"
 
 
 def _default_visual_review(output_dir: Path) -> Path:
@@ -183,7 +183,7 @@ def build_visual_review_template(
         "instructions": [
             "Fill PASS/FAIL/UNCLEAR for each field after follow-camera visual inspection.",
             "Do not mark VISUAL_PASS unless every required scenario field is PASS.",
-            "Keep this review with the M10 readiness and rollout reports.",
+            "Keep this review with the readiness and rollout reports.",
         ],
         "scenarios": [
             {
@@ -202,7 +202,7 @@ def build_visual_review_template(
 def render_visual_review_template_markdown(template: Mapping[str, Any]) -> str:
     profile = str(template.get("profile") or "")
     lines = [
-        "# Soridormi M10 visual review template",
+        "# Soridormi visual review template",
         "",
         f"Profile: `{profile}`",
         "",
@@ -229,7 +229,7 @@ def render_visual_review_template_markdown(template: Mapping[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "Promotion rule: visual review can only support M10 evidence after all required fields are `PASS`.",
+            "Promotion rule: visual review can only support clearance evidence after all required fields are `PASS`.",
             "Quantitative clearance readiness remains mandatory and cannot be replaced by visual review.",
             "",
         ]
@@ -273,22 +273,22 @@ def _next_steps(
 ) -> list[str]:
     if not readiness_ok:
         return [
-            "Run the required M10 scenario rollouts and regenerate clearance readiness.",
-            "Keep the candidate blocked from M10 promotion until clearance readiness passes.",
+            "Run the required scenario rollouts and regenerate clearance readiness.",
+            "Keep the candidate blocked from promotion until clearance readiness passes.",
         ]
     if not visual_plan_ok:
         return [
-            "Generate the follow-camera visual inspection plan for all required M10 scenarios.",
+            "Generate the follow-camera visual inspection plan for all required scenarios.",
         ]
     if visual_review_ok is None:
         return [
-            "Run follow-camera visual inspection and fill m10_visual_review.json.",
+            "Run follow-camera visual inspection and fill visual_review.json.",
             "Then rebuild this evidence package with --visual-review.",
         ]
     if visual_review_ok is False:
         return [
             "Keep the candidate blocked and inspect failed visual fields.",
-            "Collect or retrain clearance-focused data before re-running M10 evidence.",
+            "Collect or retrain clearance-focused data before re-running clearance evidence.",
         ]
     if status == "READY_FOR_TEACHER_COMPARISON":
         return [
@@ -316,8 +316,8 @@ def build_m10_evidence_package(
     readiness_path = Path(readiness_report) if readiness_report is not None else _default_readiness_report(profile)
     visual_plan_path = Path(visual_plan) if visual_plan is not None else _default_visual_plan(profile)
     visual_review_path = Path(visual_review) if visual_review is not None else _default_visual_review(resolved_output_dir)
-    template_json_path = resolved_output_dir / "m10_visual_review_template.json"
-    template_md_path = resolved_output_dir / "m10_visual_review_template.md"
+    template_json_path = resolved_output_dir / "visual_review_template.json"
+    template_md_path = resolved_output_dir / "visual_review_template.md"
 
     blockers: list[str] = []
     warnings: list[str] = []
@@ -380,7 +380,7 @@ def build_m10_evidence_package(
 
     commands = {
         "analyze_clearance_readiness": [
-            "./scripts/analyze_m10_clearance_readiness.sh",
+            "./scripts/analyze_clearance_readiness.sh",
             "--profile-name",
             profile,
             "--output-dir",
@@ -391,7 +391,7 @@ def build_m10_evidence_package(
             "--strict",
         ],
         "plan_visual_inspection": [
-            "./scripts/plan_m10_visual_inspection.sh",
+            "./scripts/plan_policy_visual_inspection.sh",
             "--profile-name",
             profile,
             "--output-dir",
@@ -405,7 +405,7 @@ def build_m10_evidence_package(
             "--strict",
         ],
         "rebuild_evidence_package": [
-            "./scripts/build_m10_evidence_package.sh",
+            "./scripts/build_clearance_evidence_package.sh",
             "--profile-name",
             profile,
             "--output-dir",
@@ -460,7 +460,7 @@ def build_m10_evidence_package(
 
 def render_markdown(package: M10EvidencePackage) -> str:
     lines = [
-        "# Soridormi M10 evidence package",
+        "# Soridormi clearance evidence package",
         "",
         f"Profile: `{package.profile}`",
         f"Status: `{package.status}`",
@@ -509,16 +509,16 @@ def render_markdown(package: M10EvidencePackage) -> str:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Build a Soridormi M10 evidence package manifest.")
+    parser = argparse.ArgumentParser(description="Build a Soridormi clearance evidence package manifest.")
     parser.add_argument("--profile-name", default=DEFAULT_PROFILE, help="Policy profile to package.")
     parser.add_argument("--scenario", action="append", default=[], help="Required scenario id; repeat or comma-separate.")
     parser.add_argument("--scenario-manifest", type=Path, default=DEFAULT_SCENARIO_MANIFEST)
     parser.add_argument("--output-dir", type=Path, default=None, help="Directory for evidence package artifacts.")
     parser.add_argument("--output", type=Path, default=None, help="Markdown package output path.")
     parser.add_argument("--json-output", type=Path, default=None, help="JSON package output path.")
-    parser.add_argument("--readiness-report", type=Path, default=None, help="M10 clearance readiness JSON path.")
-    parser.add_argument("--visual-plan", type=Path, default=None, help="M10 visual inspection plan JSON path.")
-    parser.add_argument("--visual-review", type=Path, default=None, help="Filled M10 visual review JSON path.")
+    parser.add_argument("--readiness-report", type=Path, default=None, help="Clearance readiness JSON path.")
+    parser.add_argument("--visual-plan", type=Path, default=None, help="Visual inspection plan JSON path.")
+    parser.add_argument("--visual-review", type=Path, default=None, help="Filled visual review JSON path.")
     parser.add_argument("--no-require-clearance-ready", action="store_true", help="Do not block when clearance readiness is missing/failing.")
     parser.add_argument("--no-require-visual-plan", action="store_true", help="Do not block when visual plan is missing/failing.")
     parser.add_argument("--require-visual-pass", action="store_true", help="Block unless a filled visual review passes every required field.")
@@ -543,8 +543,8 @@ def main(argv: list[str] | None = None) -> int:
         require_visual_plan=not args.no_require_visual_plan,
         require_visual_pass=args.require_visual_pass,
     )
-    json_output = args.json_output or Path(output_dir) / "m10_evidence_package.json"
-    markdown_output = args.output or Path(output_dir) / "m10_evidence_package.md"
+    json_output = args.json_output or Path(output_dir) / "clearance_evidence_package.json"
+    markdown_output = args.output or Path(output_dir) / "clearance_evidence_package.md"
     json_output.parent.mkdir(parents=True, exist_ok=True)
     json_output.write_text(json.dumps(package.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     markdown_output.parent.mkdir(parents=True, exist_ok=True)

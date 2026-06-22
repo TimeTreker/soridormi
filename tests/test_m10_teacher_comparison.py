@@ -80,7 +80,7 @@ def test_teacher_comparison_script_writes_reports(tmp_path: Path) -> None:
     result = subprocess.run(
         [
             "bash",
-            "scripts/compare_m10_teacher_suite.sh",
+            "scripts/compare_policy_teacher_suite.sh",
             str(reference),
             str(candidate),
             "--output-dir",
@@ -97,7 +97,7 @@ def test_teacher_comparison_script_writes_reports(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert json.loads(result.stdout)["status"] == "TEACHER_COMPARISON_PASS"
-    assert (output_dir / "m10_teacher_comparison.json").exists()
+    assert (output_dir / "policy_teacher_comparison.json").exists()
     assert "does not replace" in (
-        output_dir / "m10_teacher_comparison.md"
+        output_dir / "policy_teacher_comparison.md"
     ).read_text(encoding="utf-8")

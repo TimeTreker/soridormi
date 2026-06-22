@@ -4,7 +4,36 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${repo_root}"
 
-use_docker="${SORIDORMI_M11_TASK_AGENT_USE_DOCKER:-auto}"
+use_docker="${SORIDORMI_TASK_AGENT_USE_DOCKER:-${SORIDORMI_M11_TASK_AGENT_USE_DOCKER:-auto}}"
+
+usage() {
+  cat <<'USAGE'
+Usage: ./scripts/validate_task_agent_contract.sh [--help]
+
+Validate Soridormi's task-agent contract surface with compile checks, manifest
+checks, focused tests, and documentation guards.
+
+Environment:
+  SORIDORMI_TASK_AGENT_USE_DOCKER=auto|1|0
+      auto: use Docker Compose when available, otherwise host Python
+         1: require Docker Compose
+         0: run on host Python
+USAGE
+}
+
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  "")
+    ;;
+  *)
+    echo "Unknown option: $1" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
 
 run_python_gate() {
   echo "Checking Python compile targets..."
@@ -14,8 +43,8 @@ run_python_gate() {
   python -c 'from soridormi_runtime.task_capabilities import load_task_capability_manifest, validate_task_capability_manifest; result = validate_task_capability_manifest(load_task_capability_manifest()); assert result.ok, result.errors'
 
   echo "Exporting compact MCP capability manifest..."
-  python -m soridormi_runtime.mcp.export_capabilities --compact >/tmp/soridormi_m11_task_agent_manifest.json
-  python -m json.tool /tmp/soridormi_m11_task_agent_manifest.json >/dev/null
+  python -m soridormi_runtime.mcp.export_capabilities --compact >/tmp/soridormi_task_agent_manifest.json
+  python -m json.tool /tmp/soridormi_task_agent_manifest.json >/dev/null
 
   echo "Running task-agent contract tests..."
   pytest -q \
@@ -54,8 +83,8 @@ run_docs_gate() {
   python -c 'from pathlib import Path; paths = [Path(p) for p in ("docs/README.md", "docs/SORIDORMI_EXECUTION_ROADMAP.md", "docs/SORIDORMI_MCP_SERVER.md", "docs/mcp_capability_manifest.md", "docs/mcp_dag_integration.md", "docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md", "docs/SORIDORMI_NAVIGATION_GOAL_CONTRACT.md")]; bad = [str(p) for p in paths if p.read_text(encoding="utf-8").count("```") % 2]; assert not bad, bad'
 }
 
-echo "Soridormi M11 task-agent contract validation"
-echo "=============================================="
+echo "Soridormi task-agent contract validation"
+echo "========================================"
 
 if [ "${use_docker}" != "0" ]; then
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
@@ -70,8 +99,8 @@ if [ "${use_docker}" != "0" ]; then
       export PYTHONPATH=/app/src
       python -m compileall -q src/soridormi_runtime/mcp src/soridormi_runtime/task_capabilities.py
       python -c '"'"'from soridormi_runtime.task_capabilities import load_task_capability_manifest, validate_task_capability_manifest; result = validate_task_capability_manifest(load_task_capability_manifest()); assert result.ok, result.errors'"'"'
-      python -m soridormi_runtime.mcp.export_capabilities --compact >/tmp/soridormi_m11_task_agent_manifest.json
-      python -m json.tool /tmp/soridormi_m11_task_agent_manifest.json >/dev/null
+      python -m soridormi_runtime.mcp.export_capabilities --compact >/tmp/soridormi_task_agent_manifest.json
+      python -m json.tool /tmp/soridormi_task_agent_manifest.json >/dev/null
       pytest -q \
         tests/test_task_capability_manifest_m11.py \
         tests/test_mcp_capability_manifest.py \
@@ -84,7 +113,7 @@ if [ "${use_docker}" != "0" ]; then
         tests/test_skill_manifest_m7.py
     '
   elif [ "${use_docker}" = "1" ]; then
-    echo "ERROR: SORIDORMI_M11_TASK_AGENT_USE_DOCKER=1 was requested, but Docker Compose is not available." >&2
+    echo "ERROR: SORIDORMI_TASK_AGENT_USE_DOCKER=1 was requested, but Docker Compose is not available." >&2
     exit 2
   else
     echo "Docker Compose not available; falling back to host Python."
@@ -99,4 +128,4 @@ fi
 
 run_docs_gate
 
-echo "M11 task-agent contract validation: PASS"
+echo "Task-agent contract validation: PASS"

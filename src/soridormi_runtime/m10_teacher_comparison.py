@@ -9,7 +9,7 @@ from typing import Any, Mapping, Sequence
 
 from soridormi_runtime.m10_clearance_readiness import DEFAULT_REQUIRED_SCENARIOS
 
-DEFAULT_OUTPUT_ROOT = Path("artifacts/m10_teacher_comparison")
+DEFAULT_OUTPUT_ROOT = Path("artifacts/policy_teacher_comparison")
 
 
 @dataclass(frozen=True)
@@ -132,7 +132,7 @@ def compare_m10_teacher_suites(
     candidate_summary = _summary_view(candidate_suite)
     errors: list[str] = []
     warnings = [
-        "This comparison does not replace the absolute M10 swing-clearance readiness gate."
+        "This comparison does not replace the absolute swing-clearance readiness gate."
     ]
 
     if not reference_summary["ok"]:
@@ -245,7 +245,7 @@ def compare_m10_teacher_suites(
 
 def render_markdown(result: M10TeacherComparison) -> str:
     lines = [
-        "# Soridormi M10 teacher comparison",
+        "# Soridormi policy teacher comparison",
         "",
         f"Status: `{result.status}`",
         f"Result: {'PASS' if result.ok else 'FAIL'}",
@@ -290,7 +290,8 @@ def _normalise_csv(values: Sequence[str]) -> list[str]:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Compare an M10 candidate scenario suite with the official teacher suite."
+        prog="./scripts/compare_policy_teacher_suite.sh",
+        description="Compare a candidate scenario suite with the official teacher suite."
     )
     parser.add_argument("reference_suite", type=Path)
     parser.add_argument("candidate_suite", type=Path)
@@ -323,11 +324,11 @@ def main(argv: list[str] | None = None) -> int:
         output_dir=args.output_dir,
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    (args.output_dir / "m10_teacher_comparison.json").write_text(
+    (args.output_dir / "policy_teacher_comparison.json").write_text(
         json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    (args.output_dir / "m10_teacher_comparison.md").write_text(
+    (args.output_dir / "policy_teacher_comparison.md").write_text(
         render_markdown(result),
         encoding="utf-8",
     )

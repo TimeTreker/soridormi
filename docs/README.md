@@ -26,7 +26,7 @@ be committed.
   for Chromie-facing Soridormi task submissions and fail-closed embodied goals.
 - `configs/task_capabilities/open_duck_mini_v2_task_capabilities.json`:
   Soridormi-owned readiness table for task-level MCP capabilities.
-- `scripts/validate_m11_task_agent_contract.sh`: one-command M11A gate for the
+- `scripts/validate_task_agent_contract.sh`: one-command gate for the
   no-motion Chromie/Soridormi task-agent contract, task graph surface, task
   capability manifest, and acceptance cases.
 - `scripts/demo_task_mcp_contract.sh`: local no-motion demo for the
@@ -34,9 +34,9 @@ be committed.
 - `docs/SORIDORMI_NEURAL_PARAMETER_ADAPTIVE_MPC_WBC.md`: future
   neural parameter-adaptive MPC/WBC controller design; NN estimates model
   error while MPC/WBC enforces physics.
-- `scripts/build_m10_evidence_package.sh`: packages M10 clearance readiness,
+- `scripts/build_clearance_evidence_package.sh`: packages clearance readiness,
   follow-camera planning, and visual review evidence.
-- `scripts/compare_m10_teacher_suite.sh`: compares the candidate and official
+- `scripts/compare_policy_teacher_suite.sh`: compares the candidate and official
   teacher scenario-suite summaries after visual review.
 
 ## Active locomotion/data docs

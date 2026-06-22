@@ -261,7 +261,7 @@ manipulation, unsafe physical tasks, and stop-through-task requests by default.
 Validation:
 
 ```bash
-./scripts/validate_m11_task_agent_contract.sh
+./scripts/validate_task_agent_contract.sh
 ```
 
 Passing this gate means Chromie can inspect and monitor Soridormi's embodied

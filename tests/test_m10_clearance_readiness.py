@@ -209,8 +209,8 @@ def test_m10_clearance_readiness_cli_functionally_writes_reports(tmp_path: Path)
     payload = json.loads(result.stdout)
     assert payload["gate_status"] == "BLOCKED_BY_CLEARANCE_GATE"
     assert payload["summary_metrics"]["clearance_failed_count"] == 1
-    assert (output_dir / "m10_clearance_readiness.json").exists()
-    assert "Soridormi M10 clearance readiness report" in (output_dir / "m10_clearance_readiness.md").read_text()
+    assert (output_dir / "clearance_readiness.json").exists()
+    assert "Soridormi clearance readiness report" in (output_dir / "clearance_readiness.md").read_text()
 
 
 def test_m10_clearance_readiness_script_functionally_preserves_wrapper(tmp_path: Path) -> None:
@@ -230,7 +230,7 @@ def test_m10_clearance_readiness_script_functionally_preserves_wrapper(tmp_path:
     result = subprocess.run(
         [
             "bash",
-            "scripts/analyze_m10_clearance_readiness.sh",
+            "scripts/analyze_clearance_readiness.sh",
             "--profile-name",
             "candidate",
             "--suite-dir",
@@ -250,5 +250,5 @@ def test_m10_clearance_readiness_script_functionally_preserves_wrapper(tmp_path:
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert payload["gate_status"] == "READY_FOR_VISUAL_INSPECTION"
-    assert (output_dir / "m10_clearance_readiness.json").exists()
-    assert (output_dir / "m10_clearance_readiness.md").exists()
+    assert (output_dir / "clearance_readiness.json").exists()
+    assert (output_dir / "clearance_readiness.md").exists()

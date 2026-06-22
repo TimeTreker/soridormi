@@ -30,7 +30,7 @@ def _write_readiness(path: Path, *, ok: bool, gate_status: str) -> None:
 
 
 def test_visual_inspection_plan_includes_follow_camera_and_required_scenarios(tmp_path: Path) -> None:
-    readiness_path = tmp_path / "readiness" / "m10_clearance_readiness.json"
+    readiness_path = tmp_path / "readiness" / "clearance_readiness.json"
     _write_readiness(readiness_path, ok=True, gate_status="READY_FOR_VISUAL_INSPECTION")
 
     plan = build_m10_visual_inspection_plan(
@@ -98,7 +98,7 @@ def test_visual_inspection_markdown_contains_commands_and_checklist(tmp_path: Pa
 
     rendered = render_markdown(plan)
 
-    assert "Soridormi M10 visual inspection plan" in rendered
+    assert "Soridormi policy visual inspection plan" in rendered
     assert "./scripts/run_sim_server.sh" in rendered
     assert "--follow-camera" in rendered
     assert "--camera-distance 2" in rendered
@@ -109,7 +109,7 @@ def test_visual_inspection_markdown_contains_commands_and_checklist(tmp_path: Pa
 
 
 def test_m10_visual_inspection_cli_functionally_writes_plan_artifacts(tmp_path: Path) -> None:
-    readiness_path = tmp_path / "readiness" / "m10_clearance_readiness.json"
+    readiness_path = tmp_path / "readiness" / "clearance_readiness.json"
     output_dir = tmp_path / "visual_plan"
     _write_readiness(readiness_path, ok=True, gate_status="READY_FOR_VISUAL_INSPECTION")
 
@@ -141,19 +141,19 @@ def test_m10_visual_inspection_cli_functionally_writes_plan_artifacts(tmp_path: 
     assert "--follow-camera" in payload["sim_server_command"]
     assert payload["readiness_command"][payload["readiness_command"].index("--output-dir") + 1] == str(readiness_path.parent)
     assert payload["readiness_command"][payload["readiness_command"].index("--json-output") + 1] == str(readiness_path)
-    assert (output_dir / "m10_visual_inspection_plan.json").exists()
-    assert "Start MuJoCo follow-camera server" in (output_dir / "m10_visual_inspection_plan.md").read_text()
+    assert (output_dir / "policy_visual_inspection_plan.json").exists()
+    assert "Start MuJoCo follow-camera server" in (output_dir / "policy_visual_inspection_plan.md").read_text()
 
 
 def test_m10_visual_inspection_script_functionally_blocks_failed_readiness(tmp_path: Path) -> None:
-    readiness_path = tmp_path / "readiness" / "m10_clearance_readiness.json"
+    readiness_path = tmp_path / "readiness" / "clearance_readiness.json"
     output_dir = tmp_path / "blocked_visual_plan"
     _write_readiness(readiness_path, ok=False, gate_status="BLOCKED_BY_CLEARANCE_GATE")
 
     result = subprocess.run(
         [
             "bash",
-            "scripts/plan_m10_visual_inspection.sh",
+            "scripts/plan_policy_visual_inspection.sh",
             "--profile-name",
             "candidate",
             "--output-dir",
@@ -175,5 +175,5 @@ def test_m10_visual_inspection_script_functionally_blocks_failed_readiness(tmp_p
     payload = json.loads(result.stdout)
     assert payload["status"] == "BLOCKED_BY_CLEARANCE_READINESS"
     assert payload["blockers"]
-    assert (output_dir / "m10_visual_inspection_plan.json").exists()
-    assert (output_dir / "m10_visual_inspection_plan.md").exists()
+    assert (output_dir / "policy_visual_inspection_plan.json").exists()
+    assert (output_dir / "policy_visual_inspection_plan.md").exists()

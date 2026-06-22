@@ -285,13 +285,13 @@ def _max_float(values: Sequence[Any]) -> float | None:
 def _recommendations(blockers: Sequence[str]) -> list[str]:
     if blockers:
         return [
-            "Keep the current context policy blocked from M10 promotion.",
+            "Keep the current context policy blocked from promotion.",
             "Do not recollect unchanged teacher behavior when the teacher also fails the clearance target.",
             "Use a teacher that demonstrates the target clearance or train a bounded phase/state-conditioned residual.",
             "Rerun the required scenario suite before visual inspection.",
         ]
     return [
-        "Run follow-camera visual inspection for all required M10 scenarios.",
+        "Run follow-camera visual inspection for all required scenarios.",
         "Re-evaluate the candidate against the official Open Duck teacher baseline.",
         "Retain the readiness JSON/Markdown artifacts with the candidate evidence package.",
     ]
@@ -376,7 +376,7 @@ def _format_value(value: Any) -> str:
 
 def render_markdown(report: M10ClearanceReadinessReport) -> str:
     lines = [
-        "# Soridormi M10 clearance readiness report",
+        "# Soridormi clearance readiness report",
         "",
         f"Profile: `{report.profile}`",
         f"Result: {'PASS' if report.ok else 'FAILED'}",
@@ -429,7 +429,7 @@ def render_markdown(report: M10ClearanceReadinessReport) -> str:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Analyze M10 context-policy clearance readiness.")
+    parser = argparse.ArgumentParser(description="Analyze context-policy clearance readiness.")
     parser.add_argument("--profile-name", default=DEFAULT_PROFILE, help="Policy profile name used to resolve the default suite dir.")
     parser.add_argument("--suite-dir", type=Path, default=None, help="Directory containing per-scenario subdirectories and reports.")
     parser.add_argument("--report", action="append", default=[], help="Explicit scenario_rollout_report.json path; repeat as needed.")
@@ -453,9 +453,9 @@ def main(argv: list[str] | None = None) -> int:
         scenarios=scenarios,
         manifest_path=args.scenario_manifest,
     )
-    output_dir = args.output_dir or Path("artifacts/m10_clearance_readiness") / args.profile_name
-    json_output = args.json_output or output_dir / "m10_clearance_readiness.json"
-    markdown_output = args.output or output_dir / "m10_clearance_readiness.md"
+    output_dir = args.output_dir or Path("artifacts/clearance_readiness") / args.profile_name
+    json_output = args.json_output or output_dir / "clearance_readiness.json"
+    markdown_output = args.output or output_dir / "clearance_readiness.md"
 
     json_output.parent.mkdir(parents=True, exist_ok=True)
     json_output.write_text(json.dumps(report.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")

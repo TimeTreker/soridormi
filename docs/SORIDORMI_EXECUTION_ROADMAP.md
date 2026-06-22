@@ -236,8 +236,8 @@ observation[101]
   - curve_turn_walk_v1: 0.0063m (need +0.0087m)
 - [ ] Perform follow-camera visual inspection
 - [x] Define clearance-focused promotion thresholds
-- [x] Add threshold-aligned M10 clearance readiness report
-- [x] Add an M10 evidence package and visual-review template
+- [x] Add threshold-aligned clearance readiness report
+- [x] Add an clearance evidence package and visual-review template
 - [x] Add scenario-suite comparison against the official teacher
 - [x] Re-evaluate the current candidate against the official teacher
   - flat distance/speed ratio: 0.978
@@ -310,7 +310,7 @@ teacher comparison: PASS (relative behavior only; does not replace clearance)
 > **Current status:** The candidate passes 3/3 scenarios but does not pass G10
 > due to swing clearance deficit across all three scenarios.
 >
-> **Clearance readiness:** Generate with `./scripts/analyze_m10_clearance_readiness.sh --profile-name context_stage1_three_scenario_10ep_e80 --output-dir artifacts/m10_clearance_readiness/context_stage1_three_scenario_10ep_e80`.
+> **Clearance readiness:** Generate with `./scripts/analyze_clearance_readiness.sh --profile-name context_stage1_three_scenario_10ep_e80 --output-dir artifacts/clearance_readiness/context_stage1_three_scenario_10ep_e80`.
 >
 > **Decision path:**
 > - **Option 1 (Recommended):** Pursue clearance-focused refinement before M10.0 release
@@ -341,12 +341,12 @@ hardware execution.
 - [x] Add navigation-goal training and contract cases without claiming that
   navigation is executable
 - [x] Add the host validation gate:
-  `./scripts/validate_m11_task_agent_contract.sh`
+  `./scripts/validate_task_agent_contract.sh`
 
 **Gate G11A:**
 
 ```text
-./scripts/validate_m11_task_agent_contract.sh
+./scripts/validate_task_agent_contract.sh
 ```
 
 This gate passes when:
@@ -388,7 +388,7 @@ before task-level physical execution exists.
 **Gate G11B:**
 
 ```text
-./scripts/validate_m11_task_agent_contract.sh
+./scripts/validate_task_agent_contract.sh
 ```
 
 This gate passes when task event cursor behavior works for active planning-hold
@@ -417,7 +417,7 @@ task reference without creating duplicate Soridormi records.
 **Gate G11C:**
 
 ```text
-./scripts/validate_m11_task_agent_contract.sh
+./scripts/validate_task_agent_contract.sh
 ```
 
 This gate passes when duplicate submits do not duplicate records, conflicting
@@ -443,7 +443,7 @@ after Chromie has stopped waiting.
 **Gate G11D:**
 
 ```text
-./scripts/validate_m11_task_agent_contract.sh
+./scripts/validate_task_agent_contract.sh
 ```
 
 This gate passes when planning-hold tasks expire deterministically, timeout
@@ -593,7 +593,7 @@ verification in MuJoCo.
 
 ```text
 M9 training-ready evidence
-  -> M10 clearance refinement
+  -> clearance refinement
   -> M11 held-out generalization
   -> M12 targeted improvement
   -> M13 staged hardware transfer
@@ -640,14 +640,14 @@ depends on the hardware safety gate.
    dataset.
 2. Run the current candidate with `--viewer --follow-camera`.
 3. Record swing-clearance evidence for all three scenarios.
-4. Fill the M10 visual-review template and rebuild the evidence package.
+4. Fill the visual-review template and rebuild the evidence package.
 5. Focus training commands/objective on start-stop and turning clearance while
    preserving the near-passing flat result, or acquire a higher-clearance
    teacher.
 6. Pass the quantitative clearance readiness gate without regressing the
    original scenario suite.
 7. Compare the new candidate suite against the official teacher with
-   `compare_m10_teacher_suite.sh`.
+   `compare_policy_teacher_suite.sh`.
 8. Begin M11 held-out scenario development only after G10 passes.
 
 ## Project success criteria

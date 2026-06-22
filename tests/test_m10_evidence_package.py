@@ -74,8 +74,8 @@ def _visual_review_payload(*, passing: bool = True) -> dict:
 
 
 def test_evidence_package_ready_for_visual_review_when_quantitative_and_plan_pass(tmp_path: Path) -> None:
-    readiness_path = tmp_path / "readiness" / "m10_clearance_readiness.json"
-    visual_plan_path = tmp_path / "visual" / "m10_visual_inspection_plan.json"
+    readiness_path = tmp_path / "readiness" / "clearance_readiness.json"
+    visual_plan_path = tmp_path / "visual" / "policy_visual_inspection_plan.json"
     _write_json(readiness_path, _readiness_payload(tmp_path, ok=True))
     _write_json(visual_plan_path, _visual_plan_payload(ok=True))
 
@@ -92,13 +92,13 @@ def test_evidence_package_ready_for_visual_review_when_quantitative_and_plan_pas
     assert package.visual_plan_ok
     assert package.visual_review_ok is None
     assert package.next_steps
-    assert package.commands["analyze_clearance_readiness"][0] == "./scripts/analyze_m10_clearance_readiness.sh"
+    assert package.commands["analyze_clearance_readiness"][0] == "./scripts/analyze_clearance_readiness.sh"
 
 
 def test_evidence_package_ready_for_teacher_comparison_after_visual_pass(tmp_path: Path) -> None:
-    readiness_path = tmp_path / "readiness" / "m10_clearance_readiness.json"
-    visual_plan_path = tmp_path / "visual" / "m10_visual_inspection_plan.json"
-    visual_review_path = tmp_path / "evidence" / "m10_visual_review.json"
+    readiness_path = tmp_path / "readiness" / "clearance_readiness.json"
+    visual_plan_path = tmp_path / "visual" / "policy_visual_inspection_plan.json"
+    visual_review_path = tmp_path / "evidence" / "visual_review.json"
     _write_json(readiness_path, _readiness_payload(tmp_path, ok=True))
     _write_json(visual_plan_path, _visual_plan_payload(ok=True))
     _write_json(visual_review_path, _visual_review_payload(passing=True))
@@ -119,9 +119,9 @@ def test_evidence_package_ready_for_teacher_comparison_after_visual_pass(tmp_pat
 
 
 def test_evidence_package_blocks_failed_visual_review_when_required(tmp_path: Path) -> None:
-    readiness_path = tmp_path / "readiness" / "m10_clearance_readiness.json"
-    visual_plan_path = tmp_path / "visual" / "m10_visual_inspection_plan.json"
-    visual_review_path = tmp_path / "evidence" / "m10_visual_review.json"
+    readiness_path = tmp_path / "readiness" / "clearance_readiness.json"
+    visual_plan_path = tmp_path / "visual" / "policy_visual_inspection_plan.json"
+    visual_review_path = tmp_path / "evidence" / "visual_review.json"
     _write_json(readiness_path, _readiness_payload(tmp_path, ok=True))
     _write_json(visual_plan_path, _visual_plan_payload(ok=True))
     _write_json(visual_review_path, _visual_review_payload(passing=False))
@@ -153,13 +153,13 @@ def test_visual_review_template_and_markdown_cover_required_scenarios() -> None:
 
     assert [item["scenario_id"] for item in template["scenarios"]] == list(DEFAULT_REQUIRED_SCENARIOS)
     assert "foot_clearance" in template["scenarios"][0]
-    assert "Soridormi M10 evidence package" in rendered
-    assert "m10_visual_review_template.json" in rendered
+    assert "Soridormi clearance evidence package" in rendered
+    assert "visual_review_template.json" in rendered
 
 
 def test_m10_evidence_package_cli_functionally_writes_manifest_and_templates(tmp_path: Path) -> None:
-    readiness_path = tmp_path / "readiness" / "m10_clearance_readiness.json"
-    visual_plan_path = tmp_path / "visual" / "m10_visual_inspection_plan.json"
+    readiness_path = tmp_path / "readiness" / "clearance_readiness.json"
+    visual_plan_path = tmp_path / "visual" / "policy_visual_inspection_plan.json"
     output_dir = tmp_path / "evidence"
     _write_json(readiness_path, _readiness_payload(tmp_path, ok=True))
     _write_json(visual_plan_path, _visual_plan_payload(ok=True))
@@ -190,10 +190,10 @@ def test_m10_evidence_package_cli_functionally_writes_manifest_and_templates(tmp
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert payload["status"] == "READY_FOR_VISUAL_REVIEW"
-    assert (output_dir / "m10_evidence_package.json").exists()
-    assert (output_dir / "m10_evidence_package.md").exists()
-    assert (output_dir / "m10_visual_review_template.json").exists()
-    assert "Promotion rule" in (output_dir / "m10_visual_review_template.md").read_text()
+    assert (output_dir / "clearance_evidence_package.json").exists()
+    assert (output_dir / "clearance_evidence_package.md").exists()
+    assert (output_dir / "visual_review_template.json").exists()
+    assert "Promotion rule" in (output_dir / "visual_review_template.md").read_text()
 
 
 def test_m10_evidence_package_script_functionally_blocks_missing_readiness(tmp_path: Path) -> None:
@@ -202,7 +202,7 @@ def test_m10_evidence_package_script_functionally_blocks_missing_readiness(tmp_p
     result = subprocess.run(
         [
             "bash",
-            "scripts/build_m10_evidence_package.sh",
+            "scripts/build_clearance_evidence_package.sh",
             "--profile-name",
             "candidate",
             "--output-dir",
@@ -225,5 +225,5 @@ def test_m10_evidence_package_script_functionally_blocks_missing_readiness(tmp_p
     payload = json.loads(result.stdout)
     assert payload["status"] == "BLOCKED_BY_CLEARANCE_READINESS"
     assert payload["blockers"]
-    assert (output_dir / "m10_evidence_package.json").exists()
-    assert (output_dir / "m10_visual_review_template.json").exists()
+    assert (output_dir / "clearance_evidence_package.json").exists()
+    assert (output_dir / "visual_review_template.json").exists()

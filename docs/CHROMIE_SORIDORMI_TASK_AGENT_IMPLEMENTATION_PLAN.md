@@ -249,7 +249,7 @@ manipulation, perception, stop-through-task, and unsafe physical requests.
 The full no-motion contract milestone is the M11A gate:
 
 ```bash
-./scripts/validate_m11_task_agent_contract.sh
+./scripts/validate_task_agent_contract.sh
 ```
 
 MuJoCo-backed scenarios should be added only for tasks that map to existing
@@ -331,7 +331,7 @@ python -c "from pathlib import Path; p = Path('docs/CHROMIE_SORIDORMI_TASK_AGENT
 Code or manifest changes:
 
 ```bash
-./scripts/validate_m11_task_agent_contract.sh
+./scripts/validate_task_agent_contract.sh
 ```
 
 MuJoCo-backed executable task changes:

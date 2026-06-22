@@ -71,7 +71,7 @@ For the full M11A task-agent contract gate, including task capability
 readiness, manifest export, acceptance cases, `task_graph`, and docs checks:
 
 ```bash
-./scripts/validate_m11_task_agent_contract.sh
+./scripts/validate_task_agent_contract.sh
 ```
 
 ## Safety boundary

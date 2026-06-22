@@ -13,7 +13,7 @@ from soridormi_runtime.m10_clearance_readiness import (
 )
 from soridormi_runtime.scenario_curriculum import DEFAULT_SCENARIO_MANIFEST, get_scenario_definition
 
-DEFAULT_OUTPUT_ROOT = Path("artifacts/m10_visual_inspection")
+DEFAULT_OUTPUT_ROOT = Path("artifacts/policy_visual_inspection")
 DEFAULT_CAMERA_DISTANCE = 1.4
 DEFAULT_CAMERA_AZIMUTH = 135.0
 DEFAULT_CAMERA_ELEVATION = -20.0
@@ -178,7 +178,7 @@ def build_m10_visual_inspection_plan(
     scenario_ids = list(scenarios)
     resolved_output_dir = Path(output_dir) if output_dir is not None else DEFAULT_OUTPUT_ROOT / profile
     explicit_readiness_report = readiness_report is not None
-    readiness_path = Path(readiness_report) if explicit_readiness_report else resolved_output_dir / "m10_clearance_readiness.json"
+    readiness_path = Path(readiness_report) if explicit_readiness_report else resolved_output_dir / "clearance_readiness.json"
     blockers: list[str] = []
     notes: list[str] = []
     readiness_status: str | None = None
@@ -193,7 +193,7 @@ def build_m10_visual_inspection_plan(
     else:
         notes.append(
             "No readiness report was found; this plan can still be used as an inspection checklist, "
-            "but promotion evidence should include a passing M10 clearance readiness report."
+            "but promotion evidence should include a passing clearance readiness report."
         )
 
     if require_clearance_ready and blockers:
@@ -217,7 +217,7 @@ def build_m10_visual_inspection_plan(
         f"{camera_elevation:g}",
     ]
     readiness_command = [
-        "./scripts/analyze_m10_clearance_readiness.sh",
+        "./scripts/analyze_clearance_readiness.sh",
         "--profile-name",
         profile,
         *_readiness_command_output_args(
@@ -246,7 +246,7 @@ def build_m10_visual_inspection_plan(
         "Inspect every required scenario from the follow-camera viewer, not only the aggregate JSON pass/fail result.",
         "Record PASS/FAIL/UNCLEAR for foot clearance, base stability, toe drag, and command transition quality.",
         "Keep the readiness JSON, visual inspection Markdown, and scenario rollout reports in the same evidence package.",
-        "Do not promote to hardware or Chromie integration from visual evidence alone; keep M10 promotion tied to quantitative gates.",
+        "Do not promote to hardware or Chromie integration from visual evidence alone; keep promotion tied to quantitative gates.",
     ]
     return M10VisualInspectionPlan(
         ok=not blockers or not require_clearance_ready,
@@ -269,7 +269,7 @@ def build_m10_visual_inspection_plan(
 
 def render_markdown(plan: M10VisualInspectionPlan) -> str:
     lines = [
-        "# Soridormi M10 visual inspection plan",
+        "# Soridormi policy visual inspection plan",
         "",
         f"Profile: `{plan.profile}`",
         f"Status: `{plan.status}`",
@@ -324,14 +324,14 @@ def render_markdown(plan: M10VisualInspectionPlan) -> str:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Create a repeatable M10 follow-camera visual inspection plan.")
+    parser = argparse.ArgumentParser(description="Create a repeatable follow-camera visual inspection plan.")
     parser.add_argument("--profile-name", default=DEFAULT_PROFILE, help="Policy profile to inspect.")
     parser.add_argument("--scenario", action="append", default=[], help="Required scenario id; repeat or comma-separate.")
     parser.add_argument("--scenario-manifest", type=Path, default=DEFAULT_SCENARIO_MANIFEST)
     parser.add_argument("--output-dir", type=Path, default=None, help="Directory for visual inspection artifacts.")
     parser.add_argument("--output", type=Path, default=None, help="Markdown output path.")
     parser.add_argument("--json-output", type=Path, default=None, help="JSON output path.")
-    parser.add_argument("--readiness-report", type=Path, default=None, help="M10 clearance readiness JSON path.")
+    parser.add_argument("--readiness-report", type=Path, default=None, help="Clearance readiness JSON path.")
     parser.add_argument("--require-clearance-ready", action="store_true", help="Exit nonzero unless readiness report exists and passes.")
     parser.add_argument("--camera-distance", type=float, default=DEFAULT_CAMERA_DISTANCE)
     parser.add_argument("--camera-azimuth", type=float, default=DEFAULT_CAMERA_AZIMUTH)
@@ -362,8 +362,8 @@ def main(argv: list[str] | None = None) -> int:
         duration_s=args.duration_s,
         steps=args.steps,
     )
-    json_output = args.json_output or output_dir / "m10_visual_inspection_plan.json"
-    markdown_output = args.output or output_dir / "m10_visual_inspection_plan.md"
+    json_output = args.json_output or output_dir / "policy_visual_inspection_plan.json"
+    markdown_output = args.output or output_dir / "policy_visual_inspection_plan.md"
     json_output.parent.mkdir(parents=True, exist_ok=True)
     json_output.write_text(json.dumps(plan.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     markdown_output.parent.mkdir(parents=True, exist_ok=True)

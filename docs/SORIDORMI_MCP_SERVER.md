@@ -161,7 +161,7 @@ compilation without claiming the robot physically executed the task.
 Run the M11A task-agent contract gate from the Soridormi repo root:
 
 ```bash
-./scripts/validate_m11_task_agent_contract.sh
+./scripts/validate_task_agent_contract.sh
 ```
 
 A compact local demo is available:
