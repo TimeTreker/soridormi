@@ -244,7 +244,7 @@ observation[101]
   - flat_walk_varied_speed_v1: 0.0102m (need +0.0048m)
   - start_stop_velocity_ramp_v1: 0.0076m (need +0.0074m)
   - curve_turn_walk_v1: 0.0063m (need +0.0087m)
-- [ ] Perform follow-camera visual inspection
+- [ ] Perform human follow-camera visual inspection before promotion
 - [x] Define clearance-focused promotion thresholds
 - [x] Add threshold-aligned clearance readiness report
 - [x] Add an clearance evidence package and visual-review template
@@ -311,11 +311,20 @@ observation[101]
   - start-stop: distance 0.32191m, p50 clearance 0.00855m, stuck 0.012
   - curve: distance 0.15236m, p50 clearance 0.00649m, stuck 0.277
   - result: runnable but not equivalent to the historical retained candidate
-- [x] Run `context_stage1_three_scenario_10ep_e80` with MuJoCo viewer
-  follow-camera and rebuild clearance evidence
-  - command: `./scripts/run_sim_server.sh --backend mujoco --profile context_stage1_three_scenario_10ep_e80 --viewer --follow-camera`
-  - viewer-backed scenario rollouts matched the headless result: no falls, but
-    all three scenarios failed clearance
+- [x] Restore the historical `context_stage1_three_scenario_10ep_e80` ONNX from
+  local backup and preserve the regenerated ONNX separately
+  - restored ONNX sha256:
+    `2a7e41afe855702638aed56ec32e0f5e067a6b76fdcd76af4d43a101191730b7`
+  - regenerated ONNX preserved under
+    `data/training_runs/context_stage1_three_scenario_10ep_neural_bc_m10_e80_regenerated_20260622/`
+  - restored live suite under the current clearance gate: FAIL, 0/3
+  - flat: distance 0.31202m, p50 clearance 0.01023m
+  - start-stop: distance 0.26651m, p50 clearance 0.00759m
+  - curve: distance 0.15465m, p50 clearance 0.00632m
+- [x] Rebuild clearance evidence and keep the follow-camera review path ready
+  - command for human visual pass: `./scripts/run_sim_server.sh --backend mujoco --profile context_stage1_three_scenario_10ep_e80 --viewer --follow-camera`
+  - metric-grounded review artifact records no falls, but all three scenarios
+    failed clearance
   - filled review:
     `artifacts/clearance_evidence/context_stage1_three_scenario_10ep_e80/visual_review.json`
   - evidence package status: `BLOCKED_BY_CLEARANCE_READINESS`
@@ -324,6 +333,21 @@ observation[101]
   - output: `/data/rl_finetune/clearance_gap_probe_s91`
   - best score: `0.26074`
   - result: zero residual selected; not a promotion candidate
+- [x] Restore the strongest retained nonlinear residual checkpoint
+  - output: `/data/rl_finetune/m10_command_state_mlp_cem4x14_s79`
+  - suite remains blocked by current clearance gate, but it is still the best
+    retained residual reference
+  - flat: p50 clearance 0.01471m, low-clearance ratio 0.528
+  - start-stop: p50 clearance 0.01152m, low-clearance ratio 0.971
+  - curve: p50 clearance 0.01025m, low-clearance ratio 0.973
+- [x] Train and evaluate a restored warm-start clearance sequence candidate
+  - candidate: `clearance_gap_sequence_restored_s83`
+  - model/profile contract: PASS
+  - required scenario suite: FAIL, 0/3 under current clearance gate
+  - flat: distance 0.47062m, p50 clearance 0.01344m, low-clearance ratio 0.752
+  - start-stop: distance 0.50116m, p50 clearance 0.01148m, low-clearance ratio 0.985
+  - curve: distance 0.23559m, p50 clearance 0.00863m, low-clearance ratio 1.000
+  - result: reproducible failed candidate; do not promote
 - [ ] Focus the next training stage on start/stop and turning clearance, or
   acquire a higher-clearance teacher
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
@@ -333,29 +357,31 @@ observation[101]
 ```text
 profile/model contract: PASS
 bounded rollout: PASS
-required scenario suite: FAIL for the local regenerated E80 ONNX
+required scenario suite: FAIL under current clearance gate
 fall/reset limits: PASS
 foot-clearance threshold: ✗ FAIL (all scenarios < 0.015m)
-visual inspection: ✗ FAIL (metric-grounded review from viewer-backed rollouts)
+human visual inspection: PENDING
+metric-grounded review: ✗ FAIL
 teacher comparison: PASS (relative behavior only; does not replace clearance)
 ```
 
 > **Current status:** Historical retained evidence for
 > `context_stage1_three_scenario_10ep_e80` passed the three-scenario suite but
-> failed G10 due to swing clearance deficit. The locally regenerated ONNX from
-> the 2026-06-22 M9 dataset does **not** reproduce that pass: it is runnable
-> and model-contract valid, but fails all three scenario acceptance gates. Treat
-> the regenerated model as blocked; restore the historical ONNX or train a new
-> candidate before using it for promotion decisions.
-> Follow-camera MuJoCo rollouts were rerun on 2026-06-22 and the clearance
-> evidence package now includes a filled metric-grounded visual review. It is
-> intentionally blocked, not a visual PASS: all scenarios remained upright but
-> failed the `0.015 m` swing-clearance gate.
+> failed G10 due to swing clearance deficit. The historical ONNX was restored
+> locally on 2026-06-22 and the regenerated ONNX was preserved separately. Under
+> the current clearance-aware gate, restored E80 still fails all three scenario
+> acceptance gates because p50 swing clearance is below `0.015 m` and
+> low-clearance ratio remains too high.
+> The clearance evidence package includes a filled metric-grounded review. It is
+> intentionally blocked, not a human visual PASS: all scenarios remained upright
+> but failed the `0.015 m` swing-clearance gate. A direct human follow-camera
+> inspection remains pending before any promotion.
 >
 > **Clearance readiness:** Generate with `./scripts/analyze_clearance_readiness.sh --profile-name context_stage1_three_scenario_10ep_e80 --output-dir artifacts/clearance_readiness/context_stage1_three_scenario_10ep_e80`.
 >
 > **Decision path:**
-> - **Option 1 (Recommended):** Pursue clearance-focused refinement before M10.0 release
+> - **Option 1 (Recommended):** Continue clearance-focused refinement from the
+>   best retained residual reference before M10.0 release
 > - **Option 2:** Accept as experimental M10.0, document limitation, refine in M11
 
 ---
@@ -690,19 +716,21 @@ depends on the hardware safety gate.
 
 ## Immediate execution plan
 
-1. Restore the historical E80 ONNX or train a new candidate that passes the
-   original flat/start-stop/curve scenario suite.
-2. Run the candidate with `--viewer --follow-camera`.
-3. Record swing-clearance evidence for all three scenarios.
-4. Fill the visual-review template and rebuild the evidence package.
-5. Focus training commands/objective on start-stop and turning clearance while
+1. Keep `m10_command_state_mlp_cem4x14_s79` as the best retained residual
+   reference and reject `clearance_gap_sequence_restored_s83` for promotion.
+2. Train the next clearance candidate to beat that retained reference on all
+   three scenarios, not only the restored E80 baseline.
+3. Run the candidate with `--viewer --follow-camera` for human visual review.
+4. Record swing-clearance evidence for all three scenarios.
+5. Fill the visual-review template and rebuild the evidence package.
+6. Focus training commands/objective on start-stop and turning clearance while
    preserving the near-passing flat result, or acquire a higher-clearance
    teacher.
-6. Pass the quantitative clearance readiness gate without regressing the
+7. Pass the quantitative clearance readiness gate without regressing the
    original scenario suite.
-7. Compare the new candidate suite against the official teacher with
+8. Compare the new candidate suite against the official teacher with
    `compare_policy_teacher_suite.sh`.
-8. Begin M11 held-out scenario development only after G10 passes.
+9. Begin M11 held-out scenario development only after G10 passes.
 
 ## Project success criteria
 
@@ -746,6 +774,12 @@ set `--score-normalization per_step`, add a small nonzero
 `--episodic-clearance-gap-weight` when the turn objective has saturated
 low-clearance ratio, and enable `--final-score-breakdown` before accepting any
 clearance improvement for G10 evidence.
+
+2026-06-22 update: `clearance_gap_sequence_restored_s83` followed this
+warm-start path and produced a valid runtime profile, but failed the
+three-scenario clearance gate and did not improve on
+`m10_command_state_mlp_cem4x14_s79`. The next run should compare against that
+retained residual reference before consuming full G10 evidence time.
 
 Host wrapper:
 

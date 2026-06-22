@@ -230,12 +230,23 @@ flat/start-stop/curve suite: PASS, 3/3 scenarios accepted
   fallen_count: 0
 ```
 
-Conclusion: the three-scenario candidate is the current best MuJoCo candidate.
-It passes the suite that the flat-only context candidates failed, including the
-curve/turning case. It is not hardware-ready: all three accepted scenario
-reports still warn about low swing clearance. The next checkpoint is visual
-follow-camera inspection plus clearance-focused refinement before any broader
-promotion.
+Conclusion: the three-scenario candidate remains the best restored context-BC
+baseline, but it is blocked by the current G10 clearance gate. On 2026-06-22
+the historical ONNX was restored locally with sha256
+`2a7e41afe855702638aed56ec32e0f5e067a6b76fdcd76af4d43a101191730b7`; the
+locally regenerated ONNX was preserved separately because it did not reproduce
+the historical pass. The restored model reproduces the old movement behavior,
+but all three scenarios remain below the `0.015 m` swing-clearance target.
+
+The strongest retained residual reference is
+`m10_command_state_mlp_cem4x14_s79`: it improves distance and clearance over the
+restored context-BC baseline but still fails the absolute clearance gate. A
+new restored warm-start candidate, `clearance_gap_sequence_restored_s83`, is
+reproducible and profile-contract valid, but it also fails `0/3` scenarios and
+does not beat `m10_command_state_mlp_cem4x14_s79`. The next M10 work is
+clearance refinement against that retained residual reference, followed by
+quantitative clearance readiness and a direct human follow-camera visual pass
+before any broader promotion.
 
 ### M11A: task-agent contract foundation
 

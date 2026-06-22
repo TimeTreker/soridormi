@@ -168,13 +168,32 @@ scenario suite: FAIL, 0/3 scenarios accepted
 
 Interpretation: the regenerated ONNX is runnable but is not equivalent to the
 historical retained candidate. It remains blocked before promotion and before
-visual-review claims. Restore the historical ONNX or train a new candidate that
-passes the flat/start-stop/curve suite before using it as the M10 baseline.
+visual-review claims.
 
-2026-06-22 follow-camera update: `context_stage1_three_scenario_10ep_e80` was
-run with MuJoCo viewer follow-camera and all three required scenarios were
-replayed. The viewer-backed rollouts stayed upright but reproduced the
-clearance failure:
+2026-06-22 artifact restoration:
+
+```text
+canonical profile: context_stage1_three_scenario_10ep_e80
+restored ONNX sha256: 2a7e41afe855702638aed56ec32e0f5e067a6b76fdcd76af4d43a101191730b7
+preserved regenerated ONNX: data/training_runs/context_stage1_three_scenario_10ep_neural_bc_m10_e80_regenerated_20260622/
+preserved regenerated suite: artifacts/scenario_eval/context_stage1_three_scenario_10ep_e80_suite_regenerated_20260622/
+restored warm-start residual: /data/rl_finetune/m10_command_state_mlp_cem4x14_s79
+```
+
+The restored historical E80 reproduces the old movement metrics, but the
+current acceptance gate now includes absolute clearance checks. Under the
+current gate it is still `0/3`:
+
+```text
+flat:       distance ~= 0.312m, p50 clearance ~= 0.01023m, low-clearance ratio 1.0
+start-stop: distance ~= 0.267m, p50 clearance ~= 0.00759m, low-clearance ratio 1.0
+curve:      distance ~= 0.155m, p50 clearance ~= 0.00632m, low-clearance ratio 1.0
+```
+
+2026-06-22 visual-review status: follow-camera commands and visual-review
+templates exist, and a metric-grounded Codex review artifact records the
+clearance failure, but a direct human GUI visual pass is still pending before
+promotion. The rollouts stayed upright but reproduced the clearance failure:
 
 ```text
 flat:       p50 clearance 0.01006m, low-clearance ratio 1.0
@@ -191,6 +210,31 @@ and remains `BLOCKED_BY_CLEARANCE_READINESS`.
 E80 teacher without the missing historical warm-start checkpoint, but selected
 the zero residual (`Best parameter abs max: 0`). Treat it as a workflow probe,
 not a candidate.
+
+2026-06-22 restored warm-start clearance candidate:
+`clearance_gap_sequence_restored_s83` was trained from the restored historical
+E80 teacher with the restored `m10_command_state_mlp_cem4x14_s79` checkpoint.
+Its profile/model contract passes, but the required scenario suite remains
+`0/3` because all scenarios fail clearance:
+
+```text
+flat:       distance ~= 0.471m, p50 clearance ~= 0.01344m, low-clearance ratio ~= 0.752
+start-stop: distance ~= 0.501m, p50 clearance ~= 0.01148m, low-clearance ratio ~= 0.985
+curve:      distance ~= 0.236m, p50 clearance ~= 0.00863m, low-clearance ratio ~= 1.000
+```
+
+Do not promote `clearance_gap_sequence_restored_s83`. It improves movement over
+restored E80 but does not beat the older retained
+`m10_command_state_mlp_cem4x14_s79` residual, which remains the best retained
+clearance-refinement reference:
+
+```text
+m10_command_state_mlp_cem4x14_s79:
+  flat p50 clearance ~= 0.01471m, low-clearance ratio ~= 0.528
+  start-stop p50 clearance ~= 0.01152m, low-clearance ratio ~= 0.971
+  curve p50 clearance ~= 0.01025m, low-clearance ratio ~= 0.973
+  required suite: 0/3 under current G10 clearance gate
+```
 
 clearance evidence commands:
 
