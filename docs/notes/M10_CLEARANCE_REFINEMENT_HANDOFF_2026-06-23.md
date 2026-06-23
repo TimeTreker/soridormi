@@ -1,5 +1,26 @@
 # M10 Clearance Refinement Handoff - 2026-06-23
 
+Transfer checkpoint:
+
+```text
+branch: main
+latest pushed commit: b1a1a9d Add M10 low-clearance guard training evidence
+status: M10/G10 still blocked by low-clearance-ratio gate
+hardware: excluded for now
+human visual review: pending; do not claim without viewer/follow-camera pass
+```
+
+Read first in a new workspace:
+
+```text
+AGENTS.md
+LLM_CONTEXT.md
+docs/SORIDORMI_EXECUTION_ROADMAP.md
+docs/SORIDORMI_TARGET_AND_ROADMAP.md
+docs/M6_SIM_TRAINING_LOOP.md
+docs/notes/M10_CLEARANCE_REFINEMENT_HANDOFF_2026-06-23.md
+```
+
 Current best retained blocked profile:
 
 ```text
@@ -145,3 +166,40 @@ Next best work:
 2. Keep `s143` as the current metric-grounded retained blocked reference.
 3. Do not claim human visual review until a direct viewer/follow-camera pass is
    actually performed.
+
+Resume checklist:
+
+```bash
+git checkout main
+git pull
+bash -n scripts/train_residual_policy.sh
+docker compose -f compose.sim.yaml run --rm runtime bash -lc 'source /opt/venvs/runtime/bin/activate && pytest -q tests/test_residual_policy_m619_m621.py tests/test_residual_scripts_m621.py tests/test_m10_clearance_readiness.py'
+./scripts/validate_policy_profiles.sh configs/policies/clearance_liftscale_stack_s143_step090_offset005.yaml configs/policies/clearance_s143_refguard_stack_s215.yaml configs/policies/clearance_s143_gateguard_stack_s217.yaml configs/policies/clearance_s143_curvegateguard_stack_s219.yaml --robot-config configs/robots/open_duck_mini_v2.yaml
+```
+
+Before any new live training or suite evaluation, start MuJoCo explicitly:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile context_stage1_three_scenario_10ep_e80 --no-viewer
+```
+
+Use the retained-reference comparator for every exploratory candidate before
+retaining it:
+
+```bash
+./scripts/evaluate_scenario_suite.sh --backend mujoco --profile <candidate_profile> --output-dir artifacts/scenario_eval/<candidate_profile> --json
+./scripts/analyze_clearance_readiness.sh \
+  --profile-name <candidate_profile> \
+  --suite-dir artifacts/scenario_eval/<candidate_profile> \
+  --reference-profile-name clearance_liftscale_stack_s143_step090_offset005 \
+  --reference-suite-dir artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005 \
+  --output-dir artifacts/clearance_readiness/<candidate_profile> \
+  --json \
+  --require-reference-improvement
+```
+
+Optional human visual pass, only after a candidate clears the metric gates:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile <candidate_profile> --viewer --follow-camera
+```
