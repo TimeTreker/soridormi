@@ -639,7 +639,6 @@ def plan_shell_exports(plan: SkillPlan) -> str:
         "SORIDORMI_COMMAND_X_OVERRIDE": f"{command.vx_mps:.10g}",
         "SORIDORMI_COMMAND_Y_OVERRIDE": f"{command.vy_mps:.10g}",
         "SORIDORMI_COMMAND_YAW_OVERRIDE": f"{command.yaw_radps:.10g}",
-        "SORIDORMI_COMMAND_RAMP_SECONDS_OVERRIDE": "0",
         "SORIDORMI_RUNTIME_LOG_PREFIX_OVERRIDE": f"skill_{plan.skill_id}",
     }
     return "\n".join(f"export {key}={shlex.quote(value)}" for key, value in sorted(exports.items()))

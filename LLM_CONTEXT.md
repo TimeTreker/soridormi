@@ -423,6 +423,25 @@ clearance_liftscale_stack_s143_step090_offset005:
 `~0.308`; p50 clearance and no-fall behavior are healthy, but G10 still fails
 because all three scenarios exceed the `0.25` low-clearance-ratio limit.
 
+2026-06-23 post-`s143` low-ratio probes:
+profile-level action-scale, pre-roll, command-ramp, startup-tail training, and
+opt-in clearance-reflex probes did not pass G10. `clearance_actionscale_stack_s177_scale0262`
+is the best full-suite action-scale near miss, with total distance `~2.297 m`,
+no falls, and curve low-clearance ratio `~0.263`, but it worsens flat/start-stop
+to `~0.319`/`~0.315`, so it is not the retained best. A learned continuation
+from that profile, `clearance_s177_tail_stack_s201`, trained cleanly but live
+curve still failed at low-clearance ratio `~0.257`; the tiny
+`clearance_s177_tail_stack_s203_scale026215` action-scale nudge regressed curve
+to `~0.294`.
+
+Two implementation findings are now preserved for later M10 work:
+`skill_execution.plan_shell_exports()` no longer forces
+`SORIDORMI_COMMAND_RAMP_SECONDS_OVERRIDE=0`, so profile-level command ramp can
+be exercised in scenario rollouts; and `ActionPostprocessor` has an opt-in
+`swing_clearance_reflex` diagnostic mode that uses feet contact/position state.
+The ramp and reflex profiles tried so far were metric-grounded rejects, not
+promotion candidates.
+
 Do not promote the intermediate or rejected probes:
 `clearance_contactlift_stack_s121`, `clearance_contactlift_stack_s123`,
 `clearance_cmdlift_stack_s125`, `clearance_liftscale_stack_s129`, or
@@ -443,13 +462,29 @@ Do not promote the intermediate or rejected probes:
 `clearance_liftscale_stack_s167_step090_offset005_scale014`,
 `clearance_liftscale_stack_s169_step090_offset005_kneegain`,
 `clearance_harmonic_direct_stack_s171`, and
-`clearance_harmonic_aggressive_stack_s173`.
+`clearance_harmonic_aggressive_stack_s173`; plus post-`s143` probes
+`clearance_cmdmlp_tail_stack_s175_quick`,
+`clearance_actionscale_stack_s175_scale026`,
+`clearance_actionscale_stack_s177_scale0262`,
+`clearance_actionscale_stack_s181_scale0248`,
+`clearance_reflex_stack_s183_swinglift`,
+`clearance_reflex_stack_s185_earlysoft`,
+`clearance_actionscale_stack_s187_scale02618`,
+`clearance_reflex_stack_s189_swinggain`,
+`clearance_actionscale_ramp_stack_s191_scale0262_ramp05`,
+`clearance_startup_tail_stack_s193`,
+`clearance_actionscale_preroll_stack_s195_scale0262_preroll25`,
+`clearance_actionscale_preroll_stack_s197_scale0263_preroll25`,
+`clearance_actionscale_stack_s199_scale026205`,
+`clearance_s177_tail_stack_s201`, and
+`clearance_s177_tail_stack_s203_scale026215`.
 
 Current best retained candidate: `clearance_liftscale_stack_s143_step090_offset005`.
 It is still blocked by the G10 low-clearance-ratio gate in all three scenarios;
-p50 clearance and no-fall behavior are no longer the bottleneck. Next M10 work
-should use a more substantial training redesign or a higher-clearance teacher
-to drive low-clearance ratio below `0.25` while preserving strong movement.
+p50 clearance and no-fall behavior are no longer the bottleneck. The remaining
+failure is lower-tail/startup clearance, especially in turning. Next M10 work
+should use a more substantial training redesign or a higher-clearance teacher to
+drive low-clearance ratio below `0.25` while preserving strong movement.
 
 clearance evidence commands:
 

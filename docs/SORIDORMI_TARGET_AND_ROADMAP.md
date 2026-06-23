@@ -253,11 +253,14 @@ remaining blocker is the low-clearance-ratio gate in all three scenarios: flat
 is about `0.268`, start-stop about `0.257`, and curve about `0.308` against a
 `0.25` limit. Do not promote the intermediate stacked, phase, scale,
 postprocess, or continuation probes documented in
-`docs/SORIDORMI_EXECUTION_ROADMAP.md`. The next M10 work must use a broader
-clearance redesign or higher-clearance teacher to reduce low-clearance ratios
-without sacrificing no-fall behavior or strong movement distance, followed by
-quantitative clearance readiness and a direct human follow-camera visual pass
-before any broader promotion.
+`docs/SORIDORMI_EXECUTION_ROADMAP.md`. Post-`s143` action-scale, command-ramp,
+pre-roll, clearance-reflex, and startup-tail probes through
+`clearance_s177_tail_stack_s203_scale026215` also remained blocked. The next
+M10 work must use a broader clearance redesign or higher-clearance teacher to
+reduce lower-tail/startup low-clearance ratios without sacrificing no-fall
+behavior or strong movement distance, followed by quantitative clearance
+readiness and a direct human follow-camera visual pass before any broader
+promotion.
 
 ### M11A: task-agent contract foundation
 

@@ -475,6 +475,34 @@ observation[101]
     `clearance_liftscale_stack_s169_step090_offset005_kneegain`,
     `clearance_harmonic_direct_stack_s171`, and
     `clearance_harmonic_aggressive_stack_s173`.
+- [x] Run post-`s143` low-ratio and startup-tail probes
+  - `clearance_actionscale_stack_s177_scale0262`: full-suite 0/3; curve nearly
+    passed at low-clearance ratio `~0.263`, but flat/start-stop regressed to
+    `~0.319`/`~0.315`, so it is not the retained best.
+  - `clearance_actionscale_stack_s175_scale026`,
+    `clearance_actionscale_stack_s181_scale0248`,
+    `clearance_actionscale_stack_s187_scale02618`,
+    `clearance_actionscale_stack_s199_scale026205`,
+    `clearance_actionscale_preroll_stack_s195_scale0262_preroll25`, and
+    `clearance_actionscale_preroll_stack_s197_scale0263_preroll25`: profile
+    brackets remained blocked by the curve low-clearance-ratio gate.
+  - `clearance_actionscale_ramp_stack_s191_scale0262_ramp05`: confirmed
+    profile-level command ramp can now reach the controller, but the rollout
+    collapsed in curve (`low ratio 1.0`, distance `~0.019 m`).
+  - `clearance_reflex_stack_s183_swinglift`,
+    `clearance_reflex_stack_s185_earlysoft`, and
+    `clearance_reflex_stack_s189_swinggain`: opt-in clearance-reflex runtime
+    probes were metric-grounded rejects; do not promote.
+  - `clearance_startup_tail_stack_s193`: learned startup-tail continuation
+    trained cleanly but retained poor startup lower-tail metrics.
+  - `clearance_s177_tail_stack_s201`: trained from the `s177` action-scale near
+    miss; live curve still failed at low-clearance ratio `~0.257`, with p50
+    `~0.01846 m`, distance `~0.717 m`, and no fall.
+  - `clearance_s177_tail_stack_s203_scale026215`: tiny action-scale nudge on
+    `s201`; curve regressed to low-clearance ratio `~0.294`.
+  - result: keep `clearance_liftscale_stack_s143_step090_offset005` as the best
+    balanced retained full-suite reference. The remaining blocker is lower-tail
+    startup/turning clearance, not p50 clearance or falls.
 - [ ] Focus the next training stage on a broader clearance redesign, or
   acquire a higher-clearance teacher
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
@@ -509,6 +537,11 @@ teacher comparison: PASS (relative behavior only; does not replace clearance)
 > reduces max low-clearance ratio to `0.308`, but it remains blocked because
 > flat (`0.268`), start-stop (`0.257`), and curve (`0.308`) still exceed the
 > `0.25` low-clearance-ratio limit.
+> Post-`s143` action-scale, pre-roll, command-ramp, reflex, and startup-tail
+> probes through `clearance_s177_tail_stack_s203_scale026215` did not pass G10.
+> The closest live curve-only probe was `clearance_s177_tail_stack_s201`
+> (`~0.257` low-clearance ratio), but it still failed the curve gate and did not
+> justify a new retained promotion.
 >
 > **Clearance readiness:** Current best generated with
 > `./scripts/analyze_clearance_readiness.sh --profile-name clearance_liftscale_stack_s143_step090_offset005 --suite-dir artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005 --output-dir artifacts/clearance_readiness/clearance_liftscale_stack_s143_step090_offset005 --json`.

@@ -24,6 +24,7 @@ def test_plan_shell_exports_bind_velocity_command_overrides() -> None:
     assert "export SORIDORMI_COMMAND_YAW_OVERRIDE=-0.05" in text
     assert "export SORIDORMI_SKILL_DURATION_SECONDS=2.5" in text
     assert "export SORIDORMI_SKILL_ID=walk_velocity" in text
+    assert "SORIDORMI_COMMAND_RAMP_SECONDS_OVERRIDE" not in text
 
 
 def test_skill_execution_cli_shell_env() -> None:

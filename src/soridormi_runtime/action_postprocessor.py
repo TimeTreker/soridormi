@@ -66,6 +66,13 @@ class ActionPostprocessorConfig:
     ankle_gain: float = 1.0
     clip_abs: float = 0.0
     mode: str = "identity"
+    clearance_reflex_target_m: float = 0.015
+    clearance_reflex_activation_margin_m: float = 0.01
+    clearance_reflex_contact_threshold: float = 0.5
+    clearance_reflex_sagittal_gain: float = 1.0
+    clearance_reflex_hip_pitch: float = 0.0
+    clearance_reflex_knee: float = 0.0
+    clearance_reflex_ankle: float = 0.0
 
 
 @dataclass
@@ -74,6 +81,7 @@ class ActionPostprocessor:
     last_input_stats: dict[str, Any] | None = None
     last_output_stats: dict[str, Any] | None = None
     last_joint_gains: dict[str, float] = field(default_factory=dict)
+    last_clearance_reflex: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_env(cls) -> "ActionPostprocessor":
@@ -89,10 +97,34 @@ class ActionPostprocessor:
                 knee_gain=_env_float("SORIDORMI_KNEE_ACTION_GAIN", 1.0),
                 ankle_gain=_env_float("SORIDORMI_ANKLE_ACTION_GAIN", 1.0),
                 clip_abs=_env_float("SORIDORMI_ACTION_CLIP_ABS", 0.0),
+                clearance_reflex_target_m=_env_float("SORIDORMI_CLEARANCE_REFLEX_TARGET_M", 0.015),
+                clearance_reflex_activation_margin_m=_env_float(
+                    "SORIDORMI_CLEARANCE_REFLEX_ACTIVATION_MARGIN_M",
+                    0.01,
+                ),
+                clearance_reflex_contact_threshold=_env_float(
+                    "SORIDORMI_CLEARANCE_REFLEX_CONTACT_THRESHOLD",
+                    0.5,
+                ),
+                clearance_reflex_sagittal_gain=_env_float(
+                    "SORIDORMI_CLEARANCE_REFLEX_SAGITTAL_GAIN",
+                    1.0,
+                ),
+                clearance_reflex_hip_pitch=_env_float(
+                    "SORIDORMI_CLEARANCE_REFLEX_HIP_PITCH",
+                    0.0,
+                ),
+                clearance_reflex_knee=_env_float("SORIDORMI_CLEARANCE_REFLEX_KNEE", 0.0),
+                clearance_reflex_ankle=_env_float("SORIDORMI_CLEARANCE_REFLEX_ANKLE", 0.0),
             )
         )
 
-    def apply(self, action: np.ndarray | list[float], joint_names: list[str]) -> np.ndarray:
+    def apply(
+        self,
+        action: np.ndarray | list[float],
+        joint_names: list[str],
+        state: Any | None = None,
+    ) -> np.ndarray:
         arr = np.asarray(action, dtype=np.float32)
         if arr.shape == (1, 14):
             arr = arr.reshape(14)
@@ -108,12 +140,92 @@ class ActionPostprocessor:
         if self.config.enabled:
             gain_arr = np.asarray([gains[name] for name in joint_names], dtype=np.float32)
             out = out * gain_arr
+            out = self._apply_clearance_reflex(out, joint_names, state)
             if self.config.clip_abs and self.config.clip_abs > 0.0:
                 out = np.clip(out, -float(self.config.clip_abs), float(self.config.clip_abs))
+        else:
+            self.last_clearance_reflex = {"enabled": False, "applied": False, "feet": []}
 
         self.last_joint_gains = gains
         self.last_output_stats = _stats(out)
         return out.astype(np.float32)
+
+    def _apply_clearance_reflex(
+        self,
+        action: np.ndarray,
+        joint_names: list[str],
+        state: Any | None,
+    ) -> np.ndarray:
+        if self.config.mode != "swing_clearance_reflex":
+            self.last_clearance_reflex = {"enabled": False, "applied": False, "feet": []}
+            return action
+
+        contacts = getattr(state, "feet_contacts", None)
+        feet_position_xyz = getattr(state, "feet_position_xyz", None)
+        if not _valid_foot_state(contacts, feet_position_xyz):
+            self.last_clearance_reflex = {
+                "enabled": True,
+                "applied": False,
+                "reason": "missing_feet_state",
+                "feet": [],
+            }
+            return action
+
+        out = action.copy()
+        target = max(0.0, float(self.config.clearance_reflex_target_m))
+        margin = max(1e-6, float(self.config.clearance_reflex_activation_margin_m))
+        contact_threshold = float(self.config.clearance_reflex_contact_threshold)
+        correction_by_suffix = {
+            "hip_pitch": float(self.config.clearance_reflex_hip_pitch),
+            "knee": float(self.config.clearance_reflex_knee),
+            "ankle": float(self.config.clearance_reflex_ankle),
+        }
+        sagittal_gain = float(self.config.clearance_reflex_sagittal_gain)
+        joint_index_by_name = {name: index for index, name in enumerate(joint_names)}
+        foot_records: list[dict[str, Any]] = []
+        applied = False
+
+        for foot_index, side in enumerate(("left", "right")):
+            contact = float(contacts[foot_index])
+            z_m = float(feet_position_xyz[foot_index][2])
+            gap_m = max(0.0, target - z_m)
+            activation = float(np.clip(gap_m / margin, 0.0, 1.0))
+            is_swing = contact <= contact_threshold
+            foot_applied = bool(is_swing and activation > 0.0)
+            if foot_applied:
+                applied = True
+                gain = 1.0 + (sagittal_gain - 1.0) * activation
+                for suffix, correction in correction_by_suffix.items():
+                    joint_name = f"{side}_{suffix}"
+                    joint_index = joint_index_by_name.get(joint_name)
+                    if joint_index is not None:
+                        out[joint_index] *= np.float32(gain)
+                        out[joint_index] += np.float32(correction * activation)
+
+            foot_records.append(
+                {
+                    "side": side,
+                    "contact": contact,
+                    "z_m": z_m,
+                    "gap_m": gap_m,
+                    "activation": activation,
+                    "applied": foot_applied,
+                }
+            )
+
+        self.last_clearance_reflex = {
+            "enabled": True,
+            "applied": applied,
+            "target_m": target,
+            "activation_margin_m": margin,
+            "contact_threshold": contact_threshold,
+            "sagittal_gain": sagittal_gain,
+            "hip_pitch": correction_by_suffix["hip_pitch"],
+            "knee": correction_by_suffix["knee"],
+            "ankle": correction_by_suffix["ankle"],
+            "feet": foot_records,
+        }
+        return out
 
     def _joint_gains(self, joint_names: list[str]) -> dict[str, float]:
         gains: dict[str, float] = {}
@@ -144,6 +256,17 @@ class ActionPostprocessor:
             "knee_gain": float(self.config.knee_gain),
             "ankle_gain": float(self.config.ankle_gain),
             "clip_abs": float(self.config.clip_abs),
+            "clearance_reflex_target_m": float(self.config.clearance_reflex_target_m),
+            "clearance_reflex_activation_margin_m": float(
+                self.config.clearance_reflex_activation_margin_m
+            ),
+            "clearance_reflex_contact_threshold": float(
+                self.config.clearance_reflex_contact_threshold
+            ),
+            "clearance_reflex_sagittal_gain": float(self.config.clearance_reflex_sagittal_gain),
+            "clearance_reflex_hip_pitch": float(self.config.clearance_reflex_hip_pitch),
+            "clearance_reflex_knee": float(self.config.clearance_reflex_knee),
+            "clearance_reflex_ankle": float(self.config.clearance_reflex_ankle),
         }
 
 
@@ -158,3 +281,14 @@ def _stats(values: np.ndarray) -> dict[str, float]:
         "std": float(arr.std()),
         "abs_max": float(np.max(np.abs(arr))),
     }
+
+
+def _valid_foot_state(contacts: Any, feet_position_xyz: Any) -> bool:
+    if contacts is None or feet_position_xyz is None:
+        return False
+    try:
+        if len(contacts) != 2 or len(feet_position_xyz) != 2:
+            return False
+        return all(len(item) == 3 for item in feet_position_xyz)
+    except TypeError:
+        return False

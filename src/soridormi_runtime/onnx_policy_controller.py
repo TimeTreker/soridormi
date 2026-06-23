@@ -126,7 +126,11 @@ class OnnxPolicyController:
         if raw_action.shape != (14,):
             raise RuntimeError(f"ONNX policy action must have shape (14,), got {raw_action.shape}")
 
-        action = self.action_postprocessor.apply(raw_action, self._joint_names_for_action(state))
+        action = self.action_postprocessor.apply(
+            raw_action,
+            self._joint_names_for_action(state),
+            state=state,
+        )
 
         try:
             command = self.mapper.action_to_command(action, state=state, dt=self.dt)
@@ -319,6 +323,7 @@ class OnnxPolicyController:
             "action_postprocessor_input_stats": self.action_postprocessor.last_input_stats,
             "action_postprocessor_output_stats": self.action_postprocessor.last_output_stats,
             "action_postprocessor_joint_gains": self.action_postprocessor.last_joint_gains,
+            "action_postprocessor_clearance_reflex": self.action_postprocessor.last_clearance_reflex,
             "leg_action_abs_max": self._group_action_abs_max(action_arr, {
                 "left_hip_yaw", "left_hip_roll", "left_hip_pitch", "left_knee", "left_ankle",
                 "right_hip_yaw", "right_hip_roll", "right_hip_pitch", "right_knee", "right_ankle",

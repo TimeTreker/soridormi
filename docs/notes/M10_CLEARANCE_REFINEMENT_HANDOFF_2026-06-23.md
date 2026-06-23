@@ -59,6 +59,21 @@ clearance_liftscale_stack_s167_step090_offset005_scale014
 clearance_liftscale_stack_s169_step090_offset005_kneegain
 clearance_harmonic_direct_stack_s171
 clearance_harmonic_aggressive_stack_s173
+clearance_cmdmlp_tail_stack_s175_quick
+clearance_actionscale_stack_s175_scale026
+clearance_actionscale_stack_s177_scale0262
+clearance_actionscale_stack_s181_scale0248
+clearance_reflex_stack_s183_swinglift
+clearance_reflex_stack_s185_earlysoft
+clearance_actionscale_stack_s187_scale02618
+clearance_reflex_stack_s189_swinggain
+clearance_actionscale_ramp_stack_s191_scale0262_ramp05
+clearance_startup_tail_stack_s193
+clearance_actionscale_preroll_stack_s195_scale0262_preroll25
+clearance_actionscale_preroll_stack_s197_scale0263_preroll25
+clearance_actionscale_stack_s199_scale026205
+clearance_s177_tail_stack_s201
+clearance_s177_tail_stack_s203_scale026215
 ```
 
 Useful findings:
@@ -72,6 +87,22 @@ Useful findings:
   a promotion path.
 - Small contact/phase, command-contact/phase, and harmonic continuations on
   top of `s143` did not break the `~0.31` curve low-ratio plateau.
+- `clearance_actionscale_stack_s177_scale0262` improved curve ratio to
+  `~0.263` and total distance to `~2.297 m`, but worsened flat/start-stop
+  ratios to `~0.319`/`~0.315`; it remained 0/3 and is not the retained best.
+- Low-clearance misses are strongly startup/tail clustered. For the `s177`
+  action-scale probe, the curve rollout after the initial second is under the
+  `0.25` ratio target, while the full rollout still misses at `~0.263`.
+- Profile command ramp now survives skill execution, but
+  `clearance_actionscale_ramp_stack_s191_scale0262_ramp05` collapsed movement
+  in curve (`low ratio 1.0`, distance `~0.019 m`).
+- Runtime `swing_clearance_reflex` postprocessing is available as an opt-in
+  diagnostic/probe mode, but fixed/sagittal reflex probes through `s189`
+  regressed curve ratio and must not be promoted.
+- `clearance_s177_tail_stack_s201` trained cleanly from the `s177` near miss,
+  but live curve still failed at low-clearance ratio `~0.257` with p50
+  `~0.01846 m`, distance `~0.717 m`, and no fall. The tiny `s203` action-scale
+  nudge regressed curve to `~0.294`.
 
 Next best work:
 

@@ -202,6 +202,27 @@ class PolicyProfile:
             "SORIDORMI_KNEE_ACTION_GAIN": _fmt(postprocess.get("knee_gain", 1.0)),
             "SORIDORMI_ANKLE_ACTION_GAIN": _fmt(postprocess.get("ankle_gain", 1.0)),
             "SORIDORMI_ACTION_CLIP_ABS": _fmt(postprocess.get("clip_abs", 0.0)),
+            "SORIDORMI_CLEARANCE_REFLEX_TARGET_M": _fmt(
+                postprocess.get("clearance_reflex_target_m", 0.015)
+            ),
+            "SORIDORMI_CLEARANCE_REFLEX_ACTIVATION_MARGIN_M": _fmt(
+                postprocess.get("clearance_reflex_activation_margin_m", 0.01)
+            ),
+            "SORIDORMI_CLEARANCE_REFLEX_CONTACT_THRESHOLD": _fmt(
+                postprocess.get("clearance_reflex_contact_threshold", 0.5)
+            ),
+            "SORIDORMI_CLEARANCE_REFLEX_SAGITTAL_GAIN": _fmt(
+                postprocess.get("clearance_reflex_sagittal_gain", 1.0)
+            ),
+            "SORIDORMI_CLEARANCE_REFLEX_HIP_PITCH": _fmt(
+                postprocess.get("clearance_reflex_hip_pitch", 0.0)
+            ),
+            "SORIDORMI_CLEARANCE_REFLEX_KNEE": _fmt(
+                postprocess.get("clearance_reflex_knee", 0.0)
+            ),
+            "SORIDORMI_CLEARANCE_REFLEX_ANKLE": _fmt(
+                postprocess.get("clearance_reflex_ankle", 0.0)
+            ),
             "SORIDORMI_RESIDUAL_TEACHER_PROFILE": str(residual.get("teacher_profile", "open_duck_forward")),
             "SORIDORMI_RESIDUAL_SCALE": _fmt(residual.get("residual_scale", 0.05)),
             "SORIDORMI_RESIDUAL_CLIP_ABS": _fmt(residual.get("residual_clip_abs", 1.0)),
