@@ -246,13 +246,13 @@ changed residual scale from the retained checkpoint's `0.1` to `0.05`. The
 wrapper now preserves `0.1` by default.
 
 The current best retained residual candidate is
-`clearance_lowratio_multicmd_s107`. It is still blocked from promotion, but it
-improves total distance to about `1.903 m`, keeps flat and start-stop p50 swing
-clearance above `0.015 m`, and reduces max low-clearance ratio to about `0.519`.
-Remaining blockers are the low-clearance-ratio gate in all three scenarios plus
-curve p50 clearance. The next M10 work is clearance refinement against `s107`,
-followed by quantitative clearance readiness and a direct human follow-camera
-visual pass before any broader promotion.
+`clearance_lowratio_gatepush_s111`. It is still blocked from promotion, but it
+improves total distance to about `1.928 m`, gets all three p50 swing-clearance
+metrics above `0.015 m`, and reduces max low-clearance ratio to about `0.496`.
+The remaining blocker is the low-clearance-ratio gate in all three scenarios.
+The next M10 work is clearance refinement against `s111`, followed by
+quantitative clearance readiness and a direct human follow-camera visual pass
+before any broader promotion.
 
 ### M11A: task-agent contract foundation
 

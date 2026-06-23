@@ -295,11 +295,10 @@ clearance_lowratio_refine_s103:
 ```
 
 `clearance_lowratio_multicmd_s107` warm-started from `s103` with multiple
-fixed-command objectives and stronger low-clearance pressure. Treat `s107` as
-the current best retained clearance-refinement candidate, not promotable. It
-improves total distance, start-stop low-clearance ratio, curve p50 clearance,
-and max low-clearance ratio over `s103`, but still fails the G10 low-clearance
-ratio gate in all three scenarios and misses curve p50 clearance.
+fixed-command objectives and stronger low-clearance pressure. It improves total
+distance, start-stop low-clearance ratio, curve p50 clearance, and max
+low-clearance ratio over `s103`, but still fails the G10 low-clearance ratio
+gate in all three scenarios and misses curve p50 clearance.
 
 ```text
 clearance_lowratio_multicmd_s107:
@@ -315,6 +314,29 @@ clearance_lowratio_multicmd_s107:
 `clearance_lowratio_curvepush_s109` was a curve-focused continuation from
 `s107`. It slightly improved curve p50 but worsened total distance and max
 low-clearance ratio, so treat it as a rejected probe.
+
+`clearance_lowratio_gatepush_s111` warm-started from `s107` with stronger
+low-clearance pressure and additional ramp/turn objectives. Treat `s111` as the
+current best retained clearance-refinement candidate, not promotable. It
+improves total distance and reduces low-clearance ratio in all three scenarios
+relative to `s107`; p50 clearance is now above `0.015 m` in all three scenarios.
+It remains blocked because all scenarios still exceed the `0.25` low-clearance
+ratio gate.
+
+```text
+clearance_lowratio_gatepush_s111:
+  initial checkpoint: clearance_lowratio_multicmd_s107
+  residual_scale: 0.1
+  suite: 0/3, BLOCKED_BY_CLEARANCE_GATE
+  total distance ~= 1.928m
+  flat:       p50 ~= 0.01679m, low-clearance ratio ~= 0.388
+  start-stop: p50 ~= 0.01626m, low-clearance ratio ~= 0.423
+  curve:      p50 ~= 0.01506m, low-clearance ratio ~= 0.496
+```
+
+`clearance_lowratio_targetlift_s113` raised the training clearance target to
+`0.0165 m`, but exported an ONNX byte-identical to `s111`; treat it as a
+rejected probe.
 
 clearance evidence commands:
 

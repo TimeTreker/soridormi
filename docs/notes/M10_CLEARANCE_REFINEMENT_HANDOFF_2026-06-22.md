@@ -190,8 +190,8 @@ falls:      none
 Interpretation:
 
 ```text
-clearance_lowratio_multicmd_s107 is the current best retained blocked
-candidate. It improves total distance, start-stop low-clearance ratio, curve
+clearance_lowratio_multicmd_s107 became the best retained blocked candidate at
+that point. It improves total distance, start-stop low-clearance ratio, curve
 p50 clearance, and max low-clearance ratio over s103. It is not promotable: all
 scenarios still fail the low-clearance-ratio gate, and curve p50 remains below
 0.015m.
@@ -228,6 +228,60 @@ Validation commands run for the retained continuation:
 ./scripts/validate_policy_profiles.sh configs/policies/clearance_lowratio_multicmd_s107.yaml --robot-config configs/robots/open_duck_mini_v2.yaml
 ./scripts/evaluate_scenario_suite.sh --backend mujoco --profile clearance_lowratio_multicmd_s107 --output-dir artifacts/scenario_eval/clearance_lowratio_multicmd_s107 --json
 ./scripts/analyze_clearance_readiness.sh --profile-name clearance_lowratio_multicmd_s107 --suite-dir artifacts/scenario_eval/clearance_lowratio_multicmd_s107 --output-dir artifacts/clearance_readiness/clearance_lowratio_multicmd_s107 --json
+```
+
+No human viewer/follow-camera visual review was performed in this continuation.
+
+## 2026-06-23 Gate-Push Continuation
+
+The retained continuation started from `clearance_lowratio_multicmd_s107`:
+
+```text
+clearance_lowratio_gatepush_s111:
+initial checkpoint: clearance_lowratio_multicmd_s107
+residual_scale: 0.1
+profile contract: PASS
+suite: 0/3, BLOCKED_BY_CLEARANCE_GATE
+total distance: ~1.928m
+flat:       p50 ~0.01679m, low-clearance ratio ~0.388
+start-stop: p50 ~0.01626m, low-clearance ratio ~0.423
+curve:      p50 ~0.01506m, low-clearance ratio ~0.496
+falls:      none
+```
+
+Interpretation:
+
+```text
+clearance_lowratio_gatepush_s111 is the current best retained blocked
+candidate. It improves total distance and low-clearance ratio in all three
+scenarios relative to s107. It also brings curve p50 clearance above 0.015m, so
+all three p50 clearance checks now meet target. It is not promotable: all
+scenarios still fail the low-clearance-ratio gate.
+```
+
+The target-lift probe raised the training target to `0.0165m`:
+
+```text
+clearance_lowratio_targetlift_s113:
+status: rejected probe
+reason: exported ONNX was byte-identical to s111
+```
+
+Metric evidence generated:
+
+```text
+artifacts/scenario_eval/clearance_lowratio_gatepush_s111/suite_summary.json
+artifacts/clearance_readiness/clearance_lowratio_gatepush_s111/clearance_readiness.json
+data/rl_finetune/clearance_lowratio_gatepush_s111/residual_train_report.md
+data/rl_finetune/clearance_lowratio_targetlift_s113/residual_train_report.md
+```
+
+Validation commands run for the retained continuation:
+
+```bash
+./scripts/validate_policy_profiles.sh configs/policies/clearance_lowratio_gatepush_s111.yaml --robot-config configs/robots/open_duck_mini_v2.yaml
+./scripts/evaluate_scenario_suite.sh --backend mujoco --profile clearance_lowratio_gatepush_s111 --output-dir artifacts/scenario_eval/clearance_lowratio_gatepush_s111 --json
+./scripts/analyze_clearance_readiness.sh --profile-name clearance_lowratio_gatepush_s111 --suite-dir artifacts/scenario_eval/clearance_lowratio_gatepush_s111 --output-dir artifacts/clearance_readiness/clearance_lowratio_gatepush_s111 --json
 ```
 
 No human viewer/follow-camera visual review was performed in this continuation.
