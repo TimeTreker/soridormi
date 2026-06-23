@@ -57,6 +57,12 @@ class M10ClearanceReadinessReport:
     recommendations: list[str] = field(default_factory=list)
     next_required_evidence: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    reference_profile: str | None = None
+    reference_suite_dir: str | None = None
+    reference_summary_metrics: dict[str, Any] | None = None
+    scenario_comparisons: list[dict[str, Any]] = field(default_factory=list)
+    reference_comparison: dict[str, Any] | None = None
+    candidate_beats_reference: bool | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -282,6 +288,183 @@ def _max_float(values: Sequence[Any]) -> float | None:
     return max(clean) if clean else None
 
 
+def _sum_float(values: Sequence[Any]) -> float | None:
+    parsed = [_as_float(value) for value in values]
+    clean = [value for value in parsed if value is not None]
+    return sum(clean) if clean else None
+
+
+def _is_true(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes"}
+    return False
+
+
+def _clearance_p50_margin(item: M10ClearanceScenarioReadiness) -> float | None:
+    swing_p50 = _as_float(item.metrics.get("swing_clearance_p50_m"))
+    threshold = _as_float(item.thresholds.get("min_swing_clearance_m"))
+    if swing_p50 is None or threshold is None:
+        return None
+    return swing_p50 - threshold
+
+
+def _low_clearance_ratio_excess(item: M10ClearanceScenarioReadiness) -> float | None:
+    low_ratio = _as_float(item.metrics.get("low_clearance_swing_ratio"))
+    threshold = _as_float(item.thresholds.get("max_low_clearance_ratio"))
+    if low_ratio is None or threshold is None:
+        return None
+    return low_ratio - threshold
+
+
+def _build_summary_metrics(
+    scenario_reports: Sequence[M10ClearanceScenarioReadiness],
+) -> dict[str, Any]:
+    metrics = [item.metrics for item in scenario_reports]
+    return {
+        "min_swing_clearance_p50_m": _min_float([item.get("swing_clearance_p50_m") for item in metrics]),
+        "min_swing_clearance_p05_m": _min_float([item.get("swing_clearance_p05_m") for item in metrics]),
+        "max_low_clearance_ratio": _max_float([item.get("low_clearance_swing_ratio") for item in metrics]),
+        "min_swing_clearance_p50_margin_m": _min_float(
+            [_clearance_p50_margin(item) for item in scenario_reports]
+        ),
+        "max_low_clearance_ratio_excess": _max_float(
+            [_low_clearance_ratio_excess(item) for item in scenario_reports]
+        ),
+        "total_forward_distance_m": _sum_float([item.get("forward_distance_m") for item in metrics]),
+        "max_stuck_ratio": _max_float([item.get("stuck_ratio") for item in metrics]),
+        "fallen_count": sum(1 for item in metrics if _is_true(item.get("fallen"))),
+        "clearance_failed_count": sum(1 for item in scenario_reports if not item.clearance_ok),
+        "foot_metrics_missing_count": sum(1 for item in scenario_reports if not item.foot_metrics_present),
+        "scenario_acceptance_failed_count": sum(1 for item in scenario_reports if not item.scenario_acceptance_ok),
+    }
+
+
+def _delta(candidate_value: Any, reference_value: Any) -> float | None:
+    candidate = _as_float(candidate_value)
+    reference = _as_float(reference_value)
+    if candidate is None or reference is None:
+        return None
+    return candidate - reference
+
+
+def _scenario_comparisons(
+    candidate_reports: Sequence[M10ClearanceScenarioReadiness],
+    reference_reports: Sequence[M10ClearanceScenarioReadiness],
+) -> list[dict[str, Any]]:
+    references = {item.scenario_id: item for item in reference_reports}
+    comparisons: list[dict[str, Any]] = []
+    for candidate in candidate_reports:
+        reference = references.get(candidate.scenario_id)
+        if reference is None:
+            comparisons.append(
+                {
+                    "scenario_id": candidate.scenario_id,
+                    "status": "MISSING_REFERENCE",
+                    "candidate_status": candidate.status,
+                    "reference_status": None,
+                }
+            )
+            continue
+        candidate_metrics = candidate.metrics
+        reference_metrics = reference.metrics
+        comparisons.append(
+            {
+                "scenario_id": candidate.scenario_id,
+                "status": "COMPARED",
+                "candidate_status": candidate.status,
+                "reference_status": reference.status,
+                "candidate_ok": candidate.ok,
+                "reference_ok": reference.ok,
+                "candidate_low_clearance_ratio": candidate_metrics.get("low_clearance_swing_ratio"),
+                "reference_low_clearance_ratio": reference_metrics.get("low_clearance_swing_ratio"),
+                "delta_low_clearance_ratio": _delta(
+                    candidate_metrics.get("low_clearance_swing_ratio"),
+                    reference_metrics.get("low_clearance_swing_ratio"),
+                ),
+                "candidate_low_clearance_ratio_excess": _low_clearance_ratio_excess(candidate),
+                "reference_low_clearance_ratio_excess": _low_clearance_ratio_excess(reference),
+                "delta_low_clearance_ratio_excess": _delta(
+                    _low_clearance_ratio_excess(candidate),
+                    _low_clearance_ratio_excess(reference),
+                ),
+                "candidate_swing_clearance_p50_m": candidate_metrics.get("swing_clearance_p50_m"),
+                "reference_swing_clearance_p50_m": reference_metrics.get("swing_clearance_p50_m"),
+                "delta_swing_clearance_p50_m": _delta(
+                    candidate_metrics.get("swing_clearance_p50_m"),
+                    reference_metrics.get("swing_clearance_p50_m"),
+                ),
+                "candidate_forward_distance_m": candidate_metrics.get("forward_distance_m"),
+                "reference_forward_distance_m": reference_metrics.get("forward_distance_m"),
+                "delta_forward_distance_m": _delta(
+                    candidate_metrics.get("forward_distance_m"),
+                    reference_metrics.get("forward_distance_m"),
+                ),
+                "candidate_fallen": candidate_metrics.get("fallen"),
+                "reference_fallen": reference_metrics.get("fallen"),
+            }
+        )
+    return comparisons
+
+
+def _reference_comparison(
+    *,
+    candidate_summary: Mapping[str, Any],
+    reference_summary: Mapping[str, Any],
+    distance_floor_ratio: float = 0.90,
+) -> dict[str, Any]:
+    candidate_low_excess = _as_float(candidate_summary.get("max_low_clearance_ratio_excess"))
+    reference_low_excess = _as_float(reference_summary.get("max_low_clearance_ratio_excess"))
+    candidate_p50_margin = _as_float(candidate_summary.get("min_swing_clearance_p50_margin_m"))
+    reference_p50_margin = _as_float(reference_summary.get("min_swing_clearance_p50_margin_m"))
+    candidate_distance = _as_float(candidate_summary.get("total_forward_distance_m"))
+    reference_distance = _as_float(reference_summary.get("total_forward_distance_m"))
+    candidate_falls = int(candidate_summary.get("fallen_count") or 0)
+    reference_falls = int(reference_summary.get("fallen_count") or 0)
+    candidate_clearance_failed = int(candidate_summary.get("clearance_failed_count") or 0)
+    reference_clearance_failed = int(reference_summary.get("clearance_failed_count") or 0)
+
+    low_excess_delta = _delta(candidate_low_excess, reference_low_excess)
+    p50_margin_delta = _delta(candidate_p50_margin, reference_p50_margin)
+    distance_delta = _delta(candidate_distance, reference_distance)
+    no_new_falls = candidate_falls <= reference_falls
+    if candidate_distance is not None and reference_distance is not None and reference_distance > 0:
+        movement_preserved = candidate_distance >= reference_distance * distance_floor_ratio
+    else:
+        movement_preserved = False
+
+    clearance_better = candidate_clearance_failed < reference_clearance_failed
+    if not clearance_better and low_excess_delta is not None:
+        clearance_better = low_excess_delta < -1e-9
+    if not clearance_better and low_excess_delta is not None and abs(low_excess_delta) <= 1e-9:
+        clearance_better = p50_margin_delta is not None and p50_margin_delta > 1e-9
+
+    blockers: list[str] = []
+    if not clearance_better:
+        blockers.append("candidate does not improve the G10 clearance bottleneck versus reference")
+    if not no_new_falls:
+        blockers.append("candidate adds falls versus reference")
+    if not movement_preserved:
+        blockers.append(
+            f"candidate total distance is below {distance_floor_ratio:.0%} of the reference distance"
+        )
+
+    return {
+        "candidate_beats_reference": clearance_better and no_new_falls and movement_preserved,
+        "clearance_bottleneck_improved": clearance_better,
+        "no_new_falls": no_new_falls,
+        "movement_distance_preserved": movement_preserved,
+        "distance_floor_ratio": distance_floor_ratio,
+        "delta_max_low_clearance_ratio_excess": low_excess_delta,
+        "delta_min_swing_clearance_p50_margin_m": p50_margin_delta,
+        "delta_total_forward_distance_m": distance_delta,
+        "candidate_clearance_failed_count": candidate_clearance_failed,
+        "reference_clearance_failed_count": reference_clearance_failed,
+        "blockers": blockers,
+    }
+
+
 def _recommendations(blockers: Sequence[str]) -> list[str]:
     if blockers:
         return [
@@ -304,6 +487,8 @@ def build_m10_clearance_readiness(
     report_paths: Sequence[str | Path] | None = None,
     scenarios: Sequence[str] = DEFAULT_REQUIRED_SCENARIOS,
     manifest_path: str | Path = DEFAULT_SCENARIO_MANIFEST,
+    reference_profile: str | None = None,
+    reference_suite_dir: str | Path | None = None,
 ) -> M10ClearanceReadinessReport:
     scenario_ids = list(scenarios)
     resolved_suite_dir = Path(suite_dir) if suite_dir is not None else Path("artifacts/scenario_eval") / f"{profile}_suite"
@@ -329,18 +514,32 @@ def build_m10_clearance_readiness(
     passed = sum(1 for item in scenario_reports if item.ok)
     failed = sum(1 for item in scenario_reports if not item.ok and item.status != "MISSING_REPORT")
     missing = sum(1 for item in scenario_reports if item.status == "MISSING_REPORT")
-    metrics = [item.metrics for item in scenario_reports]
-    summary_metrics = {
-        "min_swing_clearance_p50_m": _min_float([item.get("swing_clearance_p50_m") for item in metrics]),
-        "min_swing_clearance_p05_m": _min_float([item.get("swing_clearance_p05_m") for item in metrics]),
-        "max_low_clearance_ratio": _max_float([item.get("low_clearance_swing_ratio") for item in metrics]),
-        "clearance_failed_count": sum(1 for item in scenario_reports if not item.clearance_ok),
-        "foot_metrics_missing_count": sum(1 for item in scenario_reports if not item.foot_metrics_present),
-        "scenario_acceptance_failed_count": sum(1 for item in scenario_reports if not item.scenario_acceptance_ok),
-    }
+    summary_metrics = _build_summary_metrics(scenario_reports)
     ok = not blockers and passed == len(scenario_reports)
     gate_status = "READY_FOR_VISUAL_INSPECTION" if ok else "BLOCKED_BY_CLEARANCE_GATE"
     report_paths_out = [item.report_path for item in scenario_reports if item.report_path]
+    reference_reports: list[M10ClearanceScenarioReadiness] = []
+    reference_summary_metrics: dict[str, Any] | None = None
+    scenario_comparisons: list[dict[str, Any]] = []
+    reference_comparison: dict[str, Any] | None = None
+    candidate_beats_reference: bool | None = None
+    resolved_reference_suite_dir = Path(reference_suite_dir) if reference_suite_dir is not None else None
+    if resolved_reference_suite_dir is not None:
+        for scenario_id in scenario_ids:
+            reference_reports.append(
+                _scenario_readiness(
+                    scenario_id,
+                    _scenario_report_path(resolved_reference_suite_dir, scenario_id),
+                    manifest_path=manifest_path,
+                )
+            )
+        reference_summary_metrics = _build_summary_metrics(reference_reports)
+        scenario_comparisons = _scenario_comparisons(scenario_reports, reference_reports)
+        reference_comparison = _reference_comparison(
+            candidate_summary=summary_metrics,
+            reference_summary=reference_summary_metrics,
+        )
+        candidate_beats_reference = bool(reference_comparison.get("candidate_beats_reference"))
     return M10ClearanceReadinessReport(
         ok=ok,
         profile=profile,
@@ -361,6 +560,12 @@ def build_m10_clearance_readiness(
             "official-teacher comparison",
         ],
         warnings=warnings,
+        reference_profile=reference_profile,
+        reference_suite_dir=str(resolved_reference_suite_dir) if resolved_reference_suite_dir is not None else None,
+        reference_summary_metrics=reference_summary_metrics,
+        scenario_comparisons=scenario_comparisons,
+        reference_comparison=reference_comparison,
+        candidate_beats_reference=candidate_beats_reference,
     )
 
 
@@ -424,6 +629,36 @@ def render_markdown(report: M10ClearanceReadinessReport) -> str:
     if report.warnings:
         lines.extend(["", "## Warnings", ""])
         lines.extend(f"- {warning}" for warning in report.warnings)
+    if report.reference_suite_dir:
+        lines.extend(
+            [
+                "",
+                "## Reference comparison",
+                "",
+                f"Reference profile: `{report.reference_profile or 'n/a'}`",
+                f"Reference suite: `{report.reference_suite_dir}`",
+                f"Candidate beats reference: {_format_value(report.candidate_beats_reference)}",
+                "",
+                "| Scenario | Delta low ratio | Delta p50 m | Delta distance m | Candidate status | Reference status |",
+                "| --- | ---: | ---: | ---: | --- | --- |",
+            ]
+        )
+        for item in report.scenario_comparisons:
+            lines.append(
+                "| {scenario} | {low_delta} | {p50_delta} | {distance_delta} | {candidate_status} | {reference_status} |".format(
+                    scenario=item.get("scenario_id"),
+                    low_delta=_format_value(item.get("delta_low_clearance_ratio")),
+                    p50_delta=_format_value(item.get("delta_swing_clearance_p50_m")),
+                    distance_delta=_format_value(item.get("delta_forward_distance_m")),
+                    candidate_status=item.get("candidate_status") or "n/a",
+                    reference_status=item.get("reference_status") or "n/a",
+                )
+            )
+        comparison = _mapping(report.reference_comparison)
+        blockers = comparison.get("blockers", [])
+        if blockers:
+            lines.extend(["", "Reference blockers:", ""])
+            lines.extend(f"- {blocker}" for blocker in blockers if isinstance(blocker, str))
     lines.append("")
     return "\n".join(lines)
 
@@ -435,6 +670,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--report", action="append", default=[], help="Explicit scenario_rollout_report.json path; repeat as needed.")
     parser.add_argument("--scenario", action="append", default=[], help="Required scenario id; repeat or comma-separate.")
     parser.add_argument("--scenario-manifest", type=Path, default=DEFAULT_SCENARIO_MANIFEST)
+    parser.add_argument("--reference-profile-name", default=None, help="Optional retained reference profile name for comparison.")
+    parser.add_argument("--reference-suite-dir", type=Path, default=None, help="Optional retained reference suite directory.")
+    parser.add_argument(
+        "--require-reference-improvement",
+        action="store_true",
+        help="Exit nonzero unless the candidate improves the reference without new falls or major distance loss.",
+    )
     parser.add_argument("--output-dir", type=Path, default=None, help="Directory for JSON and Markdown readiness reports.")
     parser.add_argument("--output", type=Path, default=None, help="Markdown output path.")
     parser.add_argument("--json-output", type=Path, default=None, help="JSON output path.")
@@ -452,6 +694,8 @@ def main(argv: list[str] | None = None) -> int:
         report_paths=args.report,
         scenarios=scenarios,
         manifest_path=args.scenario_manifest,
+        reference_profile=args.reference_profile_name,
+        reference_suite_dir=args.reference_suite_dir,
     )
     output_dir = args.output_dir or Path("artifacts/clearance_readiness") / args.profile_name
     json_output = args.json_output or output_dir / "clearance_readiness.json"
@@ -466,7 +710,12 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
     else:
         print(render_markdown(report))
-    return 1 if args.strict and not report.ok else 0
+    if args.strict and not report.ok:
+        return 1
+    if args.require_reference_improvement:
+        if report.candidate_beats_reference is not True:
+            return 1
+    return 0
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -497,6 +497,14 @@ clearance evidence commands:
 ./scripts/analyze_clearance_readiness.sh \
   --profile-name context_stage1_three_scenario_10ep_e80 \
   --output-dir artifacts/clearance_readiness/context_stage1_three_scenario_10ep_e80
+./scripts/analyze_clearance_readiness.sh \
+  --profile-name <candidate_profile> \
+  --suite-dir artifacts/scenario_eval/<candidate_profile> \
+  --reference-profile-name clearance_liftscale_stack_s143_step090_offset005 \
+  --reference-suite-dir artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005 \
+  --output-dir artifacts/clearance_readiness/<candidate_profile> \
+  --json \
+  --require-reference-improvement
 ./scripts/plan_policy_visual_inspection.sh \
   --profile-name context_stage1_three_scenario_10ep_e80 \
   --output-dir artifacts/policy_visual_inspection/context_stage1_three_scenario_10ep_e80

@@ -890,16 +890,24 @@ depends on the hardware safety gate.
 
 ## Immediate execution plan
 
-1. Use `clearance_lowratio_gatepush_s111` as the balanced retained residual
-   reference and `clearance_lowratio_quantile_s119` as the best blocked probe by
-   worst-case low-clearance ratio and total distance. Reject
-   `clearance_gap_sequence_restored_s83`, `clearance_lowratio_sequence_s97`,
-   `clearance_lowratio_turnfocus_s101`, `clearance_lowratio_curvepush_s109`,
-   `clearance_lowratio_targetlift_s113`, `clearance_lowratio_forced_s115`, and
-   `clearance_lowratio_suitecmd_s117` for promotion.
-2. Train the next clearance candidate to beat both references on low-clearance
-   ratio in all three scenarios while preserving p50 clearance, no-fall
-   behavior, and movement distance.
+1. Use `clearance_liftscale_stack_s143_step090_offset005` as the retained
+   residual reference. Reject the post-`s143` scalar, pre-roll, MLP, reflex, and
+   startup-tail probes through `clearance_s201_microreflex_s207` for promotion.
+2. Train the next clearance candidate to beat `s143` on low-clearance ratio in
+   all three scenarios while preserving p50 clearance, no-fall behavior, and
+   movement distance. Screen candidates with:
+
+```bash
+./scripts/analyze_clearance_readiness.sh \
+  --profile-name <candidate_profile> \
+  --suite-dir artifacts/scenario_eval/<candidate_profile> \
+  --reference-profile-name clearance_liftscale_stack_s143_step090_offset005 \
+  --reference-suite-dir artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005 \
+  --output-dir artifacts/clearance_readiness/<candidate_profile> \
+  --json \
+  --require-reference-improvement
+```
+
 3. Run the candidate with `--viewer --follow-camera` for human visual review.
 4. Record swing-clearance evidence for all three scenarios.
 5. Fill the visual-review template and rebuild the evidence package.

@@ -17,6 +17,12 @@ Options:
   --report PATH             Explicit scenario_rollout_report.json path; repeat as needed
   --scenario ID             Required scenario id; repeat or comma-separate
   --scenario-manifest PATH  Scenario manifest path
+  --reference-profile-name NAME
+                           Retained reference profile name for comparison
+  --reference-suite-dir DIR
+                           Retained reference suite directory for comparison
+  --require-reference-improvement
+                           Exit nonzero unless candidate beats the reference
   --output-dir DIR          Output directory for JSON and Markdown reports
   --json                    Print machine-readable JSON to stdout
   --strict                  Exit nonzero if readiness fails

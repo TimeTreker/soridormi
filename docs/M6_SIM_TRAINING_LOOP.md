@@ -414,3 +414,23 @@ missed the `0.25` ratio gate and should not be promoted. The next training
 attempt should target lower-tail/startup clearance through a new teacher or
 reward/actor redesign rather than another narrow profile scalar sweep, MLP
 rerun, or reflex wrapper.
+
+Use the clearance readiness helper as both an absolute G10 gate and a retained
+best comparison. For exploratory candidates that are still expected to miss
+G10, omit `--strict` and require improvement against `s143` before retaining the
+candidate:
+
+```bash
+./scripts/analyze_clearance_readiness.sh \
+  --profile-name <candidate_profile> \
+  --suite-dir artifacts/scenario_eval/<candidate_profile> \
+  --reference-profile-name clearance_liftscale_stack_s143_step090_offset005 \
+  --reference-suite-dir artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005 \
+  --output-dir artifacts/clearance_readiness/<candidate_profile> \
+  --json \
+  --require-reference-improvement
+```
+
+For promotion evidence, add `--strict`; a candidate still must pass the absolute
+clearance gate before follow-camera visual inspection or teacher comparison can
+be promotion evidence.

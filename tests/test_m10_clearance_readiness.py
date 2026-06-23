@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from soridormi_runtime.m10_clearance_readiness import (
     build_m10_clearance_readiness,
     render_markdown,
@@ -20,6 +22,9 @@ def _report_payload(
     swing_p05: float | None = 0.02,
     low_ratio: float | None = 0.0,
     samples_with_feet: int | None = 20,
+    forward_distance_m: float = 0.2,
+    stuck_ratio: float = 0.0,
+    fallen: bool = False,
 ) -> dict:
     checks = [
         {
@@ -63,10 +68,10 @@ def _report_payload(
             "swing_clearance_p05_m": swing_p05,
             "swing_clearance_p50_m": swing_p50,
             "low_clearance_swing_ratio": low_ratio,
-            "forward_distance_m": 0.2,
+            "forward_distance_m": forward_distance_m,
             "mean_forward_speed_mps": 0.1,
-            "stuck_ratio": 0.0,
-            "fallen": False,
+            "stuck_ratio": stuck_ratio,
+            "fallen": fallen,
         },
         "checks": checks,
         "stride_step_report": {"samples_with_feet": samples_with_feet},
@@ -113,6 +118,9 @@ def test_readiness_blocks_low_clearance_with_manifest_thresholds(tmp_path: Path)
     assert report.summary_metrics["clearance_failed_count"] == 1
     assert report.summary_metrics["min_swing_clearance_p50_m"] == 0.010
     assert report.summary_metrics["max_low_clearance_ratio"] == 0.50
+    assert report.summary_metrics["min_swing_clearance_p50_margin_m"] == pytest.approx(-0.005)
+    assert report.summary_metrics["max_low_clearance_ratio_excess"] == 0.25
+    assert report.summary_metrics["total_forward_distance_m"] == pytest.approx(0.6)
     assert any("flat_walk_varied_speed_v1" in blocker for blocker in report.blockers)
     flat = {item["scenario_id"]: item for item in report.scenarios}["flat_walk_varied_speed_v1"]
     assert flat["thresholds"]["max_low_clearance_ratio"] == 0.25
@@ -157,6 +165,127 @@ def test_readiness_passes_clearance_before_visual_inspection(tmp_path: Path) -> 
     assert report.summary_metrics["clearance_failed_count"] == 0
     assert "follow-camera visual inspection" in rendered
     assert "official-teacher comparison" in rendered
+
+
+def test_readiness_compares_candidate_against_retained_reference(tmp_path: Path) -> None:
+    candidate_suite = tmp_path / "candidate_suite"
+    reference_suite = tmp_path / "reference_suite"
+    scenarios = (
+        "flat_walk_varied_speed_v1",
+        "start_stop_velocity_ramp_v1",
+        "curve_turn_walk_v1",
+    )
+    reference_low_ratios = {
+        "flat_walk_varied_speed_v1": 0.268,
+        "start_stop_velocity_ramp_v1": 0.257,
+        "curve_turn_walk_v1": 0.308,
+    }
+    candidate_low_ratios = {
+        "flat_walk_varied_speed_v1": 0.258,
+        "start_stop_velocity_ramp_v1": 0.252,
+        "curve_turn_walk_v1": 0.285,
+    }
+    for scenario_id in scenarios:
+        _write_suite_report(
+            reference_suite,
+            scenario_id,
+            _report_payload(
+                scenario_id=scenario_id,
+                ok=False,
+                swing_p50=0.018,
+                low_ratio=reference_low_ratios[scenario_id],
+                forward_distance_m=0.70,
+            ),
+        )
+        _write_suite_report(
+            candidate_suite,
+            scenario_id,
+            _report_payload(
+                scenario_id=scenario_id,
+                ok=False,
+                swing_p50=0.019,
+                low_ratio=candidate_low_ratios[scenario_id],
+                forward_distance_m=0.68,
+            ),
+        )
+
+    report = build_m10_clearance_readiness(
+        profile="candidate",
+        suite_dir=candidate_suite,
+        reference_profile="reference",
+        reference_suite_dir=reference_suite,
+    )
+    rendered = render_markdown(report)
+
+    assert not report.ok
+    assert report.candidate_beats_reference is True
+    assert report.reference_profile == "reference"
+    assert report.reference_summary_metrics is not None
+    assert report.reference_summary_metrics["max_low_clearance_ratio"] == 0.308
+    assert report.reference_comparison is not None
+    assert report.reference_comparison["delta_max_low_clearance_ratio_excess"] == pytest.approx(-0.023)
+    assert report.reference_comparison["movement_distance_preserved"] is True
+    curve = {item["scenario_id"]: item for item in report.scenario_comparisons}["curve_turn_walk_v1"]
+    assert curve["delta_low_clearance_ratio"] == pytest.approx(-0.023)
+    assert "Reference comparison" in rendered
+    assert "Candidate beats reference: yes" in rendered
+
+
+def test_readiness_can_require_reference_improvement_from_cli(tmp_path: Path) -> None:
+    candidate_suite = tmp_path / "candidate_suite"
+    reference_suite = tmp_path / "reference_suite"
+    output_dir = tmp_path / "readiness"
+    for scenario_id in (
+        "flat_walk_varied_speed_v1",
+        "start_stop_velocity_ramp_v1",
+        "curve_turn_walk_v1",
+    ):
+        _write_suite_report(
+            reference_suite,
+            scenario_id,
+            _report_payload(scenario_id=scenario_id, ok=False, swing_p50=0.018, low_ratio=0.30),
+        )
+        _write_suite_report(
+            candidate_suite,
+            scenario_id,
+            _report_payload(
+                scenario_id=scenario_id,
+                ok=False,
+                swing_p50=0.017,
+                low_ratio=0.32,
+                forward_distance_m=0.05,
+            ),
+        )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "soridormi_runtime.m10_clearance_readiness",
+            "--profile-name",
+            "candidate",
+            "--suite-dir",
+            str(candidate_suite),
+            "--reference-profile-name",
+            "reference",
+            "--reference-suite-dir",
+            str(reference_suite),
+            "--require-reference-improvement",
+            "--output-dir",
+            str(output_dir),
+            "--json",
+        ],
+        check=False,
+        text=True,
+        capture_output=True,
+        timeout=60,
+        env={**os.environ, "PYTHONPATH": "src"},
+    )
+
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert payload["candidate_beats_reference"] is False
+    assert payload["reference_comparison"]["blockers"]
 
 
 def test_m10_clearance_readiness_cli_functionally_writes_reports(tmp_path: Path) -> None:
