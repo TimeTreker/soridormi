@@ -246,18 +246,18 @@ changed residual scale from the retained checkpoint's `0.1` to `0.05`. The
 wrapper now preserves `0.1` by default.
 
 The current best retained residual candidate is
-`clearance_liftscale_stack_s127`. It is still blocked from promotion, but it
-improves total distance to about `2.189 m`, gets all three p50 swing-clearance
-metrics above `0.015 m`, and reduces max low-clearance ratio to about `0.409`.
-The remaining blocker is the low-clearance-ratio gate in all three scenarios:
-flat is about `0.353`, start-stop about `0.345`, and curve about `0.409`
-against a `0.25` limit. Do not promote the intermediate stacked probes
-`clearance_contactlift_stack_s121`, `clearance_contactlift_stack_s123`,
-`clearance_cmdlift_stack_s125`, `clearance_liftscale_stack_s129`, or
-`clearance_harmonic_stack_s131`. The next M10 work must reduce s127's
-low-clearance ratios without sacrificing no-fall behavior or the stronger
-movement distance, followed by quantitative clearance readiness and a direct
-human follow-camera visual pass before any broader promotion.
+`clearance_liftscale_stack_s143_step090_offset005`. It is still blocked from
+promotion, but it gets all three p50 swing-clearance metrics above `0.015 m`,
+has no falls, and reduces max low-clearance ratio to about `0.308`. The
+remaining blocker is the low-clearance-ratio gate in all three scenarios: flat
+is about `0.268`, start-stop about `0.257`, and curve about `0.308` against a
+`0.25` limit. Do not promote the intermediate stacked, phase, scale,
+postprocess, or continuation probes documented in
+`docs/SORIDORMI_EXECUTION_ROADMAP.md`. The next M10 work must use a broader
+clearance redesign or higher-clearance teacher to reduce low-clearance ratios
+without sacrificing no-fall behavior or strong movement distance, followed by
+quantitative clearance readiness and a direct human follow-camera visual pass
+before any broader promotion.
 
 ### M11A: task-agent contract foundation
 

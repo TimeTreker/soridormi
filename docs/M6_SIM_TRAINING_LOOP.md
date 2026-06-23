@@ -397,8 +397,11 @@ gates.
 2026-06-23 update: stacked residual-teacher refinement is now available in
 `scripts/train_residual_policy.sh` through the runtime residual profile path.
 The current best retained M10 clearance candidate is
-`clearance_liftscale_stack_s127` (`contact_phase_lift`, explicit
-`residual_scale=0.16`). It remains blocked by G10 low-clearance ratio, but its
-full suite reaches total distance `~2.189 m`, all p50 swing clearances above
-`0.015 m`, and no falls. Next clearance training should beat s127's ratios
-(`flat ~0.353`, `start-stop ~0.345`, `curve ~0.409`) while preserving distance.
+`clearance_liftscale_stack_s143_step090_offset005`. It reuses the `s127`
+`contact_phase_lift` ONNX with `phase.step_increment=0.9`,
+`phase.offset=0.05`, and explicit `residual_scale=0.16`. It remains blocked by
+G10 low-clearance ratio, but its full suite reaches total distance `~2.150 m`,
+all p50 swing clearances above `0.015 m`, and no falls. Next clearance training
+should beat s143's ratios (`flat ~0.268`, `start-stop ~0.257`,
+`curve ~0.308`) while preserving distance. The narrow phase/scale/postprocess
+brackets and small stacked continuations through `s173` did not pass the gate.

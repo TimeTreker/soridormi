@@ -66,12 +66,12 @@ model: /data/training_runs/context_stage1_three_scenario_10ep_neural_bc_m10_e80/
 Current retained clearance-refinement candidate:
 
 ```text
-profile: clearance_liftscale_stack_s127
+profile: clearance_liftscale_stack_s143_step090_offset005
 status: 0/3 scenarios pass, BLOCKED_BY_CLEARANCE_GATE
-total distance ~= 2.189m
-flat:       p50 ~= 0.01742m, low-clearance ratio ~= 0.353
-start-stop: p50 ~= 0.01716m, low-clearance ratio ~= 0.345
-curve:      p50 ~= 0.01616m, low-clearance ratio ~= 0.409
+total distance ~= 2.150m
+flat:       p50 ~= 0.01858m, low-clearance ratio ~= 0.268
+start-stop: p50 ~= 0.01861m, low-clearance ratio ~= 0.257
+curve:      p50 ~= 0.01781m, low-clearance ratio ~= 0.308
 falls:      none
 ```
 
@@ -388,8 +388,8 @@ swing-lift actors. `clearance_contactlift_stack_s121` first stacked a
 contact/phase lift residual on `s111`; it remained blocked but improved total
 distance to about `2.028 m`, kept all p50 clearances above `0.015 m`, and
 reduced max low-clearance ratio to about `0.460`. `clearance_liftscale_stack_s127`
-is the current best retained blocked candidate after increasing the explicit
-stack residual scale to `0.16`.
+then improved total distance to about `2.189 m` and reduced max low-clearance
+ratio to about `0.409`.
 
 ```text
 clearance_liftscale_stack_s127:
@@ -404,18 +404,52 @@ clearance_liftscale_stack_s127:
   falls:      none
 ```
 
-Do not promote the intermediate probes:
+2026-06-23 phase-timing continuation:
+profile-level phase timing moved the best blocked candidate to
+`clearance_liftscale_stack_s143_step090_offset005`. It reuses the `s127` ONNX
+with `step_increment=0.9`, `offset=0.05`, and `residual_scale=0.16`.
+
+```text
+clearance_liftscale_stack_s143_step090_offset005:
+  suite: 0/3, BLOCKED_BY_CLEARANCE_GATE
+  total distance ~= 2.150m
+  flat:       p50 ~= 0.01858m, low-clearance ratio ~= 0.268
+  start-stop: p50 ~= 0.01861m, low-clearance ratio ~= 0.257
+  curve:      p50 ~= 0.01781m, low-clearance ratio ~= 0.308
+  falls:      none
+```
+
+`s143` improves the maximum low-clearance ratio from `s127`'s `~0.409` to
+`~0.308`; p50 clearance and no-fall behavior are healthy, but G10 still fails
+because all three scenarios exceed the `0.25` low-clearance-ratio limit.
+
+Do not promote the intermediate or rejected probes:
 `clearance_contactlift_stack_s121`, `clearance_contactlift_stack_s123`,
 `clearance_cmdlift_stack_s125`, `clearance_liftscale_stack_s129`, or
-`clearance_harmonic_stack_s131`. `s129` improved flat low-clearance ratio but
-regressed start-stop and curve relative to `s127`; `s131` did not beat `s127`
-in training and did not get full-suite evidence.
+`clearance_harmonic_stack_s131`, plus the phase/training probes
+`clearance_cmdtail_stack_s133`, `clearance_liftscale_stack_s135_scale018`,
+`clearance_liftscale_stack_s137_step090`, `clearance_liftscale_stack_s139_step080`,
+`clearance_liftscale_stack_s141_step090_scale018`,
+`clearance_liftscale_stack_s145_step090_offset010`,
+`clearance_liftscale_stack_s147_step090_offset005_scale018`,
+`clearance_liftscale_stack_s149_step085_offset005`,
+`clearance_liftscale_stack_s151_step090_offset004`,
+`clearance_liftscale_stack_s153_step090_offset006`,
+`clearance_liftscale_stack_s155_step092_offset005`,
+`clearance_liftscale_stack_s157_step095_offset005`,
+`clearance_curve_tail_stack_s159`, `clearance_curve_direct_stack_s161`,
+`clearance_cmdcurve_direct_stack_s163`,
+`clearance_liftscale_stack_s165_step090_offset005_scale015`,
+`clearance_liftscale_stack_s167_step090_offset005_scale014`,
+`clearance_liftscale_stack_s169_step090_offset005_kneegain`,
+`clearance_harmonic_direct_stack_s171`, and
+`clearance_harmonic_aggressive_stack_s173`.
 
-Current best retained candidate: `clearance_liftscale_stack_s127`. It is still
-blocked by the G10 low-clearance-ratio gate in all three scenarios; p50
-clearance and no-fall behavior are no longer the bottleneck. Next M10 work
-should target low-clearance ratio below `0.25` without sacrificing s127's
-movement distance.
+Current best retained candidate: `clearance_liftscale_stack_s143_step090_offset005`.
+It is still blocked by the G10 low-clearance-ratio gate in all three scenarios;
+p50 clearance and no-fall behavior are no longer the bottleneck. Next M10 work
+should use a more substantial training redesign or a higher-clearance teacher
+to drive low-clearance ratio below `0.25` while preserving strong movement.
 
 clearance evidence commands:
 

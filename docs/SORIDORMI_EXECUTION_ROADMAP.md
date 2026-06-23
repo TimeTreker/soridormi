@@ -431,7 +431,7 @@ observation[101]
   - `clearance_cmdlift_stack_s125`: command-conditioned training probe; did not
     beat `s121`/`s127` on curve; do not promote.
 - [x] Train and evaluate explicit residual-scale lift candidates
-  - `clearance_liftscale_stack_s127`: current best retained blocked candidate.
+  - `clearance_liftscale_stack_s127`: previously best retained blocked candidate.
   - required scenario suite: FAIL, 0/3 under current clearance gate
   - flat: distance 0.72664m, p50 clearance 0.01742m, low-clearance ratio 0.353
   - start-stop: distance 0.88341m, p50 clearance 0.01716m, low-clearance ratio
@@ -443,8 +443,39 @@ observation[101]
 - [x] Add and smoke-test a harmonic swing-lift actor
   - `clearance_harmonic_stack_s131`: blocked training probe; did not beat `s127`
     in training lower-tail metrics, so it did not receive full G10 evidence.
-  - result: keep `s127` as the best retained blocked candidate.
-- [ ] Focus the next training stage on start/stop and turning clearance, or
+  - result: keep `s127` as the best retained blocked candidate before phase
+    timing probes.
+- [x] Run phase-timing and continuation probes from `s127`
+  - `clearance_liftscale_stack_s137_step090`: phase-rate probe; reduced
+    low-clearance ratios to flat `~0.298`, start-stop `~0.264`, curve `~0.346`,
+    but remained 0/3 under G10.
+  - `clearance_liftscale_stack_s143_step090_offset005`: current best retained
+    blocked candidate after adding `phase.offset=0.05`.
+  - required scenario suite: FAIL, 0/3 under current clearance gate
+  - flat: distance 0.70473m, p50 clearance 0.01858m, low-clearance ratio 0.268
+  - start-stop: distance 0.84432m, p50 clearance 0.01861m, low-clearance ratio
+    0.257
+  - curve: distance 0.60072m, p50 clearance 0.01781m, low-clearance ratio 0.308
+  - total distance: 2.14977m; no falls
+  - rejected probes: `clearance_cmdtail_stack_s133`,
+    `clearance_liftscale_stack_s135_scale018`,
+    `clearance_liftscale_stack_s139_step080`,
+    `clearance_liftscale_stack_s141_step090_scale018`,
+    `clearance_liftscale_stack_s145_step090_offset010`,
+    `clearance_liftscale_stack_s147_step090_offset005_scale018`,
+    `clearance_liftscale_stack_s149_step085_offset005`,
+    `clearance_liftscale_stack_s151_step090_offset004`,
+    `clearance_liftscale_stack_s153_step090_offset006`,
+    `clearance_liftscale_stack_s155_step092_offset005`,
+    `clearance_liftscale_stack_s157_step095_offset005`,
+    `clearance_curve_tail_stack_s159`, `clearance_curve_direct_stack_s161`,
+    `clearance_cmdcurve_direct_stack_s163`,
+    `clearance_liftscale_stack_s165_step090_offset005_scale015`,
+    `clearance_liftscale_stack_s167_step090_offset005_scale014`,
+    `clearance_liftscale_stack_s169_step090_offset005_kneegain`,
+    `clearance_harmonic_direct_stack_s171`, and
+    `clearance_harmonic_aggressive_stack_s173`.
+- [ ] Focus the next training stage on a broader clearance redesign, or
   acquire a higher-clearance teacher
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
 
@@ -473,12 +504,14 @@ teacher comparison: PASS (relative behavior only; does not replace clearance)
 > but failed the `0.015 m` swing-clearance gate. A direct human follow-camera
 > inspection remains pending before any promotion.
 > The current best retained residual candidate is
-> `clearance_liftscale_stack_s127`: it improves total distance to `2.189 m`,
-> gets all three scenario p50 clearances over the `0.015 m` threshold, and
-> reduces max low-clearance ratio to `0.409`, but it remains blocked because
-> all scenarios still exceed the `0.25` low-clearance-ratio limit.
+> `clearance_liftscale_stack_s143_step090_offset005`: it keeps all three
+> scenario p50 clearances over the `0.015 m` threshold, has no falls, and
+> reduces max low-clearance ratio to `0.308`, but it remains blocked because
+> flat (`0.268`), start-stop (`0.257`), and curve (`0.308`) still exceed the
+> `0.25` low-clearance-ratio limit.
 >
-> **Clearance readiness:** Generate with `./scripts/analyze_clearance_readiness.sh --profile-name context_stage1_three_scenario_10ep_e80 --output-dir artifacts/clearance_readiness/context_stage1_three_scenario_10ep_e80`.
+> **Clearance readiness:** Current best generated with
+> `./scripts/analyze_clearance_readiness.sh --profile-name clearance_liftscale_stack_s143_step090_offset005 --suite-dir artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005 --output-dir artifacts/clearance_readiness/clearance_liftscale_stack_s143_step090_offset005 --json`.
 >
 > **Decision path:**
 > - **Option 1 (Recommended):** Continue clearance-focused refinement from the
