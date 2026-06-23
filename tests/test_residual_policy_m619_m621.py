@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -208,6 +210,30 @@ def test_phase_contact_optimizer_uses_full_actor_parameter_vector() -> None:
 
     assert len(result.best_residual) == PHASE_CONTACT_PARAMETER_SIZE
     assert len(result.final_mean) == PHASE_CONTACT_PARAMETER_SIZE
+
+
+def test_residual_cli_dry_run_can_exclude_zero_candidate(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train_residual_policy",
+            "teacher_profile",
+            "--output-dir",
+            str(tmp_path),
+            "--dry-run",
+            "--no-zero-candidate",
+        ],
+    )
+
+    train_residual_policy_module.main()
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["optimization_config"]["include_zero_candidate"] is False
 
 
 def test_command_state_actor_uses_command_joint_state_and_history() -> None:

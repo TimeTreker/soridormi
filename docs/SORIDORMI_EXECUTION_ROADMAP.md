@@ -408,6 +408,12 @@ observation[101]
   - curve: distance 0.48593m, p50 clearance 0.01506m, low-clearance ratio 0.496
   - rejected probe: `clearance_lowratio_targetlift_s113` exported the same
     ONNX as `clearance_lowratio_gatepush_s111`
+  - rejected probe: `clearance_lowratio_forced_s115` disabled zero-candidate
+    retention and produced a different ONNX, but regressed training clearance
+    metrics
+  - rejected probe: `clearance_lowratio_suitecmd_s117` directly optimized the
+    three suite commands and reduced curve low-clearance ratio slightly, but
+    regressed flat/start low-clearance ratio and total distance
   - result: best retained candidate so far, but still blocked by low-clearance
     ratio in all scenarios
 - [ ] Focus the next training stage on start/stop and turning clearance, or
@@ -836,6 +842,8 @@ Soridormi succeeds when:
 - [x] Add an episodic clearance-gap penalty so optimization can distinguish
   shallow below-target swings from deep below-target swings when
   `low_clearance_ratio` is saturated at 1.0.
+- [x] Add `--no-zero-candidate` so warm-start probes can force CEM to evaluate
+  actual parameter moves instead of re-exporting the unchanged checkpoint.
 
 Recommended next M10 experiment: warm-start from
 `m10_command_state_mlp_cem4x14_s79`, keep one fixed flat-walk command, add
@@ -862,7 +870,11 @@ distance, curve p50, and max low-clearance ratio. The curve-focused
 distance and max low-clearance ratio, so it is a rejected probe. The gate-push
 continuation `clearance_lowratio_gatepush_s111` is the best retained blocked
 candidate so far. The target-lift probe `clearance_lowratio_targetlift_s113`
-exported the same ONNX as `s111`, so it is rejected. The next run should
+exported the same ONNX as `s111`, so it is rejected. The no-zero probe
+`clearance_lowratio_forced_s115` moved away from `s111` but regressed training
+clearance metrics. The suite-command probe `clearance_lowratio_suitecmd_s117`
+reduced curve low-clearance ratio slightly but regressed flat/start
+low-clearance ratio and total distance, so it is rejected. The next run should
 compare against `s111` before consuming full G10 evidence time.
 
 Host wrapper:

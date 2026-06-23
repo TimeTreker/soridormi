@@ -1974,6 +1974,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--initial-std", type=float, default=0.25, help="Initial residual search std")
     parser.add_argument("--min-std", type=float, default=0.01, help="Minimum residual search std")
     parser.add_argument("--std-decay", type=float, default=0.85, help="Std decay after elite update")
+    parser.add_argument(
+        "--no-zero-candidate",
+        action="store_true",
+        help="Do not force the current CEM mean into each generation; useful when probing beyond a warm-start checkpoint.",
+    )
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
     parser.add_argument("--residual-scale", type=float, default=0.05, help="Runtime scale for residual output")
     parser.add_argument("--residual-clip-abs", type=float, default=1.0, help="Clip residual model output to ±this value")
@@ -2039,6 +2044,7 @@ def main() -> None:
         std_decay=args.std_decay,
         seed=args.seed,
         residual_clip_abs=args.residual_clip_abs,
+        include_zero_candidate=not bool(args.no_zero_candidate),
     )
     reward_cfg = WalkingRewardConfig(
         target_height=args.target_height,

@@ -338,6 +338,16 @@ clearance_lowratio_gatepush_s111:
 `0.0165 m`, but exported an ONNX byte-identical to `s111`; treat it as a
 rejected probe.
 
+The residual trainer now exposes `--no-zero-candidate`, which disables forcing
+the current CEM mean into each generation when probing beyond a warm-start
+checkpoint. `clearance_lowratio_forced_s115` used that flag through the
+clearance wrapper and produced a different ONNX, but regressed training
+clearance metrics versus `s111`; reject it. `clearance_lowratio_suitecmd_s117`
+used the same flag with direct three-command suite objectives. It reduced curve
+low-clearance ratio slightly in the full suite, but regressed flat/start
+low-clearance ratio and total distance, so keep `s111` as the current best
+retained blocked candidate.
+
 clearance evidence commands:
 
 ```bash

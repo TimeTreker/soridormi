@@ -165,6 +165,61 @@ Validation commands run for the continuation:
 
 No human viewer/follow-camera visual review was performed in this continuation.
 
+## 2026-06-23 No-Zero Probe Continuation
+
+The residual trainer now exposes `--no-zero-candidate`, which prevents CEM from
+forcing the current warm-start mean into every generation. This was added after
+`clearance_lowratio_targetlift_s113` exported an ONNX byte-identical to `s111`.
+
+`clearance_lowratio_forced_s115`:
+
+```text
+status: rejected probe
+initial checkpoint: clearance_lowratio_gatepush_s111
+training mode: clearance wrapper with --no-zero-candidate
+profile contract: PASS
+reason: produced a different ONNX but regressed training clearance metrics
+```
+
+`clearance_lowratio_suitecmd_s117`:
+
+```text
+status: rejected probe
+initial checkpoint: clearance_lowratio_gatepush_s111
+training mode: direct train_residual_policy.sh suite-command objectives with
+--no-zero-candidate
+profile contract: PASS
+suite: 0/3, BLOCKED_BY_CLEARANCE_GATE
+total distance: ~1.892m
+flat:       p50 ~0.01597m, low-clearance ratio ~0.430
+start-stop: p50 ~0.01603m, low-clearance ratio ~0.446
+curve:      p50 ~0.01522m, low-clearance ratio ~0.489
+falls:      none
+reason: slightly improved curve low-clearance ratio but regressed flat/start
+low-clearance ratio and total distance relative to s111
+```
+
+Metric evidence generated:
+
+```text
+artifacts/scenario_eval/clearance_lowratio_suitecmd_s117/suite_summary.json
+artifacts/clearance_readiness/clearance_lowratio_suitecmd_s117/clearance_readiness.json
+data/rl_finetune/clearance_lowratio_forced_s115/residual_train_report.md
+data/rl_finetune/clearance_lowratio_suitecmd_s117/residual_train_report.md
+```
+
+Validation commands run:
+
+```bash
+docker compose -f compose.sim.yaml run --rm runtime bash -lc 'source /opt/venvs/runtime/bin/activate && pytest -q tests/test_residual_policy_m619_m621.py tests/test_residual_scripts_m621.py'
+./scripts/validate_policy_profiles.sh configs/policies/clearance_lowratio_forced_s115.yaml --robot-config configs/robots/open_duck_mini_v2.yaml
+./scripts/validate_policy_profiles.sh configs/policies/clearance_lowratio_suitecmd_s117.yaml --robot-config configs/robots/open_duck_mini_v2.yaml
+./scripts/evaluate_scenario_suite.sh --backend mujoco --profile clearance_lowratio_suitecmd_s117 --output-dir artifacts/scenario_eval/clearance_lowratio_suitecmd_s117 --json
+./scripts/analyze_clearance_readiness.sh --profile-name clearance_lowratio_suitecmd_s117 --suite-dir artifacts/scenario_eval/clearance_lowratio_suitecmd_s117 --output-dir artifacts/clearance_readiness/clearance_lowratio_suitecmd_s117 --json
+```
+
+No human viewer/follow-camera visual review was performed in this continuation.
+
 ## 2026-06-23 Continuation
 
 The next continuation started MuJoCo explicitly with the same headless command:

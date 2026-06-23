@@ -250,9 +250,10 @@ The current best retained residual candidate is
 improves total distance to about `1.928 m`, gets all three p50 swing-clearance
 metrics above `0.015 m`, and reduces max low-clearance ratio to about `0.496`.
 The remaining blocker is the low-clearance-ratio gate in all three scenarios.
-The next M10 work is clearance refinement against `s111`, followed by
-quantitative clearance readiness and a direct human follow-camera visual pass
-before any broader promotion.
+Recent no-zero and direct suite-command probes did not beat this balance. The
+next M10 work is clearance refinement against `s111`, followed by quantitative
+clearance readiness and a direct human follow-camera visual pass before any
+broader promotion.
 
 ### M11A: task-agent contract foundation
 
