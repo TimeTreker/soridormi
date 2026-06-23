@@ -432,7 +432,10 @@ to `~0.319`/`~0.315`, so it is not the retained best. A learned continuation
 from that profile, `clearance_s177_tail_stack_s201`, trained cleanly but live
 curve still failed at low-clearance ratio `~0.257`; the tiny
 `clearance_s177_tail_stack_s203_scale026215` action-scale nudge regressed curve
-to `~0.294`.
+to `~0.294`. A broader `command_state_mlp` lower-tail run,
+`clearance_cmdmlp_lowtail_s205`, also regressed live curve to `~0.338`; a tiny
+micro-reflex on the `s201` near miss, `clearance_s201_microreflex_s207`,
+regressed curve to `~0.282`.
 
 Two implementation findings are now preserved for later M10 work:
 `skill_execution.plan_shell_exports()` no longer forces
@@ -477,7 +480,9 @@ Do not promote the intermediate or rejected probes:
 `clearance_actionscale_preroll_stack_s197_scale0263_preroll25`,
 `clearance_actionscale_stack_s199_scale026205`,
 `clearance_s177_tail_stack_s201`, and
-`clearance_s177_tail_stack_s203_scale026215`.
+`clearance_s177_tail_stack_s203_scale026215`,
+`clearance_cmdmlp_lowtail_s205`, and
+`clearance_s201_microreflex_s207`.
 
 Current best retained candidate: `clearance_liftscale_stack_s143_step090_offset005`.
 It is still blocked by the G10 low-clearance-ratio gate in all three scenarios;

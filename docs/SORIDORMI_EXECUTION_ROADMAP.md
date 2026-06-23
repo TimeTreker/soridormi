@@ -500,6 +500,13 @@ observation[101]
     `~0.01846 m`, distance `~0.717 m`, and no fall.
   - `clearance_s177_tail_stack_s203_scale026215`: tiny action-scale nudge on
     `s201`; curve regressed to low-clearance ratio `~0.294`.
+  - `clearance_cmdmlp_lowtail_s205`: broader `command_state_mlp` lower-tail
+    run with a stricter `0.017 m` training target; live curve regressed to
+    low-clearance ratio `~0.338`, p50 `~0.01712 m`, distance `~0.606 m`, and no
+    fall.
+  - `clearance_s201_microreflex_s207`: tiny swing-clearance reflex on the
+    `s201` near miss; live curve regressed to low-clearance ratio `~0.282`,
+    p50 `~0.01882 m`, distance `~0.694 m`, and no fall.
   - result: keep `clearance_liftscale_stack_s143_step090_offset005` as the best
     balanced retained full-suite reference. The remaining blocker is lower-tail
     startup/turning clearance, not p50 clearance or falls.
@@ -538,10 +545,10 @@ teacher comparison: PASS (relative behavior only; does not replace clearance)
 > flat (`0.268`), start-stop (`0.257`), and curve (`0.308`) still exceed the
 > `0.25` low-clearance-ratio limit.
 > Post-`s143` action-scale, pre-roll, command-ramp, reflex, and startup-tail
-> probes through `clearance_s177_tail_stack_s203_scale026215` did not pass G10.
-> The closest live curve-only probe was `clearance_s177_tail_stack_s201`
-> (`~0.257` low-clearance ratio), but it still failed the curve gate and did not
-> justify a new retained promotion.
+> probes through `clearance_s201_microreflex_s207` did not pass G10. The
+> closest live curve-only probe was `clearance_s177_tail_stack_s201` (`~0.257`
+> low-clearance ratio), but it still failed the curve gate and did not justify a
+> new retained promotion.
 >
 > **Clearance readiness:** Current best generated with
 > `./scripts/analyze_clearance_readiness.sh --profile-name clearance_liftscale_stack_s143_step090_offset005 --suite-dir artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005 --output-dir artifacts/clearance_readiness/clearance_liftscale_stack_s143_step090_offset005 --json`.

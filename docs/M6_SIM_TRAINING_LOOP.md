@@ -407,9 +407,10 @@ should beat s143's ratios (`flat ~0.268`, `start-stop ~0.257`,
 brackets and small stacked continuations through `s173` did not pass the gate.
 Follow-up action-scale, pre-roll, command-ramp, opt-in clearance-reflex, and
 startup-tail continuation probes through
-`clearance_s177_tail_stack_s203_scale026215` also did not pass. The closest
+`clearance_s201_microreflex_s207` also did not pass. The closest
 curve-only live result was `clearance_s177_tail_stack_s201` at low-clearance
 ratio `~0.257`, p50 `~0.01846 m`, distance `~0.717 m`, and no fall; it still
 missed the `0.25` ratio gate and should not be promoted. The next training
-attempt should target lower-tail/startup clearance directly rather than another
-narrow profile scalar sweep.
+attempt should target lower-tail/startup clearance through a new teacher or
+reward/actor redesign rather than another narrow profile scalar sweep, MLP
+rerun, or reflex wrapper.

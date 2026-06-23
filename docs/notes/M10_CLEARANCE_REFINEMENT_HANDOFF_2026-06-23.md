@@ -74,6 +74,8 @@ clearance_actionscale_preroll_stack_s197_scale0263_preroll25
 clearance_actionscale_stack_s199_scale026205
 clearance_s177_tail_stack_s201
 clearance_s177_tail_stack_s203_scale026215
+clearance_cmdmlp_lowtail_s205
+clearance_s201_microreflex_s207
 ```
 
 Useful findings:
@@ -103,6 +105,13 @@ Useful findings:
   but live curve still failed at low-clearance ratio `~0.257` with p50
   `~0.01846 m`, distance `~0.717 m`, and no fall. The tiny `s203` action-scale
   nudge regressed curve to `~0.294`.
+- `clearance_cmdmlp_lowtail_s205` used the broader `command_state_mlp` actor and
+  a stricter `0.017 m` training target to pressure startup/lower-tail clearance,
+  but live curve regressed to low-clearance ratio `~0.338`, p50 `~0.01712 m`,
+  distance `~0.606 m`, and no fall.
+- `clearance_s201_microreflex_s207` applied a much smaller reflex to the `s201`
+  near miss. It also regressed curve to low-clearance ratio `~0.282`, p50
+  `~0.01882 m`, distance `~0.694 m`, and no fall.
 
 Next best work:
 
