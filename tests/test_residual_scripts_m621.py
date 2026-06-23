@@ -31,4 +31,6 @@ def test_clearance_residual_training_wrapper_tracks_recommended_recipe() -> None
     assert 'residual_scale="0.1"' in source
     assert '--residual-scale "${residual_scale}"' in source
     assert "--episodic-clearance-gap-weight" in source
+    assert "--episodic-clearance-quantile" in source
+    assert "--episodic-clearance-quantile-gap-weight" in source
     assert "--final-score-breakdown" in source

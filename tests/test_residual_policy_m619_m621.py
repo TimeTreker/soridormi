@@ -34,6 +34,7 @@ from soridormi_runtime.train_residual_policy import (
     _parse_training_sequence,
     _residual_source_from_parameters,
     _score_for_aggregation,
+    _validate_clearance_quantile,
     _validate_score_normalization,
     _write_residual_profile,
     aggregate_training_scores,
@@ -227,6 +228,10 @@ def test_residual_cli_dry_run_can_exclude_zero_candidate(
             str(tmp_path),
             "--dry-run",
             "--no-zero-candidate",
+            "--episodic-clearance-quantile",
+            "0.20",
+            "--episodic-clearance-quantile-gap-weight",
+            "3.5",
         ],
     )
 
@@ -234,6 +239,8 @@ def test_residual_cli_dry_run_can_exclude_zero_candidate(
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["optimization_config"]["include_zero_candidate"] is False
+    assert payload["episodic_clearance_quantile"] == pytest.approx(0.20)
+    assert payload["episodic_clearance_quantile_gap_weight"] == pytest.approx(3.5)
 
 
 def test_command_state_actor_uses_command_joint_state_and_history() -> None:
@@ -340,6 +347,34 @@ def test_episodic_clearance_gap_weight_distinguishes_shortfall_size() -> None:
 
     assert shallow > deep
     assert passing == pytest.approx(0.0)
+
+
+def test_episodic_clearance_quantile_gap_weight_targets_lower_tail() -> None:
+    tail_low = episodic_clearance_adjustment(
+        [0.006, 0.015, 0.020, 0.020],
+        target_clearance=0.015,
+        clearance_weight=0.0,
+        low_clearance_penalty_weight=0.0,
+        clearance_quantile=0.25,
+        clearance_quantile_gap_weight=2.0,
+    )
+    tail_passing = episodic_clearance_adjustment(
+        [0.015, 0.015, 0.020, 0.020],
+        target_clearance=0.015,
+        clearance_weight=0.0,
+        low_clearance_penalty_weight=0.0,
+        clearance_quantile=0.25,
+        clearance_quantile_gap_weight=2.0,
+    )
+
+    assert tail_passing > tail_low
+    assert tail_passing == pytest.approx(0.0)
+
+
+def test_validate_clearance_quantile_rejects_out_of_range_values() -> None:
+    assert _validate_clearance_quantile(0.25) == pytest.approx(0.25)
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        _validate_clearance_quantile(1.1)
 
 
 def test_parse_training_command_builds_velocity_command() -> None:
@@ -557,10 +592,12 @@ def test_build_episode_score_breakdown_records_clearance_gate_metrics() -> None:
     assert breakdown["median_swing_clearance_m"] == pytest.approx(0.012)
     assert breakdown["min_swing_clearance_m"] == pytest.approx(0.006)
     assert breakdown["low_clearance_ratio"] == pytest.approx(2.0 / 3.0)
+    assert breakdown["p25_swing_clearance_m"] == pytest.approx(0.009)
     assert breakdown["mean_clearance_gap_ratio"] == pytest.approx(((0.015 - 0.006) / 0.015 + (0.015 - 0.012) / 0.015) / 3.0)
     assert breakdown["median_clearance_gap_ratio"] == pytest.approx((0.015 - 0.012) / 0.015)
     assert breakdown["max_clearance_gap_ratio"] == pytest.approx((0.015 - 0.006) / 0.015)
     assert breakdown["episodic_clearance_adjustment_total"] == pytest.approx(-0.8)
+    assert breakdown["episodic_clearance_quantile"] == pytest.approx(0.25)
 
 
 def test_build_episode_score_breakdown_records_segment_clearance_diagnostics() -> None:

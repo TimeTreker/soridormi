@@ -789,13 +789,16 @@ depends on the hardware safety gate.
 
 ## Immediate execution plan
 
-1. Use `clearance_lowratio_gatepush_s111` as the best retained residual reference
-   and reject `clearance_gap_sequence_restored_s83`, `clearance_lowratio_sequence_s97`,
+1. Use `clearance_lowratio_gatepush_s111` as the balanced retained residual
+   reference and `clearance_lowratio_quantile_s119` as the best blocked probe by
+   worst-case low-clearance ratio and total distance. Reject
+   `clearance_gap_sequence_restored_s83`, `clearance_lowratio_sequence_s97`,
    `clearance_lowratio_turnfocus_s101`, `clearance_lowratio_curvepush_s109`,
-   and `clearance_lowratio_targetlift_s113` for promotion.
-2. Train the next clearance candidate to beat `s111` on low-clearance ratio in
-   all three scenarios while preserving p50 clearance, no-fall behavior, and
-   movement distance.
+   `clearance_lowratio_targetlift_s113`, `clearance_lowratio_forced_s115`, and
+   `clearance_lowratio_suitecmd_s117` for promotion.
+2. Train the next clearance candidate to beat both references on low-clearance
+   ratio in all three scenarios while preserving p50 clearance, no-fall
+   behavior, and movement distance.
 3. Run the candidate with `--viewer --follow-camera` for human visual review.
 4. Record swing-clearance evidence for all three scenarios.
 5. Fill the visual-review template and rebuild the evidence package.
@@ -844,6 +847,10 @@ Soridormi succeeds when:
   `low_clearance_ratio` is saturated at 1.0.
 - [x] Add `--no-zero-candidate` so warm-start probes can force CEM to evaluate
   actual parameter moves instead of re-exporting the unchanged checkpoint.
+- [x] Add an episodic lower-quantile clearance-gap penalty
+  (`--episodic-clearance-quantile` and
+  `--episodic-clearance-quantile-gap-weight`) so optimization can target the
+  lower tail after p50 clearance already exceeds the gate threshold.
 
 Recommended next M10 experiment: warm-start from
 `m10_command_state_mlp_cem4x14_s79`, keep one fixed flat-walk command, add
@@ -874,8 +881,14 @@ exported the same ONNX as `s111`, so it is rejected. The no-zero probe
 `clearance_lowratio_forced_s115` moved away from `s111` but regressed training
 clearance metrics. The suite-command probe `clearance_lowratio_suitecmd_s117`
 reduced curve low-clearance ratio slightly but regressed flat/start
-low-clearance ratio and total distance, so it is rejected. The next run should
-compare against `s111` before consuming full G10 evidence time.
+low-clearance ratio and total distance, so it is rejected. The quantile-tail
+probe `clearance_lowratio_quantile_s119` added a lower-tail clearance objective
+at q=0.25 and produced a distinct ONNX from `s111`. It remains `0/3` and
+`BLOCKED_BY_CLEARANCE_GATE`, with no falls. It improves total distance
+(`~1.938 m`) and worst-case low-clearance ratio (`~0.473`) versus `s111`, but
+regresses flat low-clearance ratio (`~0.408` versus `~0.388`), so it is not a
+clean replacement. The next run should compare against both `s111` and `s119`
+before consuming full G10 evidence time.
 
 Host wrapper:
 

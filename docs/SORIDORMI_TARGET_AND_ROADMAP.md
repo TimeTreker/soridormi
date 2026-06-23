@@ -245,15 +245,18 @@ valid, but failed `0/3` scenarios and did not beat `s79` because the wrapper
 changed residual scale from the retained checkpoint's `0.1` to `0.05`. The
 wrapper now preserves `0.1` by default.
 
-The current best retained residual candidate is
+The balanced retained residual reference is
 `clearance_lowratio_gatepush_s111`. It is still blocked from promotion, but it
 improves total distance to about `1.928 m`, gets all three p50 swing-clearance
 metrics above `0.015 m`, and reduces max low-clearance ratio to about `0.496`.
+The quantile-tail probe `clearance_lowratio_quantile_s119` is also blocked, but
+it improves total distance to about `1.938 m` and reduces the worst-case
+low-clearance ratio to about `0.473`; it is not a clean replacement because
+flat low-clearance ratio regressed from about `0.388` to about `0.408`.
 The remaining blocker is the low-clearance-ratio gate in all three scenarios.
-Recent no-zero and direct suite-command probes did not beat this balance. The
-next M10 work is clearance refinement against `s111`, followed by quantitative
-clearance readiness and a direct human follow-camera visual pass before any
-broader promotion.
+The next M10 work is clearance refinement against both `s111` and `s119`,
+followed by quantitative clearance readiness and a direct human follow-camera
+visual pass before any broader promotion.
 
 ### M11A: task-agent contract foundation
 

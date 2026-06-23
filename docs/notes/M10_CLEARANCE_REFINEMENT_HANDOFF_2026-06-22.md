@@ -165,6 +165,68 @@ Validation commands run for the continuation:
 
 No human viewer/follow-camera visual review was performed in this continuation.
 
+## 2026-06-23 Quantile-Tail Probe Continuation
+
+The residual trainer now also exposes
+`--episodic-clearance-quantile` and
+`--episodic-clearance-quantile-gap-weight`. This objective penalizes normalized
+shortfall at a configured lower-tail swing-clearance quantile. It was added
+because `s111` already cleared the p50 gate in all three scenarios while still
+failing the low-clearance-ratio gate.
+
+The required headless MuJoCo server was started with:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile context_stage1_three_scenario_10ep_e80 --no-viewer
+```
+
+`clearance_lowratio_quantile_s119`:
+
+```text
+status: blocked probe, not promotable
+initial checkpoint: clearance_lowratio_gatepush_s111
+training objective: q=0.25 clearance-quantile gap penalty, weight 10.0
+profile contract: PASS
+suite: 0/3, BLOCKED_BY_CLEARANCE_GATE
+total distance: ~1.938m
+flat:       p50 ~0.01658m, low-clearance ratio ~0.408
+start-stop: p50 ~0.01632m, low-clearance ratio ~0.421
+curve:      p50 ~0.01516m, low-clearance ratio ~0.473
+falls:      none
+```
+
+Interpretation:
+
+```text
+s119 produced a distinct ONNX from s111 and slightly improved total distance,
+start-stop low-clearance ratio, curve low-clearance ratio, and worst-case
+low-clearance ratio. It regressed flat low-clearance ratio, so it is not a clean
+replacement for s111. Treat s111 as the balanced reference and s119 as the
+best blocked probe by worst-case low-clearance ratio/total distance. Neither
+candidate is promotable.
+```
+
+Metric evidence generated:
+
+```text
+artifacts/scenario_eval/clearance_lowratio_quantile_s119/suite_summary.json
+artifacts/clearance_readiness/clearance_lowratio_quantile_s119/clearance_readiness.json
+data/rl_finetune/clearance_lowratio_quantile_s119/residual_train_report.md
+```
+
+Validation commands run:
+
+```bash
+bash -n scripts/train_clearance_residual_policy.sh scripts/train_residual_policy.sh
+docker compose -f compose.sim.yaml run --rm runtime bash -lc 'source /opt/venvs/runtime/bin/activate && pytest -q tests/test_residual_policy_m619_m621.py tests/test_residual_scripts_m621.py'
+./scripts/train_clearance_residual_policy.sh --profile-name clearance_lowratio_quantile_s119 --output-dir data/rl_finetune/clearance_lowratio_quantile_s119 --initial-checkpoint data/rl_finetune/clearance_lowratio_gatepush_s111/residual_policy.pt --iterations 1 --population 2 --seed 119 --episodic-clearance-quantile 0.25 --episodic-clearance-quantile-gap-weight 6.0 --dry-run -- --no-zero-candidate
+./scripts/validate_policy_profiles.sh configs/policies/clearance_lowratio_quantile_s119.yaml --robot-config configs/robots/open_duck_mini_v2.yaml
+./scripts/evaluate_scenario_suite.sh --backend mujoco --profile clearance_lowratio_quantile_s119 --output-dir artifacts/scenario_eval/clearance_lowratio_quantile_s119 --json
+./scripts/analyze_clearance_readiness.sh --profile-name clearance_lowratio_quantile_s119 --suite-dir artifacts/scenario_eval/clearance_lowratio_quantile_s119 --output-dir artifacts/clearance_readiness/clearance_lowratio_quantile_s119 --json
+```
+
+No human viewer/follow-camera visual review was performed in this continuation.
+
 ## 2026-06-23 No-Zero Probe Continuation
 
 The residual trainer now exposes `--no-zero-candidate`, which prevents CEM from

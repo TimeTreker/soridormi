@@ -337,6 +337,8 @@ def evaluate_residual_bias_live(
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
     episodic_clearance_gap_weight: float = 0.0,
+    episodic_clearance_quantile: float = 0.25,
+    episodic_clearance_quantile_gap_weight: float = 0.0,
     worst_case_score_weight: float = 0.0,
     score_normalization: str = SCORE_NORMALIZATION_TOTAL,
 ) -> float:
@@ -355,6 +357,8 @@ def evaluate_residual_bias_live(
         episodic_clearance_weight=episodic_clearance_weight,
         episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
         episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+        episodic_clearance_quantile=episodic_clearance_quantile,
+        episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
         worst_case_score_weight=worst_case_score_weight,
         score_normalization=score_normalization,
     )
@@ -376,6 +380,8 @@ def evaluate_phase_contact_residual_live(
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
     episodic_clearance_gap_weight: float = 0.0,
+    episodic_clearance_quantile: float = 0.25,
+    episodic_clearance_quantile_gap_weight: float = 0.0,
     worst_case_score_weight: float = 0.0,
     score_normalization: str = SCORE_NORMALIZATION_TOTAL,
 ) -> float:
@@ -395,6 +401,8 @@ def evaluate_phase_contact_residual_live(
         episodic_clearance_weight=episodic_clearance_weight,
         episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
         episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+        episodic_clearance_quantile=episodic_clearance_quantile,
+        episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
         worst_case_score_weight=worst_case_score_weight,
         score_normalization=score_normalization,
     )
@@ -416,6 +424,8 @@ def evaluate_command_state_residual_live(
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
     episodic_clearance_gap_weight: float = 0.0,
+    episodic_clearance_quantile: float = 0.25,
+    episodic_clearance_quantile_gap_weight: float = 0.0,
     worst_case_score_weight: float = 0.0,
     score_normalization: str = SCORE_NORMALIZATION_TOTAL,
 ) -> float:
@@ -435,6 +445,8 @@ def evaluate_command_state_residual_live(
         episodic_clearance_weight=episodic_clearance_weight,
         episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
         episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+        episodic_clearance_quantile=episodic_clearance_quantile,
+        episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
         worst_case_score_weight=worst_case_score_weight,
         score_normalization=score_normalization,
     )
@@ -464,6 +476,8 @@ def _evaluate_residual_live(
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
     episodic_clearance_gap_weight: float = 0.0,
+    episodic_clearance_quantile: float = 0.25,
+    episodic_clearance_quantile_gap_weight: float = 0.0,
     worst_case_score_weight: float = 0.0,
     score_normalization: str = SCORE_NORMALIZATION_TOTAL,
 ) -> float:
@@ -483,6 +497,8 @@ def _evaluate_residual_live(
             episodic_clearance_weight=episodic_clearance_weight,
             episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
             episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+            episodic_clearance_quantile=episodic_clearance_quantile,
+            episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
             worst_case_score_weight=worst_case_score_weight,
             score_normalization=score_normalization,
         )["aggregate_score"]
@@ -505,10 +521,13 @@ def _evaluate_residual_live_breakdown(
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
     episodic_clearance_gap_weight: float = 0.0,
+    episodic_clearance_quantile: float = 0.25,
+    episodic_clearance_quantile_gap_weight: float = 0.0,
     worst_case_score_weight: float = 0.0,
     score_normalization: str = SCORE_NORMALIZATION_TOTAL,
 ) -> dict[str, Any]:
     score_normalization = _validate_score_normalization(score_normalization)
+    episodic_clearance_quantile = _validate_clearance_quantile(episodic_clearance_quantile)
     if not math.isfinite(float(worst_case_score_weight)) or not 0.0 <= float(worst_case_score_weight) <= 1.0:
         raise ValueError(
             "worst_case_score_weight must be finite and in [0, 1], "
@@ -540,6 +559,8 @@ def _evaluate_residual_live_breakdown(
             episodic_clearance_weight=episodic_clearance_weight,
             episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
             episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+            episodic_clearance_quantile=episodic_clearance_quantile,
+            episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
         )
         score = float(episode["score"])
         objective_score = _score_for_aggregation(episode, score_normalization=score_normalization)
@@ -574,6 +595,8 @@ def _evaluate_residual_live_breakdown(
             episodic_clearance_weight=episodic_clearance_weight,
             episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
             episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+            episodic_clearance_quantile=episodic_clearance_quantile,
+            episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
         )
         score = float(episode["score"])
         objective_score = _score_for_aggregation(episode, score_normalization=score_normalization)
@@ -628,6 +651,8 @@ def _evaluate_residual_episode(
     episodic_clearance_weight: float,
     episodic_low_clearance_penalty_weight: float,
     episodic_clearance_gap_weight: float = 0.0,
+    episodic_clearance_quantile: float = 0.25,
+    episodic_clearance_quantile_gap_weight: float = 0.0,
 ) -> float:
     return float(
         _evaluate_residual_episode_breakdown(
@@ -645,6 +670,8 @@ def _evaluate_residual_episode(
             episodic_clearance_weight=episodic_clearance_weight,
             episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
             episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+            episodic_clearance_quantile=episodic_clearance_quantile,
+            episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
         )["score"]
     )
 
@@ -665,7 +692,10 @@ def _evaluate_residual_episode_breakdown(
     episodic_clearance_weight: float,
     episodic_low_clearance_penalty_weight: float,
     episodic_clearance_gap_weight: float = 0.0,
+    episodic_clearance_quantile: float = 0.25,
+    episodic_clearance_quantile_gap_weight: float = 0.0,
 ) -> dict[str, Any]:
+    episodic_clearance_quantile = _validate_clearance_quantile(episodic_clearance_quantile)
     env = RlFineTuneEnv(
         profile=teacher_profile,
         host=host,
@@ -737,6 +767,8 @@ def _evaluate_residual_episode_breakdown(
         clearance_weight=episodic_clearance_weight,
         low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
         clearance_gap_weight=episodic_clearance_gap_weight,
+        clearance_quantile=episodic_clearance_quantile,
+        clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
     )
     clearance_total = completed * clearance_adjustment
     survival_bonus = 0.001 * completed
@@ -751,6 +783,8 @@ def _evaluate_residual_episode_breakdown(
         target_clearance=reward_config.target_swing_clearance,
         clearance_adjustment_per_step=clearance_adjustment,
         clearance_adjustment_total=clearance_total,
+        clearance_quantile=episodic_clearance_quantile,
+        clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
         survival_bonus=survival_bonus,
         segments=segment_breakdowns,
     )
@@ -768,6 +802,8 @@ def _build_episode_score_breakdown(
     clearance_adjustment_per_step: float,
     clearance_adjustment_total: float,
     survival_bonus: float,
+    clearance_quantile: float = 0.25,
+    clearance_quantile_gap_weight: float = 0.0,
     segments: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
@@ -780,6 +816,8 @@ def _build_episode_score_breakdown(
         "survival_bonus": float(survival_bonus),
         "episodic_clearance_adjustment_per_step": float(clearance_adjustment_per_step),
         "episodic_clearance_adjustment_total": float(clearance_adjustment_total),
+        "episodic_clearance_quantile": float(_validate_clearance_quantile(clearance_quantile)),
+        "episodic_clearance_quantile_gap_weight": float(clearance_quantile_gap_weight),
         "target_swing_clearance_m": float(target_clearance),
     }
     payload.update(_build_clearance_diagnostics(swing_clearances, target_clearance=target_clearance))
@@ -825,6 +863,9 @@ def _build_clearance_diagnostics(
         "min_swing_clearance_m": None,
         "max_swing_clearance_m": None,
         "low_clearance_ratio": None,
+        "p05_swing_clearance_m": None,
+        "p10_swing_clearance_m": None,
+        "p25_swing_clearance_m": None,
         "mean_clearance_gap_ratio": None,
         "median_clearance_gap_ratio": None,
         "max_clearance_gap_ratio": None,
@@ -839,6 +880,9 @@ def _build_clearance_diagnostics(
                 "min_swing_clearance_m": float(np.min(clearances)),
                 "max_swing_clearance_m": float(np.max(clearances)),
                 "low_clearance_ratio": float(np.mean(clearances < target)),
+                "p05_swing_clearance_m": float(np.quantile(clearances, 0.05)),
+                "p10_swing_clearance_m": float(np.quantile(clearances, 0.10)),
+                "p25_swing_clearance_m": float(np.quantile(clearances, 0.25)),
                 "mean_clearance_gap_ratio": float(np.mean(gap_ratios)),
                 "median_clearance_gap_ratio": float(np.median(gap_ratios)),
                 "max_clearance_gap_ratio": float(np.max(gap_ratios)),
@@ -854,18 +898,24 @@ def episodic_clearance_adjustment(
     clearance_weight: float,
     low_clearance_penalty_weight: float,
     clearance_gap_weight: float = 0.0,
+    clearance_quantile: float = 0.25,
+    clearance_quantile_gap_weight: float = 0.0,
 ) -> float:
     if not swing_clearances:
         return 0.0
     target = max(float(target_clearance), 1e-9)
+    quantile = _validate_clearance_quantile(clearance_quantile)
     values = np.asarray(swing_clearances, dtype=np.float64)
     median_ratio = float(np.median(values)) / target
     low_ratio = float(np.mean(values < target))
     gap_ratio = float(np.mean(np.maximum(target - values, 0.0) / target))
+    quantile_clearance = float(np.quantile(values, quantile))
+    quantile_gap_ratio = max(target - quantile_clearance, 0.0) / target
     return (
         float(clearance_weight) * median_ratio
         - float(low_clearance_penalty_weight) * low_ratio
         - float(clearance_gap_weight) * gap_ratio
+        - float(clearance_quantile_gap_weight) * quantile_gap_ratio
     )
 
 
@@ -926,6 +976,13 @@ def _validate_score_normalization(score_normalization: str) -> str:
             "score_normalization must be one of "
             f"{', '.join(SCORE_NORMALIZATION_CHOICES)}, got {score_normalization!r}"
         )
+    return value
+
+
+def _validate_clearance_quantile(clearance_quantile: float) -> float:
+    value = float(clearance_quantile)
+    if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+        raise ValueError(f"clearance quantile must be finite and in [0, 1], got {clearance_quantile!r}")
     return value
 
 
@@ -1385,6 +1442,8 @@ def train_residual_policy(
     episodic_clearance_weight: float = 0.0,
     episodic_low_clearance_penalty_weight: float = 0.0,
     episodic_clearance_gap_weight: float = 0.0,
+    episodic_clearance_quantile: float = 0.25,
+    episodic_clearance_quantile_gap_weight: float = 0.0,
     worst_case_score_weight: float = 0.0,
     score_normalization: str = SCORE_NORMALIZATION_TOTAL,
     initial_checkpoint: Path | None = None,
@@ -1409,6 +1468,15 @@ def train_residual_policy(
                 "episodic_clearance_gap_weight must be non-negative and finite, "
                 f"got {episodic_clearance_gap_weight!r}"
             )
+        if (
+            not math.isfinite(float(episodic_clearance_quantile_gap_weight))
+            or float(episodic_clearance_quantile_gap_weight) < 0.0
+        ):
+            raise ValueError(
+                "episodic_clearance_quantile_gap_weight must be non-negative and finite, "
+                f"got {episodic_clearance_quantile_gap_weight!r}"
+            )
+        episodic_clearance_quantile = _validate_clearance_quantile(episodic_clearance_quantile)
         teacher = PolicyProfile.load(teacher_profile)
         input_size = _profile_input_size(teacher)
         initial_parameters = (
@@ -1433,6 +1501,8 @@ def train_residual_policy(
                     episodic_clearance_weight=episodic_clearance_weight,
                     episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
                     episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    episodic_clearance_quantile=episodic_clearance_quantile,
+                    episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
                     worst_case_score_weight=worst_case_score_weight,
                     score_normalization=score_normalization,
                 ),
@@ -1461,6 +1531,8 @@ def train_residual_policy(
                     episodic_clearance_weight=episodic_clearance_weight,
                     episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
                     episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    episodic_clearance_quantile=episodic_clearance_quantile,
+                    episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
                     worst_case_score_weight=worst_case_score_weight,
                     score_normalization=score_normalization,
                 ),
@@ -1489,6 +1561,8 @@ def train_residual_policy(
                     episodic_clearance_weight=episodic_clearance_weight,
                     episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
                     episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    episodic_clearance_quantile=episodic_clearance_quantile,
+                    episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
                     worst_case_score_weight=worst_case_score_weight,
                     score_normalization=score_normalization,
                 ),
@@ -1517,6 +1591,8 @@ def train_residual_policy(
                     episodic_clearance_weight=episodic_clearance_weight,
                     episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
                     episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    episodic_clearance_quantile=episodic_clearance_quantile,
+                    episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
                     worst_case_score_weight=worst_case_score_weight,
                     score_normalization=score_normalization,
                 ),
@@ -1561,6 +1637,8 @@ def train_residual_policy(
                     episodic_clearance_weight=episodic_clearance_weight,
                     episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
                     episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    episodic_clearance_quantile=episodic_clearance_quantile,
+                    episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
                     worst_case_score_weight=worst_case_score_weight,
                     score_normalization=score_normalization,
                 )
@@ -1589,6 +1667,8 @@ def train_residual_policy(
         "episodic_clearance_weight": float(episodic_clearance_weight),
         "episodic_low_clearance_penalty_weight": float(episodic_low_clearance_penalty_weight),
         "episodic_clearance_gap_weight": float(episodic_clearance_gap_weight),
+        "episodic_clearance_quantile": float(episodic_clearance_quantile),
+        "episodic_clearance_quantile_gap_weight": float(episodic_clearance_quantile_gap_weight),
         "worst_case_score_weight": float(worst_case_score_weight),
         "score_normalization": score_normalization,
         "final_score_breakdown_requested": bool(final_score_breakdown),
@@ -1631,6 +1711,8 @@ def _write_report(path: Path, payload: dict[str, Any]) -> None:
         f"Residual scale: `{payload['residual_scale']}`",
         f"Worst-case score weight: `{payload.get('worst_case_score_weight', 0.0):.6g}`",
         f"Episodic clearance gap weight: `{payload.get('episodic_clearance_gap_weight', 0.0):.6g}`",
+        f"Episodic clearance quantile: `{payload.get('episodic_clearance_quantile', 0.25):.6g}`",
+        f"Episodic clearance quantile gap weight: `{payload.get('episodic_clearance_quantile_gap_weight', 0.0):.6g}`",
         f"Score normalization: `{payload.get('score_normalization', SCORE_NORMALIZATION_TOTAL)}`",
         f"Policy input size: `{payload.get('policy_input_size')}`",
         "",
@@ -2010,6 +2092,21 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Episode-level penalty weight for the mean normalized swing-clearance shortfall below target",
     )
     parser.add_argument(
+        "--episodic-clearance-quantile",
+        type=float,
+        default=0.25,
+        help=(
+            "Episode-level lower-tail swing-clearance quantile used by "
+            "--episodic-clearance-quantile-gap-weight"
+        ),
+    )
+    parser.add_argument(
+        "--episodic-clearance-quantile-gap-weight",
+        type=float,
+        default=0.0,
+        help="Episode-level penalty weight for the normalized target shortfall at the configured clearance quantile",
+    )
+    parser.add_argument(
         "--initial-checkpoint",
         type=Path,
         default=None,
@@ -2035,6 +2132,15 @@ def main() -> None:
         raise SystemExit("--worst-case-score-weight must be finite and in [0, 1]")
     if not math.isfinite(float(args.episodic_clearance_gap_weight)) or float(args.episodic_clearance_gap_weight) < 0.0:
         raise SystemExit("--episodic-clearance-gap-weight must be non-negative and finite")
+    try:
+        episodic_clearance_quantile = _validate_clearance_quantile(args.episodic_clearance_quantile)
+    except ValueError as exc:
+        raise SystemExit(f"--episodic-clearance-quantile invalid: {exc}") from exc
+    if (
+        not math.isfinite(float(args.episodic_clearance_quantile_gap_weight))
+        or float(args.episodic_clearance_quantile_gap_weight) < 0.0
+    ):
+        raise SystemExit("--episodic-clearance-quantile-gap-weight must be non-negative and finite")
     opt_cfg = ResidualOptimizationConfig(
         iterations=args.iterations,
         population=args.population,
@@ -2073,6 +2179,8 @@ def main() -> None:
             "episodic_clearance_weight": args.episodic_clearance_weight,
             "episodic_low_clearance_penalty_weight": args.episodic_low_clearance_penalty_weight,
             "episodic_clearance_gap_weight": args.episodic_clearance_gap_weight,
+            "episodic_clearance_quantile": episodic_clearance_quantile,
+            "episodic_clearance_quantile_gap_weight": args.episodic_clearance_quantile_gap_weight,
             "initial_checkpoint": None if args.initial_checkpoint is None else str(args.initial_checkpoint),
             "residual_scale": args.residual_scale,
             "residual_clip_abs": args.residual_clip_abs,
@@ -2099,6 +2207,8 @@ def main() -> None:
         episodic_clearance_weight=args.episodic_clearance_weight,
         episodic_low_clearance_penalty_weight=args.episodic_low_clearance_penalty_weight,
         episodic_clearance_gap_weight=args.episodic_clearance_gap_weight,
+        episodic_clearance_quantile=episodic_clearance_quantile,
+        episodic_clearance_quantile_gap_weight=args.episodic_clearance_quantile_gap_weight,
         worst_case_score_weight=args.worst_case_score_weight,
         score_normalization=args.score_normalization,
         initial_checkpoint=args.initial_checkpoint,

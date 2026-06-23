@@ -28,6 +28,10 @@ Options:
   --worst-case-score-weight W     Weakest-objective blend weight (default: 0.35).
   --episodic-clearance-gap-weight W
                                   Gap penalty for below-target clearance (default: 1.0).
+  --episodic-clearance-quantile Q
+                                  Lower-tail clearance quantile for quantile gap penalty (default: 0.25).
+  --episodic-clearance-quantile-gap-weight W
+                                  Gap penalty at the configured clearance quantile (default: 0.0).
   --force-profile                 Overwrite an existing generated profile.
   --dry-run                       Print resolved trainer config without connecting to sim.
   -h, --help                      Show this help.
@@ -47,6 +51,8 @@ seed="83"
 residual_scale="0.1"
 worst_case_score_weight="0.35"
 episodic_clearance_gap_weight="1.0"
+episodic_clearance_quantile="0.25"
+episodic_clearance_quantile_gap_weight="0.0"
 force_profile="0"
 dry_run="0"
 extra_args=()
@@ -97,6 +103,14 @@ while [ "$#" -gt 0 ]; do
       episodic_clearance_gap_weight="${2:?--episodic-clearance-gap-weight requires a value}"
       shift 2
       ;;
+    --episodic-clearance-quantile)
+      episodic_clearance_quantile="${2:?--episodic-clearance-quantile requires a value}"
+      shift 2
+      ;;
+    --episodic-clearance-quantile-gap-weight)
+      episodic_clearance_quantile_gap_weight="${2:?--episodic-clearance-quantile-gap-weight requires a value}"
+      shift 2
+      ;;
     --force-profile)
       force_profile="1"
       shift
@@ -138,6 +152,8 @@ cmd=(
   --episodic-clearance-weight 5
   --episodic-low-clearance-penalty-weight 4
   --episodic-clearance-gap-weight "${episodic_clearance_gap_weight}"
+  --episodic-clearance-quantile "${episodic_clearance_quantile}"
+  --episodic-clearance-quantile-gap-weight "${episodic_clearance_quantile_gap_weight}"
   --worst-case-score-weight "${worst_case_score_weight}"
   --score-normalization per_step
   --iterations "${iterations}"

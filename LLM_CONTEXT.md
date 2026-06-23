@@ -345,8 +345,34 @@ clearance wrapper and produced a different ONNX, but regressed training
 clearance metrics versus `s111`; reject it. `clearance_lowratio_suitecmd_s117`
 used the same flag with direct three-command suite objectives. It reduced curve
 low-clearance ratio slightly in the full suite, but regressed flat/start
-low-clearance ratio and total distance, so keep `s111` as the current best
-retained blocked candidate.
+low-clearance ratio and total distance, so reject it.
+
+The residual trainer also exposes a lower-tail clearance objective:
+`--episodic-clearance-quantile` and
+`--episodic-clearance-quantile-gap-weight`. It penalizes normalized shortfall at
+the chosen clearance quantile, intended to attack low-clearance ratio after p50
+clearance is already above target. `clearance_lowratio_quantile_s119`
+warm-started from `s111` with quantile `0.25` and gap weight `10`. It is a
+distinct ONNX and remains blocked by the G10 clearance gate. Treat it as a
+metric-only blocked candidate, not a promotion. It improves worst-case
+low-clearance ratio and total distance versus `s111`, but worsens flat
+low-clearance ratio.
+
+```text
+clearance_lowratio_quantile_s119:
+  initial checkpoint: clearance_lowratio_gatepush_s111
+  residual_scale: 0.1
+  suite: 0/3, BLOCKED_BY_CLEARANCE_GATE
+  total distance ~= 1.938m
+  flat:       p50 ~= 0.01658m, low-clearance ratio ~= 0.408
+  start-stop: p50 ~= 0.01632m, low-clearance ratio ~= 0.421
+  curve:      p50 ~= 0.01516m, low-clearance ratio ~= 0.473
+  falls:      none
+```
+
+Current best depends on ranking: `s111` remains the cleaner balanced reference
+because flat is better, while `s119` is the best blocked probe by worst-case
+low-clearance ratio and total distance. Neither is promotable.
 
 clearance evidence commands:
 
