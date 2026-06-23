@@ -386,6 +386,18 @@ observation[101]
   - curve: distance 0.46317m, p50 clearance 0.01451m, low-clearance ratio 0.662
   - result: best retained candidate so far, but still blocked by low-clearance
     ratio in all scenarios and curve p50 clearance
+- [x] Train and evaluate a multi-command low-ratio continuation
+  - candidate: `clearance_lowratio_multicmd_s107`
+  - initial checkpoint: `clearance_lowratio_refine_s103`
+  - model/profile contract: PASS
+  - required scenario suite: FAIL, 0/3 under current clearance gate
+  - flat: distance 0.63908m, p50 clearance 0.01614m, low-clearance ratio 0.420
+  - start-stop: distance 0.78692m, p50 clearance 0.01578m, low-clearance ratio 0.425
+  - curve: distance 0.47653m, p50 clearance 0.01456m, low-clearance ratio 0.519
+  - rejected probe: `clearance_lowratio_curvepush_s109` slightly improved curve
+    p50 but worsened total distance and max low-clearance ratio
+  - result: best retained candidate so far, but still blocked by low-clearance
+    ratio in all scenarios and curve p50 clearance
 - [ ] Focus the next training stage on start/stop and turning clearance, or
   acquire a higher-clearance teacher
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
@@ -415,9 +427,9 @@ teacher comparison: PASS (relative behavior only; does not replace clearance)
 > but failed the `0.015 m` swing-clearance gate. A direct human follow-camera
 > inspection remains pending before any promotion.
 > The current best retained residual candidate is
-> `clearance_lowratio_refine_s103`: it improves total distance to `1.838 m`,
-> gets flat and start/stop p50 clearance over the `0.015 m` threshold, and
-> reduces max low-clearance ratio to `0.662`, but it remains blocked because
+> `clearance_lowratio_multicmd_s107`: it improves total distance to `1.903 m`,
+> keeps flat and start/stop p50 clearance over the `0.015 m` threshold, and
+> reduces max low-clearance ratio to `0.519`, but it remains blocked because
 > all scenarios still exceed the `0.25` low-clearance-ratio limit and curve p50
 > clearance remains below target.
 >
@@ -760,10 +772,11 @@ depends on the hardware safety gate.
 
 ## Immediate execution plan
 
-1. Use `clearance_lowratio_refine_s103` as the best retained residual reference
+1. Use `clearance_lowratio_multicmd_s107` as the best retained residual reference
    and reject `clearance_gap_sequence_restored_s83`, `clearance_lowratio_sequence_s97`,
-   and `clearance_lowratio_turnfocus_s101` for promotion.
-2. Train the next clearance candidate to beat `s103` on low-clearance ratio and
+   `clearance_lowratio_turnfocus_s101`, and `clearance_lowratio_curvepush_s109`
+   for promotion.
+2. Train the next clearance candidate to beat `s107` on low-clearance ratio and
    p50 clearance in all three scenarios, not only movement distance.
 3. Run the candidate with `--viewer --follow-camera` for human visual review.
 4. Record swing-clearance evidence for all three scenarios.
@@ -830,9 +843,12 @@ movement and flat p50 clearance. The first low-ratio continuation,
 `clearance_lowratio_sequence_s97`, improved curve clearance and total distance.
 The stricter turn-focused `clearance_lowratio_turnfocus_s101` re-exported the
 same ONNX as `s97`, so it is a rejected probe. The tighter-search continuation
-`clearance_lowratio_refine_s103` is the best retained blocked candidate so far.
-The next run should compare against `s103` before consuming full G10 evidence
-time.
+`clearance_lowratio_refine_s103` improved distance and max low-clearance ratio.
+The multi-command continuation `clearance_lowratio_multicmd_s107` is the best
+retained blocked candidate so far. The curve-focused
+`clearance_lowratio_curvepush_s109` slightly improved curve p50 but regressed
+distance and max low-clearance ratio, so it is a rejected probe. The next run
+should compare against `s107` before consuming full G10 evidence time.
 
 Host wrapper:
 

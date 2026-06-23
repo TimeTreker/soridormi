@@ -278,11 +278,10 @@ failed probe, not a retained candidate.
 
 `clearance_lowratio_refine_s103` warm-started from `s97` with the retained
 `residual_scale 0.1`, tighter CEM search (`initial_std 0.12`), and moderately
-stronger clearance/low-ratio pressure. Treat `s103` as the current best
-retained clearance-refinement candidate, not promotable. It improves total
-distance, start-stop p50, curve p50, and max low-clearance ratio over `s97`,
-but still fails the G10 low-clearance-ratio gate in all three scenarios and
-misses curve p50 clearance.
+stronger clearance/low-ratio pressure. It improved total distance, start-stop
+p50, curve p50, and max low-clearance ratio over `s97`, but remained blocked
+by the G10 low-clearance-ratio gate in all three scenarios and missed curve p50
+clearance.
 
 ```text
 clearance_lowratio_refine_s103:
@@ -294,6 +293,28 @@ clearance_lowratio_refine_s103:
   start-stop: p50 ~= 0.01559m, low-clearance ratio ~= 0.456
   curve:      p50 ~= 0.01451m, low-clearance ratio ~= 0.662
 ```
+
+`clearance_lowratio_multicmd_s107` warm-started from `s103` with multiple
+fixed-command objectives and stronger low-clearance pressure. Treat `s107` as
+the current best retained clearance-refinement candidate, not promotable. It
+improves total distance, start-stop low-clearance ratio, curve p50 clearance,
+and max low-clearance ratio over `s103`, but still fails the G10 low-clearance
+ratio gate in all three scenarios and misses curve p50 clearance.
+
+```text
+clearance_lowratio_multicmd_s107:
+  initial checkpoint: clearance_lowratio_refine_s103
+  residual_scale: 0.1
+  suite: 0/3, BLOCKED_BY_CLEARANCE_GATE
+  total distance ~= 1.903m
+  flat:       p50 ~= 0.01614m, low-clearance ratio ~= 0.420
+  start-stop: p50 ~= 0.01578m, low-clearance ratio ~= 0.425
+  curve:      p50 ~= 0.01456m, low-clearance ratio ~= 0.519
+```
+
+`clearance_lowratio_curvepush_s109` was a curve-focused continuation from
+`s107`. It slightly improved curve p50 but worsened total distance and max
+low-clearance ratio, so treat it as a rejected probe.
 
 clearance evidence commands:
 
