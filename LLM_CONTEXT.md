@@ -436,6 +436,12 @@ to `~0.294`. A broader `command_state_mlp` lower-tail run,
 `clearance_cmdmlp_lowtail_s205`, also regressed live curve to `~0.338`; a tiny
 micro-reflex on the `s201` near miss, `clearance_s201_microreflex_s207`,
 regressed curve to `~0.282`.
+`clearance_s143_cmdtail_stack_s211` trained a command-contact/phase lift actor
+directly on `s143` with aggressive lower-tail penalties, but the full suite
+regressed max low-clearance ratio to `~0.391`. `clearance_s143_scenariogate_stack_s213`
+used more scenario-shaped training and improved start-stop enough to pass that
+scenario (`~0.249` low-clearance ratio), but it regressed flat to `~0.295` and
+curve to `~0.318`, so it is also rejected.
 
 Two implementation findings are now preserved for later M10 work:
 `skill_execution.plan_shell_exports()` no longer forces
@@ -482,7 +488,9 @@ Do not promote the intermediate or rejected probes:
 `clearance_s177_tail_stack_s201`, and
 `clearance_s177_tail_stack_s203_scale026215`,
 `clearance_cmdmlp_lowtail_s205`, and
-`clearance_s201_microreflex_s207`.
+`clearance_s201_microreflex_s207`, plus direct-`s143` continuation probes
+`clearance_s143_cmdtail_stack_s211` and
+`clearance_s143_scenariogate_stack_s213`.
 
 Current best retained candidate: `clearance_liftscale_stack_s143_step090_offset005`.
 It is still blocked by the G10 low-clearance-ratio gate in all three scenarios;

@@ -112,6 +112,16 @@ Useful findings:
 - `clearance_s201_microreflex_s207` applied a much smaller reflex to the `s201`
   near miss. It also regressed curve to low-clearance ratio `~0.282`, p50
   `~0.01882 m`, distance `~0.694 m`, and no fall.
+- `clearance_s143_cmdtail_stack_s211` trained directly on `s143` with a
+  command-contact/phase lift actor and aggressive lower-tail penalties. It
+  preserved no-fall behavior and total distance, but regressed the full-suite
+  max low-clearance ratio to `~0.391`, so reject it.
+- `clearance_s143_scenariogate_stack_s213` used scenario-shaped training
+  lengths/commands against `s143`. It passed start-stop (`~0.249`
+  low-clearance ratio) and improved total distance to `~2.171 m`, but regressed
+  flat to `~0.295` and curve to `~0.318`, so reject it. This run tightened the
+  reference-comparison helper: a candidate cannot be retained if any required
+  scenario regresses low-clearance ratio versus `s143`.
 
 Next best work:
 

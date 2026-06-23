@@ -418,7 +418,9 @@ rerun, or reflex wrapper.
 Use the clearance readiness helper as both an absolute G10 gate and a retained
 best comparison. For exploratory candidates that are still expected to miss
 G10, omit `--strict` and require improvement against `s143` before retaining the
-candidate:
+candidate. Reference improvement means preserving movement/no-fall behavior,
+improving at least one low-clearance bottleneck, and not regressing the
+low-clearance ratio in any required scenario:
 
 ```bash
 ./scripts/analyze_clearance_readiness.sh \

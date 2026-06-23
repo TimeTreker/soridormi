@@ -507,6 +507,12 @@ observation[101]
   - `clearance_s201_microreflex_s207`: tiny swing-clearance reflex on the
     `s201` near miss; live curve regressed to low-clearance ratio `~0.282`,
     p50 `~0.01882 m`, distance `~0.694 m`, and no fall.
+  - `clearance_s143_cmdtail_stack_s211`: direct `s143` command-contact/phase
+    lift continuation with aggressive lower-tail penalties; live full suite
+    regressed max low-clearance ratio to `~0.391`.
+  - `clearance_s143_scenariogate_stack_s213`: scenario-shaped direct `s143`
+    continuation; start-stop passed (`~0.249` low-clearance ratio), but flat
+    regressed to `~0.295` and curve regressed to `~0.318`, so it is not retained.
   - result: keep `clearance_liftscale_stack_s143_step090_offset005` as the best
     balanced retained full-suite reference. The remaining blocker is lower-tail
     startup/turning clearance, not p50 clearance or falls.

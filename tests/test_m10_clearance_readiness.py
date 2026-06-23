@@ -231,6 +231,70 @@ def test_readiness_compares_candidate_against_retained_reference(tmp_path: Path)
     assert "Candidate beats reference: yes" in rendered
 
 
+def test_readiness_rejects_reference_comparison_with_per_scenario_low_ratio_regression(
+    tmp_path: Path,
+) -> None:
+    candidate_suite = tmp_path / "candidate_suite"
+    reference_suite = tmp_path / "reference_suite"
+    scenarios = (
+        "flat_walk_varied_speed_v1",
+        "start_stop_velocity_ramp_v1",
+        "curve_turn_walk_v1",
+    )
+    reference_low_ratios = {
+        "flat_walk_varied_speed_v1": 0.268,
+        "start_stop_velocity_ramp_v1": 0.257,
+        "curve_turn_walk_v1": 0.308,
+    }
+    candidate_low_ratios = {
+        "flat_walk_varied_speed_v1": 0.295,
+        "start_stop_velocity_ramp_v1": 0.249,
+        "curve_turn_walk_v1": 0.318,
+    }
+    for scenario_id in scenarios:
+        _write_suite_report(
+            reference_suite,
+            scenario_id,
+            _report_payload(
+                scenario_id=scenario_id,
+                ok=False,
+                swing_p50=0.018,
+                low_ratio=reference_low_ratios[scenario_id],
+                forward_distance_m=0.70,
+            ),
+        )
+        _write_suite_report(
+            candidate_suite,
+            scenario_id,
+            _report_payload(
+                scenario_id=scenario_id,
+                ok=candidate_low_ratios[scenario_id] <= 0.25,
+                swing_p50=0.019,
+                low_ratio=candidate_low_ratios[scenario_id],
+                forward_distance_m=0.72,
+            ),
+        )
+
+    report = build_m10_clearance_readiness(
+        profile="candidate",
+        suite_dir=candidate_suite,
+        reference_profile="reference",
+        reference_suite_dir=reference_suite,
+    )
+
+    assert report.reference_comparison is not None
+    assert report.candidate_beats_reference is False
+    assert report.reference_comparison["no_low_clearance_ratio_regressions"] is False
+    assert {
+        item["scenario_id"]
+        for item in report.reference_comparison["low_clearance_ratio_regressions"]
+    } == {"flat_walk_varied_speed_v1", "curve_turn_walk_v1"}
+    assert any(
+        "regresses low-clearance ratio" in blocker
+        for blocker in report.reference_comparison["blockers"]
+    )
+
+
 def test_readiness_can_require_reference_improvement_from_cli(tmp_path: Path) -> None:
     candidate_suite = tmp_path / "candidate_suite"
     reference_suite = tmp_path / "reference_suite"

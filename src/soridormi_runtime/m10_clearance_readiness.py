@@ -412,6 +412,7 @@ def _reference_comparison(
     *,
     candidate_summary: Mapping[str, Any],
     reference_summary: Mapping[str, Any],
+    scenario_comparisons: Sequence[Mapping[str, Any]] = (),
     distance_floor_ratio: float = 0.90,
 ) -> dict[str, Any]:
     candidate_low_excess = _as_float(candidate_summary.get("max_low_clearance_ratio_excess"))
@@ -434,15 +435,44 @@ def _reference_comparison(
     else:
         movement_preserved = False
 
-    clearance_better = candidate_clearance_failed < reference_clearance_failed
-    if not clearance_better and low_excess_delta is not None:
-        clearance_better = low_excess_delta < -1e-9
-    if not clearance_better and low_excess_delta is not None and abs(low_excess_delta) <= 1e-9:
-        clearance_better = p50_margin_delta is not None and p50_margin_delta > 1e-9
+    low_ratio_regressions: list[dict[str, Any]] = []
+    low_ratio_improvements: list[dict[str, Any]] = []
+    for item in scenario_comparisons:
+        delta_low_ratio = _as_float(item.get("delta_low_clearance_ratio"))
+        if delta_low_ratio is None:
+            continue
+        scenario_id = str(item.get("scenario_id") or "")
+        if delta_low_ratio > 1e-9:
+            low_ratio_regressions.append(
+                {
+                    "scenario_id": scenario_id,
+                    "delta_low_clearance_ratio": delta_low_ratio,
+                }
+            )
+        elif delta_low_ratio < -1e-9:
+            low_ratio_improvements.append(
+                {
+                    "scenario_id": scenario_id,
+                    "delta_low_clearance_ratio": delta_low_ratio,
+                }
+            )
+
+    no_low_ratio_regressions = not low_ratio_regressions
+    clearance_better = False
+    if no_low_ratio_regressions:
+        clearance_better = bool(low_ratio_improvements)
+        if not clearance_better and candidate_clearance_failed < reference_clearance_failed:
+            clearance_better = low_excess_delta is not None and low_excess_delta <= 1e-9
+        if not clearance_better and low_excess_delta is not None and low_excess_delta < -1e-9:
+            clearance_better = True
+        if not clearance_better and low_excess_delta is not None and abs(low_excess_delta) <= 1e-9:
+            clearance_better = p50_margin_delta is not None and p50_margin_delta > 1e-9
 
     blockers: list[str] = []
     if not clearance_better:
         blockers.append("candidate does not improve the G10 clearance bottleneck versus reference")
+    if low_ratio_regressions:
+        blockers.append("candidate regresses low-clearance ratio in one or more required scenarios")
     if not no_new_falls:
         blockers.append("candidate adds falls versus reference")
     if not movement_preserved:
@@ -453,6 +483,7 @@ def _reference_comparison(
     return {
         "candidate_beats_reference": clearance_better and no_new_falls and movement_preserved,
         "clearance_bottleneck_improved": clearance_better,
+        "no_low_clearance_ratio_regressions": no_low_ratio_regressions,
         "no_new_falls": no_new_falls,
         "movement_distance_preserved": movement_preserved,
         "distance_floor_ratio": distance_floor_ratio,
@@ -461,6 +492,8 @@ def _reference_comparison(
         "delta_total_forward_distance_m": distance_delta,
         "candidate_clearance_failed_count": candidate_clearance_failed,
         "reference_clearance_failed_count": reference_clearance_failed,
+        "low_clearance_ratio_improvements": low_ratio_improvements,
+        "low_clearance_ratio_regressions": low_ratio_regressions,
         "blockers": blockers,
     }
 
@@ -538,6 +571,7 @@ def build_m10_clearance_readiness(
         reference_comparison = _reference_comparison(
             candidate_summary=summary_metrics,
             reference_summary=reference_summary_metrics,
+            scenario_comparisons=scenario_comparisons,
         )
         candidate_beats_reference = bool(reference_comparison.get("candidate_beats_reference"))
     return M10ClearanceReadinessReport(
