@@ -410,10 +410,25 @@ startup-tail continuation probes through
 `clearance_s201_microreflex_s207` also did not pass. The closest
 curve-only live result was `clearance_s177_tail_stack_s201` at low-clearance
 ratio `~0.257`, p50 `~0.01846 m`, distance `~0.717 m`, and no fall; it still
-missed the `0.25` ratio gate and should not be promoted. The next training
-attempt should target lower-tail/startup clearance through a new teacher or
-reward/actor redesign rather than another narrow profile scalar sweep, MLP
-rerun, or reflex wrapper.
+missed the `0.25` ratio gate and should not be promoted.
+
+`scripts/train_residual_policy.sh` now also supports per-objective
+low-clearance regression penalties with repeated
+`--reference-low-clearance-ratio` values and
+`--low-clearance-regression-penalty-weight`. Use one ratio per training command
+or sequence objective. The final score breakdown records the reference ratio
+and regression penalty for each objective, which helps reject candidates before
+the full suite.
+
+Guarded probes from `s143` through `clearance_s143_refguard_stack_s215`,
+`clearance_s143_gateguard_stack_s217`, and
+`clearance_s143_curvegateguard_stack_s219` did not finish M10. `s217` and
+`s219` each passed start-stop (`~0.245` and `~0.241` low-clearance ratio), but
+both regressed flat and curve against `s143`; `s219` regressed curve to
+`~0.340`. Do not promote these profiles. The next training attempt should
+target lower-tail/startup clearance through a new teacher or reward/actor
+redesign rather than another narrow profile scalar sweep, MLP rerun, reflex
+wrapper, or low-clearance-ratio penalty retune.
 
 Use the clearance readiness helper as both an absolute G10 gate and a retained
 best comparison. For exploratory candidates that are still expected to miss

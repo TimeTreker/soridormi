@@ -76,6 +76,9 @@ clearance_s177_tail_stack_s201
 clearance_s177_tail_stack_s203_scale026215
 clearance_cmdmlp_lowtail_s205
 clearance_s201_microreflex_s207
+clearance_s143_refguard_stack_s215
+clearance_s143_gateguard_stack_s217
+clearance_s143_curvegateguard_stack_s219
 ```
 
 Useful findings:
@@ -122,6 +125,19 @@ Useful findings:
   flat to `~0.295` and curve to `~0.318`, so reject it. This run tightened the
   reference-comparison helper: a candidate cannot be retained if any required
   scenario regresses low-clearance ratio versus `s143`.
+- `clearance_s143_refguard_stack_s215` added training-time low-clearance
+  reference penalties against the retained `s143` ratios. It preserved no-fall
+  behavior and total distance (`~2.159 m`), but full-suite low-clearance ratios
+  were flat `~0.295`, start-stop `~0.271`, and curve `~0.327`; reject it
+  because all three regressed against `s143`.
+- `clearance_s143_gateguard_stack_s217` used the same trainer guard with all
+  references set to the G10 `0.25` gate. It passed start-stop (`~0.245`) with
+  no fall and total distance `~2.167 m`, but flat `~0.271` and curve `~0.325`
+  failed and regressed against `s143`; reject it.
+- `clearance_s143_curvegateguard_stack_s219` corrected the curve training
+  sequence to constant yaw from step one. It passed start-stop (`~0.241`) with
+  no fall and total distance `~2.166 m`, but flat `~0.275` and curve `~0.340`
+  failed and regressed against `s143`; reject it.
 
 Next best work:
 

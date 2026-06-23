@@ -513,11 +513,25 @@ observation[101]
   - `clearance_s143_scenariogate_stack_s213`: scenario-shaped direct `s143`
     continuation; start-stop passed (`~0.249` low-clearance ratio), but flat
     regressed to `~0.295` and curve regressed to `~0.318`, so it is not retained.
+  - `clearance_s143_refguard_stack_s215`: direct `s143` continuation with
+    per-objective reference low-clearance-ratio penalties set to the retained
+    `s143` scenario ratios; full suite remained 0/3 and regressed all three
+    low-clearance ratios (`flat ~0.295`, `start-stop ~0.271`,
+    `curve ~0.327`).
+  - `clearance_s143_gateguard_stack_s217`: same direct `s143` continuation, but
+    with all per-objective low-clearance references set to the G10 `0.25` gate;
+    start-stop passed at `~0.245`, but flat `~0.271` and curve `~0.325`
+    failed and regressed against `s143`.
+  - `clearance_s143_curvegateguard_stack_s219`: corrected the curve training
+    objective to constant yaw (`0.09,0,0.12`) matching the suite command;
+    start-stop passed at `~0.241`, but flat `~0.275` and curve `~0.340`
+    failed and regressed against `s143`.
   - result: keep `clearance_liftscale_stack_s143_step090_offset005` as the best
     balanced retained full-suite reference. The remaining blocker is lower-tail
     startup/turning clearance, not p50 clearance or falls.
 - [ ] Focus the next training stage on a broader clearance redesign, or
-  acquire a higher-clearance teacher
+  acquire a higher-clearance teacher; do not continue narrow scalar/reflex/guard
+  penalty retunes as the primary M10 path
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
 
 **Gate G10:**

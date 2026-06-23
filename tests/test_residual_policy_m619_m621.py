@@ -36,6 +36,7 @@ from soridormi_runtime.train_residual_policy import (
     _build_episode_score_breakdown,
     _build_episode_segment_breakdown,
     _normalize_training_commands,
+    _normalize_reference_low_clearance_ratios,
     _normalize_training_sequences,
     _parse_training_command,
     _parse_training_command_spec,
@@ -56,6 +57,7 @@ from soridormi_runtime.train_residual_policy import (
     contact_phase_lift_residual_action,
     contact_phase_lift_residual_features,
     episodic_clearance_adjustment,
+    low_clearance_regression_adjustment,
     optimize_residual_bias,
     optimize_command_state_residual,
     optimize_command_state_mlp_residual,
@@ -598,10 +600,41 @@ def test_episodic_clearance_quantile_gap_weight_targets_lower_tail() -> None:
     assert tail_passing == pytest.approx(0.0)
 
 
+def test_low_clearance_regression_adjustment_penalizes_reference_regression() -> None:
+    penalty = low_clearance_regression_adjustment(
+        [0.010, 0.012, 0.018, 0.020],
+        target_clearance=0.015,
+        reference_low_clearance_ratio=0.25,
+        penalty_weight=10.0,
+    )
+    no_regression = low_clearance_regression_adjustment(
+        [0.010, 0.018, 0.020, 0.022],
+        target_clearance=0.015,
+        reference_low_clearance_ratio=0.25,
+        penalty_weight=10.0,
+    )
+
+    assert penalty == pytest.approx(-2.5)
+    assert no_regression == pytest.approx(0.0)
+
+
 def test_validate_clearance_quantile_rejects_out_of_range_values() -> None:
     assert _validate_clearance_quantile(0.25) == pytest.approx(0.25)
     with pytest.raises(ValueError, match=r"\[0, 1\]"):
         _validate_clearance_quantile(1.1)
+
+
+def test_normalize_reference_low_clearance_ratios_matches_objective_count() -> None:
+    assert _normalize_reference_low_clearance_ratios(
+        [0.26, 0.31],
+        objective_count=2,
+    ) == [pytest.approx(0.26), pytest.approx(0.31)]
+    assert _normalize_reference_low_clearance_ratios(None, objective_count=2) == [None, None]
+
+    with pytest.raises(ValueError, match="match the number of training objectives"):
+        _normalize_reference_low_clearance_ratios([0.26], objective_count=2)
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        _normalize_reference_low_clearance_ratios([1.2], objective_count=1)
 
 
 def test_parse_training_command_builds_velocity_command() -> None:

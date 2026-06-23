@@ -75,6 +75,33 @@ curve:      p50 ~= 0.01781m, low-clearance ratio ~= 0.308
 falls:      none
 ```
 
+Recent guarded M10 probes:
+
+```text
+clearance_s143_refguard_stack_s215:
+  reference ratios were set to s143's scenario ratios
+  result: 0/3 pass; flat ~= 0.295, start-stop ~= 0.271, curve ~= 0.327
+  verdict: reject; regresses all three low-clearance ratios vs s143
+
+clearance_s143_gateguard_stack_s217:
+  reference ratios were set to the G10 gate target 0.25
+  result: 1/3 pass; start-stop ~= 0.245 passed, flat ~= 0.271, curve ~= 0.325
+  verdict: reject; flat/curve regress vs s143
+
+clearance_s143_curvegateguard_stack_s219:
+  used the same gate target with a constant-yaw curve sequence
+  result: 1/3 pass; start-stop ~= 0.241 passed, flat ~= 0.275, curve ~= 0.340
+  verdict: reject; flat/curve regress vs s143
+```
+
+Do not promote `s215`, `s217`, or `s219`. The trainer can now penalize
+per-objective low-clearance-ratio regression with
+`--reference-low-clearance-ratio` and
+`--low-clearance-regression-penalty-weight`, but these probes show that this
+loss alone does not finish M10. Keep `s143` as the retained blocked reference
+and move the next attempt toward a broader clearance redesign or a
+higher-clearance teacher.
+
 Initial candidate checkpoint:
 
 ```text
@@ -442,6 +469,12 @@ regressed max low-clearance ratio to `~0.391`. `clearance_s143_scenariogate_stac
 used more scenario-shaped training and improved start-stop enough to pass that
 scenario (`~0.249` low-clearance ratio), but it regressed flat to `~0.295` and
 curve to `~0.318`, so it is also rejected.
+Guarded direct-`s143` probes `clearance_s143_refguard_stack_s215`,
+`clearance_s143_gateguard_stack_s217`, and
+`clearance_s143_curvegateguard_stack_s219` added per-objective low-clearance
+ratio penalties. They preserved no-fall behavior, and `s217`/`s219` each
+passed start-stop, but they regressed flat and curve against `s143`; do not
+retain them.
 
 Two implementation findings are now preserved for later M10 work:
 `skill_execution.plan_shell_exports()` no longer forces
@@ -490,7 +523,10 @@ Do not promote the intermediate or rejected probes:
 `clearance_cmdmlp_lowtail_s205`, and
 `clearance_s201_microreflex_s207`, plus direct-`s143` continuation probes
 `clearance_s143_cmdtail_stack_s211` and
-`clearance_s143_scenariogate_stack_s213`.
+`clearance_s143_scenariogate_stack_s213`, plus guarded probes
+`clearance_s143_refguard_stack_s215`,
+`clearance_s143_gateguard_stack_s217`, and
+`clearance_s143_curvegateguard_stack_s219`.
 
 Current best retained candidate: `clearance_liftscale_stack_s143_step090_offset005`.
 It is still blocked by the G10 low-clearance-ratio gate in all three scenarios;

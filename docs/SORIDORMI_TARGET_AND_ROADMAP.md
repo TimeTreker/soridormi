@@ -255,11 +255,16 @@ is about `0.268`, start-stop about `0.257`, and curve about `0.308` against a
 postprocess, or continuation probes documented in
 `docs/SORIDORMI_EXECUTION_ROADMAP.md`. Post-`s143` action-scale, command-ramp,
 pre-roll, clearance-reflex, and startup-tail probes through
-`clearance_s201_microreflex_s207` also remained blocked. The next M10 work must
-use a broader clearance redesign or higher-clearance teacher to reduce
-lower-tail/startup low-clearance ratios without sacrificing no-fall behavior or
-strong movement distance, followed by quantitative clearance readiness and a
-direct human follow-camera visual pass before any broader promotion.
+`clearance_s201_microreflex_s207` also remained blocked. Later guarded
+low-clearance-ratio probes `clearance_s143_refguard_stack_s215`,
+`clearance_s143_gateguard_stack_s217`, and
+`clearance_s143_curvegateguard_stack_s219` likewise remained blocked; `s217`
+and `s219` passed start-stop but regressed flat and curve against `s143`. The
+next M10 work must use a broader clearance redesign or higher-clearance teacher
+to reduce lower-tail/startup low-clearance ratios without sacrificing no-fall
+behavior or strong movement distance, followed by quantitative clearance
+readiness and a direct human follow-camera visual pass before any broader
+promotion.
 
 ### M11A: task-agent contract foundation
 
