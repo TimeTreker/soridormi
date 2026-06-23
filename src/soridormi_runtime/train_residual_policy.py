@@ -29,6 +29,9 @@ RESIDUAL_ACTOR_CONSTANT = "constant"
 RESIDUAL_ACTOR_PHASE_CONTACT = "phase_contact"
 RESIDUAL_ACTOR_COMMAND_STATE = "command_state"
 RESIDUAL_ACTOR_COMMAND_STATE_MLP = "command_state_mlp"
+RESIDUAL_ACTOR_CONTACT_PHASE_LIFT = "contact_phase_lift"
+RESIDUAL_ACTOR_CONTACT_PHASE_HARMONIC_LIFT = "contact_phase_harmonic_lift"
+RESIDUAL_ACTOR_COMMAND_CONTACT_PHASE_LIFT = "command_contact_phase_lift"
 PHASE_CONTACT_OBSERVATION_START = 97
 PHASE_CONTACT_OBSERVATION_STOP = 101
 PHASE_CONTACT_FEATURE_SIZE = 5
@@ -48,6 +51,17 @@ COMMAND_STATE_MLP_PARAMETER_SIZE = (
     + COMMAND_STATE_MLP_HIDDEN_SIZE
     + COMMAND_STATE_MLP_HIDDEN_SIZE * COMMAND_STATE_OUTPUT_SIZE
 )
+CONTACT_PHASE_LIFT_FEATURE_SIZE = 3
+CONTACT_PHASE_LIFT_ACTION_INDICES = COMMAND_STATE_ACTION_INDICES
+CONTACT_PHASE_LIFT_PARAMETER_SIZE = 2 * CONTACT_PHASE_LIFT_FEATURE_SIZE * 3
+CONTACT_PHASE_HARMONIC_LIFT_FEATURE_SIZE = 7
+CONTACT_PHASE_HARMONIC_LIFT_ACTION_INDICES = COMMAND_STATE_ACTION_INDICES
+CONTACT_PHASE_HARMONIC_LIFT_PARAMETER_SIZE = 2 * CONTACT_PHASE_HARMONIC_LIFT_FEATURE_SIZE * 3
+COMMAND_CONTACT_PHASE_LIFT_COMMAND_SLICE = slice(101, 104)
+COMMAND_CONTACT_PHASE_LIFT_INPUT_SIZE = 104
+COMMAND_CONTACT_PHASE_LIFT_FEATURE_SIZE = 12
+COMMAND_CONTACT_PHASE_LIFT_ACTION_INDICES = COMMAND_STATE_ACTION_INDICES
+COMMAND_CONTACT_PHASE_LIFT_PARAMETER_SIZE = 2 * COMMAND_CONTACT_PHASE_LIFT_FEATURE_SIZE * 3
 
 
 @dataclass(frozen=True)
@@ -179,6 +193,41 @@ def optimize_command_state_mlp_residual(
         parameter_size=COMMAND_STATE_MLP_PARAMETER_SIZE,
         config=config,
         initial_mean=initial_mean,
+    )
+
+
+def optimize_contact_phase_lift_residual(
+    evaluate: Callable[[np.ndarray], float],
+    *,
+    config: ResidualOptimizationConfig | None = None,
+) -> ResidualOptimizationResult:
+    """Optimize a compact swing-leg lift actor from contacts and gait phase."""
+    return _optimize_parameter_vector(evaluate, parameter_size=CONTACT_PHASE_LIFT_PARAMETER_SIZE, config=config)
+
+
+def optimize_command_contact_phase_lift_residual(
+    evaluate: Callable[[np.ndarray], float],
+    *,
+    config: ResidualOptimizationConfig | None = None,
+) -> ResidualOptimizationResult:
+    """Optimize swing-leg lift conditioned on desired command, contacts, and gait phase."""
+    return _optimize_parameter_vector(
+        evaluate,
+        parameter_size=COMMAND_CONTACT_PHASE_LIFT_PARAMETER_SIZE,
+        config=config,
+    )
+
+
+def optimize_contact_phase_harmonic_lift_residual(
+    evaluate: Callable[[np.ndarray], float],
+    *,
+    config: ResidualOptimizationConfig | None = None,
+) -> ResidualOptimizationResult:
+    """Optimize a swing-leg lift actor with phase harmonics."""
+    return _optimize_parameter_vector(
+        evaluate,
+        parameter_size=CONTACT_PHASE_HARMONIC_LIFT_PARAMETER_SIZE,
+        config=config,
     )
 
 
@@ -321,6 +370,164 @@ def command_state_mlp_residual_action(
     return action
 
 
+def contact_phase_lift_residual_features(observation: np.ndarray | list[float]) -> tuple[np.ndarray, np.ndarray]:
+    obs = np.asarray(observation, dtype=np.float32).reshape(-1)
+    if obs.size < PHASE_CONTACT_OBSERVATION_STOP:
+        raise ValueError(
+            "contact_phase_lift actor requires an observation with at least "
+            f"{PHASE_CONTACT_OBSERVATION_STOP} values, got {obs.size}"
+        )
+    left_contact, right_contact, phase_cos, phase_sin = obs[COMMAND_STATE_CONTACT_PHASE_SLICE]
+    left_swing = float(np.clip(1.0 - float(left_contact), 0.0, 1.0))
+    right_swing = float(np.clip(1.0 - float(right_contact), 0.0, 1.0))
+    left_features = np.asarray(
+        [left_swing, left_swing * float(phase_cos), left_swing * float(phase_sin)],
+        dtype=np.float32,
+    )
+    right_features = np.asarray(
+        [right_swing, right_swing * float(phase_cos), right_swing * float(phase_sin)],
+        dtype=np.float32,
+    )
+    return left_features, right_features
+
+
+def contact_phase_lift_residual_action(
+    observation: np.ndarray | list[float],
+    parameters: np.ndarray | list[float],
+) -> np.ndarray:
+    values = np.asarray(parameters, dtype=np.float32).reshape(2, CONTACT_PHASE_LIFT_FEATURE_SIZE, 3)
+    left_features, right_features = contact_phase_lift_residual_features(observation)
+    left_action = np.tanh(left_features @ values[0]).astype(np.float32)
+    right_action = np.tanh(right_features @ values[1]).astype(np.float32)
+    action = np.zeros(ACTION_SIZE, dtype=np.float32)
+    action[2:5] = left_action
+    action[11:14] = right_action
+    return action
+
+
+def _command_contact_phase_lift_leg_features(
+    swing: float,
+    phase_cos: float,
+    phase_sin: float,
+    desired_vx: float,
+    desired_vy: float,
+    desired_yaw: float,
+) -> np.ndarray:
+    return np.asarray(
+        [
+            swing,
+            swing * phase_cos,
+            swing * phase_sin,
+            swing * desired_vx,
+            swing * desired_vx * phase_cos,
+            swing * desired_vx * phase_sin,
+            swing * desired_vy,
+            swing * desired_vy * phase_cos,
+            swing * desired_vy * phase_sin,
+            swing * desired_yaw,
+            swing * desired_yaw * phase_cos,
+            swing * desired_yaw * phase_sin,
+        ],
+        dtype=np.float32,
+    )
+
+
+def command_contact_phase_lift_residual_features(
+    observation: np.ndarray | list[float],
+) -> tuple[np.ndarray, np.ndarray]:
+    obs = np.asarray(observation, dtype=np.float32).reshape(-1)
+    if obs.size < COMMAND_CONTACT_PHASE_LIFT_INPUT_SIZE:
+        raise ValueError(
+            "command_contact_phase_lift actor requires a 104D policy input with appended command, "
+            f"got {obs.size} values"
+        )
+    left_contact, right_contact, phase_cos, phase_sin = obs[COMMAND_STATE_CONTACT_PHASE_SLICE]
+    desired_vx, desired_vy, desired_yaw = obs[COMMAND_CONTACT_PHASE_LIFT_COMMAND_SLICE]
+    left_swing = float(np.clip(1.0 - float(left_contact), 0.0, 1.0))
+    right_swing = float(np.clip(1.0 - float(right_contact), 0.0, 1.0))
+    left_features = _command_contact_phase_lift_leg_features(
+        left_swing,
+        float(phase_cos),
+        float(phase_sin),
+        float(desired_vx),
+        float(desired_vy),
+        float(desired_yaw),
+    )
+    right_features = _command_contact_phase_lift_leg_features(
+        right_swing,
+        float(phase_cos),
+        float(phase_sin),
+        float(desired_vx),
+        float(desired_vy),
+        float(desired_yaw),
+    )
+    return left_features, right_features
+
+
+def command_contact_phase_lift_residual_action(
+    observation: np.ndarray | list[float],
+    parameters: np.ndarray | list[float],
+) -> np.ndarray:
+    values = np.asarray(parameters, dtype=np.float32).reshape(2, COMMAND_CONTACT_PHASE_LIFT_FEATURE_SIZE, 3)
+    left_features, right_features = command_contact_phase_lift_residual_features(observation)
+    left_action = np.tanh(left_features @ values[0]).astype(np.float32)
+    right_action = np.tanh(right_features @ values[1]).astype(np.float32)
+    action = np.zeros(ACTION_SIZE, dtype=np.float32)
+    action[2:5] = left_action
+    action[11:14] = right_action
+    return action
+
+
+def contact_phase_harmonic_lift_residual_features(
+    observation: np.ndarray | list[float],
+) -> tuple[np.ndarray, np.ndarray]:
+    obs = np.asarray(observation, dtype=np.float32).reshape(-1)
+    if obs.size < PHASE_CONTACT_OBSERVATION_STOP:
+        raise ValueError(
+            "contact_phase_harmonic_lift actor requires an observation with at least "
+            f"{PHASE_CONTACT_OBSERVATION_STOP} values, got {obs.size}"
+        )
+    left_contact, right_contact, phase_cos, phase_sin = obs[COMMAND_STATE_CONTACT_PHASE_SLICE]
+    cos1 = float(phase_cos)
+    sin1 = float(phase_sin)
+    cos2 = cos1 * cos1 - sin1 * sin1
+    sin2 = 2.0 * cos1 * sin1
+    cos3 = cos1 * cos2 - sin1 * sin2
+    sin3 = sin1 * cos2 + cos1 * sin2
+    left_swing = float(np.clip(1.0 - float(left_contact), 0.0, 1.0))
+    right_swing = float(np.clip(1.0 - float(right_contact), 0.0, 1.0))
+
+    def leg_features(swing: float) -> np.ndarray:
+        return np.asarray(
+            [
+                swing,
+                swing * cos1,
+                swing * sin1,
+                swing * cos2,
+                swing * sin2,
+                swing * cos3,
+                swing * sin3,
+            ],
+            dtype=np.float32,
+        )
+
+    return leg_features(left_swing), leg_features(right_swing)
+
+
+def contact_phase_harmonic_lift_residual_action(
+    observation: np.ndarray | list[float],
+    parameters: np.ndarray | list[float],
+) -> np.ndarray:
+    values = np.asarray(parameters, dtype=np.float32).reshape(2, CONTACT_PHASE_HARMONIC_LIFT_FEATURE_SIZE, 3)
+    left_features, right_features = contact_phase_harmonic_lift_residual_features(observation)
+    left_action = np.tanh(left_features @ values[0]).astype(np.float32)
+    right_action = np.tanh(right_features @ values[1]).astype(np.float32)
+    action = np.zeros(ACTION_SIZE, dtype=np.float32)
+    action[2:5] = left_action
+    action[11:14] = right_action
+    return action
+
+
 def evaluate_residual_bias_live(
     residual: np.ndarray,
     *,
@@ -457,6 +664,30 @@ def evaluate_command_state_mlp_residual_live(
     **kwargs: Any,
 ) -> float:
     actor = lambda observation: command_state_mlp_residual_action(observation, parameters)
+    return _evaluate_residual_live(actor, **kwargs)
+
+
+def evaluate_contact_phase_lift_residual_live(
+    parameters: np.ndarray,
+    **kwargs: Any,
+) -> float:
+    actor = lambda observation: contact_phase_lift_residual_action(observation, parameters)
+    return _evaluate_residual_live(actor, **kwargs)
+
+
+def evaluate_command_contact_phase_lift_residual_live(
+    parameters: np.ndarray,
+    **kwargs: Any,
+) -> float:
+    actor = lambda observation: command_contact_phase_lift_residual_action(observation, parameters)
+    return _evaluate_residual_live(actor, **kwargs)
+
+
+def evaluate_contact_phase_harmonic_lift_residual_live(
+    parameters: np.ndarray,
+    **kwargs: Any,
+) -> float:
+    actor = lambda observation: contact_phase_harmonic_lift_residual_action(observation, parameters)
     return _evaluate_residual_live(actor, **kwargs)
 
 
@@ -1337,6 +1568,304 @@ def export_command_state_mlp_residual_policy(
         )
 
 
+def export_contact_phase_lift_residual_policy(
+    parameters: np.ndarray | list[float],
+    *,
+    output_onnx: Path,
+    output_checkpoint: Path | None = None,
+    input_size: int = 101,
+) -> None:
+    torch = _import_torch()
+    values = np.asarray(parameters, dtype=np.float32).reshape(2, CONTACT_PHASE_LIFT_FEATURE_SIZE, 3)
+
+    class ContactPhaseLiftResidualPolicy(torch.nn.Module):  # type: ignore[name-defined]
+        def __init__(self) -> None:
+            super().__init__()
+            self.register_buffer("weights", torch.as_tensor(values, dtype=torch.float32))
+            projection = torch.zeros((CONTACT_PHASE_LIFT_PARAMETER_SIZE // CONTACT_PHASE_LIFT_FEATURE_SIZE, ACTION_SIZE), dtype=torch.float32)
+            for source_index, action_index in enumerate(CONTACT_PHASE_LIFT_ACTION_INDICES):
+                projection[source_index, action_index] = 1.0
+            self.register_buffer("projection", projection)
+
+        def forward(self, obs: Any) -> Any:  # noqa: ANN401
+            left_contact = obs[:, 97:98]
+            right_contact = obs[:, 98:99]
+            phase_cos = obs[:, 99:100]
+            phase_sin = obs[:, 100:101]
+            left_swing = torch.clamp(1.0 - left_contact, min=0.0, max=1.0)
+            right_swing = torch.clamp(1.0 - right_contact, min=0.0, max=1.0)
+            left_features = torch.cat(
+                (left_swing, left_swing * phase_cos, left_swing * phase_sin),
+                dim=1,
+            )
+            right_features = torch.cat(
+                (right_swing, right_swing * phase_cos, right_swing * phase_sin),
+                dim=1,
+            )
+            left_action = torch.tanh(left_features @ self.weights[0])
+            right_action = torch.tanh(right_features @ self.weights[1])
+            return torch.cat((left_action, right_action), dim=1) @ self.projection
+
+    resolved_input_size = int(input_size)
+    if resolved_input_size < PHASE_CONTACT_OBSERVATION_STOP:
+        raise ValueError(
+            f"contact_phase_lift residual policy requires input_size >= {PHASE_CONTACT_OBSERVATION_STOP}"
+        )
+    module = ContactPhaseLiftResidualPolicy()
+    module.eval()
+    output_onnx.parent.mkdir(parents=True, exist_ok=True)
+    dummy = torch.zeros((1, resolved_input_size), dtype=torch.float32)
+    torch.onnx.export(
+        module,
+        dummy,
+        str(output_onnx),
+        input_names=["obs"],
+        output_names=["continuous_actions"],
+        dynamic_axes={"obs": {0: "batch"}, "continuous_actions": {0: "batch"}},
+        opset_version=17,
+        do_constant_folding=True,
+        dynamo=False,
+    )
+    if output_checkpoint is not None:
+        output_checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {
+                "schema_version": 1,
+                "model_kind": "contact_phase_lift_residual_policy",
+                "parameters": values.reshape(CONTACT_PHASE_LIFT_PARAMETER_SIZE).tolist(),
+                "feature_names": ["swing", "swing_phase_cos", "swing_phase_sin"],
+                "observation_slice": [
+                    PHASE_CONTACT_OBSERVATION_START,
+                    PHASE_CONTACT_OBSERVATION_STOP,
+                ],
+                "observation_size": resolved_input_size,
+                "action_size": ACTION_SIZE,
+                "controlled_action_indices": list(CONTACT_PHASE_LIFT_ACTION_INDICES),
+                "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            },
+            output_checkpoint,
+        )
+
+
+def export_command_contact_phase_lift_residual_policy(
+    parameters: np.ndarray | list[float],
+    *,
+    output_onnx: Path,
+    output_checkpoint: Path | None = None,
+    input_size: int = 101,
+) -> None:
+    torch = _import_torch()
+    values = np.asarray(parameters, dtype=np.float32).reshape(2, COMMAND_CONTACT_PHASE_LIFT_FEATURE_SIZE, 3)
+
+    class CommandContactPhaseLiftResidualPolicy(torch.nn.Module):  # type: ignore[name-defined]
+        def __init__(self) -> None:
+            super().__init__()
+            self.register_buffer("weights", torch.as_tensor(values, dtype=torch.float32))
+            projection = torch.zeros(
+                (len(COMMAND_CONTACT_PHASE_LIFT_ACTION_INDICES), ACTION_SIZE),
+                dtype=torch.float32,
+            )
+            for source_index, action_index in enumerate(COMMAND_CONTACT_PHASE_LIFT_ACTION_INDICES):
+                projection[source_index, action_index] = 1.0
+            self.register_buffer("projection", projection)
+
+        def _leg_features(self, swing: Any, phase_cos: Any, phase_sin: Any, command: Any) -> Any:  # noqa: ANN401
+            desired_vx = command[:, 0:1]
+            desired_vy = command[:, 1:2]
+            desired_yaw = command[:, 2:3]
+            return torch.cat(
+                (
+                    swing,
+                    swing * phase_cos,
+                    swing * phase_sin,
+                    swing * desired_vx,
+                    swing * desired_vx * phase_cos,
+                    swing * desired_vx * phase_sin,
+                    swing * desired_vy,
+                    swing * desired_vy * phase_cos,
+                    swing * desired_vy * phase_sin,
+                    swing * desired_yaw,
+                    swing * desired_yaw * phase_cos,
+                    swing * desired_yaw * phase_sin,
+                ),
+                dim=1,
+            )
+
+        def forward(self, obs: Any) -> Any:  # noqa: ANN401
+            left_contact = obs[:, 97:98]
+            right_contact = obs[:, 98:99]
+            phase_cos = obs[:, 99:100]
+            phase_sin = obs[:, 100:101]
+            command = obs[:, 101:104]
+            left_swing = torch.clamp(1.0 - left_contact, min=0.0, max=1.0)
+            right_swing = torch.clamp(1.0 - right_contact, min=0.0, max=1.0)
+            left_features = self._leg_features(left_swing, phase_cos, phase_sin, command)
+            right_features = self._leg_features(right_swing, phase_cos, phase_sin, command)
+            left_action = torch.tanh(left_features @ self.weights[0])
+            right_action = torch.tanh(right_features @ self.weights[1])
+            return torch.cat((left_action, right_action), dim=1) @ self.projection
+
+    resolved_input_size = int(input_size)
+    if resolved_input_size < COMMAND_CONTACT_PHASE_LIFT_INPUT_SIZE:
+        raise ValueError(
+            "command_contact_phase_lift residual policy requires input_size >= "
+            f"{COMMAND_CONTACT_PHASE_LIFT_INPUT_SIZE}"
+        )
+    module = CommandContactPhaseLiftResidualPolicy()
+    module.eval()
+    output_onnx.parent.mkdir(parents=True, exist_ok=True)
+    dummy = torch.zeros((1, resolved_input_size), dtype=torch.float32)
+    torch.onnx.export(
+        module,
+        dummy,
+        str(output_onnx),
+        input_names=["obs"],
+        output_names=["continuous_actions"],
+        dynamic_axes={"obs": {0: "batch"}, "continuous_actions": {0: "batch"}},
+        opset_version=17,
+        do_constant_folding=True,
+        dynamo=False,
+    )
+    if output_checkpoint is not None:
+        output_checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {
+                "schema_version": 1,
+                "model_kind": "command_contact_phase_lift_residual_policy",
+                "parameters": values.reshape(COMMAND_CONTACT_PHASE_LIFT_PARAMETER_SIZE).tolist(),
+                "feature_names": [
+                    "swing",
+                    "swing_phase_cos",
+                    "swing_phase_sin",
+                    "swing_vx",
+                    "swing_vx_phase_cos",
+                    "swing_vx_phase_sin",
+                    "swing_vy",
+                    "swing_vy_phase_cos",
+                    "swing_vy_phase_sin",
+                    "swing_yaw",
+                    "swing_yaw_phase_cos",
+                    "swing_yaw_phase_sin",
+                ],
+                "contact_phase_observation_slice": [
+                    PHASE_CONTACT_OBSERVATION_START,
+                    PHASE_CONTACT_OBSERVATION_STOP,
+                ],
+                "command_observation_slice": [
+                    COMMAND_CONTACT_PHASE_LIFT_COMMAND_SLICE.start,
+                    COMMAND_CONTACT_PHASE_LIFT_COMMAND_SLICE.stop,
+                ],
+                "observation_size": resolved_input_size,
+                "action_size": ACTION_SIZE,
+                "controlled_action_indices": list(COMMAND_CONTACT_PHASE_LIFT_ACTION_INDICES),
+                "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            },
+            output_checkpoint,
+        )
+
+
+def export_contact_phase_harmonic_lift_residual_policy(
+    parameters: np.ndarray | list[float],
+    *,
+    output_onnx: Path,
+    output_checkpoint: Path | None = None,
+    input_size: int = 101,
+) -> None:
+    torch = _import_torch()
+    values = np.asarray(parameters, dtype=np.float32).reshape(2, CONTACT_PHASE_HARMONIC_LIFT_FEATURE_SIZE, 3)
+
+    class ContactPhaseHarmonicLiftResidualPolicy(torch.nn.Module):  # type: ignore[name-defined]
+        def __init__(self) -> None:
+            super().__init__()
+            self.register_buffer("weights", torch.as_tensor(values, dtype=torch.float32))
+            projection = torch.zeros(
+                (len(CONTACT_PHASE_HARMONIC_LIFT_ACTION_INDICES), ACTION_SIZE),
+                dtype=torch.float32,
+            )
+            for source_index, action_index in enumerate(CONTACT_PHASE_HARMONIC_LIFT_ACTION_INDICES):
+                projection[source_index, action_index] = 1.0
+            self.register_buffer("projection", projection)
+
+        def _leg_features(self, swing: Any, phase_cos: Any, phase_sin: Any) -> Any:  # noqa: ANN401
+            phase_cos_2 = phase_cos * phase_cos - phase_sin * phase_sin
+            phase_sin_2 = 2.0 * phase_cos * phase_sin
+            phase_cos_3 = phase_cos * phase_cos_2 - phase_sin * phase_sin_2
+            phase_sin_3 = phase_sin * phase_cos_2 + phase_cos * phase_sin_2
+            return torch.cat(
+                (
+                    swing,
+                    swing * phase_cos,
+                    swing * phase_sin,
+                    swing * phase_cos_2,
+                    swing * phase_sin_2,
+                    swing * phase_cos_3,
+                    swing * phase_sin_3,
+                ),
+                dim=1,
+            )
+
+        def forward(self, obs: Any) -> Any:  # noqa: ANN401
+            left_contact = obs[:, 97:98]
+            right_contact = obs[:, 98:99]
+            phase_cos = obs[:, 99:100]
+            phase_sin = obs[:, 100:101]
+            left_swing = torch.clamp(1.0 - left_contact, min=0.0, max=1.0)
+            right_swing = torch.clamp(1.0 - right_contact, min=0.0, max=1.0)
+            left_features = self._leg_features(left_swing, phase_cos, phase_sin)
+            right_features = self._leg_features(right_swing, phase_cos, phase_sin)
+            left_action = torch.tanh(left_features @ self.weights[0])
+            right_action = torch.tanh(right_features @ self.weights[1])
+            return torch.cat((left_action, right_action), dim=1) @ self.projection
+
+    resolved_input_size = int(input_size)
+    if resolved_input_size < PHASE_CONTACT_OBSERVATION_STOP:
+        raise ValueError(
+            f"contact_phase_harmonic_lift residual policy requires input_size >= {PHASE_CONTACT_OBSERVATION_STOP}"
+        )
+    module = ContactPhaseHarmonicLiftResidualPolicy()
+    module.eval()
+    output_onnx.parent.mkdir(parents=True, exist_ok=True)
+    dummy = torch.zeros((1, resolved_input_size), dtype=torch.float32)
+    torch.onnx.export(
+        module,
+        dummy,
+        str(output_onnx),
+        input_names=["obs"],
+        output_names=["continuous_actions"],
+        dynamic_axes={"obs": {0: "batch"}, "continuous_actions": {0: "batch"}},
+        opset_version=17,
+        do_constant_folding=True,
+        dynamo=False,
+    )
+    if output_checkpoint is not None:
+        output_checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        torch.save(
+            {
+                "schema_version": 1,
+                "model_kind": "contact_phase_harmonic_lift_residual_policy",
+                "parameters": values.reshape(CONTACT_PHASE_HARMONIC_LIFT_PARAMETER_SIZE).tolist(),
+                "feature_names": [
+                    "swing",
+                    "swing_phase_cos",
+                    "swing_phase_sin",
+                    "swing_phase_cos_2",
+                    "swing_phase_sin_2",
+                    "swing_phase_cos_3",
+                    "swing_phase_sin_3",
+                ],
+                "observation_slice": [
+                    PHASE_CONTACT_OBSERVATION_START,
+                    PHASE_CONTACT_OBSERVATION_STOP,
+                ],
+                "observation_size": resolved_input_size,
+                "action_size": ACTION_SIZE,
+                "controlled_action_indices": list(CONTACT_PHASE_HARMONIC_LIFT_ACTION_INDICES),
+                "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            },
+            output_checkpoint,
+        )
+
+
 def load_residual_initial_parameters(
     checkpoint_path: Path,
     *,
@@ -1355,6 +1884,9 @@ def load_residual_initial_parameters(
         RESIDUAL_ACTOR_CONSTANT: ACTION_SIZE,
         RESIDUAL_ACTOR_PHASE_CONTACT: PHASE_CONTACT_PARAMETER_SIZE,
         RESIDUAL_ACTOR_COMMAND_STATE: COMMAND_STATE_PARAMETER_SIZE,
+        RESIDUAL_ACTOR_CONTACT_PHASE_LIFT: CONTACT_PHASE_LIFT_PARAMETER_SIZE,
+        RESIDUAL_ACTOR_CONTACT_PHASE_HARMONIC_LIFT: CONTACT_PHASE_HARMONIC_LIFT_PARAMETER_SIZE,
+        RESIDUAL_ACTOR_COMMAND_CONTACT_PHASE_LIFT: COMMAND_CONTACT_PHASE_LIFT_PARAMETER_SIZE,
     }[actor_kind]
     return source.reshape(expected)
 
@@ -1375,6 +1907,15 @@ def _residual_source_from_parameters(
     if actor_kind == RESIDUAL_ACTOR_COMMAND_STATE_MLP:
         shaped = values.reshape(COMMAND_STATE_MLP_PARAMETER_SIZE)
         return lambda observation: command_state_mlp_residual_action(observation, shaped)
+    if actor_kind == RESIDUAL_ACTOR_CONTACT_PHASE_LIFT:
+        shaped = values.reshape(CONTACT_PHASE_LIFT_PARAMETER_SIZE)
+        return lambda observation: contact_phase_lift_residual_action(observation, shaped)
+    if actor_kind == RESIDUAL_ACTOR_CONTACT_PHASE_HARMONIC_LIFT:
+        shaped = values.reshape(CONTACT_PHASE_HARMONIC_LIFT_PARAMETER_SIZE)
+        return lambda observation: contact_phase_harmonic_lift_residual_action(observation, shaped)
+    if actor_kind == RESIDUAL_ACTOR_COMMAND_CONTACT_PHASE_LIFT:
+        shaped = values.reshape(COMMAND_CONTACT_PHASE_LIFT_PARAMETER_SIZE)
+        return lambda observation: command_contact_phase_lift_residual_action(observation, shaped)
     raise ValueError(f"unsupported residual actor kind: {actor_kind}")
 
 
@@ -1403,7 +1944,12 @@ def _write_residual_profile(
         input_shape=input_shape,
         output_shape=[1, 14],
     )
-    payload.setdefault("metadata", {})["generated_by"] = "soridormi_m619_residual_rl"
+    metadata = payload.setdefault("metadata", {})
+    metadata["generated_by"] = "soridormi_m619_residual_rl"
+    metadata["training_output"] = str(Path(residual_onnx_path).parent)
+    metadata["promotion_status"] = "blocked_clearance_gate"
+    for stale_key in ("initial_checkpoint", "scenario_suite", "clearance_readiness"):
+        metadata.pop(stale_key, None)
     payload["model"]["kind"] = "residual_onnx"
     payload["residual_policy"] = {
         "teacher_profile": teacher_profile,
@@ -1600,6 +2146,96 @@ def train_residual_policy(
                 initial_mean=initial_parameters,
             )
             export_command_state_mlp_residual_policy(
+                optimization.best_residual,
+                output_onnx=onnx_path,
+                output_checkpoint=checkpoint_path,
+                input_size=input_size,
+            )
+        elif actor_kind == RESIDUAL_ACTOR_CONTACT_PHASE_LIFT:
+            optimization = optimize_contact_phase_lift_residual(
+                lambda parameters: evaluate_contact_phase_lift_residual_live(
+                    parameters,
+                    teacher_profile=teacher_profile,
+                    steps=steps_per_episode,
+                    residual_scale=residual_scale,
+                    residual_clip_abs=residual_clip_abs,
+                    final_action_clip_abs=final_action_clip_abs,
+                    reward_config=reward_config,
+                    host=host,
+                    port=port,
+                    training_commands=training_commands,
+                    training_sequences=training_sequences,
+                    episodic_clearance_weight=episodic_clearance_weight,
+                    episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+                    episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    episodic_clearance_quantile=episodic_clearance_quantile,
+                    episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
+                    worst_case_score_weight=worst_case_score_weight,
+                    score_normalization=score_normalization,
+                ),
+                config=optimization_config,
+            )
+            export_contact_phase_lift_residual_policy(
+                optimization.best_residual,
+                output_onnx=onnx_path,
+                output_checkpoint=checkpoint_path,
+                input_size=input_size,
+            )
+        elif actor_kind == RESIDUAL_ACTOR_CONTACT_PHASE_HARMONIC_LIFT:
+            optimization = optimize_contact_phase_harmonic_lift_residual(
+                lambda parameters: evaluate_contact_phase_harmonic_lift_residual_live(
+                    parameters,
+                    teacher_profile=teacher_profile,
+                    steps=steps_per_episode,
+                    residual_scale=residual_scale,
+                    residual_clip_abs=residual_clip_abs,
+                    final_action_clip_abs=final_action_clip_abs,
+                    reward_config=reward_config,
+                    host=host,
+                    port=port,
+                    training_commands=training_commands,
+                    training_sequences=training_sequences,
+                    episodic_clearance_weight=episodic_clearance_weight,
+                    episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+                    episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    episodic_clearance_quantile=episodic_clearance_quantile,
+                    episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
+                    worst_case_score_weight=worst_case_score_weight,
+                    score_normalization=score_normalization,
+                ),
+                config=optimization_config,
+            )
+            export_contact_phase_harmonic_lift_residual_policy(
+                optimization.best_residual,
+                output_onnx=onnx_path,
+                output_checkpoint=checkpoint_path,
+                input_size=input_size,
+            )
+        elif actor_kind == RESIDUAL_ACTOR_COMMAND_CONTACT_PHASE_LIFT:
+            optimization = optimize_command_contact_phase_lift_residual(
+                lambda parameters: evaluate_command_contact_phase_lift_residual_live(
+                    parameters,
+                    teacher_profile=teacher_profile,
+                    steps=steps_per_episode,
+                    residual_scale=residual_scale,
+                    residual_clip_abs=residual_clip_abs,
+                    final_action_clip_abs=final_action_clip_abs,
+                    reward_config=reward_config,
+                    host=host,
+                    port=port,
+                    training_commands=training_commands,
+                    training_sequences=training_sequences,
+                    episodic_clearance_weight=episodic_clearance_weight,
+                    episodic_low_clearance_penalty_weight=episodic_low_clearance_penalty_weight,
+                    episodic_clearance_gap_weight=episodic_clearance_gap_weight,
+                    episodic_clearance_quantile=episodic_clearance_quantile,
+                    episodic_clearance_quantile_gap_weight=episodic_clearance_quantile_gap_weight,
+                    worst_case_score_weight=worst_case_score_weight,
+                    score_normalization=score_normalization,
+                ),
+                config=optimization_config,
+            )
+            export_command_contact_phase_lift_residual_policy(
                 optimization.best_residual,
                 output_onnx=onnx_path,
                 output_checkpoint=checkpoint_path,
@@ -2010,6 +2646,9 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             RESIDUAL_ACTOR_PHASE_CONTACT,
             RESIDUAL_ACTOR_COMMAND_STATE,
             RESIDUAL_ACTOR_COMMAND_STATE_MLP,
+            RESIDUAL_ACTOR_CONTACT_PHASE_LIFT,
+            RESIDUAL_ACTOR_CONTACT_PHASE_HARMONIC_LIFT,
+            RESIDUAL_ACTOR_COMMAND_CONTACT_PHASE_LIFT,
         ],
         default=RESIDUAL_ACTOR_CONSTANT,
         help="Residual actor architecture",

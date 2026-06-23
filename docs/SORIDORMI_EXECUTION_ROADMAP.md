@@ -416,6 +416,34 @@ observation[101]
     regressed flat/start low-clearance ratio and total distance
   - result: best retained candidate so far, but still blocked by low-clearance
     ratio in all scenarios
+- [x] Add stacked residual-teacher support and compact swing-lift actors
+  - `residual_onnx` teachers now compose through `make_runtime_policy`, so a
+    residual profile can safely train on top of another residual profile.
+  - added `contact_phase_lift`, `command_contact_phase_lift`, and
+    `contact_phase_harmonic_lift` residual actor families for bounded swing-leg
+    clearance refinement.
+- [x] Train and evaluate stacked contact/phase lift candidates
+  - `clearance_contactlift_stack_s121`: blocked, but improved total distance to
+    `~2.028 m`, kept all p50 clearances above `0.015 m`, and reduced max
+    low-clearance ratio to `~0.460`.
+  - `clearance_contactlift_stack_s123`: blocked; improved flat/start ratios and
+    total distance, but regressed curve to `~0.480`; do not promote.
+  - `clearance_cmdlift_stack_s125`: command-conditioned training probe; did not
+    beat `s121`/`s127` on curve; do not promote.
+- [x] Train and evaluate explicit residual-scale lift candidates
+  - `clearance_liftscale_stack_s127`: current best retained blocked candidate.
+  - required scenario suite: FAIL, 0/3 under current clearance gate
+  - flat: distance 0.72664m, p50 clearance 0.01742m, low-clearance ratio 0.353
+  - start-stop: distance 0.88341m, p50 clearance 0.01716m, low-clearance ratio
+    0.345
+  - curve: distance 0.57878m, p50 clearance 0.01616m, low-clearance ratio 0.409
+  - total distance: 2.18883m; no falls
+  - `clearance_liftscale_stack_s129`: blocked; improved flat ratio to `~0.318`
+    but regressed start-stop and curve versus `s127`; do not promote.
+- [x] Add and smoke-test a harmonic swing-lift actor
+  - `clearance_harmonic_stack_s131`: blocked training probe; did not beat `s127`
+    in training lower-tail metrics, so it did not receive full G10 evidence.
+  - result: keep `s127` as the best retained blocked candidate.
 - [ ] Focus the next training stage on start/stop and turning clearance, or
   acquire a higher-clearance teacher
 - [ ] **DECISION REQUIRED:** Clearance refinement or experimental M10.0?
@@ -445,9 +473,9 @@ teacher comparison: PASS (relative behavior only; does not replace clearance)
 > but failed the `0.015 m` swing-clearance gate. A direct human follow-camera
 > inspection remains pending before any promotion.
 > The current best retained residual candidate is
-> `clearance_lowratio_gatepush_s111`: it improves total distance to `1.928 m`,
+> `clearance_liftscale_stack_s127`: it improves total distance to `2.189 m`,
 > gets all three scenario p50 clearances over the `0.015 m` threshold, and
-> reduces max low-clearance ratio to `0.496`, but it remains blocked because
+> reduces max low-clearance ratio to `0.409`, but it remains blocked because
 > all scenarios still exceed the `0.25` low-clearance-ratio limit.
 >
 > **Clearance readiness:** Generate with `./scripts/analyze_clearance_readiness.sh --profile-name context_stage1_three_scenario_10ep_e80 --output-dir artifacts/clearance_readiness/context_stage1_three_scenario_10ep_e80`.
@@ -889,6 +917,19 @@ at q=0.25 and produced a distinct ONNX from `s111`. It remains `0/3` and
 regresses flat low-clearance ratio (`~0.408` versus `~0.388`), so it is not a
 clean replacement. The next run should compare against both `s111` and `s119`
 before consuming full G10 evidence time.
+
+2026-06-23 update: stacked residual teachers are now supported, so residual
+profiles can train on top of prior residual profiles. The best retained blocked
+candidate is `clearance_liftscale_stack_s127`, trained from
+`clearance_contactlift_stack_s121` with actor kind `contact_phase_lift` and
+explicit `residual_scale=0.16`. It remains `0/3` and
+`BLOCKED_BY_CLEARANCE_GATE`, with no falls, but improves total distance to
+`~2.189 m`, all p50 clearances above `0.015 m`, and worst-case low-clearance
+ratio to `~0.409`. Reject `clearance_contactlift_stack_s123`,
+`clearance_cmdlift_stack_s125`, `clearance_liftscale_stack_s129`, and
+`clearance_harmonic_stack_s131` for promotion. The next run should beat `s127`
+on low-clearance ratio in all three scenarios while preserving its movement
+distance.
 
 Host wrapper:
 

@@ -63,6 +63,18 @@ profile: context_stage1_three_scenario_10ep_e80
 model: /data/training_runs/context_stage1_three_scenario_10ep_neural_bc_m10_e80/neural_behavior_clone.onnx
 ```
 
+Current retained clearance-refinement candidate:
+
+```text
+profile: clearance_liftscale_stack_s127
+status: 0/3 scenarios pass, BLOCKED_BY_CLEARANCE_GATE
+total distance ~= 2.189m
+flat:       p50 ~= 0.01742m, low-clearance ratio ~= 0.353
+start-stop: p50 ~= 0.01716m, low-clearance ratio ~= 0.345
+curve:      p50 ~= 0.01616m, low-clearance ratio ~= 0.409
+falls:      none
+```
+
 Initial candidate checkpoint:
 
 ```text
@@ -370,9 +382,40 @@ clearance_lowratio_quantile_s119:
   falls:      none
 ```
 
-Current best depends on ranking: `s111` remains the cleaner balanced reference
-because flat is better, while `s119` is the best blocked probe by worst-case
-low-clearance ratio and total distance. Neither is promotable.
+2026-06-23 stacked clearance refinement:
+the residual runtime now supports stacked residual teachers and compact
+swing-lift actors. `clearance_contactlift_stack_s121` first stacked a
+contact/phase lift residual on `s111`; it remained blocked but improved total
+distance to about `2.028 m`, kept all p50 clearances above `0.015 m`, and
+reduced max low-clearance ratio to about `0.460`. `clearance_liftscale_stack_s127`
+is the current best retained blocked candidate after increasing the explicit
+stack residual scale to `0.16`.
+
+```text
+clearance_liftscale_stack_s127:
+  teacher profile: clearance_contactlift_stack_s121
+  actor kind: contact_phase_lift
+  residual_scale: 0.16
+  suite: 0/3, BLOCKED_BY_CLEARANCE_GATE
+  total distance ~= 2.189m
+  flat:       p50 ~= 0.01742m, low-clearance ratio ~= 0.353
+  start-stop: p50 ~= 0.01716m, low-clearance ratio ~= 0.345
+  curve:      p50 ~= 0.01616m, low-clearance ratio ~= 0.409
+  falls:      none
+```
+
+Do not promote the intermediate probes:
+`clearance_contactlift_stack_s121`, `clearance_contactlift_stack_s123`,
+`clearance_cmdlift_stack_s125`, `clearance_liftscale_stack_s129`, or
+`clearance_harmonic_stack_s131`. `s129` improved flat low-clearance ratio but
+regressed start-stop and curve relative to `s127`; `s131` did not beat `s127`
+in training and did not get full-suite evidence.
+
+Current best retained candidate: `clearance_liftscale_stack_s127`. It is still
+blocked by the G10 low-clearance-ratio gate in all three scenarios; p50
+clearance and no-fall behavior are no longer the bottleneck. Next M10 work
+should target low-clearance ratio below `0.25` without sacrificing s127's
+movement distance.
 
 clearance evidence commands:
 

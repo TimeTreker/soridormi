@@ -18,6 +18,14 @@ from soridormi_runtime.train_residual_policy import (
     COMMAND_STATE_MLP_PARAMETER_SIZE,
     COMMAND_STATE_FEATURE_SIZE,
     COMMAND_STATE_PARAMETER_SIZE,
+    COMMAND_CONTACT_PHASE_LIFT_FEATURE_SIZE,
+    COMMAND_CONTACT_PHASE_LIFT_PARAMETER_SIZE,
+    CONTACT_PHASE_HARMONIC_LIFT_FEATURE_SIZE,
+    CONTACT_PHASE_HARMONIC_LIFT_PARAMETER_SIZE,
+    CONTACT_PHASE_LIFT_PARAMETER_SIZE,
+    RESIDUAL_ACTOR_COMMAND_CONTACT_PHASE_LIFT,
+    RESIDUAL_ACTOR_CONTACT_PHASE_HARMONIC_LIFT,
+    RESIDUAL_ACTOR_CONTACT_PHASE_LIFT,
     RESIDUAL_ACTOR_COMMAND_STATE,
     PHASE_CONTACT_PARAMETER_SIZE,
     RESIDUAL_ACTOR_PHASE_CONTACT,
@@ -41,10 +49,19 @@ from soridormi_runtime.train_residual_policy import (
     command_state_residual_action,
     command_state_residual_features,
     command_state_mlp_residual_action,
+    command_contact_phase_lift_residual_action,
+    command_contact_phase_lift_residual_features,
+    contact_phase_harmonic_lift_residual_action,
+    contact_phase_harmonic_lift_residual_features,
+    contact_phase_lift_residual_action,
+    contact_phase_lift_residual_features,
     episodic_clearance_adjustment,
     optimize_residual_bias,
     optimize_command_state_residual,
     optimize_command_state_mlp_residual,
+    optimize_command_contact_phase_lift_residual,
+    optimize_contact_phase_harmonic_lift_residual,
+    optimize_contact_phase_lift_residual,
     optimize_phase_contact_residual,
     phase_contact_residual_action,
 )
@@ -157,6 +174,59 @@ def test_residual_onnx_policy_accepts_context_teacher_observation(tmp_path: Path
     assert policy.last_observation.shape == (1, 104)
 
 
+def test_residual_onnx_policy_can_use_residual_teacher_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    residual_path = tmp_path / "outer_residual.onnx"
+    residual_path.write_bytes(b"fake")
+    teacher_profile = PolicyProfile(
+        name="inner_residual",
+        description="inner residual teacher",
+        path=tmp_path / "inner_residual.yaml",
+        payload={
+            "name": "inner_residual",
+            "model": {
+                "path": str(tmp_path / "inner_residual.onnx"),
+                "kind": "residual_onnx",
+                "input_shape": [1, 101],
+                "output_shape": [1, 14],
+            },
+            "residual_policy": {
+                "teacher_profile": "base_teacher",
+                "residual_scale": 0.1,
+                "residual_clip_abs": 1.0,
+            },
+        },
+        model=PolicyModelSpec(
+            path=str(tmp_path / "inner_residual.onnx"),
+            kind="residual_onnx",
+            input_shape=[1, 101],
+            output_shape=[1, 14],
+        ),
+    )
+    created: list[dict[str, str | None]] = []
+
+    def fake_make_runtime_policy(*, policy_path=None, robot_config_path=None):
+        created.append(
+            {
+                "policy_path": str(policy_path),
+                "backend": train_residual_policy_module.os.environ.get("SORIDORMI_POLICY_BACKEND"),
+            }
+        )
+        return FakeTeacher()
+
+    monkeypatch.setattr("soridormi_runtime.residual_policy.PolicyProfile.load", lambda _: teacher_profile)
+    monkeypatch.setattr("soridormi_runtime.policy_factory.make_runtime_policy", fake_make_runtime_policy)
+
+    policy = ResidualOnnxPolicy(
+        policy_path=residual_path,
+        session_factory=FakeSession,
+        providers=["CPUExecutionProvider"],
+    )
+    action = policy.compute_action(_state())
+
+    assert action.tolist() == pytest.approx([0.225] * 14)
+    assert created == [{"policy_path": str(tmp_path / "inner_residual.onnx"), "backend": "residual_onnx"}]
+
+
 def test_cem_residual_optimizer_improves_toward_target() -> None:
     target = np.asarray([0.3] * 14, dtype=np.float32)
 
@@ -226,6 +296,8 @@ def test_residual_cli_dry_run_can_exclude_zero_candidate(
             "teacher_profile",
             "--output-dir",
             str(tmp_path),
+            "--actor-kind",
+            RESIDUAL_ACTOR_CONTACT_PHASE_LIFT,
             "--dry-run",
             "--no-zero-candidate",
             "--episodic-clearance-quantile",
@@ -238,6 +310,7 @@ def test_residual_cli_dry_run_can_exclude_zero_candidate(
     train_residual_policy_module.main()
 
     payload = json.loads(capsys.readouterr().out)
+    assert payload["actor_kind"] == RESIDUAL_ACTOR_CONTACT_PHASE_LIFT
     assert payload["optimization_config"]["include_zero_candidate"] is False
     assert payload["episodic_clearance_quantile"] == pytest.approx(0.20)
     assert payload["episodic_clearance_quantile_gap_weight"] == pytest.approx(3.5)
@@ -295,6 +368,160 @@ def test_command_state_mlp_optimizer_accepts_warm_start() -> None:
 
     assert result.best_score == pytest.approx(0.0)
     assert result.best_residual == pytest.approx(initial.tolist())
+
+
+def test_contact_phase_lift_actor_uses_swing_contact_and_phase() -> None:
+    observation = np.zeros(104, dtype=np.float32)
+    observation[97:101] = [0.0, 1.0, 0.5, -0.5]
+    parameters = np.zeros(CONTACT_PHASE_LIFT_PARAMETER_SIZE, dtype=np.float32).reshape(2, 3, 3)
+    parameters[0, 0, 0] = 0.4
+    parameters[0, 1, 1] = 0.2
+    parameters[0, 2, 2] = -0.6
+
+    left_features, right_features = contact_phase_lift_residual_features(observation)
+    action = contact_phase_lift_residual_action(observation, parameters.reshape(-1))
+
+    assert left_features.tolist() == pytest.approx([1.0, 0.5, -0.5])
+    assert right_features.tolist() == pytest.approx([0.0, 0.0, 0.0])
+    assert action[2] == pytest.approx(np.tanh(0.4))
+    assert action[3] == pytest.approx(np.tanh(0.1))
+    assert action[4] == pytest.approx(np.tanh(0.3))
+    assert action[11:14].tolist() == pytest.approx([0.0, 0.0, 0.0])
+    assert action[[0, 1, 5, 6, 7, 8, 9, 10]].tolist() == pytest.approx([0.0] * 8)
+
+
+def test_contact_phase_lift_optimizer_uses_compact_parameter_vector() -> None:
+    result = optimize_contact_phase_lift_residual(
+        lambda candidate: -float(np.mean(candidate**2)),
+        config=ResidualOptimizationConfig(iterations=1, population=3, seed=11),
+    )
+
+    assert len(result.best_residual) == CONTACT_PHASE_LIFT_PARAMETER_SIZE
+
+
+def test_command_contact_phase_lift_actor_uses_command_tail() -> None:
+    observation = np.zeros(104, dtype=np.float32)
+    observation[97:101] = [0.0, 1.0, 0.5, -0.5]
+    observation[101:104] = [0.2, -0.1, 0.3]
+    parameters = np.zeros(COMMAND_CONTACT_PHASE_LIFT_PARAMETER_SIZE, dtype=np.float32).reshape(
+        2,
+        COMMAND_CONTACT_PHASE_LIFT_FEATURE_SIZE,
+        3,
+    )
+    parameters[0, 3, 0] = 2.0
+    parameters[0, 10, 1] = 4.0
+    parameters[0, 11, 2] = -2.0
+
+    left_features, right_features = command_contact_phase_lift_residual_features(observation)
+    action = command_contact_phase_lift_residual_action(observation, parameters.reshape(-1))
+
+    assert left_features.tolist() == pytest.approx(
+        [
+            1.0,
+            0.5,
+            -0.5,
+            0.2,
+            0.1,
+            -0.1,
+            -0.1,
+            -0.05,
+            0.05,
+            0.3,
+            0.15,
+            -0.15,
+        ]
+    )
+    assert right_features.tolist() == pytest.approx([0.0] * COMMAND_CONTACT_PHASE_LIFT_FEATURE_SIZE)
+    assert action[2] == pytest.approx(np.tanh(0.4))
+    assert action[3] == pytest.approx(np.tanh(0.6))
+    assert action[4] == pytest.approx(np.tanh(0.3))
+    assert action[11:14].tolist() == pytest.approx([0.0, 0.0, 0.0])
+    assert action[[0, 1, 5, 6, 7, 8, 9, 10]].tolist() == pytest.approx([0.0] * 8)
+
+
+def test_command_contact_phase_lift_actor_requires_policy_command_tail() -> None:
+    with pytest.raises(ValueError, match="104D policy input"):
+        command_contact_phase_lift_residual_features(np.zeros(101, dtype=np.float32))
+
+
+def test_command_contact_phase_lift_optimizer_uses_compact_parameter_vector() -> None:
+    result = optimize_command_contact_phase_lift_residual(
+        lambda candidate: -float(np.mean(candidate**2)),
+        config=ResidualOptimizationConfig(iterations=1, population=3, seed=13),
+    )
+
+    assert len(result.best_residual) == COMMAND_CONTACT_PHASE_LIFT_PARAMETER_SIZE
+
+
+def test_residual_source_from_command_contact_phase_lift_parameters() -> None:
+    parameters = np.zeros(COMMAND_CONTACT_PHASE_LIFT_PARAMETER_SIZE, dtype=np.float32).reshape(
+        2,
+        COMMAND_CONTACT_PHASE_LIFT_FEATURE_SIZE,
+        3,
+    )
+    parameters[0, 3, 0] = 2.0
+    source = _residual_source_from_parameters(
+        RESIDUAL_ACTOR_COMMAND_CONTACT_PHASE_LIFT,
+        parameters.reshape(-1),
+    )
+    observation = np.zeros(104, dtype=np.float32)
+    observation[97:101] = [0.0, 1.0, 0.5, -0.5]
+    observation[101:104] = [0.2, 0.0, 0.0]
+
+    action = source(observation)
+
+    assert action[2] == pytest.approx(np.tanh(0.4))
+
+
+def test_contact_phase_harmonic_lift_actor_uses_phase_harmonics() -> None:
+    observation = np.zeros(104, dtype=np.float32)
+    observation[97:101] = [0.0, 1.0, 0.5, -0.5]
+    parameters = np.zeros(CONTACT_PHASE_HARMONIC_LIFT_PARAMETER_SIZE, dtype=np.float32).reshape(
+        2,
+        CONTACT_PHASE_HARMONIC_LIFT_FEATURE_SIZE,
+        3,
+    )
+    parameters[0, 3, 0] = 2.0
+    parameters[0, 4, 1] = -1.0
+    parameters[0, 6, 2] = 0.5
+
+    left_features, right_features = contact_phase_harmonic_lift_residual_features(observation)
+    action = contact_phase_harmonic_lift_residual_action(observation, parameters.reshape(-1))
+
+    assert left_features.tolist() == pytest.approx([1.0, 0.5, -0.5, 0.0, -0.5, -0.25, -0.25])
+    assert right_features.tolist() == pytest.approx([0.0] * CONTACT_PHASE_HARMONIC_LIFT_FEATURE_SIZE)
+    assert action[2] == pytest.approx(np.tanh(0.0))
+    assert action[3] == pytest.approx(np.tanh(0.5))
+    assert action[4] == pytest.approx(np.tanh(-0.125))
+    assert action[11:14].tolist() == pytest.approx([0.0, 0.0, 0.0])
+
+
+def test_contact_phase_harmonic_lift_optimizer_uses_compact_parameter_vector() -> None:
+    result = optimize_contact_phase_harmonic_lift_residual(
+        lambda candidate: -float(np.mean(candidate**2)),
+        config=ResidualOptimizationConfig(iterations=1, population=3, seed=15),
+    )
+
+    assert len(result.best_residual) == CONTACT_PHASE_HARMONIC_LIFT_PARAMETER_SIZE
+
+
+def test_residual_source_from_contact_phase_harmonic_lift_parameters() -> None:
+    parameters = np.zeros(CONTACT_PHASE_HARMONIC_LIFT_PARAMETER_SIZE, dtype=np.float32).reshape(
+        2,
+        CONTACT_PHASE_HARMONIC_LIFT_FEATURE_SIZE,
+        3,
+    )
+    parameters[0, 4, 0] = -1.0
+    source = _residual_source_from_parameters(
+        RESIDUAL_ACTOR_CONTACT_PHASE_HARMONIC_LIFT,
+        parameters.reshape(-1),
+    )
+    observation = np.zeros(104, dtype=np.float32)
+    observation[97:101] = [0.0, 1.0, 0.5, -0.5]
+
+    action = source(observation)
+
+    assert action[2] == pytest.approx(np.tanh(0.5))
 
 
 def test_episodic_clearance_adjustment_matches_gate_direction() -> None:

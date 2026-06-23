@@ -245,18 +245,19 @@ valid, but failed `0/3` scenarios and did not beat `s79` because the wrapper
 changed residual scale from the retained checkpoint's `0.1` to `0.05`. The
 wrapper now preserves `0.1` by default.
 
-The balanced retained residual reference is
-`clearance_lowratio_gatepush_s111`. It is still blocked from promotion, but it
-improves total distance to about `1.928 m`, gets all three p50 swing-clearance
-metrics above `0.015 m`, and reduces max low-clearance ratio to about `0.496`.
-The quantile-tail probe `clearance_lowratio_quantile_s119` is also blocked, but
-it improves total distance to about `1.938 m` and reduces the worst-case
-low-clearance ratio to about `0.473`; it is not a clean replacement because
-flat low-clearance ratio regressed from about `0.388` to about `0.408`.
-The remaining blocker is the low-clearance-ratio gate in all three scenarios.
-The next M10 work is clearance refinement against both `s111` and `s119`,
-followed by quantitative clearance readiness and a direct human follow-camera
-visual pass before any broader promotion.
+The current best retained residual candidate is
+`clearance_liftscale_stack_s127`. It is still blocked from promotion, but it
+improves total distance to about `2.189 m`, gets all three p50 swing-clearance
+metrics above `0.015 m`, and reduces max low-clearance ratio to about `0.409`.
+The remaining blocker is the low-clearance-ratio gate in all three scenarios:
+flat is about `0.353`, start-stop about `0.345`, and curve about `0.409`
+against a `0.25` limit. Do not promote the intermediate stacked probes
+`clearance_contactlift_stack_s121`, `clearance_contactlift_stack_s123`,
+`clearance_cmdlift_stack_s125`, `clearance_liftscale_stack_s129`, or
+`clearance_harmonic_stack_s131`. The next M10 work must reduce s127's
+low-clearance ratios without sacrificing no-fall behavior or the stronger
+movement distance, followed by quantitative clearance readiness and a direct
+human follow-camera visual pass before any broader promotion.
 
 ### M11A: task-agent contract foundation
 

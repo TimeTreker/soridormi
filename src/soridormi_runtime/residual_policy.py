@@ -123,10 +123,11 @@ class ResidualOnnxPolicy:
             self.teacher_profile = teacher_profile_name if isinstance(teacher_profile_name, PolicyProfile) else PolicyProfile.load(teacher_profile_name)
             self.expected_input_size = _profile_input_size(self.teacher_profile)
             with _temporary_env(self.teacher_profile.env()):
-                self.teacher = OnnxPolicy(
+                from soridormi_runtime.policy_factory import make_runtime_policy
+
+                self.teacher = make_runtime_policy(
                     policy_path=self.teacher_profile.model.path,
                     robot_config_path=robot_config_path or os.environ.get("SORIDORMI_ROBOT_CONFIG"),
-                    prefer_cuda=prefer_cuda,
                 )
 
         if providers is not None:
