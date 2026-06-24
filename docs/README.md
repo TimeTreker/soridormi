@@ -31,6 +31,8 @@ be committed.
   capability manifest, and acceptance cases.
 - `scripts/demo_task_mcp_contract.sh`: local no-motion demo for the
   Chromie-to-Soridormi task MCP boundary.
+- `docs/CHROMIE_SORIDORMI_EFFECT_CHECK.md`: host-side operator check for the
+  Chromie microphone/speaker loop driving Soridormi through MuJoCo viewer.
 - `docs/SORIDORMI_NEURAL_PARAMETER_ADAPTIVE_MPC_WBC.md`: future
   neural parameter-adaptive MPC/WBC controller design; NN estimates model
   error while MPC/WBC enforces physics.
