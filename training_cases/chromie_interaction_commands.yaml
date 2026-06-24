@@ -55,6 +55,54 @@ cases:
     validation:
       dry_run: ./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":0.10,"duration_s":10.0}'
 
+  - id: chromie_interaction.zh_walk_forward_10_seconds
+    status: planned
+    priority: 15
+    natural_language_command: 向前走十秒。
+    target_skill: walk_velocity
+    scenario_id: flat_walk_varied_speed_v1
+    chromie_translation:
+      skill: walk_velocity
+      language: zh-CN
+      parameters:
+        vx_mps: 0.10
+        vy_mps: 0.0
+        yaw_radps: 0.0
+        duration_s: 10.0
+    parameters:
+      vx_mps: 0.10
+      duration_s: 10.0
+    task_context:
+      skill_family: interaction_acceptance
+      language: zh-CN
+      intent: timed_forward_walk
+    environment_context:
+      terrain_type: flat
+      obstacles: []
+    expected_outcome:
+      base_motion: forward_progress_for_requested_duration_or_safe_timeout
+      final_state: safe_idle
+    safety_checks:
+      - no_fall
+      - duration_timeout_enforced
+      - natural_language_not_sent_to_policy
+      - no_hardware_actuation
+    timeout_s: 12.0
+    pass_fail_metrics:
+      - name: fallen
+        operator: equals
+        value: false
+      - name: execution_duration_s
+        operator: between
+        value:
+          - 9.0
+          - 11.0
+      - name: forward_progress_m
+        operator: greater_equal
+        value: 0.15
+    validation:
+      dry_run: ./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":0.10,"duration_s":10.0}'
+
   - id: chromie_interaction.turn_left_then_nod_twice
     status: planned
     priority: 20

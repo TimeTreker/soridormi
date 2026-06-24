@@ -36,6 +36,10 @@ REQUIRED_CASE_KEYS = {
 }
 
 
+def _contains_cjk(text: str) -> bool:
+    return any("\u4e00" <= character <= "\u9fff" for character in text)
+
+
 def _load_yaml(path: Path) -> dict[str, Any]:
     payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert isinstance(payload, dict), path
@@ -72,6 +76,8 @@ def test_training_cases_preserve_policy_boundary() -> None:
                 key in str(case.get("task_context", {}))
                 for key in ("speech_text_to_policy", "raw_perception_to_policy")
             ) or suite["suite_id"] != "chromie_interaction_commands", case["id"]
+    chromie_cases = _load_yaml(TRAINING_CASE_DIR / "chromie_interaction_commands.yaml")["cases"]
+    assert any(_contains_cjk(case["natural_language_command"]) for case in chromie_cases)
 
 
 def test_training_cases_are_structured_and_unique() -> None:
@@ -134,6 +140,7 @@ def test_training_case_library_covers_requested_curriculum() -> None:
         "safety_recovery.recovery_from_bad_command",
         "safety_recovery.timeout_partial_execution",
         "chromie_interaction.walk_forward_10_seconds",
+        "chromie_interaction.zh_walk_forward_10_seconds",
         "chromie_interaction.turn_left_then_nod_twice",
         "chromie_interaction.sing_while_walking",
         "chromie_interaction.come_closer_slowly",

@@ -40,6 +40,38 @@ cases:
       - no_raw_motor_fields
       - no_raw_policy_action
 
+  - id: task_acceptance.zh_walk_forward_10_seconds
+    natural_language_command: 向前走十秒。
+    task_submit:
+      task_type: move_velocity
+      summary: 向前走十秒
+      parameters:
+        vx_mps: 0.10
+        vy_mps: 0.0
+        yaw_radps: 0.0
+        duration_s: 10.0
+      task_context:
+        source: chromie
+        language: zh-CN
+        intent: timed_forward_walk
+    expected:
+      accepted: true
+      status: completed
+      phase: completed
+      execution_mode: skill_dry_run
+      no_motion: true
+      skill_id: walk_velocity
+      reason_code: null
+      recommended_next_actions:
+        - report_contract_dry_run_complete
+        - use_skill_execution_path_for_physical_motion
+        - do_not_report_physical_completion
+    safety_checks:
+      - no_hardware_actuation
+      - no_raw_motor_fields
+      - no_raw_policy_action
+      - natural_language_not_sent_to_policy
+
   - id: task_acceptance.turn_left_then_nod_twice
     natural_language_command: Turn left then nod twice.
     task_submit:

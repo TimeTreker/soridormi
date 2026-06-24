@@ -19,6 +19,10 @@ FORBIDDEN_KEY_PARTS = {
 }
 
 
+def _contains_cjk(text: str) -> bool:
+    return any("\u4e00" <= character <= "\u9fff" for character in text)
+
+
 def _load_suite() -> dict[str, Any]:
     payload = yaml.safe_load(TASK_ACCEPTANCE_PATH.read_text(encoding="utf-8"))
     assert isinstance(payload, dict)
@@ -60,6 +64,7 @@ def test_task_acceptance_case_file_is_structured() -> None:
     assert suite["policy_boundary"]["natural_language_to_low_level_policy"] is False
     assert suite["policy_boundary"]["low_level_output"] == "action_14d"
     assert len(suite["cases"]) >= 8
+    assert any(_contains_cjk(case["natural_language_command"]) for case in suite["cases"])
     for case in suite["cases"]:
         assert case["id"].startswith("task_acceptance.")
         assert case["natural_language_command"]
@@ -84,6 +89,7 @@ def test_task_acceptance_cases_replay_against_local_mcp_task_service() -> None:
         assert result["execution_mode"] == expected["execution_mode"], case["id"]
         assert result["no_motion"] is True, case["id"]
         assert result["reason_code"] == expected.get("reason_code"), case["id"]
+        assert result["summary"] == case["task_submit"].get("summary", case["task_submit"]["task_type"]), case["id"]
         assert isinstance(result["plan_steps"], list), case["id"]
         assert result["task_graph"]["schema_version"] == "soridormi.task_graph.v1", case["id"]
         assert result["task_graph"]["task_ref"] == result["task_id"], case["id"]
