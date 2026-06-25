@@ -69,6 +69,24 @@ class JointKeyframeSegment:
 
 
 @dataclass(frozen=True)
+class VisualExpressionSegment:
+    """Simulator-only visual expression segment emitted by social skills."""
+
+    expression: str
+    duration_s: float = 0.1
+    intensity: float = 1.0
+    label: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "expression": self.expression,
+            "duration_s": float(self.duration_s),
+            "intensity": float(self.intensity),
+            "label": self.label,
+        }
+
+
+@dataclass(frozen=True)
 class SkillPlan:
     """Dry-run plan produced from a manifest-declared skill."""
 
@@ -81,6 +99,7 @@ class SkillPlan:
     summary: str
     commands: tuple[VelocitySegment, ...] = ()
     keyframes: tuple[JointKeyframeSegment, ...] = ()
+    visual_expressions: tuple[VisualExpressionSegment, ...] = ()
     safety: Mapping[str, Any] | None = None
     parameters: Mapping[str, Any] | None = None
 
@@ -95,6 +114,7 @@ class SkillPlan:
             "summary": self.summary,
             "commands": [command.to_dict() for command in self.commands],
             "keyframes": [keyframe.to_dict() for keyframe in self.keyframes],
+            "visual_expressions": [expression.to_dict() for expression in self.visual_expressions],
             "safety": dict(self.safety or {}),
             "parameters": dict(self.parameters or {}),
             "total_duration_s": self.total_duration_s,
@@ -104,6 +124,8 @@ class SkillPlan:
     def total_duration_s(self) -> float:
         return sum(command.duration_s for command in self.commands) + sum(
             keyframe.duration_s for keyframe in self.keyframes
+        ) + sum(
+            expression.duration_s for expression in self.visual_expressions
         )
 
 
@@ -283,6 +305,28 @@ def _scripted_keyframe_plan(
         dry_run=True,
         summary=summary,
         keyframes=tuple(keyframes),
+        safety=skill.get("safety", {}),
+        parameters=parameters,
+    )
+
+
+def _visual_expression_plan(
+    skill: dict[str, Any],
+    parameters: Mapping[str, Any],
+    profile: str,
+    *,
+    visual_expressions: Sequence[VisualExpressionSegment],
+    summary: str,
+) -> SkillPlan:
+    return SkillPlan(
+        skill_id=str(skill["id"]),
+        status=str(skill.get("status")),
+        category=str(skill.get("category")),
+        execution=str(skill.get("execution")),
+        profile=profile,
+        dry_run=True,
+        summary=summary,
+        visual_expressions=tuple(visual_expressions),
         safety=skill.get("safety", {}),
         parameters=parameters,
     )
@@ -534,6 +578,40 @@ def _plan_express_attention(skill: dict[str, Any], parameters: Mapping[str, Any]
     return _scripted_keyframe_plan(skill, parameters, profile, keyframes=keyframes, summary=summary)
 
 
+def _plan_blink_eyes(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+    skill_id = str(skill["id"])
+    count = _count_cycles(parameters.get("count", 2), minimum=1, maximum=6)
+    closed_duration = float(parameters.get("closed_duration_s", 0.12))
+    open_duration = float(parameters.get("open_duration_s", 0.18))
+    intensity = float(parameters.get("intensity", 1.0))
+    expressions: list[VisualExpressionSegment] = [
+        VisualExpressionSegment(expression="eyes_open", duration_s=open_duration, intensity=intensity, label=f"{skill_id}_open_start")
+    ]
+    for index in range(count):
+        expressions.append(
+            VisualExpressionSegment(
+                expression="eyes_closed",
+                duration_s=closed_duration,
+                intensity=intensity,
+                label=f"{skill_id}_closed_{index + 1}",
+            )
+        )
+        expressions.append(
+            VisualExpressionSegment(
+                expression="eyes_open",
+                duration_s=open_duration,
+                intensity=intensity,
+                label=f"{skill_id}_open_{index + 1}",
+            )
+        )
+    summary = (
+        f"Plan {skill_id}: {count} visual blink cycle(s), "
+        f"closed={closed_duration:.2f}s open={open_duration:.2f}s, "
+        "using simulator visual expression geoms only."
+    )
+    return _visual_expression_plan(skill, parameters, profile, visual_expressions=expressions, summary=summary)
+
+
 BUILTIN_SKILL_PLANNERS: dict[str, SkillPlanner] = {
     "stand_idle": _plan_stand_idle,
     "stop": _plan_stop,
@@ -548,6 +626,7 @@ BUILTIN_SKILL_PLANNERS: dict[str, SkillPlanner] = {
     "shake_no": _plan_shake_no,
     "bow": _plan_bow,
     "express_attention": _plan_express_attention,
+    "blink_eyes": _plan_blink_eyes,
 }
 
 
@@ -719,6 +798,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                     f"{name}={value:.3f}" for name, value in sorted(keyframe.positions_by_name.items())
                 )
                 print(f"- {keyframe.label}: {targets} duration={keyframe.duration_s:.2f}s")
+        if plan.visual_expressions:
+            print("Visual expressions:")
+            for expression in plan.visual_expressions:
+                print(
+                    f"- {expression.label}: {expression.expression} "
+                    f"intensity={expression.intensity:.2f} duration={expression.duration_s:.2f}s"
+                )
         print("No robot, simulator, or hardware command was executed.")
     return 0
 

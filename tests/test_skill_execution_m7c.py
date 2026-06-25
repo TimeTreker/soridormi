@@ -17,6 +17,7 @@ def _registry() -> SkillExecutionRegistry:
 def test_registry_lists_manifest_backed_executable_skill_ids() -> None:
     registry = _registry()
     assert registry.executable_skill_ids() == (
+        "blink_eyes",
         "bow",
         "curve_walk",
         "express_attention",
@@ -57,6 +58,26 @@ def test_skill_parameter_defaults_are_applied() -> None:
     assert command.vy_mps == 0.0
     assert command.yaw_radps == pytest.approx(0.15)
     assert command.duration_s == pytest.approx(2.0)
+
+
+def test_blink_eyes_dry_run_uses_visual_expression_segments() -> None:
+    plan = _registry().create_plan(
+        "blink_eyes",
+        {"count": 2, "closed_duration_s": 0.10, "open_duration_s": 0.20},
+    )
+
+    assert plan.commands == ()
+    assert plan.keyframes == ()
+    assert [segment.expression for segment in plan.visual_expressions] == [
+        "eyes_open",
+        "eyes_closed",
+        "eyes_open",
+        "eyes_closed",
+        "eyes_open",
+    ]
+    assert plan.visual_expressions[1].duration_s == pytest.approx(0.10)
+    assert plan.visual_expressions[2].duration_s == pytest.approx(0.20)
+    assert plan.total_duration_s == pytest.approx(0.80)
 
 
 def test_rejects_out_of_range_and_unknown_parameters() -> None:

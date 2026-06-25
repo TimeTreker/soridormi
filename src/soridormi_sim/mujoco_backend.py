@@ -7,7 +7,13 @@ from pathlib import Path
 
 import numpy as np
 
-from soridormi_api import IMUState, JointState, MotorCommand, RobotState
+from soridormi_api import IMUState, JointState, MotorCommand, RobotState, VisualExpressionCommand
+from .social_eye_scene import (
+    LEFT_EYE_CLOSED_NAME,
+    LEFT_EYE_NAME,
+    RIGHT_EYE_CLOSED_NAME,
+    RIGHT_EYE_NAME,
+)
 from .mujoco_viewer import MujocoViewerHandle, env_flag, env_float
 from .robot_config import RobotConfig, load_robot_config
 
@@ -26,6 +32,7 @@ class FakeMujocoBackend:
     velocities: list[float] = field(init=False)
     torques: list[float] = field(init=False)
     last_command: MotorCommand | None = None
+    last_visual_expression: VisualExpressionCommand | None = None
 
     def __post_init__(self) -> None:
         n = len(self.joint_names)
@@ -73,6 +80,9 @@ class FakeMujocoBackend:
     def apply_command(self, command: MotorCommand) -> None:
         self.last_command = command
 
+    def apply_visual_expression(self, command: VisualExpressionCommand) -> None:
+        self.last_visual_expression = command
+
     def reset(self) -> None:
         self.start_time = time.monotonic()
         n = len(self.joint_names)
@@ -80,6 +90,7 @@ class FakeMujocoBackend:
         self.velocities = [0.0] * n
         self.torques = [0.0] * n
         self.last_command = None
+        self.last_visual_expression = None
 
 
 class MujocoBackend:
@@ -514,6 +525,40 @@ class MujocoBackend:
 
     def apply_command(self, command: MotorCommand) -> None:
         self.last_command = command
+
+    def apply_visual_expression(self, command: VisualExpressionCommand) -> None:
+        expression = command.expression
+        intensity = float(command.intensity)
+        if expression == "eyes_open":
+            self._set_social_eye_visuals(open_alpha=intensity, closed_alpha=0.0)
+        elif expression == "eyes_closed":
+            self._set_social_eye_visuals(open_alpha=0.0, closed_alpha=intensity)
+        else:  # pragma: no cover - pydantic Literal validates this first.
+            raise ValueError(f"unsupported visual expression: {expression}")
+        self.mujoco.mj_forward(self.model, self.data)
+        self.viewer.sync()
+
+    def _set_social_eye_visuals(self, *, open_alpha: float, closed_alpha: float) -> None:
+        missing: list[str] = []
+        for name, alpha in (
+            (LEFT_EYE_NAME, open_alpha),
+            (RIGHT_EYE_NAME, open_alpha),
+            (LEFT_EYE_CLOSED_NAME, closed_alpha),
+            (RIGHT_EYE_CLOSED_NAME, closed_alpha),
+        ):
+            geom_id = self._geom_id(name)
+            if geom_id < 0:
+                missing.append(name)
+                continue
+            rgba = np.array(self.model.geom_rgba[geom_id], dtype=float)
+            rgba[3] = max(0.0, min(1.0, float(alpha)))
+            self.model.geom_rgba[geom_id] = rgba
+        if missing:
+            raise ValueError(
+                "MuJoCo model does not contain Soridormi social-eye geoms. "
+                "Start the sim with --social-eyes or regenerate the social-eye scene. "
+                f"missing={missing}"
+            )
 
     def _apply_last_command_to_ctrl(self) -> None:
         assert self.last_command is not None

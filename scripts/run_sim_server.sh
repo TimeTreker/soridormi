@@ -25,6 +25,10 @@ Options:
   --camera-azimuth DEG  Follow-camera azimuth. default: 135
   --camera-elevation DEG
                         Follow-camera elevation. default: -20
+  --social-eyes         Generate visual-only social eyes attached to the face. default
+  --no-social-eyes      Disable the generated visual eyes.
+  --social-eye-frame    Show an RGB debug frame at the generated eye anchor.
+  --no-social-eye-frame Hide the generated eye debug frame. default
   --rough-ground        Generate a temporary MuJoCo scene with small stone boxes.
   --no-rough-ground     Use the normal flat MuJoCo scene. default
   --rough-stone-height M
@@ -40,6 +44,8 @@ Examples:
   ./scripts/run_sim_server.sh --backend mujoco --viewer
   ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
   ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
+  ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera --social-eyes
+  ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera --social-eye-frame
   ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera --rough-ground
 
 For policy parity/teacher rollout tests, start the simulator with the same
@@ -56,6 +62,8 @@ CAMERA_DISTANCE="${SORIDORMI_MUJOCO_CAMERA_DISTANCE:-1.4}"
 CAMERA_AZIMUTH="${SORIDORMI_MUJOCO_CAMERA_AZIMUTH:-135}"
 CAMERA_ELEVATION="${SORIDORMI_MUJOCO_CAMERA_ELEVATION:--20}"
 SIM_POLICY_PROFILE="${SORIDORMI_SIM_POLICY_PROFILE:-}"
+SOCIAL_EYES="${SORIDORMI_MUJOCO_SOCIAL_EYES:-1}"
+SOCIAL_EYE_FRAME="${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME:-0}"
 ROUGH_GROUND="${SORIDORMI_MUJOCO_ROUGH_GROUND:-0}"
 ROUGH_STONE_HEIGHT="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT:-0.008}"
 ROUGH_STONE_COUNT="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT:-8}"
@@ -98,6 +106,22 @@ while [ "$#" -gt 0 ]; do
     --camera-elevation)
       CAMERA_ELEVATION="${2:?--camera-elevation requires a value}"
       shift 2
+      ;;
+    --social-eyes)
+      SOCIAL_EYES="1"
+      shift
+      ;;
+    --no-social-eyes)
+      SOCIAL_EYES="0"
+      shift
+      ;;
+    --social-eye-frame)
+      SOCIAL_EYE_FRAME="1"
+      shift
+      ;;
+    --no-social-eye-frame)
+      SOCIAL_EYE_FRAME="0"
+      shift
       ;;
     --rough-ground)
       ROUGH_GROUND="1"
@@ -187,6 +211,8 @@ export SORIDORMI_MUJOCO_CAMERA_DISTANCE="${CAMERA_DISTANCE}"
 export SORIDORMI_MUJOCO_CAMERA_AZIMUTH="${CAMERA_AZIMUTH}"
 export SORIDORMI_MUJOCO_CAMERA_ELEVATION="${CAMERA_ELEVATION}"
 export SORIDORMI_SIM_POLICY_PROFILE="${SIM_POLICY_PROFILE}"
+export SORIDORMI_MUJOCO_SOCIAL_EYES="${SOCIAL_EYES}"
+export SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME="${SOCIAL_EYE_FRAME}"
 export SORIDORMI_MUJOCO_ROUGH_GROUND="${ROUGH_GROUND}"
 export SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT="${ROUGH_STONE_HEIGHT}"
 export SORIDORMI_MUJOCO_ROUGH_STONE_COUNT="${ROUGH_STONE_COUNT}"
@@ -197,6 +223,8 @@ echo "=========================="
 echo "Backend: ${SORIDORMI_SIM_BACKEND}"
 echo "MuJoCo viewer: ${SORIDORMI_MUJOCO_VIEWER}"
 echo "MuJoCo follow camera: ${SORIDORMI_MUJOCO_FOLLOW_CAMERA}"
+echo "MuJoCo social eyes: ${SORIDORMI_MUJOCO_SOCIAL_EYES}"
+echo "MuJoCo social eye frame: ${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}"
 echo "MuJoCo rough ground: ${SORIDORMI_MUJOCO_ROUGH_GROUND}"
 if [ "${SORIDORMI_MUJOCO_FOLLOW_CAMERA}" = "1" ]; then
   echo "MuJoCo follow camera params: distance=${SORIDORMI_MUJOCO_CAMERA_DISTANCE} azimuth=${SORIDORMI_MUJOCO_CAMERA_AZIMUTH} elevation=${SORIDORMI_MUJOCO_CAMERA_ELEVATION}"
@@ -215,6 +243,8 @@ docker compose -f compose.sim.yaml run --rm \
   -e SORIDORMI_MUJOCO_CAMERA_DISTANCE_OVERRIDE="${SORIDORMI_MUJOCO_CAMERA_DISTANCE}" \
   -e SORIDORMI_MUJOCO_CAMERA_AZIMUTH_OVERRIDE="${SORIDORMI_MUJOCO_CAMERA_AZIMUTH}" \
   -e SORIDORMI_MUJOCO_CAMERA_ELEVATION_OVERRIDE="${SORIDORMI_MUJOCO_CAMERA_ELEVATION}" \
+  -e SORIDORMI_MUJOCO_SOCIAL_EYES_OVERRIDE="${SORIDORMI_MUJOCO_SOCIAL_EYES}" \
+  -e SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME_OVERRIDE="${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}" \
   -e SORIDORMI_MUJOCO_ROUGH_GROUND_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_GROUND}" \
   -e SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT}" \
   -e SORIDORMI_MUJOCO_ROUGH_STONE_COUNT_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT}" \
@@ -237,12 +267,34 @@ docker compose -f compose.sim.yaml run --rm \
     export SORIDORMI_MUJOCO_CAMERA_DISTANCE="${SORIDORMI_MUJOCO_CAMERA_DISTANCE_OVERRIDE:-1.4}"
     export SORIDORMI_MUJOCO_CAMERA_AZIMUTH="${SORIDORMI_MUJOCO_CAMERA_AZIMUTH_OVERRIDE:-135}"
     export SORIDORMI_MUJOCO_CAMERA_ELEVATION="${SORIDORMI_MUJOCO_CAMERA_ELEVATION_OVERRIDE:--20}"
+    export SORIDORMI_MUJOCO_SOCIAL_EYES="${SORIDORMI_MUJOCO_SOCIAL_EYES_OVERRIDE:-1}"
+    export SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME="${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME_OVERRIDE:-0}"
     export SORIDORMI_MUJOCO_ROUGH_GROUND="${SORIDORMI_MUJOCO_ROUGH_GROUND_OVERRIDE:-0}"
     export SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT_OVERRIDE:-0.008}"
     export SORIDORMI_MUJOCO_ROUGH_STONE_COUNT="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT_OVERRIDE:-8}"
     export SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS="${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS_OVERRIDE:-0.018}"
 
-    if [ "${SORIDORMI_MUJOCO_ROUGH_GROUND}" = "1" ]; then
+    if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && [ "${SORIDORMI_MUJOCO_SOCIAL_EYES}" = "1" ]; then
+      BASE_MODEL="${MUJOCO_MODEL_PATH:-}"
+      if [ -z "${BASE_MODEL}" ]; then
+        BASE_MODEL="$(python - <<'PYMODEL'
+from soridormi_sim.robot_config import load_robot_config
+print(load_robot_config().model.path)
+PYMODEL
+)"
+      fi
+      # Keep generated scene/model overlays next to the Open Duck XMLs so MuJoCo
+      # still resolves mesh assets relative to the original compiler context.
+      SOCIAL_EYES_MODEL="$(dirname "${BASE_MODEL}")/soridormi_social_eyes_scene.xml"
+      SOCIAL_EYE_FRAME_ARGS=()
+      if [ "${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}" = "1" ]; then
+        SOCIAL_EYE_FRAME_ARGS+=(--debug-frame)
+      fi
+      python -m soridormi_sim.social_eye_scene         --base "${BASE_MODEL}"         --output "${SOCIAL_EYES_MODEL}"         "${SOCIAL_EYE_FRAME_ARGS[@]}"
+      export MUJOCO_MODEL_PATH="${SOCIAL_EYES_MODEL}"
+    fi
+
+    if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && [ "${SORIDORMI_MUJOCO_ROUGH_GROUND}" = "1" ]; then
       BASE_MODEL="${MUJOCO_MODEL_PATH:-}"
       if [ -z "${BASE_MODEL}" ]; then
         BASE_MODEL="$(python - <<'PYMODEL'
@@ -263,6 +315,8 @@ PYMODEL
     echo "Effective sim backend: ${SORIDORMI_SIM_BACKEND}"
     echo "Effective MuJoCo viewer: ${SORIDORMI_MUJOCO_VIEWER}"
     echo "Effective MuJoCo follow camera: ${SORIDORMI_MUJOCO_FOLLOW_CAMERA}"
+    echo "Effective MuJoCo social eyes: ${SORIDORMI_MUJOCO_SOCIAL_EYES}"
+    echo "Effective MuJoCo social eye frame: ${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}"
     echo "Effective MuJoCo rough ground: ${SORIDORMI_MUJOCO_ROUGH_GROUND}"
     if [ "${SORIDORMI_MUJOCO_FOLLOW_CAMERA}" = "1" ]; then
       echo "Effective MuJoCo camera params: distance=${SORIDORMI_MUJOCO_CAMERA_DISTANCE} azimuth=${SORIDORMI_MUJOCO_CAMERA_AZIMUTH} elevation=${SORIDORMI_MUJOCO_CAMERA_ELEVATION}"

@@ -1,7 +1,7 @@
 # Soridormi M8E scripted social skills
 
 M8E lands the first safe social skill for Open Duck Mini v2: `look_direction`.
-M8F expands the same safe path with `nod_yes` and `shake_no`. M8J adds `express_attention` as a subtle listening/attention cue. M8F.1 fixes
+M8F expands the same safe path with `nod_yes` and `shake_no`. M8J adds `express_attention` as a subtle listening/attention cue. The visual-expression path adds `blink_eyes` as a simulator-only eye cue. M8F.1 fixes
 those repeated gestures so they are visible two-cycle motions rather than tiny
 near-neutral keyframes. M8F.2 makes repeated social gestures strict neutral-home
 axis gestures: pre-center the head, move only the intended axis, then return to
@@ -18,6 +18,10 @@ The following skills are promoted to `available_sim_experimental` in
 - `nod_yes`: neutral start, repeated bounded down/up head-pitch keyframes, neutral end;
 - `shake_no`: neutral start, repeated bounded left/right head-yaw keyframes, neutral end;
 - `express_attention`: neutral start, subtle listening/focus head pose, short hold, neutral end.
+
+`blink_eyes` is also `available_sim_experimental`, but it uses
+`visual_expression` instead of `scripted_keyframe`. It toggles the generated
+MuJoCo eye visuals and does not command motors.
 
 The `look_direction` planner produces one bounded head/neck keyframe:
 

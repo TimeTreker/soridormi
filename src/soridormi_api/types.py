@@ -108,9 +108,15 @@ class MotorCommand(BaseModel):
     torques: list[float]
 
 
+class VisualExpressionCommand(BaseModel):
+    expression: Literal["eyes_open", "eyes_closed"]
+    intensity: float = Field(default=1.0, ge=0.0, le=1.0)
+
+
 class ApiRequest(BaseModel):
-    kind: Literal["ping", "get_state", "send_command", "step_command", "reset"]
+    kind: Literal["ping", "get_state", "send_command", "step_command", "set_visual_expression", "reset"]
     command: MotorCommand | None = None
+    visual_expression: VisualExpressionCommand | None = None
 
 
 class ApiResponse(BaseModel):

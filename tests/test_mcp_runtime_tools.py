@@ -5,7 +5,13 @@ import threading
 
 import pytest
 
-from soridormi_api import IMUState, JointState, MotorCommand, RobotState
+from soridormi_api import (
+    IMUState,
+    JointState,
+    MotorCommand,
+    RobotState,
+    VisualExpressionCommand,
+)
 from soridormi_runtime.mcp.runtime_tools import SoridormiRuntimeToolService
 from soridormi_runtime.scripted_head_skill import HEAD_JOINT_NAMES
 from soridormi_runtime.policy_command import PolicyCommand
@@ -15,6 +21,7 @@ class FakeRobot:
     def __init__(self) -> None:
         self.time = 0.0
         self.commands: list[MotorCommand] = []
+        self.visual_expressions: list[VisualExpressionCommand] = []
 
     def read_state(self) -> RobotState:
         return RobotState(
@@ -31,6 +38,11 @@ class FakeRobot:
     def send_motor_command(self, command: MotorCommand) -> None:
         self.commands.append(command)
         self.time += 0.01
+
+    def set_visual_expression(self, command: VisualExpressionCommand) -> str:
+        self.visual_expressions.append(command)
+        self.time += 0.001
+        return f"visual expression applied: {command.expression}"
 
 
 
@@ -470,7 +482,7 @@ def test_sync_step_controller_reuses_previous_step_state() -> None:
     asyncio.run(exercise())
 
 
-def test_runtime_service_lists_velocity_and_scripted_head_skills() -> None:
+def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> None:
     async def exercise() -> None:
         service = _service()
         catalog = await service.call_tool("soridormi.skill.list", {})
@@ -484,6 +496,10 @@ def test_runtime_service_lists_velocity_and_scripted_head_skills() -> None:
         assert skills["nod_yes"]["available"] is True
         assert skills["nod_yes"]["execution"] == "scripted_keyframe"
         assert "duration_s" in skills["nod_yes"]["parameters_schema"]["properties"]
+        assert "blink_eyes" in skills
+        assert skills["blink_eyes"]["execution"] == "visual_expression"
+        assert skills["blink_eyes"]["effects"] == ["visual_expression"]
+        assert skills["blink_eyes"]["safety_class"] == "low_risk_action"
 
     asyncio.run(exercise())
 
@@ -563,6 +579,54 @@ def test_runtime_service_executes_named_scripted_head_skill(monkeypatch: pytest.
         assert min(commanded_pitch) < -0.10
         assert max(commanded_pitch) > 0.05
         assert commanded_pitch[-1] == pytest.approx(0.0)
+
+    asyncio.run(exercise())
+
+
+def test_runtime_service_executes_named_visual_expression_skill(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def no_sleep(_delay: float) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "soridormi_runtime.mcp.runtime_tools.asyncio.sleep",
+        no_sleep,
+    )
+
+    async def exercise() -> None:
+        service = _service()
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {
+                "skill_id": "blink_eyes",
+                "parameters": {
+                    "count": 1,
+                    "closed_duration_s": 0.08,
+                    "open_duration_s": 0.12,
+                },
+            },
+        )
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan",
+            {"plan_id": plan["plan_id"]},
+        )
+
+        assert plan["skill_id"] == "blink_eyes"
+        assert plan["no_motion"] is True
+        assert result["completed"] is True
+        assert result["skill_id"] == "blink_eyes"
+        assert result["no_motion"] is True
+        assert result["visual_expression_steps"] == 3
+        assert [
+            command.expression
+            for command in service.robot.visual_expressions
+        ] == [
+            "eyes_open",
+            "eyes_closed",
+            "eyes_open",
+            "eyes_open",
+        ]
 
     asyncio.run(exercise())
 

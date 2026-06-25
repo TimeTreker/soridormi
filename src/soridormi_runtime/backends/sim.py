@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from soridormi_api import MotorCommand, RobotApiClient, RobotState
+from soridormi_api import MotorCommand, RobotApiClient, RobotState, VisualExpressionCommand
 
 
 class SimRobot:
@@ -18,3 +18,6 @@ class SimRobot:
 
     def reset(self) -> str:
         return self.client.reset()
+
+    def set_visual_expression(self, command: VisualExpressionCommand) -> str:
+        return self.client.set_visual_expression(command)

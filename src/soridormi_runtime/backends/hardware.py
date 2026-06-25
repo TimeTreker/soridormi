@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from soridormi_api import MotorCommand, RobotState
+from soridormi_api import MotorCommand, RobotState, VisualExpressionCommand
 
 
 class HardwareRobot:
@@ -15,3 +15,6 @@ class HardwareRobot:
 
     def send_motor_command(self, command: MotorCommand) -> None:
         raise NotImplementedError("HardwareRobot.send_motor_command is not implemented yet")
+
+    def set_visual_expression(self, command: VisualExpressionCommand) -> str:
+        raise NotImplementedError("HardwareRobot.set_visual_expression is not implemented yet")

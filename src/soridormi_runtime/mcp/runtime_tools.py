@@ -9,7 +9,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
 
-from soridormi_api import MotorCommand, RobotState
+from soridormi_api import MotorCommand, RobotState, VisualExpressionCommand
 from soridormi_runtime.controller import HoldPositionController
 from soridormi_runtime.main import make_controller, make_robot
 from soridormi_runtime.policy_command import PolicyCommand
@@ -30,6 +30,10 @@ from soridormi_runtime.scripted_head_skill import (
 from soridormi_runtime.skill_execution import SkillExecutionRegistry
 from soridormi_runtime.skill_manifest import DEFAULT_SKILL_MANIFEST
 from soridormi_runtime.sync_preroll import preroll_sync_simulator
+from soridormi_runtime.visual_expression_skill import (
+    SUPPORTED_VISUAL_EXPRESSION_SKILLS,
+    validate_visual_expression_plan,
+)
 
 from .local_tools import MotionPlan, NamedSkillPlan, SoridormiLocalToolService
 from .task_tools import EmbodiedTaskStore, task_capabilities_payload
@@ -248,6 +252,11 @@ class SoridormiRuntimeToolService:
                 supported.append(skill_id)
             elif execution == "scripted_keyframe" and skill_id in SUPPORTED_SCRIPTED_SKILLS:
                 supported.append(skill_id)
+            elif (
+                execution == "visual_expression"
+                and skill_id in SUPPORTED_VISUAL_EXPRESSION_SKILLS
+            ):
+                supported.append(skill_id)
         return tuple(supported)
 
     @staticmethod
@@ -280,6 +289,13 @@ class SoridormiRuntimeToolService:
         skills: list[dict[str, Any]] = []
         for skill_id in self._runtime_skill_ids():
             skill = self.skill_registry.skills[skill_id]
+            execution = skill.get("execution")
+            if execution == "visual_expression":
+                effects = ["visual_expression"]
+                safety_class = "low_risk_action"
+            else:
+                effects = ["physical_motion"]
+                safety_class = "physical_motion"
             skills.append(
                 {
                     "skill_id": skill_id,
@@ -290,11 +306,11 @@ class SoridormiRuntimeToolService:
                     "interruptible": bool(
                         (skill.get("safety") or {}).get("interruptible", True)
                     ),
-                    "effects": ["physical_motion"],
-                    "safety_class": "physical_motion",
+                    "effects": effects,
+                    "safety_class": safety_class,
                     "requires_confirmation": self.mode != "sim",
                     "when_to_use": str(skill.get("description") or ""),
-                    "execution": skill.get("execution"),
+                    "execution": execution,
                 }
             )
         return {"mode": self.mode, "skills": skills}
@@ -344,6 +360,9 @@ class SoridormiRuntimeToolService:
         elif plan.execution == "scripted_keyframe":
             validate_scripted_head_plan(plan)
             plan_id = f"soridormi-skill-plan-{uuid.uuid4().hex[:12]}"
+        elif plan.execution == "visual_expression":
+            validate_visual_expression_plan(plan.skill_id, plan.execution)
+            plan_id = f"soridormi-skill-plan-{uuid.uuid4().hex[:12]}"
         else:  # pragma: no cover - guarded by _runtime_skill_ids
             raise ValueError(
                 f"skill {skill_id!r} execution {plan.execution!r} is unsupported"
@@ -362,7 +381,7 @@ class SoridormiRuntimeToolService:
             "estimated_duration_s": plan.total_duration_s,
             "requires_confirmation": self.mode != "sim",
             "interruptible": bool((plan.safety or {}).get("interruptible", True)),
-            "no_motion": False,
+            "no_motion": plan.execution == "visual_expression",
         }
 
     async def execute_runtime_skill_plan(self, plan_id: str) -> dict[str, Any]:
@@ -375,6 +394,8 @@ class SoridormiRuntimeToolService:
             result = await self.execute_motion_plan(plan_id)
         elif stored.plan.execution == "scripted_keyframe":
             result = await self.execute_scripted_head_skill(plan_id)
+        elif stored.plan.execution == "visual_expression":
+            result = await self.execute_visual_expression_skill(plan_id)
         else:  # pragma: no cover - plans are validated at creation
             raise ValueError(
                 f"skill {stored.plan.skill_id!r} execution "
@@ -384,7 +405,7 @@ class SoridormiRuntimeToolService:
             **result,
             "skill_id": stored.plan.skill_id,
             "mode": self.mode,
-            "no_motion": False,
+            "no_motion": stored.plan.execution == "visual_expression",
             "recommendation_only": False,
         }
 
@@ -476,6 +497,81 @@ class SoridormiRuntimeToolService:
                 }
             except asyncio.CancelledError:
                 await asyncio.shield(self._apply_safe_hold())
+                raise
+            finally:
+                self.active_task = None
+
+    async def execute_visual_expression_skill(self, plan_id: str) -> dict[str, Any]:
+        if self.emergency_stop:
+            raise RuntimeError("cannot execute skill while emergency_stop is active")
+        stored = self.skill_plans.get(plan_id)
+        if stored is None:
+            raise KeyError(f"skill plan not found: {plan_id}")
+        plan = stored.plan
+        validate_visual_expression_plan(plan.skill_id, plan.execution)
+        applier = getattr(self.robot, "set_visual_expression", None)
+        if not callable(applier):
+            raise RuntimeError("robot backend does not support visual expressions")
+
+        async with self._motion_lock:
+            if self.emergency_stop:
+                raise RuntimeError("cannot execute skill while emergency_stop is active")
+            self._motion_stop_requested = False
+            self.active_task = {
+                "plan_id": plan_id,
+                "skill_id": plan.skill_id,
+                "execution": plan.execution,
+                "started_at": time.time(),
+                "command_index": 0,
+            }
+            try:
+                for index, expression in enumerate(plan.visual_expressions):
+                    if self.emergency_stop or self._motion_stop_requested:
+                        await self._call_robot(
+                            applier,
+                            VisualExpressionCommand(
+                                expression="eyes_open",
+                                intensity=1.0,
+                            ),
+                        )
+                        return {
+                            "completed": False,
+                            "stopped": True,
+                            "dry_run_only": False,
+                            "summary": (
+                                f"Soridormi runtime stopped skill {plan.skill_id}."
+                            ),
+                        }
+                    assert self.active_task is not None
+                    self.active_task["command_index"] = index
+                    await self._call_robot(
+                        applier,
+                        VisualExpressionCommand(
+                            expression=expression.expression,
+                            intensity=expression.intensity,
+                        ),
+                    )
+                    await asyncio.sleep(max(0.0, float(expression.duration_s)))
+                await self._call_robot(
+                    applier,
+                    VisualExpressionCommand(expression="eyes_open", intensity=1.0),
+                )
+                return {
+                    "completed": True,
+                    "dry_run_only": False,
+                    "summary": (
+                        f"Soridormi runtime completed skill {plan.skill_id}."
+                    ),
+                    "estimated_duration_s": plan.total_duration_s,
+                    "visual_expression_steps": len(plan.visual_expressions),
+                }
+            except asyncio.CancelledError:
+                await asyncio.shield(
+                    self._call_robot(
+                        applier,
+                        VisualExpressionCommand(expression="eyes_open", intensity=1.0),
+                    )
+                )
                 raise
             finally:
                 self.active_task = None

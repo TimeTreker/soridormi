@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import zmq
 
-from .types import ApiRequest, ApiResponse, MotorCommand, RobotState
+from .types import ApiRequest, ApiResponse, MotorCommand, RobotState, VisualExpressionCommand
 
 
 @dataclass
@@ -53,6 +53,10 @@ class RobotApiClient:
 
     def reset(self) -> str:
         response = self._request(ApiRequest(kind="reset"))
+        return response.message
+
+    def set_visual_expression(self, command: VisualExpressionCommand) -> str:
+        response = self._request(ApiRequest(kind="set_visual_expression", visual_expression=command))
         return response.message
 
     def _request(self, request: ApiRequest) -> ApiResponse:

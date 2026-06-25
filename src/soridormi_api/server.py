@@ -6,7 +6,7 @@ from typing import Protocol
 
 import zmq
 
-from .types import ApiRequest, ApiResponse, MotorCommand, RobotState
+from .types import ApiRequest, ApiResponse, MotorCommand, RobotState, VisualExpressionCommand
 
 
 class RobotBackend(Protocol):
@@ -56,6 +56,14 @@ class RobotApiServer:
             self.backend.apply_command(request.command)
             self.backend.step()
             return ApiResponse(ok=True, state=self.backend.get_state())
+        if request.kind == "set_visual_expression":
+            if request.visual_expression is None:
+                return ApiResponse(ok=False, message="set_visual_expression requires visual_expression")
+            applier = getattr(self.backend, "apply_visual_expression", None)
+            if not callable(applier):
+                return ApiResponse(ok=False, message="backend does not support visual expressions")
+            applier(request.visual_expression)
+            return ApiResponse(ok=True, message=f"visual expression applied: {request.visual_expression.expression}")
         if request.kind == "reset":
             resetter = getattr(self.backend, "reset", None)
             if not callable(resetter):
