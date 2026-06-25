@@ -39,10 +39,10 @@ RENDER_GID_VALUE="$(detect_render_gid)"
 : "${SORIDORMI_ORIN_RUNTIME_IMAGE:=soridormi-runtime:orin}"
 : "${SORIDORMI_THOR_RUNTIME_IMAGE:=soridormi-runtime:thor}"
 
-: "${RUNTIME_DEV_BASE:=nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04}"
+: "${RUNTIME_DEV_BASE:=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04}"
 : "${ORIN_RUNTIME_BASE:=nvcr.io/nvidia/l4t-jetpack:r36.4.0}"
 : "${THOR_RUNTIME_BASE:=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04}"
-: "${SIM_BASE:=nvidia/cuda:12.8.1-cudnn-devel-ubuntu24.04}"
+: "${SIM_BASE:=nvidia/cuda:13.1.2-cudnn-devel-ubuntu24.04}"
 : "${SORIDORMI_POLICY_PROFILE:=open_duck_forward}"
 
 cat > .env <<EOF_ENV
