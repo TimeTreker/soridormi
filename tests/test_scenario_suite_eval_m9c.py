@@ -9,6 +9,15 @@ from soridormi_runtime.scenario_suite_eval import (
     render_suite_markdown,
 )
 
+READY_LOCOMOTION_SCENARIOS = [
+    "flat_walk_varied_speed_v1",
+    "start_stop_velocity_ramp_v1",
+    "curve_turn_walk_v1",
+    "startup_tail_clearance_v1",
+    "s_turn_reversal_v1",
+    "turn_stop_settle_v1",
+]
+
 
 def _write_report(path: Path, *, scenario_id: str, ok: bool, distance: float = 0.2) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -42,11 +51,7 @@ def _write_report(path: Path, *, scenario_id: str, ok: bool, distance: float = 0
 def test_suite_plan_defaults_to_ready_locomotion_scenarios_only() -> None:
     plan = build_scenario_suite_plan()
 
-    assert plan.scenario_ids == [
-        "flat_walk_varied_speed_v1",
-        "start_stop_velocity_ramp_v1",
-        "curve_turn_walk_v1",
-    ]
+    assert plan.scenario_ids == READY_LOCOMOTION_SCENARIOS
     assert all(item["run_plan"] for item in plan.selected)
     assert any(item["scenario_id"] == "look_direction_stationary_v1" for item in plan.skipped)
 

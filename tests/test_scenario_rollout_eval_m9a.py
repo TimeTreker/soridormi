@@ -79,6 +79,28 @@ def test_build_curve_scenario_run_plan_picks_visible_turn() -> None:
     assert plan.args["yaw_radps"] > 0.0
 
 
+def test_build_wbc_clearance_enrichment_run_plans_are_bounded_skills() -> None:
+    startup = build_scenario_run_plan("startup_tail_clearance_v1", control_hz=20.0)
+    reversal = build_scenario_run_plan("s_turn_reversal_v1", control_hz=20.0)
+    settle = build_scenario_run_plan("turn_stop_settle_v1", control_hz=20.0)
+
+    assert startup.skill_id == "walk_velocity"
+    assert startup.args["duration_s"] == 7.0
+    assert 0.0 < startup.args["vx_mps"] <= 0.16
+    assert startup.task_context["clearance_focus"] == "startup_tail"
+
+    assert reversal.skill_id == "curve_walk"
+    assert reversal.args["vx_mps"] > 0.0
+    assert reversal.args["yaw_radps"] > 0.0
+    assert reversal.task_context["clearance_focus"] == "turn_reversal"
+
+    assert settle.skill_id == "curve_walk"
+    assert settle.args["duration_s"] == 6.25
+    assert settle.args["vx_mps"] > 0.0
+    assert settle.args["yaw_radps"] > 0.0
+    assert settle.task_context["clearance_focus"] == "turn_stop_settle"
+
+
 def test_evaluate_scenario_rollout_passes_progressing_log(tmp_path: Path) -> None:
     path = tmp_path / "walk.jsonl"
     _write_jsonl(path, _passing_rows())

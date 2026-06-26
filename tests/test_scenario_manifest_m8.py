@@ -94,6 +94,28 @@ def test_stage_one_scenarios_cover_velocity_yaw_and_ramps():
     assert turning["yaw_radps"][1] >= 0.20
 
 
+def test_wbc_clearance_enrichment_scenarios_are_ready_and_tagged():
+    manifest = load_manifest()
+    scenario_by_id = {scenario["id"]: scenario for scenario in manifest["scenarios"]}
+    expected = {
+        "startup_tail_clearance_v1": "startup_tail",
+        "s_turn_reversal_v1": "turn_reversal",
+        "turn_stop_settle_v1": "turn_stop_settle",
+    }
+
+    for scenario_id, clearance_focus in expected.items():
+        scenario = scenario_by_id[scenario_id]
+        tags = set(scenario["dataset_tags"])
+
+        assert scenario["status"] == "mujoco_registry_ready"
+        assert scenario["task_context"]["clearance_focus"] == clearance_focus
+        assert scenario["task_context"]["requires_progress"] is True
+        assert "wbc_clearance_v0" in tags
+        assert "clearance" in tags
+        assert "min_foot_clearance_m" in scenario["success_metrics"]["required"]
+        assert scenario["acceptance_thresholds"]["require_foot_metrics"] is True
+
+
 def test_obstacle_and_terrain_scenarios_are_explicitly_contextualized():
     manifest = load_manifest()
     scenario_by_id = {scenario["id"]: scenario for scenario in manifest["scenarios"]}

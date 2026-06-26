@@ -934,9 +934,20 @@ depends on the hardware safety gate.
    This gate validates reporting, readiness analysis, follow-camera planning,
    evidence packaging, docs, and focused tests. It intentionally does not train,
    launch MuJoCo, or send actuator commands.
-4. Train the next clearance candidate to beat `s143` on low-clearance ratio in
-   all three scenarios while preserving p50 clearance, no-fall behavior, and
-   movement distance. Screen candidates with:
+4. Validate the expanded ready scenario surface before the next WBC or training
+   pass. The M10 promotion core remains the original three scenarios, and the
+   pre-WBC enrichment adds:
+
+```text
+startup_tail_clearance_v1
+s_turn_reversal_v1
+turn_stop_settle_v1
+```
+
+5. Train or implement the next clearance candidate to beat `s143` on
+   low-clearance ratio across the enriched six-scenario surface while
+   preserving p50 clearance, no-fall behavior, and movement distance. Screen
+   candidates with:
 
 ```bash
 ./scripts/analyze_clearance_readiness.sh \
@@ -949,17 +960,17 @@ depends on the hardware safety gate.
   --require-reference-improvement
 ```
 
-5. Run the candidate with `--viewer --follow-camera` for human visual review.
-6. Record swing-clearance evidence for all three scenarios.
-7. Fill the visual-review template and rebuild the evidence package.
-8. Focus training commands/objective on start-stop and turning clearance while
-   preserving the near-passing flat result, or acquire a higher-clearance
-   teacher.
-9. Pass the quantitative clearance readiness gate without regressing the
-   original scenario suite.
-10. Compare the new candidate suite against the official teacher with
+6. Run the candidate with `--viewer --follow-camera` for human visual review.
+7. Record swing-clearance evidence for all six ready locomotion scenarios.
+8. Fill the visual-review template and rebuild the evidence package.
+9. Focus training commands/objective on start-stop, startup-tail, and turning
+   clearance while preserving the near-passing flat result, or acquire a
+   higher-clearance teacher.
+10. Pass the quantitative clearance readiness gate without regressing the
+   original three-scenario M10 core.
+11. Compare the new candidate suite against the official teacher with
    `compare_policy_teacher_suite.sh`.
-11. Begin M11 held-out scenario development only after G10 passes.
+12. Begin M11 held-out scenario development only after G10 passes.
 
 ## Immediate WBC/control start
 
@@ -971,11 +982,11 @@ contract as the first body-control section:
 ./scripts/validate_wbc_clearance_contract.sh
 ```
 
-This section defines allowed clearance-control parameters and candidate sets
-for startup/tail and turning clearance. It is not a runtime backend yet: do not
-launch hardware, do not allow raw `action_14d`, and do not claim promotion until
-implemented candidates pass the M10 scenario/readiness/visual/teacher evidence
-path.
+This section defines allowed clearance-control parameters, candidate sets, and
+the enriched six-scenario evaluation surface for startup/tail and turning
+clearance. It is not a runtime backend yet: do not launch hardware, do not allow
+raw `action_14d`, and do not claim promotion until implemented candidates pass
+the M10 scenario/readiness/visual/teacher evidence path.
 
 ## Project success criteria
 

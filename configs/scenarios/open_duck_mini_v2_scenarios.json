@@ -294,6 +294,267 @@
       }
     },
     {
+      "id": "startup_tail_clearance_v1",
+      "title": "Startup and stopping tail clearance",
+      "status": "mujoco_registry_ready",
+      "priority": 32,
+      "family": "locomotion_flat",
+      "skills": [
+        "walk_velocity",
+        "stand",
+        "stop"
+      ],
+      "description": "Stress stand-to-walk and walk-to-stand tails where low swing-foot clearance most often appears before WBC tuning.",
+      "task_context": {
+        "skill_family": "locomotion",
+        "gait_style": "clearance_walk",
+        "requires_progress": true,
+        "requires_obstacle_crossing": false,
+        "clearance_focus": "startup_tail"
+      },
+      "environment_context": {
+        "terrain_type": "flat",
+        "terrain_height_m_range": [
+          0.0,
+          0.0
+        ],
+        "friction_range": [
+          0.8,
+          1.2
+        ],
+        "obstacles": []
+      },
+      "command_space": {
+        "vx_mps": [
+          0.0,
+          0.16
+        ],
+        "vy_mps": [
+          -0.015,
+          0.015
+        ],
+        "yaw_radps": [
+          -0.04,
+          0.04
+        ],
+        "duration_s": [
+          4.0,
+          10.0
+        ],
+        "ramps": [
+          "stand_micro_walk_stop",
+          "short_pulse_walk_stop",
+          "repeated_start_stop"
+        ]
+      },
+      "success_metrics": {
+        "required": [
+          "fall",
+          "forward_progress_m",
+          "stuck_ratio",
+          "terminal_speed_mps",
+          "min_foot_clearance_m"
+        ],
+        "fall_allowed": false,
+        "maximum_terminal_speed_mps": 0.035,
+        "maximum_stuck_ratio": 0.3
+      },
+      "dataset_tags": [
+        "bc_stage_2",
+        "wbc_clearance_v0",
+        "startup_tail",
+        "start_stop",
+        "clearance"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.06,
+        "min_mean_forward_speed_mps": 0.01,
+        "max_stuck_sample_ratio": 0.3,
+        "require_not_fallen": true,
+        "min_touchdown_count": 4,
+        "min_swing_clearance_m": 0.017,
+        "max_low_clearance_ratio": 0.25,
+        "require_foot_metrics": true,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 0.9
+      }
+    },
+    {
+      "id": "s_turn_reversal_v1",
+      "title": "S-turn reversal clearance",
+      "status": "mujoco_registry_ready",
+      "priority": 34,
+      "family": "locomotion_turning",
+      "skills": [
+        "curve_walk",
+        "walk_velocity",
+        "stop"
+      ],
+      "description": "Exercise left-right yaw reversals so clearance tuning is checked during lateral swing and curved-walk transitions.",
+      "task_context": {
+        "skill_family": "locomotion",
+        "gait_style": "clearance_walk",
+        "requires_progress": true,
+        "requires_obstacle_crossing": false,
+        "clearance_focus": "turn_reversal"
+      },
+      "environment_context": {
+        "terrain_type": "flat",
+        "terrain_height_m_range": [
+          0.0,
+          0.0
+        ],
+        "friction_range": [
+          0.8,
+          1.2
+        ],
+        "obstacles": []
+      },
+      "command_space": {
+        "vx_mps": [
+          0.03,
+          0.14
+        ],
+        "vy_mps": [
+          -0.015,
+          0.015
+        ],
+        "yaw_radps": [
+          -0.18,
+          0.18
+        ],
+        "duration_s": [
+          4.0,
+          10.0
+        ],
+        "ramps": [
+          "left_right_s_turn",
+          "right_left_s_turn",
+          "curve_reverse_settle"
+        ]
+      },
+      "success_metrics": {
+        "required": [
+          "fall",
+          "yaw_tracking_error",
+          "forward_progress_m",
+          "stuck_ratio",
+          "min_foot_clearance_m"
+        ],
+        "fall_allowed": false,
+        "maximum_stuck_ratio": 0.35
+      },
+      "dataset_tags": [
+        "bc_stage_2",
+        "wbc_clearance_v0",
+        "turn_reversal",
+        "curves",
+        "clearance"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.05,
+        "min_mean_forward_speed_mps": 0.01,
+        "max_stuck_sample_ratio": 0.35,
+        "require_not_fallen": true,
+        "min_touchdown_count": 4,
+        "min_swing_clearance_m": 0.017,
+        "max_low_clearance_ratio": 0.25,
+        "require_foot_metrics": true,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 0.95
+      }
+    },
+    {
+      "id": "turn_stop_settle_v1",
+      "title": "Turn, stop, and settle",
+      "status": "mujoco_registry_ready",
+      "priority": 36,
+      "family": "locomotion_turning",
+      "skills": [
+        "curve_walk",
+        "turn_in_place",
+        "stop",
+        "stand"
+      ],
+      "description": "Check clearance, terminal speed, and stability when curved walking transitions into a stop-and-hold phase.",
+      "task_context": {
+        "skill_family": "locomotion",
+        "gait_style": "clearance_walk",
+        "requires_progress": true,
+        "requires_obstacle_crossing": false,
+        "clearance_focus": "turn_stop_settle"
+      },
+      "environment_context": {
+        "terrain_type": "flat",
+        "terrain_height_m_range": [
+          0.0,
+          0.0
+        ],
+        "friction_range": [
+          0.8,
+          1.2
+        ],
+        "obstacles": []
+      },
+      "command_space": {
+        "vx_mps": [
+          0.0,
+          0.12
+        ],
+        "vy_mps": [
+          -0.01,
+          0.01
+        ],
+        "yaw_radps": [
+          -0.22,
+          0.22
+        ],
+        "duration_s": [
+          3.5,
+          9.0
+        ],
+        "ramps": [
+          "turn_stop_settle",
+          "curve_stop_hold",
+          "turn_reverse_stop"
+        ]
+      },
+      "success_metrics": {
+        "required": [
+          "fall",
+          "terminal_speed_mps",
+          "stuck_ratio",
+          "heading_drift",
+          "min_foot_clearance_m"
+        ],
+        "fall_allowed": false,
+        "maximum_terminal_speed_mps": 0.035,
+        "maximum_stuck_ratio": 0.4
+      },
+      "dataset_tags": [
+        "bc_stage_2",
+        "wbc_clearance_v0",
+        "turn_stop",
+        "settle",
+        "clearance"
+      ],
+      "acceptance_thresholds": {
+        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "min_distance_m": 0.03,
+        "min_mean_forward_speed_mps": 0.005,
+        "max_stuck_sample_ratio": 0.4,
+        "require_not_fallen": true,
+        "min_touchdown_count": 4,
+        "min_swing_clearance_m": 0.017,
+        "max_low_clearance_ratio": 0.25,
+        "require_foot_metrics": true,
+        "min_base_z_m": 0.12,
+        "max_abs_roll_pitch_rad": 0.95
+      }
+    },
+    {
       "id": "rough_ground_walk_v1",
       "title": "Rough ground walking",
       "status": "planned",

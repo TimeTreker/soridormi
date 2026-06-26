@@ -12,6 +12,16 @@ The default suite includes only scenario-registry entries that are both:
 This intentionally excludes scripted social skills, because they are governed by
 `evaluate_scripted_social_skills.sh` and the social readiness report.
 
+The current default ready locomotion suite contains the three-scenario M10 core
+plus the pre-WBC clearance enrichment:
+
+- `flat_walk_varied_speed_v1`
+- `start_stop_velocity_ramp_v1`
+- `curve_turn_walk_v1`
+- `startup_tail_clearance_v1`
+- `s_turn_reversal_v1`
+- `turn_stop_settle_v1`
+
 ## Dry-run plan
 
 ```bash

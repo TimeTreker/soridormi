@@ -59,17 +59,34 @@ Raw natural language should not be passed to the low-level policy. Chromie or an
 
 ### Stage 1: flat command-conditioned locomotion
 
-Initial behavior cloning should cover continuous command variation on flat ground:
+Initial behavior cloning and the M10 promotion gate should cover continuous
+command variation on flat ground:
 
 - `flat_walk_varied_speed_v1`
 - `start_stop_velocity_ramp_v1`
 - `curve_turn_walk_v1`
 
-These scenarios are registry-ready first because they do not require new obstacle objects or perception features. They focus on continuous `vx`, `vy`, and `yaw` ranges plus smooth command ramps.
+These scenarios are registry-ready first because they do not require new
+obstacle objects or perception features. They focus on continuous `vx`, `vy`,
+and `yaw` ranges plus smooth command ramps. Keep this three-scenario set as the
+stable M10 promotion core unless a milestone explicitly changes the gate.
 
 ### Stage 2: transition and tracking robustness
 
-Use the same flat-ground scenarios to evaluate command tracking, stop quality, stuck ratio, and terminal velocity. Do not rely on a single clean walking rollout.
+Before WBC tuning, enrich the ready MuJoCo suite with flat-ground cases that
+stress known clearance and settling problems:
+
+- `startup_tail_clearance_v1`
+- `s_turn_reversal_v1`
+- `turn_stop_settle_v1`
+
+These scenarios stay in bounded skill/context space. They add startup tails,
+stop tails, yaw reversal, and turn-to-stop settling pressure without introducing
+terrain, obstacle, or hardware dependencies.
+
+Use the Stage 1 and Stage 2 ready scenarios together to evaluate command
+tracking, stop quality, stuck ratio, terminal velocity, and swing-foot
+clearance. Do not rely on a single clean walking rollout.
 
 ### Stage 3: terrain context
 

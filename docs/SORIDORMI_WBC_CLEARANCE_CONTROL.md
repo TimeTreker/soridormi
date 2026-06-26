@@ -21,12 +21,26 @@ It defines:
 - required WBC/gait clearance parameters;
 - allowed min/default/max values;
 - sim-only safety constraints;
+- the six-scenario MuJoCo evaluation surface used for WBC clearance work;
 - candidate parameter sets for startup/tail and turning clearance;
 - post-implementation evaluation commands.
 
 The contract is a planning and validation surface. Because the WBC runtime
 backend is not implemented yet, candidates are marked
 `WAITING_FOR_WBC_RUNTIME_BACKEND`.
+
+The WBC clearance scenario surface is deliberately small and flat-ground:
+
+- `flat_walk_varied_speed_v1`
+- `start_stop_velocity_ramp_v1`
+- `curve_turn_walk_v1`
+- `startup_tail_clearance_v1`
+- `s_turn_reversal_v1`
+- `turn_stop_settle_v1`
+
+The first three remain the M10 promotion core. The last three enrich the suite
+before WBC tuning by stressing startup/stop tails, turn reversal, and
+turn-to-stop settling.
 
 ## Planning Harness
 

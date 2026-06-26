@@ -8,7 +8,10 @@
   "scenario_ids": [
     "flat_walk_varied_speed_v1",
     "start_stop_velocity_ramp_v1",
-    "curve_turn_walk_v1"
+    "curve_turn_walk_v1",
+    "startup_tail_clearance_v1",
+    "s_turn_reversal_v1",
+    "turn_stop_settle_v1"
   ],
   "safety": {
     "sim_only": true,

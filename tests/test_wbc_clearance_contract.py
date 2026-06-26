@@ -12,6 +12,15 @@ from soridormi_runtime.wbc_clearance_contract import (
     build_wbc_clearance_experiment_plan,
 )
 
+WBC_CLEARANCE_SCENARIOS = [
+    "flat_walk_varied_speed_v1",
+    "start_stop_velocity_ramp_v1",
+    "curve_turn_walk_v1",
+    "startup_tail_clearance_v1",
+    "s_turn_reversal_v1",
+    "turn_stop_settle_v1",
+]
+
 
 def _contract_payload() -> dict:
     return json.loads(DEFAULT_CONTRACT_PATH.read_text(encoding="utf-8"))
@@ -28,6 +37,7 @@ def test_default_wbc_clearance_contract_is_sim_only_and_backend_blocked() -> Non
     assert plan.chromie_raw_control_allowed is False
     assert plan.candidate_count == 4
     assert all(item["status"] == "WAITING_FOR_WBC_RUNTIME_BACKEND" for item in plan.candidates)
+    assert all(item["scenario_ids"] == WBC_CLEARANCE_SCENARIOS for item in plan.candidates)
     assert "WBC runtime backend is not implemented yet." in plan.warnings
 
 
