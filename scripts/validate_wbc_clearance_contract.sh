@@ -60,6 +60,7 @@ echo
 
 echo "Checking wrappers..."
 bash -n scripts/plan_wbc_clearance_experiment.sh
+bash -n scripts/validate_pre_wbc_scenario_surface.sh
 bash -n scripts/validate_wbc_clearance_contract.sh
 
 echo "Compiling WBC clearance module..."
@@ -73,6 +74,13 @@ mkdir -p "${output_dir}"
   --json \
   --strict >"${output_dir}/wbc_clearance_plan_stdout.json"
 python -m json.tool "${output_dir}/wbc_clearance_plan_stdout.json" >/dev/null
+
+echo "Checking pre-WBC scenario surface..."
+./scripts/validate_pre_wbc_scenario_surface.sh \
+  --contract "${contract}" \
+  --scenario-manifest configs/scenarios/open_duck_mini_v2_scenarios.json \
+  --output-dir "${output_dir}/pre_wbc_surface" \
+  --skip-pytest
 
 echo "Checking docs..."
 rg -n "plan_wbc_clearance_experiment.sh|validate_wbc_clearance_contract.sh" \
@@ -95,7 +103,9 @@ PY
 
 if [ "${run_pytest}" = "1" ]; then
   echo "Running focused WBC clearance tests..."
-  pytest -q tests/test_wbc_clearance_contract.py
+  pytest -q \
+    tests/test_wbc_clearance_contract.py \
+    tests/test_pre_wbc_scenario_surface.py
 else
   echo "Skipping focused pytest gate (--skip-pytest)."
 fi

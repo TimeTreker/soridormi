@@ -944,6 +944,10 @@ s_turn_reversal_v1
 turn_stop_settle_v1
 ```
 
+```bash
+./scripts/validate_pre_wbc_scenario_surface.sh
+```
+
 5. Train or implement the next clearance candidate to beat `s143` on
    low-clearance ratio across the enriched six-scenario surface while
    preserving p50 clearance, no-fall behavior, and movement distance. Screen

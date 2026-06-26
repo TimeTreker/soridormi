@@ -22,6 +22,15 @@ plus the pre-WBC clearance enrichment:
 - `s_turn_reversal_v1`
 - `turn_stop_settle_v1`
 
+Before WBC tuning, run the dry/offline surface gate:
+
+```bash
+./scripts/validate_pre_wbc_scenario_surface.sh
+```
+
+That command checks that the default suite, the M10 core scenarios, and the WBC
+clearance contract all agree on this six-scenario surface.
+
 ## Dry-run plan
 
 ```bash

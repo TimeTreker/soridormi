@@ -46,6 +46,9 @@ be committed.
 - `scripts/validate_m10_engineering_process.sh`: dry/offline process gate for
   M10 candidate history, clearance readiness, visual planning, evidence
   packaging, docs, and focused tests.
+- `scripts/validate_pre_wbc_scenario_surface.sh`: dry/offline pre-WBC gate that
+  checks the six-scenario ready locomotion surface, the M10 core split, and the
+  WBC clearance contract before tuning starts.
 - `scripts/plan_wbc_clearance_experiment.sh`: validates the WBC clearance
   contract and writes bounded sim-only experiment plans.
 - `scripts/validate_wbc_clearance_contract.sh`: dry/offline gate for the WBC

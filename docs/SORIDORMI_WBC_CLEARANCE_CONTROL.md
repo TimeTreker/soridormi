@@ -42,6 +42,16 @@ The first three remain the M10 promotion core. The last three enrich the suite
 before WBC tuning by stressing startup/stop tails, turn reversal, and
 turn-to-stop settling.
 
+Validate that surface before tuning:
+
+```bash
+./scripts/validate_pre_wbc_scenario_surface.sh
+```
+
+This is a dry/offline gate. It checks the WBC contract, the default ready
+locomotion suite, run-plan generation, and the M10 core/enrichment split; it
+does not launch MuJoCo or create candidate profiles.
+
 ## Planning Harness
 
 Generate the bounded experiment plan:
