@@ -13,12 +13,9 @@ cases:
   - id: task_acceptance.walk_forward_10_seconds
     natural_language_command: Walk forward for 10 seconds.
     task_submit:
-      task_type: move_velocity
+      task_type: move_forward
       summary: walk forward for 10 seconds
       parameters:
-        vx_mps: 0.10
-        vy_mps: 0.0
-        yaw_radps: 0.0
         duration_s: 10.0
       task_context:
         source: chromie
@@ -29,7 +26,7 @@ cases:
       phase: completed
       execution_mode: skill_dry_run
       no_motion: true
-      skill_id: walk_velocity
+      skill_id: walk_forward
       reason_code: null
       recommended_next_actions:
         - report_contract_dry_run_complete
@@ -43,12 +40,9 @@ cases:
   - id: task_acceptance.zh_walk_forward_10_seconds
     natural_language_command: 向前走十秒。
     task_submit:
-      task_type: move_velocity
+      task_type: move_forward
       summary: 向前走十秒
       parameters:
-        vx_mps: 0.10
-        vy_mps: 0.0
-        yaw_radps: 0.0
         duration_s: 10.0
       task_context:
         source: chromie
@@ -60,7 +54,7 @@ cases:
       phase: completed
       execution_mode: skill_dry_run
       no_motion: true
-      skill_id: walk_velocity
+      skill_id: walk_forward
       reason_code: null
       recommended_next_actions:
         - report_contract_dry_run_complete

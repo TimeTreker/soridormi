@@ -84,8 +84,11 @@ def test_named_skill_provider_is_no_motion_in_all_safe_modes(
 ) -> None:
     service = SoridormiLocalToolService(mode=mode)
     catalog = service.call_tool("soridormi.skill.list", {})
+    skills = {skill["skill_id"]: skill for skill in catalog["skills"]}
     assert catalog["mode"] == mode
-    assert any(skill["skill_id"] == "nod_yes" for skill in catalog["skills"])
+    assert "nod_yes" in skills
+    assert skills["walk_forward"]["execution"] == "skill_wrapper"
+    assert skills["walk_forward"]["semantic_speed_presets_mps"]["quick"] == pytest.approx(0.16)
 
     planned = service.call_tool(
         "soridormi.skill.create_plan",
@@ -481,7 +484,9 @@ def test_task_get_capabilities_reports_soridormi_readiness() -> None:
     assert payload["schema_version"] == "soridormi.task_capabilities.v1"
     assert payload["task_api_no_motion"] is True
     assert "skill_registry" in payload["ready_subsystems"]
+    assert "walk_forward" in payload["executable_skill_ids"]
     assert "walk_velocity" in payload["executable_skill_ids"]
+    assert by_type["move_forward"]["readiness"] == "skill_dry_run_ready"
     assert by_type["move_velocity"]["readiness"] == "skill_dry_run_ready"
     assert by_type["move_velocity"]["physical_execution_ready"] is False
     assert by_type["navigate_to_location"]["readiness"] == "future_blocked"
@@ -577,6 +582,26 @@ def test_task_submit_completes_skill_dry_run_for_velocity_task() -> None:
     assert submitted["execution_mode"] == "skill_dry_run"
     assert submitted["skill_id"] == "walk_velocity"
     assert submitted["no_motion"] is True
+
+
+def test_task_submit_completes_skill_dry_run_for_semantic_forward_walk() -> None:
+    service = SoridormiLocalToolService()
+
+    submitted = service.call_tool(
+        "soridormi.task.submit",
+        {
+            "task_type": "move_forward",
+            "summary": "walk forward slowly",
+            "parameters": {"speed": "slow", "duration_s": 2.0},
+        },
+    )
+
+    assert submitted["status"] == "completed"
+    assert submitted["phase"] == "completed"
+    assert submitted["execution_mode"] == "skill_dry_run"
+    assert submitted["skill_id"] == "walk_forward"
+    assert submitted["no_motion"] is True
+    assert submitted["plan_steps"][0]["summary"].startswith("Dry-run walk_forward")
 
 
 def test_task_submit_completes_skill_sequence_dry_run() -> None:

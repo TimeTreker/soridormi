@@ -130,6 +130,7 @@ than an atomic skill.
 
 Candidate task types:
 
+- `move_forward`
 - `move_velocity`
 - `turn_to_heading`
 - `approach_target`
@@ -240,6 +241,10 @@ Dry-run and unit scenarios:
 - `walk forward to the house` refuses with `missing_navigation_pipeline`
 - `bring me water` refuses with `missing_manipulation_capability`
 - unsafe physical requests refuse with `unsafe_task`
+
+Plain "walk forward/slowly/quickly" requests should use `move_forward` or
+`walk_forward` speed labels. `move_velocity` is reserved for explicit bounded
+velocity requests and engineering/debug scripts.
 
 Implementation note: these cases now live in
 `task_acceptance_cases/mcp_task_acceptance.yaml` and replay through

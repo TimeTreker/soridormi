@@ -265,6 +265,7 @@ def build_llm_skill_context(manifest: dict[str, Any], *, language: str = "en") -
                 "规则：",
                 "- 不要调用 status=unsupported_current_robot 的技能。",
                 "- 不要把 planned/future 技能当成已经可执行。",
+                "- 普通人类口令优先使用 walk_forward(speed=slow/normal/medium/quick/fast_limited)，不要要求用户给 vx_mps。",
                 "- 所有技能默认 sim-first，hardware_enabled=false。",
                 "- 社交语音/TTS 属于 Chromie，不属于 Soridormi。",
             ]
@@ -292,6 +293,7 @@ def build_llm_skill_context(manifest: dict[str, Any], *, language: str = "en") -
             "Rules:",
             "- Do not call skills with status=unsupported_current_robot.",
             "- Do not treat planned/future skills as executable.",
+            "- Prefer walk_forward(speed=slow/normal/medium/quick/fast_limited) for ordinary human walking requests; do not ask users for vx_mps.",
             "- All skills are sim-first and hardware_enabled=false by default.",
             "- Social speech/TTS belongs to Chromie, not Soridormi.",
         ]

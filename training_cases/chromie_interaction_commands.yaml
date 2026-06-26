@@ -13,17 +13,15 @@ cases:
     status: planned
     priority: 10
     natural_language_command: Walk forward for 10 seconds.
-    target_skill: walk_velocity
+    target_skill: walk_forward
     scenario_id: flat_walk_varied_speed_v1
     chromie_translation:
-      skill: walk_velocity
+      task_type: move_forward
+      skill: walk_forward
       parameters:
-        vx_mps: 0.10
-        vy_mps: 0.0
-        yaw_radps: 0.0
         duration_s: 10.0
     parameters:
-      vx_mps: 0.10
+      speed: normal
       duration_s: 10.0
     task_context:
       skill_family: interaction_acceptance
@@ -53,24 +51,22 @@ cases:
         operator: greater_equal
         value: 0.15
     validation:
-      dry_run: ./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":0.10,"duration_s":10.0}'
+      dry_run: ./scripts/run_skill_dry_run.sh walk_forward --args '{"duration_s":10.0}'
 
   - id: chromie_interaction.zh_walk_forward_10_seconds
     status: planned
     priority: 15
     natural_language_command: 向前走十秒。
-    target_skill: walk_velocity
+    target_skill: walk_forward
     scenario_id: flat_walk_varied_speed_v1
     chromie_translation:
-      skill: walk_velocity
+      task_type: move_forward
+      skill: walk_forward
       language: zh-CN
       parameters:
-        vx_mps: 0.10
-        vy_mps: 0.0
-        yaw_radps: 0.0
         duration_s: 10.0
     parameters:
-      vx_mps: 0.10
+      speed: normal
       duration_s: 10.0
     task_context:
       skill_family: interaction_acceptance
@@ -101,7 +97,7 @@ cases:
         operator: greater_equal
         value: 0.15
     validation:
-      dry_run: ./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":0.10,"duration_s":10.0}'
+      dry_run: ./scripts/run_skill_dry_run.sh walk_forward --args '{"duration_s":10.0}'
 
   - id: chromie_interaction.turn_left_then_nod_twice
     status: planned
@@ -164,19 +160,20 @@ cases:
     status: planned
     priority: 30
     natural_language_command: Sing while walking.
-    target_skill: walk_velocity
+    target_skill: walk_forward
     scenario_id: flat_walk_varied_speed_v1
     external_capabilities:
       - chromie.speech
       - chromie.audio
     chromie_translation:
-      body_skill: walk_velocity
+      body_task_type: move_forward
+      body_skill: walk_forward
       body_parameters:
-        vx_mps: 0.06
+        speed: slow
         duration_s: 6.0
       speech_owned_by: chromie
     parameters:
-      vx_mps: 0.06
+      speed: slow
       duration_s: 6.0
       speech_owned_by: chromie
     task_context:
@@ -207,7 +204,7 @@ cases:
         operator: equals
         value: true
     validation:
-      dry_run: ./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":0.06,"duration_s":6.0}'
+      dry_run: ./scripts/run_skill_dry_run.sh walk_forward --args '{"speed":"slow","duration_s":6.0}'
 
   - id: chromie_interaction.come_closer_slowly
     status: planned
@@ -248,7 +245,7 @@ cases:
         value: false
       - name: mean_forward_speed_mps
         operator: less_equal
-        value: 0.08
+        value: 0.12
       - name: final_speed_mps
         operator: less_equal
         value: 0.03

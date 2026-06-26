@@ -24,7 +24,7 @@ def test_skill_manifest_loader_and_summary() -> None:
     summary = summarize_manifest(manifest)
     assert summary["robot"] == "open_duck_mini_v2"
     assert summary["skill_count"] >= 30
-    assert 6 <= summary["available_sim_count"] <= 13
+    assert 6 <= summary["available_sim_count"] <= 15
     assert summary["unsupported_count"] >= 3
 
 
@@ -45,6 +45,7 @@ def test_llm_skill_context_mentions_rules_in_chinese() -> None:
     text = build_llm_skill_context(manifest, language="zh")
     assert "Soridormi 技能能力摘要" in text
     assert "不要调用 status=unsupported_current_robot" in text
+    assert "walk_forward(speed=slow/normal/medium/quick/fast_limited)" in text
     assert "wave_hand" in text
     assert "Chromie" in text
 

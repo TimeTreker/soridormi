@@ -368,6 +368,16 @@ def _gesture_skill_id(parameters: dict[str, Any]) -> str:
 
 def _skill_request_for_task(record: EmbodiedTaskRecord) -> tuple[str, dict[str, Any]]:
     parameters = dict(record.parameters)
+    if record.task_type == "move_forward":
+        return (
+            "walk_forward",
+            _copy_present(
+                parameters,
+                "speed",
+                "duration_s",
+                aliases={"pace": "speed", "speed_label": "speed"},
+            ),
+        )
     if record.task_type == "move_velocity":
         return (
             "walk_velocity",

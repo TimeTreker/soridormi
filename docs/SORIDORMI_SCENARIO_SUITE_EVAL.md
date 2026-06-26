@@ -12,6 +12,12 @@ The default suite includes only scenario-registry entries that are both:
 This intentionally excludes scripted social skills, because they are governed by
 `evaluate_scripted_social_skills.sh` and the social readiness report.
 
+Generated scenario run plans use the same minimum useful forward walking speed
+as skill execution: `walk_velocity` and `curve_walk` commands are not planned
+below `0.12 m/s` when the scenario command range can support it. This avoids
+evaluating "walking" scenarios with near-zero commands that mostly wiggle in
+place.
+
 The current default ready locomotion suite contains the three-scenario M10 core
 plus the pre-WBC clearance enrichment:
 

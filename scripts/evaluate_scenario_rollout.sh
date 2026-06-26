@@ -332,9 +332,9 @@ if [ -z "${log_path}" ]; then
     # Keep stdout reserved for the final scenario JSON report.  The runtime
     # wrapper and Docker Compose may print status/banner text, so send it to
     # stderr when callers request machine-readable output.
-    bash "${run_skill_in_sim_script}" "${skill_run_args[@]}" >&2
+    SORIDORMI_MIN_FORWARD_WALK_SPEED_MPS=0 bash "${run_skill_in_sim_script}" "${skill_run_args[@]}" >&2
   else
-    bash "${run_skill_in_sim_script}" "${skill_run_args[@]}"
+    SORIDORMI_MIN_FORWARD_WALK_SPEED_MPS=0 bash "${run_skill_in_sim_script}" "${skill_run_args[@]}"
   fi
 
   host_log_dir="data/logs"

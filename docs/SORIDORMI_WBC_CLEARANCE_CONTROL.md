@@ -42,6 +42,11 @@ The first three remain the M10 promotion core. The last three enrich the suite
 before WBC tuning by stressing startup/stop tails, turn reversal, and
 turn-to-stop settling.
 
+The run-plan generator applies the shared minimum forward walk speed
+(`0.12 m/s`) for `walk_velocity` and `curve_walk` when the scenario range allows
+it. This keeps pre-WBC clearance evidence focused on real locomotion rather than
+underpowered walk commands that only wiggle around the start pose.
+
 Validate that surface before tuning:
 
 ```bash
@@ -51,6 +56,38 @@ Validate that surface before tuning:
 This is a dry/offline gate. It checks the WBC contract, the default ready
 locomotion suite, run-plan generation, and the M10 core/enrichment split; it
 does not launch MuJoCo or create candidate profiles.
+
+## Current Six-Scenario Evidence
+
+The retained blocked reference is still:
+
+```text
+clearance_liftscale_stack_s143_step090_offset005
+```
+
+After raising the shared minimum forward walk speed to `0.12 m/s`, the
+six-scenario MuJoCo suite was regenerated at:
+
+```text
+artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005_min012_six_scenario/suite_summary.md
+artifacts/m10_engineering_process/clearance_liftscale_stack_s143_step090_offset005_min012_six_scenario/readiness_six/clearance_readiness.md
+artifacts/m10_engineering_process/clearance_liftscale_stack_s143_step090_offset005_min012_six_scenario/evidence_six/clearance_evidence_package.md
+```
+
+This run is a better pre-WBC baseline than the older six-scenario artifact
+because the slow startup, reversal, and settle cases now use a useful forward
+command instead of an underpowered wiggle. It still remains blocked:
+
+- scenarios passed: `1/6`
+- fallen count: `0`
+- total forward distance: `5.29235 m`
+- max stuck ratio: `0.00803`
+- min swing-clearance p50: `0.01858 m`
+- max low-clearance ratio: `0.36232`
+
+The next WBC/control candidate must reduce low-clearance ratio across the full
+six-scenario surface while preserving no-fall behavior, forward progress, and
+the original three-scenario M10 core.
 
 ## Planning Harness
 

@@ -33,6 +33,24 @@ Create a walking command plan:
   --args '{"vx_mps":0.12,"vy_mps":0.0,"yaw_radps":0.05,"duration_s":3.0}'
 ```
 
+For normal human speech, prefer semantic wrappers over raw velocity numbers:
+
+```bash
+./scripts/run_skill_dry_run.sh walk_forward \
+  --args '{"speed":"slow","duration_s":3.0}'
+```
+
+`walk_forward` accepts `slow`, `normal`, `medium`, `quick`, and
+`fast_limited` speed labels and lowers them to bounded `walk_velocity`
+commands. Chromie should use this path for requests such as "walk slowly" or
+"walk quickly". Keep `walk_velocity` for engineering/debug cases where an
+explicit velocity is genuinely intended.
+
+Forward walking commands below `0.12 m/s` are raised to `0.12 m/s` before
+runtime command overrides are emitted. This keeps tiny "walk" requests from
+turning into a wiggle-in-place pattern. Use `stop`, `stand_idle`, or
+`turn_in_place` when the intended behavior is stationary.
+
 Machine-readable output:
 
 ```bash
@@ -69,6 +87,12 @@ environment labels such as terrain or obstacle metadata
 ```
 
 The current M7C/M7D implementation only lowers single-segment locomotion skills to velocity command overrides. Future skill execution should preserve the same boundary: validate manifest parameters, build policy context, then call the runtime policy that outputs the 14D action.
+
+`walk_forward`, `walk_velocity`, and `curve_walk` also apply the shared minimum
+useful forward walk speed of `0.12 m/s`. The resolved plan keeps
+`requested_vx_mps` and `min_forward_speed_mps` metadata when a numeric command
+is adjusted, so debugging can see both the user/planner request and the command
+sent to the runtime.
 
 ## Safety rules
 

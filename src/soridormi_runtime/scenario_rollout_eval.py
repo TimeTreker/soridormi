@@ -13,6 +13,7 @@ from soridormi_runtime.scenario_curriculum import (
     ScenarioDefinition,
     get_scenario_definition,
 )
+from soridormi_runtime.skill_execution import MIN_FORWARD_WALK_SPEED_MPS, apply_min_forward_walk_speed
 from soridormi_runtime.stride_step_metrics_eval import (
     StrideStepReport,
     StrideStepThresholds,
@@ -237,7 +238,9 @@ def _scenario_positive_nominal(scenario: ScenarioDefinition, field_name: str, fa
     if maximum <= 0.0:
         return float(maximum)
     low = max(0.0, minimum)
-    return float((low + maximum) / 2.0)
+    nominal = float((low + maximum) / 2.0)
+    applied, _ = apply_min_forward_walk_speed(nominal, max_vx_mps=maximum)
+    return applied
 
 
 def _scenario_turn_nominal(scenario: ScenarioDefinition, field_name: str, fallback: float) -> float:
@@ -292,7 +295,7 @@ def build_scenario_run_plan(
         raise ValueError("steps must be positive")
 
     args: dict[str, Any] = {"duration_s": planned_duration_s}
-    if skill_id in {"walk_velocity", "stop", "stand", "stand_idle"}:
+    if skill_id == "walk_velocity":
         args.update(
             {
                 "vx_mps": _scenario_positive_nominal(scenario, "vx_mps", 0.08),
@@ -300,6 +303,8 @@ def build_scenario_run_plan(
                 "yaw_radps": 0.0,
             }
         )
+    elif skill_id in {"stop", "stand", "stand_idle"}:
+        args.update({"vx_mps": 0.0, "vy_mps": 0.0, "yaw_radps": 0.0})
     elif skill_id == "curve_walk":
         args.update(
             {

@@ -314,6 +314,10 @@ class SoridormiLocalToolService:
                     "skill_id": skill_id,
                     "version": "0.1.0",
                     "available": True,
+                    "description": str(skill.get("description") or ""),
+                    "execution": str(skill.get("execution") or ""),
+                    "notes": str(skill.get("notes") or ""),
+                    "semantic_speed_presets_mps": dict(skill.get("semantic_speed_presets_mps") or {}),
                     "parameters_schema": {
                         "type": "object",
                         "properties": properties,

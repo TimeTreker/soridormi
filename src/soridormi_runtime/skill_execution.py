@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import os
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,11 +27,36 @@ from soridormi_runtime.skill_manifest import (
 )
 
 
-DEFAULT_SKILL_PROFILE = "open_duck_forward"
-
-
 class SkillExecutionError(ValueError):
     """Raised when a skill cannot be resolved into a safe command plan."""
+
+
+DEFAULT_SKILL_PROFILE = "open_duck_forward"
+DEFAULT_MIN_FORWARD_WALK_SPEED_MPS = 0.12
+MIN_FORWARD_WALK_SPEED_ENV = "SORIDORMI_MIN_FORWARD_WALK_SPEED_MPS"
+
+
+def _configured_min_forward_walk_speed_mps() -> float:
+    raw = os.environ.get(MIN_FORWARD_WALK_SPEED_ENV)
+    if raw is None or raw.strip() == "":
+        return DEFAULT_MIN_FORWARD_WALK_SPEED_MPS
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise SkillExecutionError(f"{MIN_FORWARD_WALK_SPEED_ENV} must be a number") from exc
+    if not math.isfinite(value) or value < 0.0:
+        raise SkillExecutionError(f"{MIN_FORWARD_WALK_SPEED_ENV} must be a finite non-negative number")
+    return value
+
+
+MIN_FORWARD_WALK_SPEED_MPS = _configured_min_forward_walk_speed_mps()
+FORWARD_WALK_SPEED_PRESETS_MPS = {
+    "slow": MIN_FORWARD_WALK_SPEED_MPS,
+    "normal": 0.12,
+    "medium": 0.12,
+    "quick": 0.16,
+    "fast_limited": 0.18,
+}
 
 
 @dataclass(frozen=True)
@@ -130,6 +157,58 @@ class SkillPlan:
 
 
 SkillPlanner = Callable[[dict[str, Any], Mapping[str, Any], str], SkillPlan]
+
+
+def _skill_parameter_max(skill: Mapping[str, Any], parameter_name: str) -> float | None:
+    parameters = skill.get("parameters", {})
+    if not isinstance(parameters, Mapping):
+        return None
+    rule = parameters.get(parameter_name)
+    if not isinstance(rule, Mapping) or "max" not in rule:
+        return None
+    try:
+        value = float(rule["max"])
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(value):
+        return None
+    return value
+
+
+def apply_min_forward_walk_speed(vx_mps: float, *, max_vx_mps: float | None = None) -> tuple[float, bool]:
+    """Raise tiny forward walk requests to the lowest useful sim walk speed."""
+
+    vx = float(vx_mps)
+    floor = MIN_FORWARD_WALK_SPEED_MPS
+    if max_vx_mps is not None and math.isfinite(max_vx_mps) and max_vx_mps >= 0.0:
+        floor = min(floor, float(max_vx_mps))
+    if 0.0 <= vx < floor:
+        return floor, True
+    return vx, False
+
+
+def _with_forward_walk_speed_metadata(
+    parameters: Mapping[str, Any],
+    requested_vx: float,
+    applied_vx: float,
+) -> dict[str, Any]:
+    planned = dict(parameters)
+    planned["vx_mps"] = applied_vx
+    if applied_vx != requested_vx:
+        planned["requested_vx_mps"] = requested_vx
+        planned["min_forward_speed_mps"] = MIN_FORWARD_WALK_SPEED_MPS
+    return planned
+
+
+def _forward_walk_speed_preset(value: Any) -> tuple[str, float]:
+    speed = str(value or "normal").strip().lower()
+    try:
+        return speed, FORWARD_WALK_SPEED_PRESETS_MPS[speed]
+    except KeyError as exc:
+        allowed = ", ".join(sorted(FORWARD_WALK_SPEED_PRESETS_MPS))
+        raise SkillExecutionError(
+            f"unsupported walk_forward speed {speed!r}; expected one of: {allowed}"
+        ) from exc
 
 
 def _coerce_number(name: str, value: Any) -> float:
@@ -246,13 +325,43 @@ def _plan_stop(skill: dict[str, Any], parameters: Mapping[str, Any], profile: st
 
 
 def _plan_walk_velocity(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+    requested_vx = float(parameters.get("vx_mps", 0.0))
+    vx, _ = apply_min_forward_walk_speed(requested_vx, max_vx_mps=_skill_parameter_max(skill, "vx_mps"))
+    planned_parameters = _with_forward_walk_speed_metadata(parameters, requested_vx, vx)
     return _velocity_skill_plan(
         skill,
-        parameters,
+        planned_parameters,
         profile,
-        vx=float(parameters.get("vx_mps", 0.0)),
+        vx=vx,
         vy=float(parameters.get("vy_mps", 0.0)),
         yaw=float(parameters.get("yaw_radps", 0.0)),
+        duration=float(parameters.get("duration_s", 2.0)),
+    )
+
+
+def _plan_walk_forward(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+    speed, requested_vx = _forward_walk_speed_preset(parameters.get("speed", "normal"))
+    vx, _ = apply_min_forward_walk_speed(requested_vx, max_vx_mps=_skill_parameter_max(skill, "vx_mps"))
+    planned_parameters = dict(parameters)
+    planned_parameters.update(
+        {
+            "speed": speed,
+            "vx_mps": vx,
+            "vy_mps": 0.0,
+            "yaw_radps": 0.0,
+            "lowered_to_skill_id": "walk_velocity",
+        }
+    )
+    if vx != requested_vx:
+        planned_parameters["requested_vx_mps"] = requested_vx
+        planned_parameters["min_forward_speed_mps"] = MIN_FORWARD_WALK_SPEED_MPS
+    return _velocity_skill_plan(
+        skill,
+        planned_parameters,
+        profile,
+        vx=vx,
+        vy=0.0,
+        yaw=0.0,
         duration=float(parameters.get("duration_s", 2.0)),
     )
 
@@ -268,11 +377,14 @@ def _plan_turn_in_place(skill: dict[str, Any], parameters: Mapping[str, Any], pr
 
 
 def _plan_curve_walk(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+    requested_vx = float(parameters.get("vx_mps", 0.0))
+    vx, _ = apply_min_forward_walk_speed(requested_vx, max_vx_mps=_skill_parameter_max(skill, "vx_mps"))
+    planned_parameters = _with_forward_walk_speed_metadata(parameters, requested_vx, vx)
     return _velocity_skill_plan(
         skill,
-        parameters,
+        planned_parameters,
         profile,
-        vx=float(parameters.get("vx_mps", 0.0)),
+        vx=vx,
         yaw=float(parameters.get("yaw_radps", 0.0)),
         duration=float(parameters.get("duration_s", 3.0)),
     )
@@ -616,6 +728,7 @@ BUILTIN_SKILL_PLANNERS: dict[str, SkillPlanner] = {
     "stand_idle": _plan_stand_idle,
     "stop": _plan_stop,
     "walk_velocity": _plan_walk_velocity,
+    "walk_forward": _plan_walk_forward,
     "turn_in_place": _plan_turn_in_place,
     "curve_walk": _plan_curve_walk,
     "sidestep": _plan_sidestep,

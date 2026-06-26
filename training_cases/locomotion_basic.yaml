@@ -49,19 +49,17 @@ cases:
   - id: locomotion_basic.walk_forward_slow_medium_fast
     status: training_ready
     priority: 20
-    natural_language_command: Walk forward at slow, medium, and fast safe speeds.
-    target_skill: walk_velocity
+    natural_language_command: Walk forward slowly, normally, and quickly.
+    target_skill: walk_forward
     scenario_id: flat_walk_varied_speed_v1
     parameters:
-      speed_bands:
-        - label: slow
-          vx_mps: 0.06
-        - label: medium
-          vx_mps: 0.14
-        - label: fast_safe
-          vx_mps: 0.22
-      vy_mps: 0.0
-      yaw_radps: 0.0
+      speed_presets:
+        - speed: slow
+          expected_vx_mps: 0.12
+        - speed: medium
+          expected_vx_mps: 0.12
+        - speed: quick
+          expected_vx_mps: 0.16
       duration_s: 6.0
       ramp: smooth_start
     task_context:
@@ -90,6 +88,7 @@ cases:
         operator: less_equal
         value: 0.2
     validation:
+      dry_run: ./scripts/run_skill_dry_run.sh walk_forward --args '{"speed":"slow","duration_s":6.0}'
       mujoco: ./scripts/evaluate_scenario_rollout.sh --scenario flat_walk_varied_speed_v1 --backend mujoco --profile open_duck_forward
 
   - id: locomotion_basic.stop_cleanly

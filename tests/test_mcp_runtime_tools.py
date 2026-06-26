@@ -14,6 +14,7 @@ from soridormi_api import (
 )
 from soridormi_runtime.mcp.runtime_tools import SoridormiRuntimeToolService
 from soridormi_runtime.scripted_head_skill import HEAD_JOINT_NAMES
+from soridormi_runtime.skill_execution import MIN_FORWARD_WALK_SPEED_MPS
 from soridormi_runtime.policy_command import PolicyCommand
 
 
@@ -492,6 +493,18 @@ def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> Non
         assert skills["walk_velocity"]["available"] is True
         assert skills["walk_velocity"]["description"]
         assert "vx_mps" in skills["walk_velocity"]["parameters_schema"]["properties"]
+        assert "walk_forward" in skills
+        assert skills["walk_forward"]["execution"] == "skill_wrapper"
+        assert skills["walk_forward"]["semantic_speed_presets_mps"]["slow"] == pytest.approx(
+            MIN_FORWARD_WALK_SPEED_MPS
+        )
+        assert skills["walk_forward"]["parameters_schema"]["properties"]["speed"]["enum"] == [
+            "slow",
+            "normal",
+            "medium",
+            "quick",
+            "fast_limited",
+        ]
         assert "nod_yes" in skills
         assert skills["nod_yes"]["available"] is True
         assert skills["nod_yes"]["execution"] == "scripted_keyframe"
@@ -531,6 +544,36 @@ def test_runtime_service_executes_named_velocity_skill() -> None:
         assert result["no_motion"] is False
         assert any(
             command.x_velocity == 0.15
+            for command in service.controller.seen_commands
+        )
+
+    asyncio.run(exercise())
+
+
+def test_runtime_service_executes_semantic_walk_forward_skill() -> None:
+    async def exercise() -> None:
+        service = _service()
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {
+                "skill_id": "walk_forward",
+                "parameters": {
+                    "speed": "slow",
+                    "duration_s": 0.5,
+                },
+            },
+        )
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan",
+            {"plan_id": plan["plan_id"]},
+        )
+
+        assert plan["skill_id"] == "walk_forward"
+        assert plan["no_motion"] is False
+        assert result["completed"] is True
+        assert result["skill_id"] == "walk_forward"
+        assert any(
+            command.x_velocity == pytest.approx(MIN_FORWARD_WALK_SPEED_MPS)
             for command in service.controller.seen_commands
         )
 

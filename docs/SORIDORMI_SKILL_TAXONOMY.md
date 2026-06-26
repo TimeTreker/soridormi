@@ -118,6 +118,11 @@ sidestep_right
 
 These should lower to the existing velocity-command policy path and continue to use MuJoCo acceptance gates.
 
+For human-facing language, Chromie should prefer semantic wrappers such as
+`walk_forward(speed=slow|normal|medium|quick|fast_limited)` instead of asking
+the user or LLM to provide exact `vx_mps` values. `walk_velocity` remains the
+bounded engineering/debug primitive beneath those wrappers.
+
 ### head_social: head/neck social skills
 
 Implement safe scripted/keyframe social behaviors in MuJoCo first:

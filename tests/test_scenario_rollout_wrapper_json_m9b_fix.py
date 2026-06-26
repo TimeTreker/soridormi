@@ -34,8 +34,10 @@ def test_scenario_rollout_shell_json_dry_run_is_machine_readable(tmp_path: Path)
 def test_scenario_rollout_shell_json_keeps_runtime_noise_off_stdout(tmp_path: Path) -> None:
     log_prefix = "m9b_json_stdout_test"
     fake_script_path = tmp_path / "fake_run_skill_in_sim.sh"
+    floor_env_path = tmp_path / "floor_env.txt"
     fake_script = f"""#!/usr/bin/env bash
 set -euo pipefail
+printf '%s\\n' "${{SORIDORMI_MIN_FORWARD_WALK_SPEED_MPS:-unset}}" > {floor_env_path}
 printf 'runtime stdout noise should not reach JSON stdout\\n'
 mkdir -p data/logs
 cat > data/logs/{log_prefix}_fake.jsonl <<'JSONL'
@@ -80,3 +82,4 @@ JSONL
     assert payload["ok"] is True
     assert "runtime stdout noise" not in result.stdout
     assert "runtime stdout noise" in result.stderr
+    assert floor_env_path.read_text(encoding="utf-8").strip() == "0"

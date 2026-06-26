@@ -188,7 +188,7 @@
         "vx_mps": {
           "min": -0.03,
           "max": 0.25,
-          "default": 0.1
+          "default": 0.12
         },
         "vy_mps": {
           "min": -0.03,
@@ -236,15 +236,18 @@
       "id": "walk_forward",
       "category": "locomotion",
       "display_name": "Walk Forward",
-      "description": "Human-facing wrapper for walk_velocity with positive vx.",
-      "status": "planned_wrapper",
+      "description": "Human-facing wrapper for natural requests like walk forward, walk slowly, and walk quickly. The speed label is lowered to a bounded positive vx command.",
+      "status": "available_sim",
       "execution": "skill_wrapper",
       "implementation_phase": "locomotion_wrappers",
       "parameters": {
         "speed": {
+          "type": "string",
           "enum": [
             "slow",
             "normal",
+            "medium",
+            "quick",
             "fast_limited"
           ],
           "default": "normal"
@@ -277,7 +280,14 @@
         "forward_progress_ratio",
         "velocity_tracking"
       ],
-      "notes": "Wrapper should lower to walk_velocity(vx>0, vy=0, yaw=0)."
+      "semantic_speed_presets_mps": {
+        "slow": 0.12,
+        "normal": 0.12,
+        "medium": 0.12,
+        "quick": 0.16,
+        "fast_limited": 0.18
+      },
+      "notes": "Executable semantic wrapper for Chromie and human-facing task planners. Use walk_forward(speed=slow|normal|medium|quick|fast_limited) for ordinary speech. It lowers to walk_velocity(vx>0, vy=0, yaw=0). True running remains future and should use run only after a validated controller exists."
     },
     {
       "id": "walk_backward",
@@ -473,7 +483,7 @@
         "vx_mps": {
           "min": 0.03,
           "max": 0.2,
-          "default": 0.08
+          "default": 0.12
         },
         "yaw_radps": {
           "min": -0.2,

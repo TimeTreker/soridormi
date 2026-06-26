@@ -29,8 +29,20 @@
   ],
   "task_types": [
     {
+      "task_type": "move_forward",
+      "description": "Semantic forward walking task for normal speech; speed labels dry-run to walk_forward.",
+      "readiness": "skill_dry_run_ready",
+      "execution_modes": ["skill_dry_run"],
+      "persistent_submit_allowed": true,
+      "required_subsystems": ["skill_registry", "policy_velocity_skill_contract"],
+      "external_dependencies": [],
+      "missing_subsystems": [],
+      "reason_code": null,
+      "recommended_actions": ["preview_task", "submit_task_when_confirmed", "use_skill_execution_path_for_physical_motion"]
+    },
+    {
       "task_type": "move_velocity",
-      "description": "Bounded explicit velocity task that can dry-run to walk_velocity.",
+      "description": "Bounded explicit velocity task for engineering/debug control that can dry-run to walk_velocity.",
       "readiness": "skill_dry_run_ready",
       "execution_modes": ["skill_dry_run"],
       "persistent_submit_allowed": true,

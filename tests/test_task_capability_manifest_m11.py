@@ -85,8 +85,11 @@ def test_emergency_stop_overlays_submit_availability_only() -> None:
     }
 
     assert stopped["safe_idle"] is False
+    assert nominal_by_type["move_forward"]["persistent_submit_allowed"] is True
+    assert stopped_by_type["move_forward"]["persistent_submit_allowed"] is False
     assert nominal_by_type["move_velocity"]["persistent_submit_allowed"] is True
     assert stopped_by_type["move_velocity"]["persistent_submit_allowed"] is False
+    assert stopped_by_type["move_forward"]["readiness"] == "skill_dry_run_ready"
     assert stopped_by_type["move_velocity"]["readiness"] == "skill_dry_run_ready"
     assert stopped_by_type["navigate_to_location"]["reason_code"] == (
         nominal_by_type["navigate_to_location"]["reason_code"]

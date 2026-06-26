@@ -248,7 +248,7 @@ class SoridormiRuntimeToolService:
         supported: list[str] = []
         for skill_id in self.skill_registry.executable_skill_ids():
             execution = self.skill_registry.skills[skill_id].get("execution")
-            if execution == "policy_velocity":
+            if execution in {"policy_velocity", "skill_wrapper"}:
                 supported.append(skill_id)
             elif execution == "scripted_keyframe" and skill_id in SUPPORTED_SCRIPTED_SKILLS:
                 supported.append(skill_id)
@@ -311,6 +311,8 @@ class SoridormiRuntimeToolService:
                     "requires_confirmation": self.mode != "sim",
                     "when_to_use": str(skill.get("description") or ""),
                     "execution": execution,
+                    "notes": str(skill.get("notes") or ""),
+                    "semantic_speed_presets_mps": dict(skill.get("semantic_speed_presets_mps") or {}),
                 }
             )
         return {"mode": self.mode, "skills": skills}
@@ -352,7 +354,7 @@ class SoridormiRuntimeToolService:
             args.get("parameters") or {},
             profile=args.get("profile"),
         )
-        if plan.execution == "policy_velocity":
+        if plan.execution in {"policy_velocity", "skill_wrapper"}:
             motion_result = self.create_motion_plan(
                 {"commands": self._motion_commands_from_skill_plan(plan)}
             )
@@ -390,7 +392,7 @@ class SoridormiRuntimeToolService:
         stored = self.skill_plans.get(plan_id)
         if stored is None:
             raise KeyError(f"skill plan not found: {plan_id}")
-        if stored.plan.execution == "policy_velocity":
+        if stored.plan.execution in {"policy_velocity", "skill_wrapper"}:
             result = await self.execute_motion_plan(plan_id)
         elif stored.plan.execution == "scripted_keyframe":
             result = await self.execute_scripted_head_skill(plan_id)

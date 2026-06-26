@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 from soridormi_runtime.scenario_rollout_eval import (
     ScenarioRolloutThresholds,
@@ -9,6 +14,7 @@ from soridormi_runtime.scenario_rollout_eval import (
     evaluate_scenario_rollout,
     render_markdown,
 )
+from soridormi_runtime.skill_execution import MIN_FORWARD_WALK_SPEED_MPS
 
 
 def _row(
@@ -65,7 +71,7 @@ def test_build_scenario_run_plan_uses_manifest_command_space() -> None:
     assert plan.profile == "open_duck_forward"
     assert plan.steps == 200
     assert plan.args["duration_s"] == 4.0
-    assert 0.0 < plan.args["vx_mps"] <= 0.25
+    assert MIN_FORWARD_WALK_SPEED_MPS <= plan.args["vx_mps"] <= 0.25
     assert plan.args["yaw_radps"] == 0.0
     assert plan.environment_context["terrain_type"] == "flat"
 
@@ -75,8 +81,17 @@ def test_build_curve_scenario_run_plan_picks_visible_turn() -> None:
 
     assert plan.skill_id == "curve_walk"
     assert plan.steps == 80
-    assert plan.args["vx_mps"] > 0.0
+    assert plan.args["vx_mps"] >= MIN_FORWARD_WALK_SPEED_MPS
     assert plan.args["yaw_radps"] > 0.0
+
+
+def test_build_stationary_scenario_run_plan_does_not_apply_walk_speed_floor() -> None:
+    plan = build_scenario_run_plan("recovery_after_push_v1", duration_s=4.0, control_hz=20.0)
+
+    assert plan.skill_id == "stand"
+    assert plan.args["vx_mps"] == 0.0
+    assert plan.args["vy_mps"] == 0.0
+    assert plan.args["yaw_radps"] == 0.0
 
 
 def test_build_wbc_clearance_enrichment_run_plans_are_bounded_skills() -> None:
@@ -86,19 +101,46 @@ def test_build_wbc_clearance_enrichment_run_plans_are_bounded_skills() -> None:
 
     assert startup.skill_id == "walk_velocity"
     assert startup.args["duration_s"] == 7.0
-    assert 0.0 < startup.args["vx_mps"] <= 0.16
+    assert startup.args["vx_mps"] == pytest.approx(MIN_FORWARD_WALK_SPEED_MPS)
     assert startup.task_context["clearance_focus"] == "startup_tail"
 
     assert reversal.skill_id == "curve_walk"
-    assert reversal.args["vx_mps"] > 0.0
+    assert reversal.args["vx_mps"] >= MIN_FORWARD_WALK_SPEED_MPS
     assert reversal.args["yaw_radps"] > 0.0
     assert reversal.task_context["clearance_focus"] == "turn_reversal"
 
     assert settle.skill_id == "curve_walk"
     assert settle.args["duration_s"] == 6.25
-    assert settle.args["vx_mps"] > 0.0
+    assert settle.args["vx_mps"] == pytest.approx(MIN_FORWARD_WALK_SPEED_MPS)
     assert settle.args["yaw_radps"] > 0.0
     assert settle.task_context["clearance_focus"] == "turn_stop_settle"
+
+
+def test_scenario_minimum_forward_speed_env_override_clamps_to_scenario_max() -> None:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = f"src{os.pathsep}{env['PYTHONPATH']}" if env.get("PYTHONPATH") else "src"
+    env["SORIDORMI_MIN_FORWARD_WALK_SPEED_MPS"] = "0.14"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "soridormi_runtime.scenario_suite_eval",
+            "--scenario",
+            "startup_tail_clearance_v1",
+            "--scenario",
+            "turn_stop_settle_v1",
+            "--print-suite-plan",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    payload = json.loads(proc.stdout)
+    plans = {item["scenario_id"]: item["run_plan"]["args"] for item in payload["selected"]}
+    assert plans["startup_tail_clearance_v1"]["vx_mps"] == pytest.approx(0.14)
+    assert plans["turn_stop_settle_v1"]["vx_mps"] == pytest.approx(0.12)
 
 
 def test_evaluate_scenario_rollout_passes_progressing_log(tmp_path: Path) -> None:

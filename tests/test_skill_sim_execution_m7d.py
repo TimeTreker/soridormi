@@ -7,7 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from soridormi_runtime.skill_execution import SkillExecutionRegistry, plan_shell_exports
+from soridormi_runtime.skill_execution import (
+    MIN_FORWARD_WALK_SPEED_MPS,
+    SkillExecutionRegistry,
+    plan_shell_exports,
+)
 from soridormi_runtime.skill_manifest import DEFAULT_SKILL_MANIFEST, load_skill_manifest
 
 
@@ -25,6 +29,33 @@ def test_plan_shell_exports_bind_velocity_command_overrides() -> None:
     assert "export SORIDORMI_SKILL_DURATION_SECONDS=2.5" in text
     assert "export SORIDORMI_SKILL_ID=walk_velocity" in text
     assert "SORIDORMI_COMMAND_RAMP_SECONDS_OVERRIDE" not in text
+
+
+def test_plan_shell_exports_use_minimum_forward_walk_speed() -> None:
+    registry = SkillExecutionRegistry(load_skill_manifest(DEFAULT_SKILL_MANIFEST))
+    plan = registry.create_plan(
+        "walk_velocity",
+        {"vx_mps": 0.02, "duration_s": 2.5},
+        profile="open_duck_forward",
+    )
+
+    text = plan_shell_exports(plan)
+    assert f"export SORIDORMI_COMMAND_X_OVERRIDE={MIN_FORWARD_WALK_SPEED_MPS:.10g}" in text
+
+
+def test_plan_shell_exports_support_semantic_walk_forward() -> None:
+    registry = SkillExecutionRegistry(load_skill_manifest(DEFAULT_SKILL_MANIFEST))
+    plan = registry.create_plan(
+        "walk_forward",
+        {"speed": "quick", "duration_s": 2.5},
+        profile="open_duck_forward",
+    )
+
+    text = plan_shell_exports(plan)
+    assert "export SORIDORMI_SKILL_ID=walk_forward" in text
+    assert "export SORIDORMI_COMMAND_X_OVERRIDE=0.16" in text
+    assert "export SORIDORMI_COMMAND_Y_OVERRIDE=0" in text
+    assert "export SORIDORMI_COMMAND_YAW_OVERRIDE=0" in text
 
 
 def test_skill_execution_cli_shell_env() -> None:
@@ -82,6 +113,43 @@ def test_run_skill_in_sim_script_help_and_dry_run_only() -> None:
     assert "Rollout steps: 50 (derived from skill duration)" in dry_proc.stdout
     assert "Wall-clock seconds cutoff: disabled" in dry_proc.stdout
     assert "Dry-run only; not launching runtime." in dry_proc.stdout
+
+
+def test_run_skill_in_sim_dry_run_only_reports_minimum_forward_walk_speed() -> None:
+    dry_proc = subprocess.run(
+        [
+            "bash",
+            "scripts/run_skill_in_sim.sh",
+            "walk_velocity",
+            "--args",
+            json.dumps({"vx_mps": 0.02, "duration_s": 1.25}),
+            "--dry-run-only",
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+        timeout=60,
+    )
+    assert f"Command overrides: x={MIN_FORWARD_WALK_SPEED_MPS:.10g}" in dry_proc.stdout
+
+
+def test_run_skill_in_sim_dry_run_only_accepts_semantic_walk_forward() -> None:
+    dry_proc = subprocess.run(
+        [
+            "bash",
+            "scripts/run_skill_in_sim.sh",
+            "walk_forward",
+            "--args",
+            json.dumps({"speed": "slow", "duration_s": 1.25}),
+            "--dry-run-only",
+        ],
+        check=True,
+        text=True,
+        capture_output=True,
+        timeout=60,
+    )
+    assert "Skill: walk_forward" in dry_proc.stdout
+    assert f"Command overrides: x={MIN_FORWARD_WALK_SPEED_MPS:.10g}" in dry_proc.stdout
 
 
 def test_run_skill_in_sim_steps_override_and_wall_clock_cutoff_are_explicit() -> None:

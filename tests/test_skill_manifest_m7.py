@@ -147,7 +147,7 @@ def test_first_available_subset_is_small_and_supported() -> None:
         for skill in skills.values()
         if skill["status"] in {"available_sim", "available_sim_experimental"}
     ]
-    assert 6 <= len(available) <= 14
+    assert 6 <= len(available) <= 16
 
     for skill in available:
         required = set(skill["required_actuator_groups"])
@@ -184,6 +184,8 @@ def test_blink_eyes_is_visual_expression_not_motor_control() -> None:
 
 def test_obstacle_run_and_posture_remain_future_not_executable() -> None:
     skills = _skills_by_id()
+    assert skills["walk_forward"]["status"] == "available_sim"
+    assert skills["walk_forward"]["execution"] == "skill_wrapper"
     assert skills["navigate_to_target"]["status"] == "future_perception"
     assert skills["navigate_to_target"]["execution"] == "navigation_pipeline"
     assert skills["step_over_obstacle"]["status"] == "future_residual_rl"
