@@ -425,6 +425,16 @@ For Soridormi's current M10 direction, the clearance gate remains critical:
 new controllers must not hide low swing-foot clearance behind aggregate pass
 metrics.
 
+Before using this WBC direction as the main development focus, close the M10
+engineering-process gate:
+
+```bash
+./scripts/validate_m10_engineering_process.sh
+```
+
+After that, WBC/model fine-tuning can focus on better clearance, startup/tail
+behavior, and turning without weakening the existing scenario evidence path.
+
 ## 12. Safety policy
 
 If the estimator is uncertain, stale, missing history, or producing out-of-range

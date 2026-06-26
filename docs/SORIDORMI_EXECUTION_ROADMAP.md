@@ -913,7 +913,28 @@ depends on the hardware safety gate.
 1. Use `clearance_liftscale_stack_s143_step090_offset005` as the retained
    residual reference. Reject the post-`s143` scalar, pre-roll, MLP, reflex, and
    startup-tail probes through `clearance_s201_microreflex_s207` for promotion.
-2. Train the next clearance candidate to beat `s143` on low-clearance ratio in
+2. Before launching another training run, summarize the existing candidate
+   history:
+
+```bash
+./scripts/report_clearance_candidate_history.sh
+```
+
+   The current artifact history reports no ready candidate and no
+   reference-beating blocked candidate, so keep `s143` as the retained blocked
+   reference and move to a broader clearance redesign or a higher-clearance
+   teacher instead of another narrow scalar/reflex/guard retune.
+3. Close the M10 engineering-process section with the dry/offline validation
+   gate:
+
+```bash
+./scripts/validate_m10_engineering_process.sh
+```
+
+   This gate validates reporting, readiness analysis, follow-camera planning,
+   evidence packaging, docs, and focused tests. It intentionally does not train,
+   launch MuJoCo, or send actuator commands.
+4. Train the next clearance candidate to beat `s143` on low-clearance ratio in
    all three scenarios while preserving p50 clearance, no-fall behavior, and
    movement distance. Screen candidates with:
 
@@ -928,17 +949,17 @@ depends on the hardware safety gate.
   --require-reference-improvement
 ```
 
-3. Run the candidate with `--viewer --follow-camera` for human visual review.
-4. Record swing-clearance evidence for all three scenarios.
-5. Fill the visual-review template and rebuild the evidence package.
-6. Focus training commands/objective on start-stop and turning clearance while
+5. Run the candidate with `--viewer --follow-camera` for human visual review.
+6. Record swing-clearance evidence for all three scenarios.
+7. Fill the visual-review template and rebuild the evidence package.
+8. Focus training commands/objective on start-stop and turning clearance while
    preserving the near-passing flat result, or acquire a higher-clearance
    teacher.
-7. Pass the quantitative clearance readiness gate without regressing the
+9. Pass the quantitative clearance readiness gate without regressing the
    original scenario suite.
-8. Compare the new candidate suite against the official teacher with
+10. Compare the new candidate suite against the official teacher with
    `compare_policy_teacher_suite.sh`.
-9. Begin M11 held-out scenario development only after G10 passes.
+11. Begin M11 held-out scenario development only after G10 passes.
 
 ## Project success criteria
 

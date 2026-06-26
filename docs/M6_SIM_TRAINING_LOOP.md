@@ -448,6 +448,29 @@ low-clearance ratio in any required scenario:
   --require-reference-improvement
 ```
 
+Before another expensive training or live suite run, summarize the accumulated
+candidate history:
+
+```bash
+./scripts/report_clearance_candidate_history.sh
+```
+
+The report ranks existing `artifacts/scenario_eval/*` candidates against the
+retained `s143` reference, flags missing partial suites, and writes JSON plus
+Markdown under `artifacts/clearance_history/`. The current artifact history has
+no ready candidate and no reference-beating blocked candidate, so the next M10
+step should be a broader clearance redesign or a higher-clearance teacher, not
+another narrow scalar/reflex/guard retune.
+
+Close the engineering-process section before motion-control or WBC fine-tuning:
+
+```bash
+./scripts/validate_m10_engineering_process.sh
+```
+
+This gate is dry/offline. It validates the report/readiness/visual-plan/evidence
+workflow and focused tests without launching MuJoCo or training a model.
+
 For promotion evidence, add `--strict`; a candidate still must pass the absolute
 clearance gate before follow-camera visual inspection or teacher comparison can
 be promotion evidence.

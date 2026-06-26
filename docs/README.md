@@ -38,6 +38,12 @@ be committed.
   error while MPC/WBC enforces physics.
 - `scripts/build_clearance_evidence_package.sh`: packages clearance readiness,
   follow-camera planning, and visual review evidence.
+- `scripts/report_clearance_candidate_history.sh`: summarizes existing M10
+  clearance scenario-evaluation artifacts and compares candidates against the
+  retained `s143` reference before another training run.
+- `scripts/validate_m10_engineering_process.sh`: dry/offline process gate for
+  M10 candidate history, clearance readiness, visual planning, evidence
+  packaging, docs, and focused tests.
 - `scripts/compare_policy_teacher_suite.sh`: compares the candidate and official
   teacher scenario-suite summaries after visual review.
 

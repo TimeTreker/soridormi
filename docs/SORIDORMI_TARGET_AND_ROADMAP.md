@@ -260,11 +260,23 @@ low-clearance-ratio probes `clearance_s143_refguard_stack_s215`,
 `clearance_s143_gateguard_stack_s217`, and
 `clearance_s143_curvegateguard_stack_s219` likewise remained blocked; `s217`
 and `s219` passed start-stop but regressed flat and curve against `s143`. The
-next M10 work must use a broader clearance redesign or higher-clearance teacher
-to reduce lower-tail/startup low-clearance ratios without sacrificing no-fall
-behavior or strong movement distance, followed by quantitative clearance
-readiness and a direct human follow-camera visual pass before any broader
-promotion.
+clearance candidate history reporter now confirms the same conclusion across
+the existing `artifacts/scenario_eval/*` reports: no ready candidate and no
+reference-beating blocked candidate. The next M10 work must use a broader
+clearance redesign or higher-clearance teacher to reduce lower-tail/startup
+low-clearance ratios without sacrificing no-fall behavior or strong movement
+distance, followed by quantitative clearance readiness and a direct human
+follow-camera visual pass before any broader promotion.
+
+```bash
+./scripts/report_clearance_candidate_history.sh
+./scripts/validate_m10_engineering_process.sh
+```
+
+After that engineering-process gate is stable, motion-control and WBC model
+fine-tuning should become the focus. The control work must still use the same
+M10 evidence path: scenario suite, clearance readiness, follow-camera review,
+and teacher comparison before any promotion claim.
 
 ### M11A: task-agent contract foundation
 
