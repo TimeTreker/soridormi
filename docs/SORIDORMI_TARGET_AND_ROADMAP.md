@@ -278,6 +278,16 @@ fine-tuning should become the focus. The control work must still use the same
 M10 evidence path: scenario suite, clearance readiness, follow-camera review,
 and teacher comparison before any promotion claim.
 
+The first control-side artifact is the sim-only WBC clearance contract:
+
+```bash
+./scripts/plan_wbc_clearance_experiment.sh
+./scripts/validate_wbc_clearance_contract.sh
+```
+
+This contract only plans bounded parameter candidates. It does not create a WBC
+runtime backend yet, and it does not authorize hardware or raw action control.
+
 ### M11A: task-agent contract foundation
 
 Expose rich embodied goals to Chromie without pretending that full autonomy is

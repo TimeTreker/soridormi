@@ -961,6 +961,22 @@ depends on the hardware safety gate.
    `compare_policy_teacher_suite.sh`.
 11. Begin M11 held-out scenario development only after G10 passes.
 
+## Immediate WBC/control start
+
+After the M10 engineering-process gate passes, use the sim-only WBC clearance
+contract as the first body-control section:
+
+```bash
+./scripts/plan_wbc_clearance_experiment.sh
+./scripts/validate_wbc_clearance_contract.sh
+```
+
+This section defines allowed clearance-control parameters and candidate sets
+for startup/tail and turning clearance. It is not a runtime backend yet: do not
+launch hardware, do not allow raw `action_14d`, and do not claim promotion until
+implemented candidates pass the M10 scenario/readiness/visual/teacher evidence
+path.
+
 ## Project success criteria
 
 Soridormi succeeds when:

@@ -1,0 +1,119 @@
+{
+  "contract_version": "wbc_clearance_control.v0",
+  "robot": "open_duck_mini_v2",
+  "scope": "sim_only_clearance_parameter_experiment",
+  "runtime_backend_ready": false,
+  "baseline_profile": "clearance_liftscale_stack_s143_step090_offset005",
+  "reference_profile": "clearance_liftscale_stack_s143_step090_offset005",
+  "scenario_ids": [
+    "flat_walk_varied_speed_v1",
+    "start_stop_velocity_ramp_v1",
+    "curve_turn_walk_v1"
+  ],
+  "safety": {
+    "sim_only": true,
+    "hardware_allowed": false,
+    "raw_action_14d_allowed": false,
+    "chromie_raw_control_allowed": false,
+    "requires_m10_engineering_gate": true
+  },
+  "parameters": {
+    "target_clearance_m": {
+      "unit": "m",
+      "default": 0.02,
+      "minimum": 0.016,
+      "maximum": 0.035,
+      "description": "Nominal swing-foot clearance target used by the WBC/gait planner."
+    },
+    "startup_clearance_boost_m": {
+      "unit": "m",
+      "default": 0.004,
+      "minimum": 0.0,
+      "maximum": 0.012,
+      "description": "Extra clearance allowance during stand-to-walk and walk-to-stand tails."
+    },
+    "turn_clearance_boost_m": {
+      "unit": "m",
+      "default": 0.004,
+      "minimum": 0.0,
+      "maximum": 0.012,
+      "description": "Extra clearance allowance during turning and curved walking."
+    },
+    "swing_height_gain": {
+      "unit": "ratio",
+      "default": 1.0,
+      "minimum": 0.85,
+      "maximum": 1.25,
+      "description": "Bounded multiplier on the WBC swing-height target."
+    },
+    "double_support_ratio": {
+      "unit": "ratio",
+      "default": 0.18,
+      "minimum": 0.1,
+      "maximum": 0.3,
+      "description": "Fraction of the gait cycle reserved for double support."
+    },
+    "step_length_scale": {
+      "unit": "ratio",
+      "default": 1.0,
+      "minimum": 0.85,
+      "maximum": 1.1,
+      "description": "Bounded multiplier on nominal sagittal step length."
+    },
+    "max_lateral_swing_m": {
+      "unit": "m",
+      "default": 0.03,
+      "minimum": 0.015,
+      "maximum": 0.05,
+      "description": "Maximum lateral swing-foot excursion used while turning."
+    },
+    "posture_weight_scale": {
+      "unit": "ratio",
+      "default": 1.0,
+      "minimum": 0.75,
+      "maximum": 1.5,
+      "description": "Bounded multiplier on posture-stability weight."
+    }
+  },
+  "candidate_sets": [
+    {
+      "id": "nominal_v0",
+      "description": "Nominal bounded WBC clearance parameters for a no-change baseline.",
+      "values": {}
+    },
+    {
+      "id": "startup_tail_clearance_v0",
+      "description": "Bias startup and stopping tails toward higher swing clearance.",
+      "values": {
+        "target_clearance_m": 0.022,
+        "startup_clearance_boost_m": 0.008,
+        "turn_clearance_boost_m": 0.004,
+        "swing_height_gain": 1.08,
+        "double_support_ratio": 0.22
+      }
+    },
+    {
+      "id": "turn_clearance_v0",
+      "description": "Bias curved walking toward higher and wider swing clearance.",
+      "values": {
+        "target_clearance_m": 0.022,
+        "startup_clearance_boost_m": 0.004,
+        "turn_clearance_boost_m": 0.01,
+        "max_lateral_swing_m": 0.04,
+        "posture_weight_scale": 1.15
+      }
+    },
+    {
+      "id": "conservative_high_clearance_v0",
+      "description": "Higher clearance with shorter step length and longer double support.",
+      "values": {
+        "target_clearance_m": 0.024,
+        "startup_clearance_boost_m": 0.006,
+        "turn_clearance_boost_m": 0.008,
+        "swing_height_gain": 1.12,
+        "double_support_ratio": 0.24,
+        "step_length_scale": 0.95
+      }
+    }
+  ]
+}

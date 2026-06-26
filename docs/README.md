@@ -36,6 +36,8 @@ be committed.
 - `docs/SORIDORMI_NEURAL_PARAMETER_ADAPTIVE_MPC_WBC.md`: future
   neural parameter-adaptive MPC/WBC controller design; NN estimates model
   error while MPC/WBC enforces physics.
+- `docs/SORIDORMI_WBC_CLEARANCE_CONTROL.md`: first sim-only WBC clearance
+  parameter contract and bounded experiment-planning harness.
 - `scripts/build_clearance_evidence_package.sh`: packages clearance readiness,
   follow-camera planning, and visual review evidence.
 - `scripts/report_clearance_candidate_history.sh`: summarizes existing M10
@@ -44,6 +46,10 @@ be committed.
 - `scripts/validate_m10_engineering_process.sh`: dry/offline process gate for
   M10 candidate history, clearance readiness, visual planning, evidence
   packaging, docs, and focused tests.
+- `scripts/plan_wbc_clearance_experiment.sh`: validates the WBC clearance
+  contract and writes bounded sim-only experiment plans.
+- `scripts/validate_wbc_clearance_contract.sh`: dry/offline gate for the WBC
+  clearance contract, planning harness, docs, and focused tests.
 - `scripts/compare_policy_teacher_suite.sh`: compares the candidate and official
   teacher scenario-suite summaries after visual review.
 

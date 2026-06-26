@@ -435,6 +435,18 @@ engineering-process gate:
 After that, WBC/model fine-tuning can focus on better clearance, startup/tail
 behavior, and turning without weakening the existing scenario evidence path.
 
+The first control-side implementation artifact is documented in
+`docs/SORIDORMI_WBC_CLEARANCE_CONTROL.md`:
+
+```bash
+./scripts/plan_wbc_clearance_experiment.sh
+./scripts/validate_wbc_clearance_contract.sh
+```
+
+This stage validates bounded clearance parameters and candidate plans only. A
+runtime WBC backend still needs to be implemented before any candidate can run
+in MuJoCo.
+
 ## 12. Safety policy
 
 If the estimator is uncertain, stale, missing history, or producing out-of-range
