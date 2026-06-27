@@ -399,12 +399,16 @@ gates.
 The current best retained M10 clearance candidate is
 `clearance_liftscale_stack_s143_step090_offset005`. It reuses the `s127`
 `contact_phase_lift` ONNX with `phase.step_increment=0.9`,
-`phase.offset=0.05`, and explicit `residual_scale=0.16`. It remains blocked by
-G10 low-clearance ratio, but its full suite reaches total distance `~2.150 m`,
-all p50 swing clearances above `0.015 m`, and no falls. Next clearance training
-should beat s143's ratios (`flat ~0.268`, `start-stop ~0.257`,
-`curve ~0.308`) while preserving distance. The narrow phase/scale/postprocess
-brackets and small stacked continuations through `s173` did not pass the gate.
+`phase.offset=0.05`, and explicit `residual_scale=0.16`. Under the current
+stable-swing three-scenario M10 core gate, the retained
+`clearance_liftscale_stack_s143_step090_offset005_stable_swing_gate` artifact
+passes `3/3` with no falls, total distance `2.40258 m`, minimum p50 swing
+clearance `0.01966 m`, and max low-clearance ratio `0.16667`. The expanded
+six-scenario pre-WBC surface remains blocked at `1/6`, with max low-clearance
+ratio `0.36232`. Next clearance training should beat `s143` on the pre-WBC
+lower-tail/startup/turning ratios while preserving the retained three-scenario
+core and distance. The narrow phase/scale/postprocess brackets and small
+stacked continuations through `s173` did not pass the earlier gate.
 Follow-up action-scale, pre-roll, command-ramp, opt-in clearance-reflex, and
 startup-tail continuation probes through
 `clearance_s201_microreflex_s207` also did not pass. The closest
@@ -458,9 +462,10 @@ candidate history:
 The report ranks existing `artifacts/scenario_eval/*` candidates against the
 retained `s143` reference, flags missing partial suites, and writes JSON plus
 Markdown under `artifacts/clearance_history/`. The current artifact history has
-no ready candidate and no reference-beating blocked candidate, so the next M10
-step should be a broader clearance redesign or a higher-clearance teacher, not
-another narrow scalar/reflex/guard retune.
+a retained stable-swing three-scenario reference, but no ready candidate for
+the expanded pre-WBC six-scenario surface. The next control-side step should be
+a broader clearance redesign or a higher-clearance teacher, not another narrow
+scalar/reflex/guard retune.
 
 Close the engineering-process section before motion-control or WBC fine-tuning:
 
