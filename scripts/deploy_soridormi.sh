@@ -84,13 +84,38 @@ else
   echo "[deploy-soridormi] Reusing existing .env."
 fi
 
-if [ ! -d workspace/Open_Duck_Mini ] || \
-   [ ! -d workspace/Open_Duck_Mini_Runtime ] || \
-   [ ! -d workspace/Open_Duck_Playground ]; then
+REQUIRED_UPSTREAM_PATHS=(
+  workspace/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx
+  workspace/Open_Duck_Mini_Runtime/mini_bdx_runtime
+  workspace/Open_Duck_Playground/playground/open_duck_mini_v2/xmls/scene_flat_terrain.xml
+  workspace/Open_Duck_Playground/playground/open_duck_mini_v2/data/polynomial_coefficients.pkl
+)
+
+upstream_ready=1
+for path in "${REQUIRED_UPSTREAM_PATHS[@]}"; do
+  if [ ! -e "$path" ]; then
+    upstream_ready=0
+    break
+  fi
+done
+
+if [ "$upstream_ready" = "0" ]; then
   echo "[deploy-soridormi] Initializing upstream Open Duck workspaces..."
   ./scripts/add_submodules.sh
 else
-  echo "[deploy-soridormi] Upstream workspaces are present."
+  echo "[deploy-soridormi] Required upstream Open Duck assets are present."
+fi
+
+missing_upstream=0
+for path in "${REQUIRED_UPSTREAM_PATHS[@]}"; do
+  if [ ! -e "$path" ]; then
+    echo "[deploy-soridormi][error] Missing required upstream asset: $path" >&2
+    missing_upstream=1
+  fi
+done
+if [ "$missing_upstream" = "1" ]; then
+  echo "[deploy-soridormi][hint] Run ./scripts/add_submodules.sh and check network/submodule access." >&2
+  exit 1
 fi
 
 COMPOSE_ARGS=(-f compose.sim.yaml --profile mcp-runtime)

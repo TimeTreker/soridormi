@@ -28,7 +28,10 @@ cd ~/github/soridormi
 The Soridormi deploy script:
 
 - creates `.env` when it is missing;
-- initializes upstream Open Duck workspaces when they are missing;
+- initializes upstream Open Duck workspaces when required reference assets are
+  missing;
+- verifies the official policy, MuJoCo XML, and reference data needed by the
+  simulator start path;
 - builds simulator, runtime, and runtime MCP images;
 - runs dry validation for the pre-WBC scenario surface and the task-agent
   contract.

@@ -106,9 +106,21 @@ if [ ! -f .env ]; then
   ./scripts/setup_env.sh
 fi
 
-if [ ! -d workspace/Open_Duck_Mini ] || [ ! -d workspace/Open_Duck_Playground ]; then
-  echo "[soridormi][error] Upstream workspaces are missing." >&2
-  echo "[soridormi][hint] Run ./scripts/add_submodules.sh" >&2
+REQUIRED_UPSTREAM_PATHS=(
+  workspace/Open_Duck_Mini/BEST_WALK_ONNX_2.onnx
+  workspace/Open_Duck_Playground/playground/open_duck_mini_v2/xmls/scene_flat_terrain.xml
+  workspace/Open_Duck_Playground/playground/open_duck_mini_v2/data/polynomial_coefficients.pkl
+)
+
+missing_upstream=0
+for path in "${REQUIRED_UPSTREAM_PATHS[@]}"; do
+  if [ ! -e "$path" ]; then
+    echo "[soridormi][error] Missing required upstream asset: $path" >&2
+    missing_upstream=1
+  fi
+done
+if [ "$missing_upstream" = "1" ]; then
+  echo "[soridormi][hint] Run ./scripts/add_submodules.sh or ./scripts/deploy_soridormi.sh." >&2
   exit 1
 fi
 
@@ -158,6 +170,24 @@ wait_for_tcp() {
   local deadline=$((SECONDS + timeout_s))
   echo "[soridormi] Waiting for $label at $host:$port..."
   until python_tcp_check "$host" "$port"; do
+    if (( SECONDS >= deadline )); then
+      echo "[soridormi][error] Timed out waiting for $label." >&2
+      return 1
+    fi
+    sleep 2
+  done
+  echo "[soridormi] $label is ready."
+}
+
+wait_for_tcp_or_process() {
+  local host="$1" port="$2" timeout_s="$3" label="$4" pid="$5"
+  local deadline=$((SECONDS + timeout_s))
+  echo "[soridormi] Waiting for $label at $host:$port..."
+  until python_tcp_check "$host" "$port"; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      echo "[soridormi][error] $label process exited before becoming ready." >&2
+      return 1
+    fi
     if (( SECONDS >= deadline )); then
       echo "[soridormi][error] Timed out waiting for $label." >&2
       return 1
@@ -259,7 +289,7 @@ if ! python_tcp_check 127.0.0.1 "$SIM_PORT"; then
   SIM_PID=$!
   OWN_SIM=1
 
-  if ! wait_for_tcp 127.0.0.1 "$SIM_PORT" 300 "MuJoCo simulator"; then
+  if ! wait_for_tcp_or_process 127.0.0.1 "$SIM_PORT" 300 "MuJoCo simulator" "$SIM_PID"; then
     tail -n 160 "$SIM_LOG" >&2 || true
     exit 1
   fi
