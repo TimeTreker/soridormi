@@ -54,6 +54,7 @@ run_python_gate() {
     tests/test_mcp_runtime_tools.py \
     tests/test_mcp_http_server.py \
     tests/test_task_acceptance_cases_m11.py \
+    tests/test_chromie_text_input_acceptance.py \
     tests/test_training_cases_m11.py \
     tests/test_navigation_goal_contract_m11.py \
     tests/test_skill_manifest_m7.py
@@ -80,7 +81,7 @@ run_docs_gate() {
     docs/mcp_capability_manifest.md \
     docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md \
     docs/SORIDORMI_EXECUTION_ROADMAP.md >/dev/null
-  python -c 'from pathlib import Path; paths = [Path(p) for p in ("docs/README.md", "docs/SORIDORMI_EXECUTION_ROADMAP.md", "docs/SORIDORMI_MCP_SERVER.md", "docs/mcp_capability_manifest.md", "docs/mcp_dag_integration.md", "docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md", "docs/SORIDORMI_NAVIGATION_GOAL_CONTRACT.md")]; bad = [str(p) for p in paths if p.read_text(encoding="utf-8").count("```") % 2]; assert not bad, bad'
+  python -c 'from pathlib import Path; paths = [Path(p) for p in ("docs/README.md", "docs/SORIDORMI_EXECUTION_ROADMAP.md", "docs/SORIDORMI_MCP_SERVER.md", "docs/mcp_capability_manifest.md", "docs/mcp_dag_integration.md", "docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md", "docs/SORIDORMI_NAVIGATION_GOAL_CONTRACT.md", "docs/SORIDORMI_TEXT_INPUT_ACCEPTANCE.md")]; bad = [str(p) for p in paths if p.read_text(encoding="utf-8").count("```") % 2]; assert not bad, bad'
 }
 
 echo "Soridormi task-agent contract validation"
@@ -108,6 +109,7 @@ if [ "${use_docker}" != "0" ]; then
         tests/test_mcp_runtime_tools.py \
         tests/test_mcp_http_server.py \
         tests/test_task_acceptance_cases_m11.py \
+        tests/test_chromie_text_input_acceptance.py \
         tests/test_training_cases_m11.py \
         tests/test_navigation_goal_contract_m11.py \
         tests/test_skill_manifest_m7.py

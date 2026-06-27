@@ -11,6 +11,7 @@ Related docs:
 - `docs/mcp_capability_manifest.md`
 - `docs/mcp_dag_integration.md`
 - `docs/SORIDORMI_NAVIGATION_GOAL_CONTRACT.md`
+- `docs/SORIDORMI_TEXT_INPUT_ACCEPTANCE.md`
 
 Chromie should keep a companion document with the same filename in the Chromie
 repository. That document owns the brain-side work: global task graphs,
@@ -122,6 +123,13 @@ stable node IDs, sequence edges, current phase, terminal state, blocked
 subsystems, and `raw_control_allowed=false`. Chromie may use this for global
 monitoring and reporting, but the graph remains a body-runtime view, not a raw
 motion-control interface.
+
+The text-input acceptance fixture at
+`task_acceptance_cases/chromie_text_input_acceptance.yaml` captures the
+brain/body routing expectation for raw user text. It deliberately starts from
+plain user utterances rather than CLI `--expect-skill` arguments: Chromie owns
+language routing and response text, while Soridormi tests only the structured
+body tasks that Chromie should submit after routing.
 
 ### Step 3 - Define the embodied task schema
 
