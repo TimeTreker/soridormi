@@ -59,7 +59,7 @@ does not launch MuJoCo or create candidate profiles.
 
 ## Current Six-Scenario Evidence
 
-The retained blocked reference is still:
+The retained pre-WBC blocked reference is still:
 
 ```text
 clearance_liftscale_stack_s143_step090_offset005

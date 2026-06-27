@@ -231,8 +231,8 @@ flat/start-stop/curve suite: PASS, 3/3 scenarios accepted
 ```
 
 Conclusion: the three-scenario candidate remains the best restored context-BC
-baseline, but it is blocked by the current G10 clearance gate. On 2026-06-22
-the historical ONNX was restored locally with sha256
+baseline, but it is superseded for M10 core evidence by the later retained
+residual reference. On 2026-06-22 the historical ONNX was restored locally with sha256
 `2a7e41afe855702638aed56ec32e0f5e067a6b76fdcd76af4d43a101191730b7`; the
 locally regenerated ONNX was preserved separately because it did not reproduce
 the historical pass. The restored model reproduces the old movement behavior,
@@ -245,28 +245,31 @@ valid, but failed `0/3` scenarios and did not beat `s79` because the wrapper
 changed residual scale from the retained checkpoint's `0.1` to `0.05`. The
 wrapper now preserves `0.1` by default.
 
-The current best retained residual candidate is
-`clearance_liftscale_stack_s143_step090_offset005`. It is still blocked from
-promotion, but it gets all three p50 swing-clearance metrics above `0.015 m`,
-has no falls, and reduces max low-clearance ratio to about `0.308`. The
-remaining blocker is the low-clearance-ratio gate in all three scenarios: flat
-is about `0.268`, start-stop about `0.257`, and curve about `0.308` against a
-`0.25` limit. Do not promote the intermediate stacked, phase, scale,
-postprocess, or continuation probes documented in
-`docs/SORIDORMI_EXECUTION_ROADMAP.md`. Post-`s143` action-scale, command-ramp,
-pre-roll, clearance-reflex, and startup-tail probes through
-`clearance_s201_microreflex_s207` also remained blocked. Later guarded
-low-clearance-ratio probes `clearance_s143_refguard_stack_s215`,
-`clearance_s143_gateguard_stack_s217`, and
-`clearance_s143_curvegateguard_stack_s219` likewise remained blocked; `s217`
-and `s219` passed start-stop but regressed flat and curve against `s143`. The
-clearance candidate history reporter now confirms the same conclusion across
-the existing `artifacts/scenario_eval/*` reports: no ready candidate and no
-reference-beating blocked candidate. The next M10 work must use a broader
-clearance redesign or higher-clearance teacher to reduce lower-tail/startup
-low-clearance ratios without sacrificing no-fall behavior or strong movement
-distance, followed by quantitative clearance readiness and a direct human
-follow-camera visual pass before any broader promotion.
+The current retained residual reference is
+`clearance_liftscale_stack_s143_step090_offset005`. Under the stable-swing M10
+core gate it now passes all three core scenarios with no falls:
+
+```text
+artifact: artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005_stable_swing_gate
+flat_walk_varied_speed_v1: distance 0.70473m, p50 clearance 0.01966m, low-clearance ratio 0.16667
+start_stop_velocity_ramp_v1: distance 0.90519m, p50 clearance 0.02027m, low-clearance ratio 0.15441
+curve_turn_walk_v1: distance 0.79266m, p50 clearance 0.02061m, low-clearance ratio 0.15000
+suite: PASS, 3/3, total distance 2.40258m, fallen_count 0
+```
+
+This is the retained M10 core simulator reference, not a broad WBC/control or
+hardware promotion. The expanded pre-WBC six-scenario run
+`artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005_min012_six_scenario`
+still remains blocked at `1/6` passed with max low-clearance ratio `0.36232`.
+Do not promote intermediate stacked, phase, scale, postprocess, continuation,
+guarded, pre-roll, or reflex probes documented in
+`docs/SORIDORMI_EXECUTION_ROADMAP.md` unless they beat `s143` on the retained
+core and improve the six-scenario lower tail. The next control-side work should
+use the WBC/pre-WBC six-scenario surface or a higher-clearance teacher to reduce
+startup and turning lower-tail low-clearance ratios without sacrificing no-fall
+behavior or strong movement distance, followed by quantitative clearance
+readiness and a direct human follow-camera visual pass before any broader
+promotion.
 
 ```bash
 ./scripts/report_clearance_candidate_history.sh

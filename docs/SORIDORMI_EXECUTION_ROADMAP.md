@@ -51,8 +51,9 @@ Current position:
 
 ```text
 M4-M9: substantially complete
-M10: functional Stage 1 candidate available
-Current blocker: low swing-foot clearance and limited held-out generalization
+M10: stable-swing three-scenario core gate passed with the retained s143 reference
+Current blocker: human follow-camera review plus pre-WBC six-scenario
+lower-tail clearance and later held-out generalization
 M11A task-agent contract foundation: no-motion gate available
 M11B task event cursor: monitorable event stream available
 M11C retry-safe task refs: client idempotency available
@@ -539,44 +540,50 @@ observation[101]
 ```text
 profile/model contract: PASS
 bounded rollout: PASS
-required scenario suite: FAIL under current clearance gate
+required three-scenario stable-swing suite: PASS
 fall/reset limits: PASS
-foot-clearance threshold: ✗ FAIL (low-clearance ratio remains too high)
+stable-swing clearance threshold: PASS (max low-clearance ratio 0.16667)
 human visual inspection: PENDING
-metric-grounded review: ✗ FAIL
+metric-grounded review: PASS for the three-scenario stable-swing core
+pre-WBC six-scenario enrichment: FAIL (max low-clearance ratio 0.36232)
 teacher comparison: PASS (relative behavior only; does not replace clearance)
 ```
 
 > **Current status:** Historical retained evidence for
 > `context_stage1_three_scenario_10ep_e80` passed the three-scenario suite but
-> failed G10 due to swing clearance deficit. The historical ONNX was restored
-> locally on 2026-06-22 and the regenerated ONNX was preserved separately. Under
-> the current clearance-aware gate, restored E80 still fails all three scenario
-> acceptance gates because p50 swing clearance is below `0.015 m` and
-> low-clearance ratio remains too high.
-> The clearance evidence package includes a filled metric-grounded review. It is
-> intentionally blocked, not a human visual PASS: all scenarios remained upright
-> but failed the `0.015 m` swing-clearance gate. A direct human follow-camera
-> inspection remains pending before any promotion.
-> The current best retained residual candidate is
-> `clearance_liftscale_stack_s143_step090_offset005`: it keeps all three
-> scenario p50 clearances over the `0.015 m` threshold, has no falls, and
-> reduces max low-clearance ratio to `0.308`, but it remains blocked because
-> flat (`0.268`), start-stop (`0.257`), and curve (`0.308`) still exceed the
-> `0.25` low-clearance-ratio limit.
-> Post-`s143` action-scale, pre-roll, command-ramp, reflex, and startup-tail
-> probes through `clearance_s201_microreflex_s207` did not pass G10. The
-> closest live curve-only probe was `clearance_s177_tail_stack_s201` (`~0.257`
-> low-clearance ratio), but it still failed the curve gate and did not justify a
-> new retained promotion.
+> failed the later clearance-aware gate due to swing clearance deficit. The
+> historical ONNX was restored locally on 2026-06-22 and the regenerated ONNX
+> was preserved separately.
+>
+> The current retained M10 core reference is
+> `clearance_liftscale_stack_s143_step090_offset005`. The retained
+> stable-swing suite
+> `artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005_stable_swing_gate`
+> passes all three core scenarios with no falls, total forward distance
+> `2.40258 m`, minimum swing-clearance p50 `0.01966 m`, and max
+> low-clearance ratio `0.16667`.
+>
+> This does not promote the candidate for broader WBC/control work. The
+> expanded six-scenario pre-WBC run
+> `artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005_min012_six_scenario`
+> remains blocked at `1/6` passed, max low-clearance ratio `0.36232`, and no
+> falls. A direct human follow-camera inspection is still pending before any
+> broader policy promotion claim.
+>
+> Post-`s143` action-scale, pre-roll, command-ramp, reflex, startup-tail, and
+> guarded low-ratio probes remain rejected unless a later run beats `s143` on
+> the retained core while also improving the pre-WBC six-scenario lower tail.
 >
 > **Clearance readiness:** Current best generated with
 > `./scripts/analyze_clearance_readiness.sh --profile-name clearance_liftscale_stack_s143_step090_offset005 --suite-dir artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005 --output-dir artifacts/clearance_readiness/clearance_liftscale_stack_s143_step090_offset005 --json`.
 >
 > **Decision path:**
-> - **Option 1 (Recommended):** Continue clearance-focused refinement from the
->   best retained residual reference before M10.0 release
-> - **Option 2:** Accept as experimental M10.0, document limitation, refine in M11
+> - **Option 1 (Recommended):** Keep `s143` as the retained M10 core
+>   stable-swing reference, complete human follow-camera review, and focus the
+>   next body-control work on the pre-WBC six-scenario lower-tail blocker.
+> - **Option 2:** Publish only a narrow simulator-demo claim that names the
+>   three-scenario evidence and explicitly excludes WBC promotion, held-out
+>   generalization, and hardware.
 
 ---
 
@@ -911,8 +918,9 @@ depends on the hardware safety gate.
 ## Immediate execution plan
 
 1. Use `clearance_liftscale_stack_s143_step090_offset005` as the retained
-   residual reference. Reject the post-`s143` scalar, pre-roll, MLP, reflex, and
-   startup-tail probes through `clearance_s201_microreflex_s207` for promotion.
+   M10 core stable-swing reference. Reject the post-`s143` scalar, pre-roll,
+   MLP, reflex, startup-tail, and guarded low-ratio probes for promotion unless
+   they beat the retained core and the pre-WBC six-scenario lower tail.
 2. Before launching another training run, summarize the existing candidate
    history:
 
@@ -920,10 +928,11 @@ depends on the hardware safety gate.
 ./scripts/report_clearance_candidate_history.sh
 ```
 
-   The current artifact history reports no ready candidate and no
-   reference-beating blocked candidate, so keep `s143` as the retained blocked
-   reference and move to a broader clearance redesign or a higher-clearance
-   teacher instead of another narrow scalar/reflex/guard retune.
+   The current artifact history now has a retained ready reference for the
+   three-scenario stable-swing core, but no ready candidate for the expanded
+   pre-WBC six-scenario surface. Keep `s143` as the reference to beat and move
+   to a broader clearance redesign or a higher-clearance teacher instead of
+   another narrow scalar/reflex/guard retune.
 3. Close the M10 engineering-process section with the dry/offline validation
    gate:
 
