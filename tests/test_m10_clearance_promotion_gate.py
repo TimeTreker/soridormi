@@ -90,6 +90,7 @@ def test_m10_promotion_scenarios_require_hard_clearance_thresholds() -> None:
         assert thresholds.require_foot_metrics is True, scenario_id
         assert thresholds.min_swing_clearance_m >= 0.015, scenario_id
         assert thresholds.max_low_clearance_ratio <= 0.25, scenario_id
+        assert thresholds.swing_boundary_exclusion_samples == 1, scenario_id
 
 
 def test_required_clearance_failure_is_rollout_error_not_warning(tmp_path: Path) -> None:

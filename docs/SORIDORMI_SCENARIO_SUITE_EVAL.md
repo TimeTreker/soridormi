@@ -18,6 +18,12 @@ below `0.12 m/s` when the scenario command range can support it. This avoids
 evaluating "walking" scenarios with near-zero commands that mostly wiggle in
 place.
 
+The M10 core clearance gate evaluates stable swing clearance.  The scenario
+manifest keeps `min_swing_clearance_m: 0.015` and
+`max_low_clearance_ratio: 0.25`, while `swing_boundary_exclusion_samples: 1`
+excludes the first and last sample of each contiguous swing segment so toe-off
+and touchdown transitions do not dominate the low-clearance ratio.
+
 The current default ready locomotion suite contains the three-scenario M10 core
 plus the pre-WBC clearance enrichment:
 

@@ -73,6 +73,7 @@ class ActionPostprocessorConfig:
     clearance_reflex_hip_pitch: float = 0.0
     clearance_reflex_knee: float = 0.0
     clearance_reflex_ankle: float = 0.0
+    clearance_reflex_mirror_right_sagittal: bool = False
 
 
 @dataclass
@@ -116,6 +117,10 @@ class ActionPostprocessor:
                 ),
                 clearance_reflex_knee=_env_float("SORIDORMI_CLEARANCE_REFLEX_KNEE", 0.0),
                 clearance_reflex_ankle=_env_float("SORIDORMI_CLEARANCE_REFLEX_ANKLE", 0.0),
+                clearance_reflex_mirror_right_sagittal=_env_bool(
+                    "SORIDORMI_CLEARANCE_REFLEX_MIRROR_RIGHT_SAGITTAL",
+                    False,
+                ),
             )
         )
 
@@ -180,6 +185,7 @@ class ActionPostprocessor:
             "knee": float(self.config.clearance_reflex_knee),
             "ankle": float(self.config.clearance_reflex_ankle),
         }
+        mirror_right_sagittal = bool(self.config.clearance_reflex_mirror_right_sagittal)
         sagittal_gain = float(self.config.clearance_reflex_sagittal_gain)
         joint_index_by_name = {name: index for index, name in enumerate(joint_names)}
         foot_records: list[dict[str, Any]] = []
@@ -195,12 +201,13 @@ class ActionPostprocessor:
             if foot_applied:
                 applied = True
                 gain = 1.0 + (sagittal_gain - 1.0) * activation
+                correction_sign = -1.0 if mirror_right_sagittal and side == "right" else 1.0
                 for suffix, correction in correction_by_suffix.items():
                     joint_name = f"{side}_{suffix}"
                     joint_index = joint_index_by_name.get(joint_name)
                     if joint_index is not None:
                         out[joint_index] *= np.float32(gain)
-                        out[joint_index] += np.float32(correction * activation)
+                        out[joint_index] += np.float32(correction_sign * correction * activation)
 
             foot_records.append(
                 {
@@ -220,6 +227,7 @@ class ActionPostprocessor:
             "activation_margin_m": margin,
             "contact_threshold": contact_threshold,
             "sagittal_gain": sagittal_gain,
+            "mirror_right_sagittal": mirror_right_sagittal,
             "hip_pitch": correction_by_suffix["hip_pitch"],
             "knee": correction_by_suffix["knee"],
             "ankle": correction_by_suffix["ankle"],
@@ -267,6 +275,9 @@ class ActionPostprocessor:
             "clearance_reflex_hip_pitch": float(self.config.clearance_reflex_hip_pitch),
             "clearance_reflex_knee": float(self.config.clearance_reflex_knee),
             "clearance_reflex_ankle": float(self.config.clearance_reflex_ankle),
+            "clearance_reflex_mirror_right_sagittal": bool(
+                self.config.clearance_reflex_mirror_right_sagittal
+            ),
         }
 
 

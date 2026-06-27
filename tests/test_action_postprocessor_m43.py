@@ -149,6 +149,36 @@ def test_swing_clearance_reflex_can_gain_existing_sagittal_action() -> None:
     assert out[13] == action[13]
 
 
+def test_swing_clearance_reflex_can_mirror_right_sagittal_corrections() -> None:
+    processor = ActionPostprocessor(
+        ActionPostprocessorConfig(
+            enabled=True,
+            mode="swing_clearance_reflex",
+            clearance_reflex_target_m=0.02,
+            clearance_reflex_activation_margin_m=0.01,
+            clearance_reflex_hip_pitch=0.04,
+            clearance_reflex_knee=0.12,
+            clearance_reflex_ankle=-0.03,
+            clearance_reflex_mirror_right_sagittal=True,
+        )
+    )
+    action = np.zeros(14, dtype=np.float32)
+    state = _state(
+        feet_contacts=[0.0, 0.0],
+        feet_position_xyz=[[0.0, 0.04, 0.01], [0.0, -0.04, 0.01]],
+    )
+
+    out = processor.apply(action, JOINTS, state=state)
+
+    assert out[2] == np.float32(0.04)
+    assert out[3] == np.float32(0.12)
+    assert out[4] == np.float32(-0.03)
+    assert out[11] == np.float32(-0.04)
+    assert out[12] == np.float32(-0.12)
+    assert out[13] == np.float32(0.03)
+    assert processor.last_clearance_reflex["mirror_right_sagittal"] is True
+
+
 def _state(
     *,
     feet_contacts: list[float],

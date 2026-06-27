@@ -223,6 +223,9 @@ class PolicyProfile:
             "SORIDORMI_CLEARANCE_REFLEX_ANKLE": _fmt(
                 postprocess.get("clearance_reflex_ankle", 0.0)
             ),
+            "SORIDORMI_CLEARANCE_REFLEX_MIRROR_RIGHT_SAGITTAL": _fmt(
+                _as_bool(postprocess.get("clearance_reflex_mirror_right_sagittal", False), False)
+            ),
             "SORIDORMI_RESIDUAL_TEACHER_PROFILE": str(residual.get("teacher_profile", "open_duck_forward")),
             "SORIDORMI_RESIDUAL_SCALE": _fmt(residual.get("residual_scale", 0.05)),
             "SORIDORMI_RESIDUAL_CLIP_ABS": _fmt(residual.get("residual_clip_abs", 1.0)),

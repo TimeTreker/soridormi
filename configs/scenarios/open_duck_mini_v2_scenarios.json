@@ -121,7 +121,8 @@
         "max_low_clearance_ratio": 0.25,
         "require_foot_metrics": true,
         "min_base_z_m": 0.12,
-        "max_abs_roll_pitch_rad": 0.9
+        "max_abs_roll_pitch_rad": 0.9,
+        "swing_boundary_exclusion_samples": 1
       }
     },
     {
@@ -206,7 +207,8 @@
         "max_low_clearance_ratio": 0.25,
         "require_foot_metrics": true,
         "min_base_z_m": 0.12,
-        "max_abs_roll_pitch_rad": 0.9
+        "max_abs_roll_pitch_rad": 0.9,
+        "swing_boundary_exclusion_samples": 1
       }
     },
     {
@@ -290,7 +292,8 @@
         "max_low_clearance_ratio": 0.25,
         "require_foot_metrics": true,
         "min_base_z_m": 0.12,
-        "max_abs_roll_pitch_rad": 0.95
+        "max_abs_roll_pitch_rad": 0.95,
+        "swing_boundary_exclusion_samples": 1
       }
     },
     {

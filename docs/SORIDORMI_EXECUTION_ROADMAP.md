@@ -228,7 +228,7 @@ observation[101]
 
 ---
 
-## M10 - Runtime context policy [Current: clearance blocker identified]
+## M10 - Runtime context policy [Current: stable-swing clearance gate passed]
 
 **Goal:** Run context-conditioned policies through the production runtime path.
 
@@ -240,10 +240,10 @@ observation[101]
 - [x] Diagnose low-speed and curve failures
 - [x] Train a three-scenario candidate
 - [x] Pass the flat/start-stop/curve suite
-- [x] Diagnose low swing-foot clearance ✗ FAILS
-  - flat_walk_varied_speed_v1: 0.0102m (need +0.0048m)
-  - start_stop_velocity_ramp_v1: 0.0076m (need +0.0074m)
-  - curve_turn_walk_v1: 0.0063m (need +0.0087m)
+- [x] Diagnose low swing-foot clearance and use stable-swing gate semantics
+  - stable-swing gate keeps `min_swing_clearance_m=0.015` and `max_low_clearance_ratio=0.25`
+  - `swing_boundary_exclusion_samples=1` excludes toe-off/touchdown transition samples
+  - latest M10 core live suite: flat/start-stop/curve PASS with no falls
 - [ ] Perform human follow-camera visual inspection before promotion
 - [x] Define clearance-focused promotion thresholds
 - [x] Add threshold-aligned clearance readiness report

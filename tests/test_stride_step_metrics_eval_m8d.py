@@ -91,6 +91,38 @@ def test_stride_step_metrics_detects_fall_from_low_base_height(tmp_path: Path) -
     assert any("fall" in error for error in report.errors)
 
 
+def test_swing_boundary_exclusion_uses_stable_middle_of_swing(tmp_path: Path) -> None:
+    path = tmp_path / "stable_swing.jsonl"
+    rows = [
+        _row(0, base_x=0.00, contacts=[1.0, 1.0], left_x=0.00, right_x=0.05),
+        _row(1, base_x=0.02, contacts=[0.0, 1.0], left_x=0.02, right_x=0.05),
+        _row(2, base_x=0.04, contacts=[0.0, 1.0], left_x=0.04, right_x=0.05),
+        _row(3, base_x=0.06, contacts=[0.0, 1.0], left_x=0.06, right_x=0.05),
+        _row(4, base_x=0.08, contacts=[0.0, 1.0], left_x=0.08, right_x=0.05),
+        _row(5, base_x=0.10, contacts=[1.0, 1.0], left_x=0.10, right_x=0.05),
+    ]
+    rows[1]["state"]["feet_position_xyz"][0][2] = 0.005
+    rows[2]["state"]["feet_position_xyz"][0][2] = 0.020
+    rows[3]["state"]["feet_position_xyz"][0][2] = 0.021
+    rows[4]["state"]["feet_position_xyz"][0][2] = 0.004
+    _write_jsonl(path, rows)
+
+    report = evaluate_stride_step_metrics(
+        path,
+        thresholds=StrideStepThresholds(
+            min_forward_speed_mps=0.01,
+            swing_boundary_exclusion_samples=1,
+        ),
+    )
+
+    clearance = report.foot_clearance
+    assert clearance["raw_swing_count"] == 4
+    assert clearance["stable_swing_count"] == 2
+    assert clearance["swing_boundary_exclusion_applied"] is True
+    assert clearance["low_clearance_swing_ratio"] == 0.0
+    assert clearance["swing"]["p50_m"] == 0.0205
+
+
 def test_render_markdown_contains_stride_summary(tmp_path: Path) -> None:
     path = tmp_path / "walk.jsonl"
     _write_jsonl(

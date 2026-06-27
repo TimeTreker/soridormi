@@ -43,6 +43,7 @@ class ScenarioRolloutThresholds:
     min_base_z_m: float = 0.12
     max_abs_roll_pitch_rad: float = 0.90
     contact_threshold: float = 0.5
+    swing_boundary_exclusion_samples: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -104,6 +105,13 @@ def thresholds_from_scenario_manifest(
         min_base_z_m=_threshold_number(raw, "min_base_z_m", base.min_base_z_m),
         max_abs_roll_pitch_rad=_threshold_number(raw, "max_abs_roll_pitch_rad", base.max_abs_roll_pitch_rad),
         contact_threshold=_threshold_number(raw, "contact_threshold", base.contact_threshold),
+        swing_boundary_exclusion_samples=int(
+            _threshold_number(
+                raw,
+                "swing_boundary_exclusion_samples",
+                base.swing_boundary_exclusion_samples,
+            )
+        ),
     )
 
 
@@ -121,6 +129,7 @@ def overlay_threshold_overrides(
     min_base_z_m: float | None = None,
     max_abs_roll_pitch_rad: float | None = None,
     contact_threshold: float | None = None,
+    swing_boundary_exclusion_samples: int | None = None,
 ) -> ScenarioRolloutThresholds:
     """Return thresholds with only explicitly provided CLI overrides applied."""
 
@@ -150,6 +159,11 @@ def overlay_threshold_overrides(
             thresholds.max_abs_roll_pitch_rad if max_abs_roll_pitch_rad is None else float(max_abs_roll_pitch_rad)
         ),
         contact_threshold=thresholds.contact_threshold if contact_threshold is None else float(contact_threshold),
+        swing_boundary_exclusion_samples=(
+            thresholds.swing_boundary_exclusion_samples
+            if swing_boundary_exclusion_samples is None
+            else int(swing_boundary_exclusion_samples)
+        ),
     )
 
 
@@ -408,6 +422,7 @@ def evaluate_scenario_rollout(
         min_swing_clearance_m=cfg.min_swing_clearance_m,
         max_low_clearance_ratio=cfg.max_low_clearance_ratio,
         contact_threshold=cfg.contact_threshold,
+        swing_boundary_exclusion_samples=cfg.swing_boundary_exclusion_samples,
     )
     stride = evaluate_stride_step_metrics(log_path, thresholds=stride_thresholds, fallback_control_hz=fallback_control_hz)
 
@@ -569,6 +584,9 @@ def evaluate_scenario_rollout(
         "swing_clearance_p05_m": stride.foot_clearance.get("swing", {}).get("p05_m"),
         "swing_clearance_p50_m": stride.foot_clearance.get("swing", {}).get("p50_m"),
         "low_clearance_swing_ratio": stride.foot_clearance.get("low_clearance_swing_ratio"),
+        "raw_swing_count": stride.foot_clearance.get("raw_swing_count"),
+        "stable_swing_count": stride.foot_clearance.get("stable_swing_count"),
+        "swing_boundary_exclusion_samples": stride.foot_clearance.get("swing_boundary_exclusion_samples"),
     }
 
     return ScenarioRolloutReport(
@@ -637,6 +655,9 @@ def render_markdown(report: ScenarioRolloutReport) -> str:
         "swing_clearance_p05_m",
         "swing_clearance_p50_m",
         "low_clearance_swing_ratio",
+        "raw_swing_count",
+        "stable_swing_count",
+        "swing_boundary_exclusion_samples",
     ):
         lines.append(f"| {key} | {_format_value(report.metrics.get(key))} |")
 
@@ -701,6 +722,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-base-z-m", type=float, default=None, help="Override manifest min_base_z_m")
     parser.add_argument("--max-abs-roll-pitch-rad", type=float, default=None, help="Override manifest max_abs_roll_pitch_rad")
     parser.add_argument("--contact-threshold", type=float, default=None, help="Override manifest contact_threshold")
+    parser.add_argument(
+        "--swing-boundary-exclusion-samples",
+        type=int,
+        default=None,
+        help="Override manifest stable-swing boundary exclusion sample count",
+    )
     parser.add_argument("--output", type=Path, default=None, help="Optional Markdown report path")
     parser.add_argument("--json-output", type=Path, default=None, help="Optional JSON report path")
     parser.add_argument("--json", action="store_true", help="Print JSON instead of Markdown")
@@ -739,6 +766,7 @@ def main(argv: list[str] | None = None) -> int:
             args.min_base_z_m,
             args.max_abs_roll_pitch_rad,
             args.contact_threshold,
+            args.swing_boundary_exclusion_samples,
         )
     ) or args.allow_fallen or args.require_foot_metrics
     resolved_thresholds = None
@@ -756,6 +784,7 @@ def main(argv: list[str] | None = None) -> int:
             min_base_z_m=args.min_base_z_m,
             max_abs_roll_pitch_rad=args.max_abs_roll_pitch_rad,
             contact_threshold=args.contact_threshold,
+            swing_boundary_exclusion_samples=args.swing_boundary_exclusion_samples,
         )
 
     report = evaluate_scenario_rollout(

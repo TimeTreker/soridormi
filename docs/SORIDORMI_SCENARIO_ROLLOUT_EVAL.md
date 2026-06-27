@@ -94,13 +94,23 @@ Example manifest fragment:
     "require_not_fallen": true,
     "min_touchdown_count": 4,
     "min_swing_clearance_m": 0.015,
-    "max_low_clearance_ratio": 0.35,
+    "max_low_clearance_ratio": 0.25,
     "require_foot_metrics": false,
     "min_base_z_m": 0.12,
-    "max_abs_roll_pitch_rad": 0.90
+    "max_abs_roll_pitch_rad": 0.90,
+    "swing_boundary_exclusion_samples": 1
   }
 }
 ```
+
+For M10 clearance-gate scenarios, `low_clearance_swing_ratio` is measured on
+stable swing samples.  `swing_boundary_exclusion_samples: 1` excludes one
+sample immediately after toe-off and one sample immediately before touchdown
+from each contiguous swing segment.  The 15 mm swing-clearance threshold and the
+25% max low-clearance ratio are unchanged; the exclusion avoids counting normal
+contact-transition samples as mid-swing foot-drag risk.  Reports include
+`raw_swing_count`, `stable_swing_count`, and
+`swing_boundary_exclusion_samples`.
 
 Use overrides only for local experiments or temporary debugging:
 

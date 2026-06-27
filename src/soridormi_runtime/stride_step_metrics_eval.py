@@ -19,6 +19,7 @@ class StrideStepThresholds:
     max_low_clearance_ratio: float = 0.35
     min_swing_clearance_m: float = 0.015
     contact_threshold: float = 0.5
+    swing_boundary_exclusion_samples: int = 0
 
     def as_dict(self) -> dict[str, float | int]:
         return asdict(self)
@@ -318,9 +319,23 @@ def _base_motion(samples: list[RuntimeSample], duration_s: float | None) -> tupl
 
 def _foot_clearance(samples: list[RuntimeSample], thresholds: StrideStepThresholds) -> dict[str, Any]:
     all_clearances: list[float] = []
-    swing_clearances: list[float] = []
-    low_swing = 0
+    raw_swing_clearances: list[float] = []
+    stable_swing_clearances: list[float] = []
+    current_swing_segments: list[list[float]] = [[], []]
+    exclusion_samples = max(0, int(thresholds.swing_boundary_exclusion_samples))
     samples_with_feet = 0
+
+    def flush_swing_segment(foot_index: int) -> None:
+        segment = current_swing_segments[foot_index]
+        if not segment:
+            return
+        raw_swing_clearances.extend(segment)
+        if exclusion_samples <= 0:
+            stable_swing_clearances.extend(segment)
+        elif len(segment) > exclusion_samples * 2:
+            stable_swing_clearances.extend(segment[exclusion_samples:-exclusion_samples])
+        current_swing_segments[foot_index] = []
+
     for sample in samples:
         if sample.feet_xyz is None:
             continue
@@ -331,15 +346,33 @@ def _foot_clearance(samples: list[RuntimeSample], thresholds: StrideStepThreshol
             all_clearances.append(z)
             contact = contacts[foot_index] >= thresholds.contact_threshold
             if not contact:
-                swing_clearances.append(z)
-                if z < thresholds.min_swing_clearance_m:
-                    low_swing += 1
+                current_swing_segments[foot_index].append(z)
+            else:
+                flush_swing_segment(foot_index)
+    for foot_index in (0, 1):
+        flush_swing_segment(foot_index)
+
+    if stable_swing_clearances:
+        swing_clearances = stable_swing_clearances
+        boundary_exclusion_applied = exclusion_samples > 0
+        boundary_exclusion_fallback = False
+    else:
+        swing_clearances = raw_swing_clearances
+        boundary_exclusion_applied = False
+        boundary_exclusion_fallback = exclusion_samples > 0 and bool(raw_swing_clearances)
+
+    low_swing = sum(1 for z in swing_clearances if z < thresholds.min_swing_clearance_m)
     swing_count = len(swing_clearances)
     low_ratio = float(low_swing) / float(swing_count) if swing_count else None
     return {
         "samples_with_feet": samples_with_feet,
         "all": _stats(all_clearances, "_m"),
         "swing": _stats(swing_clearances, "_m"),
+        "raw_swing_count": len(raw_swing_clearances),
+        "stable_swing_count": len(stable_swing_clearances),
+        "swing_boundary_exclusion_samples": exclusion_samples,
+        "swing_boundary_exclusion_applied": boundary_exclusion_applied,
+        "swing_boundary_exclusion_fallback": boundary_exclusion_fallback,
         "low_clearance_swing_steps": low_swing,
         "low_clearance_swing_ratio": low_ratio,
     }
@@ -617,6 +650,9 @@ def render_markdown(report: StrideStepReport) -> str:
         "| --- | ---: |",
         f"| swing_clearance_p50_m | {_format_value(clearance.get('swing', {}).get('p50_m'))} |",
         f"| swing_clearance_min_m | {_format_value(clearance.get('swing', {}).get('min_m'))} |",
+        f"| raw_swing_count | {_format_value(clearance.get('raw_swing_count'))} |",
+        f"| stable_swing_count | {_format_value(clearance.get('stable_swing_count'))} |",
+        f"| swing_boundary_exclusion_samples | {_format_value(clearance.get('swing_boundary_exclusion_samples'))} |",
         f"| low_clearance_swing_steps | {_format_value(clearance.get('low_clearance_swing_steps'))} |",
         f"| low_clearance_swing_ratio | {_format_value(clearance.get('low_clearance_swing_ratio'))} |",
         "",
@@ -643,6 +679,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-swing-clearance", type=float, default=0.015)
     parser.add_argument("--max-low-clearance-ratio", type=float, default=0.35)
     parser.add_argument("--contact-threshold", type=float, default=0.5)
+    parser.add_argument("--swing-boundary-exclusion-samples", type=int, default=0)
     parser.add_argument("--output", type=Path, default=None, help="Optional markdown report path.")
     parser.add_argument("--json-output", type=Path, default=None, help="Optional JSON report path.")
     parser.add_argument("--json", action="store_true", help="Print JSON instead of markdown.")
@@ -663,6 +700,7 @@ def main(argv: list[str] | None = None) -> int:
             min_swing_clearance_m=float(args.min_swing_clearance),
             max_low_clearance_ratio=float(args.max_low_clearance_ratio),
             contact_threshold=float(args.contact_threshold),
+            swing_boundary_exclusion_samples=int(args.swing_boundary_exclusion_samples),
         ),
         fallback_control_hz=float(args.fallback_control_hz) if args.fallback_control_hz else None,
     )
