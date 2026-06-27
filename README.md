@@ -59,6 +59,10 @@ soridormi-runtime  <---- same robot API ---->  motors / IMU / encoders / power
 
 The runtime code should not need to know whether it talks to MuJoCo or real hardware.
 
+For fresh-machine simulator bootstrap, use
+[Soridormi Deployment](docs/SORIDORMI_DEPLOYMENT.md) and
+`./scripts/deploy_soridormi.sh`.
+
 ## Target hardware
 
 Long-term primary target:

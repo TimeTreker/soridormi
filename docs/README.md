@@ -13,6 +13,7 @@ be committed.
 - `docs/PROJECT_SOP.md`: project backbone and validation philosophy.
 - `docs/architecture.md`: runtime/API/simulator architecture.
 - `docs/PATCH_DELIVERY_AND_VALIDATION.md`: patch and validation expectations.
+- `docs/SORIDORMI_DEPLOYMENT.md`: fresh-machine simulator deployment workflow.
 - `docs/SORIDORMI_TARGET_AND_ROADMAP.md`: cerebellum target, Chromie brain
   boundary, milestone direction, and current policy evidence.
 - `docs/SORIDORMI_EXECUTION_ROADMAP.md`: gated milestone sequence, acceptance
