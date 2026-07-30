@@ -44,6 +44,13 @@ Do not run the standalone runtime loop and the runtime MCP adapter against the
 same robot backend at the same time. The adapter owns the control loop while a
 plan is active.
 
+The repository launchers export the current Git commit as
+`SORIDORMI_SOURCE_REVISION`. When it is available, `robot.get_status` returns
+it as `source_revision` so a caller can bind retained evidence to the exact
+Soridormi source revision. This field is provenance only; it does not authorize
+execution. Direct development launches that need source-bound evidence must set
+the same environment variable explicitly.
+
 `motion.stop`, `motion.cancel`, and `safety.emergency_stop` can preempt between
 control ticks. Cancelling an in-flight MCP request also transitions the robot
 to safe hold. `robot.get_status` reports `safe_idle=true` only when no task is

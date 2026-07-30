@@ -36,6 +36,7 @@ from soridormi_runtime.visual_expression_skill import (
 )
 
 from .local_tools import MotionPlan, NamedSkillPlan, SoridormiLocalToolService
+from .source_identity import current_source_revision
 from .task_tools import EmbodiedTaskStore, task_capabilities_payload
 
 
@@ -73,6 +74,7 @@ class SoridormiRuntimeToolService:
     controller: RuntimeController
     mode: str = "sim"
     backend: str = "runtime"
+    source_revision: str | None = field(default_factory=current_source_revision)
     control_hz: float = 50.0
     plans: dict[str, MotionPlan] = field(default_factory=dict)
     skill_plans: dict[str, NamedSkillPlan] = field(default_factory=dict)
@@ -620,7 +622,7 @@ class SoridormiRuntimeToolService:
 
     async def get_status(self) -> dict[str, Any]:
         state = await self._read_state()
-        return {
+        status: dict[str, Any] = {
             "mode": self.mode,
             "backend": self.backend,
             "standing": True,
@@ -630,6 +632,9 @@ class SoridormiRuntimeToolService:
             "safe_idle": self.active_task is None and not self.emergency_stop,
             "robot_time": float(state.time),
         }
+        if self.source_revision:
+            status["source_revision"] = self.source_revision
+        return status
 
     async def execute_motion_plan(self, plan_id: str) -> dict[str, Any]:
         if self.emergency_stop:

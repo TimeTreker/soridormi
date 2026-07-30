@@ -176,6 +176,10 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                     "active_task": {"type": ["object", "null"]},
                     "safe_idle": {"type": "boolean"},
                     "robot_time": {"type": "number"},
+                    "source_revision": {
+                        "type": "string",
+                        "description": "Provider-reported source revision for evidence binding.",
+                    },
                 }),
                 effects=["read_only"],
                 safety_class="safe_read",

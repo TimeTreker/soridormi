@@ -74,6 +74,11 @@ else
 fi
 cd "$ROOT_DIR"
 
+if [ -z "${SORIDORMI_SOURCE_REVISION:-}" ]; then
+  SORIDORMI_SOURCE_REVISION="$(git rev-parse HEAD 2>/dev/null || true)"
+  export SORIDORMI_SOURCE_REVISION
+fi
+
 for cmd in docker python3; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "[soridormi][error] Required command not found: $cmd" >&2

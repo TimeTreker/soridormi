@@ -9,6 +9,7 @@ from typing import Any
 from soridormi_runtime.skill_execution import SkillExecutionRegistry, SkillPlan
 from soridormi_runtime.skill_manifest import DEFAULT_SKILL_MANIFEST
 
+from .source_identity import current_source_revision
 from .task_tools import EmbodiedTaskStore, task_capabilities_payload
 
 _MAX_COMMANDS = 8
@@ -114,6 +115,7 @@ class SoridormiLocalToolService:
 
     mode: str = "sim"
     backend: str = "local_tool_dry_run"
+    source_revision: str | None = field(default_factory=current_source_revision)
     plans: dict[str, MotionPlan] = field(default_factory=dict)
     skill_plans: dict[str, NamedSkillPlan] = field(default_factory=dict)
     emergency_stop: bool = False
@@ -278,7 +280,7 @@ class SoridormiLocalToolService:
         return _NO_FAULT_RESULT
 
     def get_status(self) -> dict[str, Any]:
-        return {
+        status: dict[str, Any] = {
             "mode": self.mode,
             "backend": self.backend,
             "standing": True,
@@ -287,6 +289,9 @@ class SoridormiLocalToolService:
             "active_task": None,
             "safe_idle": not self.emergency_stop,
         }
+        if self.source_revision:
+            status["source_revision"] = self.source_revision
+        return status
 
     def list_skills(self) -> dict[str, Any]:
         skills = []

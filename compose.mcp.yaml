@@ -19,6 +19,7 @@ services:
       SORIDORMI_MCP_PATH: ${SORIDORMI_MCP_PATH:-/mcp}
       SORIDORMI_MCP_MODE: ${SORIDORMI_MCP_MODE:-sim}
       SORIDORMI_MCP_LOG_LEVEL: ${SORIDORMI_MCP_LOG_LEVEL:-info}
+      SORIDORMI_SOURCE_REVISION: ${SORIDORMI_SOURCE_REVISION:-}
     read_only: true
     tmpfs:
       - /tmp
