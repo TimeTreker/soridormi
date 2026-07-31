@@ -823,6 +823,7 @@ H0 read-only state
 - [x] Publish Soridormi capability and availability data
 - [x] Define versioned request/response schemas
 - [x] Add execution status and failure reasons
+- [x] Report the live provider source revision for paired-repository evidence
 - [x] Add cancellation and stop semantics
 - [x] Validate named-skill integration in MuJoCo
 - [x] Add bounded locomotion requests
@@ -836,7 +837,10 @@ without producing low-level motor or policy actions.
 > **Contract evidence:** Soridormi now exports task-level capability readiness,
 > versioned preview/submit/status/events/cancel schemas, structured
 > `plan_steps`, `blocked_subsystems`, `recommended_next_actions`, and a
-> `raw_control_allowed=false` body-task graph. The M14 contract surface is
+> `raw_control_allowed=false` body-task graph. Source-bound launchers also
+> inject the full Soridormi Git commit into the MCP process, and
+> `soridormi.robot.get_status` reports it as `source_revision` for paired-source
+> evidence. The M14 contract surface is
 > validated by `./scripts/validate_task_agent_contract.sh`,
 > `tests/test_mcp_capability_manifest.py`,
 > `tests/test_task_acceptance_cases_m11.py`,

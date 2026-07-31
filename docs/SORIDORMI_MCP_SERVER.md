@@ -50,6 +50,9 @@ it as `source_revision` so a caller can bind retained evidence to the exact
 Soridormi source revision. This field is provenance only; it does not authorize
 execution. Direct development launches that need source-bound evidence must set
 the same environment variable explicitly.
+The MuJoCo launcher requires a full Git commit identity. It reuses an existing
+runtime MCP container only when that container reports the same injected
+revision; otherwise it restarts the MCP service with the current identity.
 
 `motion.stop`, `motion.cancel`, and `safety.emergency_stop` can preempt between
 control ticks. Cancelling an in-flight MCP request also transitions the robot

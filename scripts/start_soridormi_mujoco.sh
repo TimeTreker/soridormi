@@ -74,17 +74,24 @@ else
 fi
 cd "$ROOT_DIR"
 
-if [ -z "${SORIDORMI_SOURCE_REVISION:-}" ]; then
-  SORIDORMI_SOURCE_REVISION="$(git rev-parse HEAD 2>/dev/null || true)"
-  export SORIDORMI_SOURCE_REVISION
-fi
-
-for cmd in docker python3; do
+for cmd in docker git python3; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "[soridormi][error] Required command not found: $cmd" >&2
     exit 1
   }
 done
+
+if [ -z "${SORIDORMI_SOURCE_REVISION:-}" ]; then
+  if ! SORIDORMI_SOURCE_REVISION="$(git rev-parse --verify HEAD^{commit} 2>/dev/null)"; then
+    echo "[soridormi][error] Could not resolve the Soridormi source revision." >&2
+    exit 1
+  fi
+fi
+if [[ ! "$SORIDORMI_SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "[soridormi][error] SORIDORMI_SOURCE_REVISION must be a full Git commit." >&2
+  exit 1
+fi
+export SORIDORMI_SOURCE_REVISION
 
 docker info >/dev/null 2>&1 || {
   echo "[soridormi][error] Docker daemon is not reachable." >&2
@@ -206,6 +213,18 @@ container_running() {
   [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null || true)" = "true" ]
 }
 
+container_source_revision() {
+  local entry
+  while IFS= read -r entry; do
+    case "$entry" in
+      SORIDORMI_SOURCE_REVISION=*)
+        echo "${entry#SORIDORMI_SOURCE_REVISION=}"
+        return 0
+        ;;
+    esac
+  done < <(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$1" 2>/dev/null)
+}
+
 stop_existing_sim_containers() {
   local names=()
   local name
@@ -307,7 +326,18 @@ if { [ "$RESTART_MCP" = "1" ] || [ "$OWN_SIM" = "1" ]; } && container_running so
 fi
 
 if [ "$RESTART_MCP" = "0" ] && container_running soridormi-runtime-mcp && python_tcp_check 127.0.0.1 "$MCP_PORT"; then
-  echo "[soridormi] Reusing existing runtime MCP server."
+  EXISTING_MCP_SOURCE_REVISION="$(container_source_revision soridormi-runtime-mcp)"
+  if [ "$EXISTING_MCP_SOURCE_REVISION" = "$SORIDORMI_SOURCE_REVISION" ]; then
+    echo "[soridormi] Reusing existing runtime MCP server for source ${SORIDORMI_SOURCE_REVISION}."
+  else
+    echo "[soridormi] Restarting runtime MCP because its source identity does not match this checkout."
+    docker compose "${COMPOSE_ARGS[@]}" stop mcp-runtime >/dev/null 2>&1 || true
+    RESTART_MCP=1
+  fi
+fi
+
+if [ "$RESTART_MCP" = "0" ] && container_running soridormi-runtime-mcp && python_tcp_check 127.0.0.1 "$MCP_PORT"; then
+  :
 else
   echo "[soridormi] Starting runtime MCP without build or pull..."
   : > "$MCP_LOG"
@@ -339,6 +369,7 @@ Soridormi is ready for Chromie
 ======================================================================
 MuJoCo:  127.0.0.1:${SIM_PORT}
 MCP:     http://127.0.0.1:${MCP_PORT}${MCP_PATH}
+Source:  ${SORIDORMI_SOURCE_REVISION}
 Profile: ${PROFILE}
 Viewer:  ${VIEWER_STATUS}
 Follow camera: ${FOLLOW_CAMERA_STATUS}
