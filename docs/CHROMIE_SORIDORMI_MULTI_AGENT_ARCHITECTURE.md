@@ -31,6 +31,13 @@ Chromie global task DAG
 Chromie should send what should be achieved and why. Soridormi decides whether
 and how the robot body can safely do it.
 
+For named-skill planning, Chromie may attach a `chromie_intent` object with
+`execution_mode=proposed`, `execution_semantics=proposal_from_chromie`, and
+`requires_runtime_validation=true`. Soridormi validates this as advisory
+provenance only. It rejects executable semantics, low-level controls, and
+physical coordinates in that metadata, then independently validates and plans
+the named skill through its owned runtime boundary.
+
 ## Two DAG scopes
 
 ### Chromie global DAG

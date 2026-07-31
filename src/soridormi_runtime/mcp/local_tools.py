@@ -21,6 +21,67 @@ _LIMITS = {
     "yaw": (-0.4, 0.4),
     "duration_s": (0.05, 5.0),
 }
+_CHROMIE_INTENT_CONSTANTS = {
+    "execution_mode": "proposed",
+    "execution_semantics": "proposal_from_chromie",
+    "requires_runtime_validation": True,
+}
+_CHROMIE_INTENT_FORBIDDEN_PHYSICAL_FIELDS = {
+    "action_14d",
+    "actuator_ctrl",
+    "joint_targets",
+    "motor_commands",
+    "target_coordinates",
+    "target_pose",
+    "torque_commands",
+    "x",
+    "y",
+    "z",
+}
+
+
+def _forbidden_chromie_intent_paths(value: Any, *, path: str = "chromie_intent") -> list[str]:
+    found: list[str] = []
+    if isinstance(value, dict):
+        for name, nested in value.items():
+            nested_path = f"{path}.{name}"
+            if name in _CHROMIE_INTENT_FORBIDDEN_PHYSICAL_FIELDS:
+                found.append(nested_path)
+            found.extend(_forbidden_chromie_intent_paths(nested, path=nested_path))
+    elif isinstance(value, list):
+        for index, nested in enumerate(value):
+            found.extend(
+                _forbidden_chromie_intent_paths(nested, path=f"{path}[{index}]")
+            )
+    return found
+
+
+def validate_chromie_intent(value: Any) -> None:
+    """Validate advisory Chromie metadata without treating it as body control."""
+
+    if value is None:
+        return
+    if not isinstance(value, dict):
+        raise ValueError("chromie_intent must be an object")
+    for name, expected in _CHROMIE_INTENT_CONSTANTS.items():
+        if value.get(name) != expected:
+            raise ValueError(f"chromie_intent.{name} must be {expected!r}")
+    forbidden = sorted(_forbidden_chromie_intent_paths(value))
+    if forbidden:
+        raise ValueError(
+            "chromie_intent must not contain physical control or coordinate fields: "
+            + ", ".join(forbidden)
+        )
+    if value.get("physical_state_source") not in {None, "soridormi_runtime"}:
+        raise ValueError(
+            "chromie_intent.physical_state_source must be 'soridormi_runtime'"
+        )
+    for name in (
+        "chromie_must_not_provide_physical_coordinates",
+        "soridormi_owns_pose_estimation",
+    ):
+        if name in value and value[name] is not True:
+            raise ValueError(f"chromie_intent.{name} must be true")
 
 
 @dataclass(frozen=True)
@@ -336,6 +397,7 @@ class SoridormiLocalToolService:
         return {"mode": self.mode, "skills": skills}
 
     def create_skill_plan(self, args: dict[str, Any]) -> dict[str, Any]:
+        validate_chromie_intent(args.get("chromie_intent"))
         skill_id = str(args.get("skill_id", ""))
         if not skill_id:
             raise ValueError("skill_id is required")

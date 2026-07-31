@@ -144,6 +144,49 @@ def _object_schema(properties: dict[str, Any], required: list[str] | None = None
     return schema
 
 
+def _chromie_intent_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "description": (
+            "Chromie-side proposal metadata. Soridormi treats it as advisory "
+            "intent, never as a hardware command."
+        ),
+        "properties": {
+            "execution_mode": {"type": "string", "const": "proposed"},
+            "execution_semantics": {
+                "type": "string",
+                "const": "proposal_from_chromie",
+            },
+            "requires_runtime_validation": {"type": "boolean", "const": True},
+            "interaction_id": {"type": "string"},
+            "request_id": {"type": "string"},
+            "skill_id": {"type": "string"},
+            "upstream_skill_id": {"type": "string"},
+            "source_component": {"type": "string"},
+            "requires_live_perception": {"type": "boolean"},
+            "perception_dependency": {"type": "string"},
+            "physical_state_source": {
+                "type": "string",
+                "const": "soridormi_runtime",
+            },
+            "chromie_must_not_provide_physical_coordinates": {
+                "type": "boolean",
+                "const": True,
+            },
+            "soridormi_owns_pose_estimation": {
+                "type": "boolean",
+                "const": True,
+            },
+        },
+        "required": [
+            "execution_mode",
+            "execution_semantics",
+            "requires_runtime_validation",
+        ],
+        "additionalProperties": True,
+    }
+
+
 def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
     """Return Soridormi's robot-body capability manifest.
 
@@ -412,6 +455,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                             "additionalProperties": True,
                         },
                         "profile": {"type": "string"},
+                        "chromie_intent": _chromie_intent_schema(),
                     },
                     required=["skill_id"],
                 ),
@@ -433,6 +477,12 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                     idempotent=False,
                     side_effect_free=False,
                 ),
+                llm_hints={
+                    "chromie_intent_contract": (
+                        "Chromie sends proposal metadata only; Soridormi validates, "
+                        "plans, monitors, and may refuse every physical execution."
+                    )
+                },
             ),
             ToolCapability(
                 name="soridormi.skill.execute_plan",

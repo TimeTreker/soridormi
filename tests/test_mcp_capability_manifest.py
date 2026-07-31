@@ -49,6 +49,23 @@ def test_named_skill_execute_is_declared_as_physical_motion_boundary() -> None:
     assert "recommendation_only" in execute.output_schema["properties"]
 
 
+def test_named_skill_plan_declares_chromie_proposal_boundary() -> None:
+    bundle = build_soridormi_capability_bundle()
+    tools = {tool.name: tool for agent in bundle.agents for tool in agent.tools}
+    create_plan = tools["soridormi.skill.create_plan"]
+    proposal = create_plan.input_schema["properties"]["chromie_intent"]
+
+    assert proposal["properties"]["execution_mode"]["const"] == "proposed"
+    assert (
+        proposal["properties"]["execution_semantics"]["const"]
+        == "proposal_from_chromie"
+    )
+    assert proposal["properties"]["requires_runtime_validation"]["const"] is True
+    assert create_plan.llm_hints["chromie_intent_contract"].startswith(
+        "Chromie sends proposal metadata only"
+    )
+
+
 def test_status_schema_exposes_safe_idle_for_chromie() -> None:
     bundle = build_soridormi_capability_bundle()
     tools = {tool.name: tool for agent in bundle.agents for tool in agent.tools}

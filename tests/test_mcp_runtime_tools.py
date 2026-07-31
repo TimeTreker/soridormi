@@ -190,6 +190,25 @@ def test_runtime_service_executes_bounded_plan_through_controller() -> None:
     asyncio.run(exercise())
 
 
+def test_runtime_skill_plan_rejects_invalid_chromie_proposal_metadata() -> None:
+    async def exercise() -> None:
+        service = _service()
+        with pytest.raises(ValueError, match="requires_runtime_validation"):
+            await service.call_tool(
+                "soridormi.skill.create_plan",
+                {
+                    "skill_id": "nod_yes",
+                    "chromie_intent": {
+                        "execution_mode": "proposed",
+                        "execution_semantics": "proposal_from_chromie",
+                        "requires_runtime_validation": False,
+                    },
+                },
+            )
+
+    asyncio.run(exercise())
+
+
 def test_runtime_stop_preempts_long_running_plan() -> None:
     async def exercise() -> None:
         service = _service(control_hz=100.0)

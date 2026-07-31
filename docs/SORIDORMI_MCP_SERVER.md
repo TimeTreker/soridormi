@@ -70,6 +70,12 @@ soridormi.skill.list
   -> soridormi.robot.get_status for safe-idle confirmation
 ```
 
+`soridormi.skill.create_plan` accepts optional `chromie_intent` proposal
+metadata. The required proposal constants make Chromie's role explicit, while
+Soridormi rejects execution semantics, raw controls, and physical coordinates
+inside that metadata. It remains Soridormi's responsibility to validate the
+skill, choose the body plan, monitor execution, and refuse when necessary.
+
 The lower-level `soridormi.motion.*` tools remain available for bounded
 velocity-plan integration tests and emergency controls. Neither path exposes
 raw joint targets, motor commands, torque commands, or low-level 14D policy

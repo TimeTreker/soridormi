@@ -106,6 +106,57 @@ def test_named_skill_provider_is_no_motion_in_all_safe_modes(
     assert service.get_status()["active_task"] is None
 
 
+def test_named_skill_plan_accepts_valid_chromie_proposal_metadata() -> None:
+    service = SoridormiLocalToolService()
+
+    result = service.call_tool(
+        "soridormi.skill.create_plan",
+        {
+            "skill_id": "nod_yes",
+            "chromie_intent": {
+                "execution_mode": "proposed",
+                "execution_semantics": "proposal_from_chromie",
+                "requires_runtime_validation": True,
+                "physical_state_source": "soridormi_runtime",
+                "chromie_must_not_provide_physical_coordinates": True,
+                "soridormi_owns_pose_estimation": True,
+                "route_stage": "goal_interpreter",
+            },
+        },
+    )
+
+    assert result["skill_id"] == "nod_yes"
+
+
+@pytest.mark.parametrize(
+    "chromie_intent",
+    [
+        {"execution_mode": "execute"},
+        {
+            "execution_mode": "proposed",
+            "execution_semantics": "proposal_from_chromie",
+            "requires_runtime_validation": False,
+        },
+        {
+            "execution_mode": "proposed",
+            "execution_semantics": "proposal_from_chromie",
+            "requires_runtime_validation": True,
+            "route_context": {"target_coordinates": [1.0, 2.0, 3.0]},
+        },
+    ],
+)
+def test_named_skill_plan_rejects_invalid_chromie_proposal_metadata(
+    chromie_intent: object,
+) -> None:
+    service = SoridormiLocalToolService()
+
+    with pytest.raises(ValueError, match="chromie_intent"):
+        service.call_tool(
+            "soridormi.skill.create_plan",
+            {"skill_id": "nod_yes", "chromie_intent": chromie_intent},
+        )
+
+
 def test_test_only_fault_injection_is_one_shot_and_clearable() -> None:
     service = SoridormiLocalToolService()
     configured = service.call_tool(

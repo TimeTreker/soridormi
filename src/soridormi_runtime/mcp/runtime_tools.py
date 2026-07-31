@@ -35,7 +35,12 @@ from soridormi_runtime.visual_expression_skill import (
     validate_visual_expression_plan,
 )
 
-from .local_tools import MotionPlan, NamedSkillPlan, SoridormiLocalToolService
+from .local_tools import (
+    MotionPlan,
+    NamedSkillPlan,
+    SoridormiLocalToolService,
+    validate_chromie_intent,
+)
 from .source_identity import current_source_revision
 from .task_tools import EmbodiedTaskStore, task_capabilities_payload
 
@@ -343,6 +348,7 @@ class SoridormiRuntimeToolService:
         return commands
 
     def create_runtime_skill_plan(self, args: dict[str, Any]) -> dict[str, Any]:
+        validate_chromie_intent(args.get("chromie_intent"))
         skill_id = str(args.get("skill_id", "")).strip()
         if not skill_id:
             raise ValueError("skill_id is required")
