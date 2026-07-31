@@ -244,3 +244,13 @@ def test_dag_contract_recommends_monitoring_motion_execution() -> None:
     sequence = "\n".join(bundle.dag_contract["default_short_motion_sequence"])
     assert "soridormi.safety.monitor_motion" in sequence
     assert "soridormi.motion.execute_plan" in sequence
+
+
+def test_dag_contract_uses_semantic_status_language() -> None:
+    bundle = build_soridormi_capability_bundle()
+
+    assert any(
+        "task submission is contract-only and no-motion" in rule
+        for rule in bundle.dag_contract["rules"]
+    )
+    assert all("M11" not in rule for rule in bundle.dag_contract["rules"])

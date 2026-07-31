@@ -62,7 +62,7 @@ def build_soridormi_dag_contract(*, mode: str = "sim") -> dict[str, Any]:
             "Chromie must use soridormi.skill.create_plan before soridormi.skill.execute_plan.",
             "Chromie may use soridormi.task.get_capabilities to inspect Soridormi-owned embodied readiness before preview or submission.",
             "Chromie may use soridormi.task.preview before user confirmation or task submission to inspect Soridormi's no-motion embodied interpretation.",
-            "Chromie may submit structured embodied goals through soridormi.task.submit, but M11 task submission is contract-only and no-motion until Soridormi adds task execution.",
+            "Chromie may submit structured embodied goals through soridormi.task.submit, but task submission is contract-only and no-motion until Soridormi adds task execution.",
             "Chromie must use soridormi.task.status or soridormi.task.events to monitor task-level requests.",
             "Do not expose raw motor, joint, or torque controls to LLM-generated graphs.",
             "stop and emergency_stop may preempt any running motion task.",
