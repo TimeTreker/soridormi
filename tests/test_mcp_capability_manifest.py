@@ -262,8 +262,8 @@ def test_body_activity_surface_declares_resource_validated_concurrency() -> None
 
     expected = {
         "soridormi.activity.get_capabilities",
-        "soridormi.activity.create_plan",
-        "soridormi.activity.execute_plan",
+        "soridormi.activity.compile",
+        "soridormi.activity.execute",
         "soridormi.activity.status",
         "soridormi.activity.cancel",
     }
@@ -273,14 +273,14 @@ def test_body_activity_surface_declares_resource_validated_concurrency() -> None
     assert capabilities.execution.side_effect_free is True
     assert capabilities.output_schema["properties"]["speech_owner"]["const"] == "chromie"
 
-    create_plan = tools["soridormi.activity.create_plan"]
+    create_plan = tools["soridormi.activity.compile"]
     member_schema = create_plan.input_schema["properties"]["members"]["items"]
     assert "skill_id" in member_schema["properties"]
     assert "optional" in member_schema["properties"]
     assert "coordination_id" in create_plan.input_schema["properties"]
     assert "Do not include speech" in create_plan.llm_hints["when_to_use"]
 
-    execute = tools["soridormi.activity.execute_plan"]
+    execute = tools["soridormi.activity.execute"]
     assert execute.safety_class == "physical_motion"
     assert execute.confirmation.required is True
     assert execute.monitoring.requires_safety_monitor is True
@@ -313,5 +313,5 @@ def test_dag_contract_freezes_single_core_three_lane_model() -> None:
         "body_provider": "soridormi",
     }
     assert contract["soridormi_concurrency_model"]["one_final_motor_command_authority"] is True
-    assert "soridormi.activity.execute_plan" in contract["physical_motion_tools"]
+    assert "soridormi.activity.execute" in contract["physical_motion_tools"]
     assert any("Speech or singing is never a Soridormi activity member" in rule for rule in contract["rules"])

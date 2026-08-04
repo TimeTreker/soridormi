@@ -12,7 +12,8 @@ from soridormi_runtime.skill_manifest import DEFAULT_SKILL_MANIFEST
 from .body_activity import (
     BodyActivityPlanRecord,
     body_activity_capabilities_payload,
-    create_body_activity_plan,
+    compile_body_activity,
+    skill_concurrency_projection,
 )
 from .source_identity import current_source_revision
 from .task_tools import EmbodiedTaskStore, task_capabilities_payload
@@ -241,15 +242,15 @@ class SoridormiLocalToolService:
                     mode=self.mode,
                     backend=self.backend,
                 )
-            if tool_name == "soridormi.activity.create_plan":
+            if tool_name in {"soridormi.activity.compile", "soridormi.activity.create_plan"}:
                 return self.create_activity_plan(args)
-            if tool_name == "soridormi.activity.execute_plan":
-                return self.execute_activity_plan(str(args.get("plan_id", "")))
+            if tool_name in {"soridormi.activity.execute", "soridormi.activity.execute_plan"}:
+                return self.execute_activity_plan(str(args.get("compiled_activity_id") or args.get("plan_id") or ""))
             if tool_name == "soridormi.activity.status":
-                return self.activity_status(str(args.get("plan_id", "")))
+                return self.activity_status(str(args.get("compiled_activity_id") or args.get("plan_id") or ""))
             if tool_name == "soridormi.activity.cancel":
                 return self.cancel_activity(
-                    str(args.get("plan_id", "")),
+                    str(args.get("compiled_activity_id") or args.get("plan_id") or ""),
                     reason=str(args.get("reason") or "cancelled by caller"),
                 )
             body_safe_idle = not self.emergency_stop
@@ -421,7 +422,7 @@ class SoridormiLocalToolService:
                     "interruptible": bool(
                         (skill.get("safety") or {}).get("interruptible", True)
                     ),
-                    "concurrency": dict(skill.get("concurrency") or {}),
+                    **skill_concurrency_projection(skill),
                 }
             )
         return {"mode": self.mode, "skills": skills}
@@ -474,7 +475,7 @@ class SoridormiLocalToolService:
 
     def create_activity_plan(self, args: dict[str, Any]) -> dict[str, Any]:
         validate_chromie_intent(args.get("chromie_intent"))
-        record = create_body_activity_plan(self.skill_registry, args)
+        record = compile_body_activity(self.skill_registry, args)
         self.activity_plans[record.plan_id] = record
         return record.to_dict(
             mode=self.mode,

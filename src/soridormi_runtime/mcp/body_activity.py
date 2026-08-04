@@ -84,6 +84,12 @@ class BodyActivityPlanRecord:
     failure_reason: str | None = None
 
     @property
+    def compiled_activity_id(self) -> str:
+        """Canonical identity of the deterministically compiled body activity."""
+
+        return self.plan_id
+
+    @property
     def terminal(self) -> bool:
         return self.status in TERMINAL_ACTIVITY_STATUSES
 
@@ -128,6 +134,7 @@ class BodyActivityPlanRecord:
     def to_dict(self, *, mode: str, backend: str, dry_run_only: bool) -> dict[str, Any]:
         return {
             "schema_version": "soridormi.body_activity.v1",
+            "compiled_activity_id": self.compiled_activity_id,
             "plan_id": self.plan_id,
             "coordination_id": self.coordination_id,
             "mode": mode,
@@ -154,6 +161,9 @@ class BodyActivityPlanRecord:
             "safety_authority": "soridormi",
             "speech_owner": "chromie",
             "one_final_motor_command_authority": True,
+            "semantic_role": "deterministic_embodied_compiler",
+            "cognitive_planning": False,
+            "llm_required": False,
         }
 
 
@@ -164,6 +174,19 @@ def body_activity_capabilities_payload(*, mode: str, backend: str) -> dict[str, 
         "backend": backend,
         "speech_owner": "chromie",
         "speech_is_external_peer_lane": True,
+        "semantic_role": "deterministic_embodied_compiler",
+        "cognitive_planning": False,
+        "llm_required": False,
+        "canonical_tools": {
+            "compile": "soridormi.activity.compile",
+            "execute": "soridormi.activity.execute",
+            "status": "soridormi.activity.status",
+            "cancel": "soridormi.activity.cancel",
+        },
+        "compatibility_aliases": {
+            "soridormi.activity.create_plan": "soridormi.activity.compile",
+            "soridormi.activity.execute_plan": "soridormi.activity.execute",
+        },
         "ability_classes": [
             {
                 "ability_class": ABILITY_CLASS_SUBTLE_EXPRESSION,
@@ -248,7 +271,7 @@ def _validate_overlay_envelope(member: BodyActivityMemberPlan) -> None:
         )
 
 
-def create_body_activity_plan(
+def compile_body_activity(
     registry: SkillExecutionRegistry,
     args: Mapping[str, Any],
 ) -> BodyActivityPlanRecord:
@@ -354,3 +377,52 @@ def create_body_activity_plan(
         created_at=time.time(),
         estimated_duration_s=estimated_duration_s,
     )
+
+
+def create_body_activity_plan(
+    registry: SkillExecutionRegistry,
+    args: Mapping[str, Any],
+) -> BodyActivityPlanRecord:
+    """Compatibility alias for the earlier planning-oriented API name."""
+
+    return compile_body_activity(registry, args)
+
+
+def skill_concurrency_projection(skill: Mapping[str, Any]) -> dict[str, Any]:
+    """Project the canonical nested contract into Chromie's compatibility fields.
+
+    The nested ``concurrency`` object remains authoritative. The flattened fields
+    exist only for clients that predate the body-activity compiler contract.
+    """
+
+    contract = _concurrency_contract(skill)
+    ability_class = str(contract["ability_class"])
+    coupling = str(contract["control_coupling"])
+    resources = [str(value) for value in contract["write_resources"]]
+    if ability_class == ABILITY_CLASS_SUBTLE_EXPRESSION:
+        body_lane = "subtle_expression"
+    elif coupling == CONTROL_COUPLING_PRIMARY:
+        body_lane = "locomotion"
+    else:
+        body_lane = "whole_body"
+    can_run_parallel = coupling in {
+        CONTROL_COUPLING_PRIMARY,
+        CONTROL_COUPLING_OVERLAY,
+        CONTROL_COUPLING_INDEPENDENT,
+    }
+    exclusive_group = (
+        f"soridormi.resource.{resources[0]}" if resources else None
+    )
+    execution_constraints = {
+        key: value
+        for key, value in contract.items()
+        if key not in {"ability_class", "write_resources"}
+    }
+    return {
+        "body_lane": body_lane,
+        "can_run_parallel": can_run_parallel,
+        "exclusive_group": exclusive_group,
+        "resource_claims": resources,
+        "execution_constraints": execution_constraints,
+        "concurrency": dict(contract),
+    }

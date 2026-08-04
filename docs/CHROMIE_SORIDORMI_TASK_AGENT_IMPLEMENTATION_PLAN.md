@@ -50,9 +50,9 @@ members that must overlap use the body-activity path:
 
 ```text
 activity.get_capabilities
-  -> activity.create_plan
+  -> activity.compile
   -> confirmation when required
-  -> safety monitoring during activity.execute_plan
+  -> safety monitoring during activity.execute
   -> activity.status or activity.cancel
   -> robot.get_status and per-member outcome reconciliation
 ```

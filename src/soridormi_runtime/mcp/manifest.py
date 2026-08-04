@@ -566,6 +566,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
     activity_status_schema = _object_schema(
         {
             "schema_version": {"type": "string"},
+            "compiled_activity_id": {"type": "string"},
             "plan_id": {"type": "string"},
             "coordination_id": {"type": ["string", "null"]},
             "mode": {"type": "string"},
@@ -593,9 +594,13 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
             "safety_authority": {"type": "string", "const": "soridormi"},
             "speech_owner": {"type": "string", "const": "chromie"},
             "one_final_motor_command_authority": {"type": "boolean", "const": True},
+            "semantic_role": {"type": "string", "const": "deterministic_embodied_compiler"},
+            "cognitive_planning": {"type": "boolean", "const": False},
+            "llm_required": {"type": "boolean", "const": False},
         },
         required=[
             "schema_version",
+            "compiled_activity_id",
             "plan_id",
             "status",
             "terminal",
@@ -604,6 +609,9 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
             "safety_authority",
             "speech_owner",
             "one_final_motor_command_authority",
+            "semantic_role",
+            "cognitive_planning",
+            "llm_required",
         ],
     )
     activity_agent = AgentManifest(
@@ -634,6 +642,11 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                     {
                         "schema_version": {"type": "string"},
                         "speech_owner": {"type": "string", "const": "chromie"},
+                        "semantic_role": {"type": "string", "const": "deterministic_embodied_compiler"},
+                        "cognitive_planning": {"type": "boolean", "const": False},
+                        "llm_required": {"type": "boolean", "const": False},
+                        "canonical_tools": {"type": "object"},
+                        "compatibility_aliases": {"type": "object"},
                         "ability_classes": {"type": "array", "items": {"type": "object"}},
                         "control_couplings": {"type": "array", "items": {"type": "string"}},
                         "concurrency_rules": {"type": "object"},
@@ -642,6 +655,9 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                     required=[
                         "schema_version",
                         "speech_owner",
+                        "semantic_role",
+                        "cognitive_planning",
+                        "llm_required",
                         "ability_classes",
                         "control_couplings",
                         "concurrency_rules",
@@ -658,15 +674,15 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 ),
             ),
             ToolCapability(
-                name="soridormi.activity.create_plan",
+                name="soridormi.activity.compile",
                 agent_id="soridormi.activity",
                 description=(
                     "Validate exact body members, resource compatibility, bounded "
-                    "head-overlay envelopes, and create an opaque body-activity plan."
+                    "head-overlay envelopes, and compile an opaque executable body activity. This is deterministic embodied compilation, not cognitive planning."
                 ),
                 input_schema=activity_plan_schema,
                 output_schema=activity_status_schema,
-                effects=["planning_only", "creates_plan", "resource_validation"],
+                effects=["planning_only", "compiles_body_activity", "resource_validation"],
                 safety_class="planning_only",
                 availability=ToolAvailability(modes=safe_modes),
                 execution=ExecutionPolicy(
@@ -687,13 +703,66 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 },
             ),
             ToolCapability(
-                name="soridormi.activity.execute_plan",
+                name="soridormi.activity.execute",
                 agent_id="soridormi.activity",
                 description=(
                     "Execute a validated concurrent body-activity plan. Soridormi "
                     "composes one final motor command and may reject, constrain, stop, "
                     "or recover independently for physical safety."
                 ),
+                input_schema=_object_schema(
+                    {"compiled_activity_id": {"type": "string", "minLength": 1}},
+                    required=["compiled_activity_id"],
+                ),
+                output_schema=activity_status_schema,
+                effects=["physical_motion", "visual_expression", "body_activity_execution"],
+                safety_class="physical_motion",
+                availability=ToolAvailability(modes=safe_modes),
+                execution=ExecutionPolicy(
+                    can_run_parallel=False,
+                    exclusive_group="soridormi.body_activity_scheduler",
+                    timeout_s=60.0,
+                    idempotent=False,
+                    side_effect_free=False,
+                ),
+                confirmation=ConfirmationPolicy(
+                    required=True,
+                    reason="A coordinated body activity may move the robot.",
+                    required_in_modes=["hardware_shadow", "hardware_dry_run"],
+                    skippable_in_modes=["sim"],
+                ),
+                monitoring=MonitoringPolicy(
+                    requires_safety_monitor=True,
+                    recommended_monitor_tools=["soridormi.safety.monitor_motion"],
+                    hard_interrupt_events=["emergency_stop"],
+                ),
+                default_failure_policy=FailurePolicy(strategy="stop_and_report"),
+            ),
+            ToolCapability(
+                name="soridormi.activity.create_plan",
+                agent_id="soridormi.activity",
+                description=(
+                    "Compatibility alias for soridormi.activity.compile. "
+                    "It deterministically compiles exact body members and does not perform cognitive planning."
+                ),
+                llm_visible=False,
+                input_schema=activity_plan_schema,
+                output_schema=activity_status_schema,
+                effects=["planning_only", "compiles_body_activity", "resource_validation"],
+                safety_class="planning_only",
+                availability=ToolAvailability(modes=safe_modes),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=3.0,
+                    idempotent=False,
+                    side_effect_free=False,
+                ),
+            ),
+            ToolCapability(
+                name="soridormi.activity.execute_plan",
+                agent_id="soridormi.activity",
+                description="Compatibility alias for soridormi.activity.execute.",
+                llm_visible=False,
                 input_schema=_object_schema(
                     {"plan_id": {"type": "string", "minLength": 1}},
                     required=["plan_id"],
@@ -727,8 +796,8 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 agent_id="soridormi.activity",
                 description="Read per-member and aggregate body-activity status.",
                 input_schema=_object_schema(
-                    {"plan_id": {"type": "string", "minLength": 1}},
-                    required=["plan_id"],
+                    {"compiled_activity_id": {"type": "string", "minLength": 1}},
+                    required=["compiled_activity_id"],
                 ),
                 output_schema=activity_status_schema,
                 effects=["read_only"],
@@ -750,10 +819,10 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 ),
                 input_schema=_object_schema(
                     {
-                        "plan_id": {"type": "string", "minLength": 1},
+                        "compiled_activity_id": {"type": "string", "minLength": 1},
                         "reason": {"type": "string"},
                     },
-                    required=["plan_id"],
+                    required=["compiled_activity_id"],
                 ),
                 output_schema=activity_status_schema,
                 effects=["physical_motion", "safety_control", "activity_lifecycle"],

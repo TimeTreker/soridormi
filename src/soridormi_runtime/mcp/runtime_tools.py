@@ -42,7 +42,8 @@ from .body_activity import (
     BodyActivityPlanRecord,
     CONTROL_COUPLING_INDEPENDENT,
     body_activity_capabilities_payload,
-    create_body_activity_plan,
+    compile_body_activity,
+    skill_concurrency_projection,
 )
 from .local_tools import (
     MotionPlan,
@@ -221,17 +222,17 @@ class SoridormiRuntimeToolService:
                 mode=self.mode,
                 backend=self.backend,
             )
-        if tool_name == "soridormi.activity.create_plan":
+        if tool_name in {"soridormi.activity.compile", "soridormi.activity.create_plan"}:
             return self.create_runtime_activity_plan(args)
-        if tool_name == "soridormi.activity.execute_plan":
+        if tool_name in {"soridormi.activity.execute", "soridormi.activity.execute_plan"}:
             return await self.execute_runtime_activity_plan(
-                str(args.get("plan_id", ""))
+                str(args.get("compiled_activity_id") or args.get("plan_id") or "")
             )
         if tool_name == "soridormi.activity.status":
-            return self.runtime_activity_status(str(args.get("plan_id", "")))
+            return self.runtime_activity_status(str(args.get("compiled_activity_id") or args.get("plan_id") or ""))
         if tool_name == "soridormi.activity.cancel":
             return await self.cancel_runtime_activity(
-                str(args.get("plan_id", "")),
+                str(args.get("compiled_activity_id") or args.get("plan_id") or ""),
                 reason=str(args.get("reason") or "cancelled by caller"),
             )
         body_safe_idle = self._body_safe_idle()
@@ -363,7 +364,7 @@ class SoridormiRuntimeToolService:
                     "execution": execution,
                     "notes": str(skill.get("notes") or ""),
                     "semantic_speed_presets_mps": dict(skill.get("semantic_speed_presets_mps") or {}),
-                    "concurrency": dict(skill.get("concurrency") or {}),
+                    **skill_concurrency_projection(skill),
                 }
             )
         return {"mode": self.mode, "skills": skills}
@@ -408,7 +409,7 @@ class SoridormiRuntimeToolService:
 
     def create_runtime_activity_plan(self, args: dict[str, Any]) -> dict[str, Any]:
         validate_chromie_intent(args.get("chromie_intent"))
-        record = create_body_activity_plan(self.skill_registry, args)
+        record = compile_body_activity(self.skill_registry, args)
         self.activity_plans[record.plan_id] = record
         return record.to_dict(
             mode=self.mode,

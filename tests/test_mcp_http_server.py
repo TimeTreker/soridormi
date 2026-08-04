@@ -111,8 +111,8 @@ def test_streamable_http_preserves_plan_state_across_requests() -> None:
                         tool_names = {tool.name for tool in listed.tools}
                         assert {
                             "soridormi.activity.get_capabilities",
-                            "soridormi.activity.create_plan",
-                            "soridormi.activity.execute_plan",
+                            "soridormi.activity.compile",
+                            "soridormi.activity.execute",
                             "soridormi.activity.status",
                             "soridormi.activity.cancel",
                         } <= tool_names
@@ -140,7 +140,7 @@ def test_streamable_http_preserves_plan_state_across_requests() -> None:
                         assert executed.structuredContent["dry_run_only"] is True
 
                         activity = await session.call_tool(
-                            "soridormi.activity.create_plan",
+                            "soridormi.activity.compile",
                             {
                                 "coordination_id": "http-contract-1",
                                 "members": [
@@ -162,10 +162,10 @@ def test_streamable_http_preserves_plan_state_across_requests() -> None:
                             },
                         )
                         assert activity.structuredContent is not None
-                        activity_plan_id = activity.structuredContent["plan_id"]
+                        activity_plan_id = activity.structuredContent["compiled_activity_id"]
                         activity_result = await session.call_tool(
-                            "soridormi.activity.execute_plan",
-                            {"plan_id": activity_plan_id},
+                            "soridormi.activity.execute",
+                            {"compiled_activity_id": activity_plan_id},
                         )
                         assert activity_result.structuredContent is not None
                         assert activity_result.structuredContent["completed"] is True

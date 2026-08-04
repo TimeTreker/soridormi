@@ -682,8 +682,8 @@ def _contract_only_plan_steps(record: EmbodiedTaskRecord) -> list[dict[str, Any]
                 ],
                 recommended_tools=[
                     "soridormi.activity.get_capabilities",
-                    "soridormi.activity.create_plan",
-                    "soridormi.activity.execute_plan",
+                    "soridormi.activity.compile",
+                    "soridormi.activity.execute",
                 ],
             ),
         ]

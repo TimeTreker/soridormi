@@ -89,8 +89,8 @@ Compatible physical behaviors use the body-activity surface:
 
 ```text
 soridormi.activity.get_capabilities
-soridormi.activity.create_plan
-soridormi.activity.execute_plan
+soridormi.activity.compile
+soridormi.activity.execute
 soridormi.activity.status
 soridormi.activity.cancel
 ```

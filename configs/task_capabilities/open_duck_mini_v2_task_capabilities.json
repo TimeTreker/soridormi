@@ -233,7 +233,7 @@
       "recommended_actions": [
         "preview_task",
         "select_exact_speech_and_body_capabilities",
-        "create_body_activity_plan",
+        "compile_body_activity",
         "coordinate_peer_lanes",
         "monitor_or_cancel_coordinated_group"
       ]

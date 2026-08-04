@@ -13,7 +13,7 @@ from soridormi_api import (
 )
 from soridormi_runtime.mcp.body_activity import (
     body_activity_capabilities_payload,
-    create_body_activity_plan,
+    compile_body_activity,
 )
 from soridormi_runtime.mcp.local_tools import SoridormiLocalToolService
 from soridormi_runtime.mcp.runtime_tools import SoridormiRuntimeToolService
@@ -125,13 +125,17 @@ def test_body_activity_capabilities_preserve_chromie_speech_boundary() -> None:
 
     assert payload["speech_owner"] == "chromie"
     assert payload["speech_is_external_peer_lane"] is True
+    assert payload["semantic_role"] == "deterministic_embodied_compiler"
+    assert payload["cognitive_planning"] is False
+    assert payload["llm_required"] is False
+    assert payload["canonical_tools"]["compile"] == "soridormi.activity.compile"
     assert payload["concurrency_rules"]["max_primary_locomotion_members"] == 1
     assert payload["concurrency_rules"]["one_writer_per_resource"] is True
     assert payload["concurrency_rules"]["emergency_stop_preempts_every_body_member"] is True
 
 
 def test_activity_plan_accepts_walk_gaze_and_blink() -> None:
-    record = create_body_activity_plan(
+    record = compile_body_activity(
         _registry(),
         {
             "coordination_id": "interaction-1",
@@ -154,7 +158,7 @@ def test_activity_plan_accepts_walk_gaze_and_blink() -> None:
 
 def test_activity_plan_rejects_two_primary_locomotion_members() -> None:
     with pytest.raises(ValueError, match="body.primary_motion|one primary"):
-        create_body_activity_plan(
+        compile_body_activity(
             _registry(),
             {
                 "members": [
@@ -175,7 +179,7 @@ def test_activity_plan_rejects_two_primary_locomotion_members() -> None:
 
 def test_activity_plan_rejects_standalone_gesture_during_locomotion() -> None:
     with pytest.raises(ValueError, match="body.primary_motion|standalone"):
-        create_body_activity_plan(
+        compile_body_activity(
             _registry(),
             {
                 "members": [
@@ -204,18 +208,18 @@ def test_activity_plan_rejects_head_overlay_outside_locomotion_envelope() -> Non
     }
 
     with pytest.raises(ValueError, match="head yaw.*exceeds"):
-        create_body_activity_plan(_registry(), {"members": members})
+        compile_body_activity(_registry(), {"members": members})
 
 
 def test_local_activity_service_is_contract_only() -> None:
     service = SoridormiLocalToolService()
     plan = service.call_tool(
-        "soridormi.activity.create_plan",
+        "soridormi.activity.compile",
         {"coordination_id": "coord-1", "members": _concurrent_members()},
     )
     result = service.call_tool(
-        "soridormi.activity.execute_plan",
-        {"plan_id": plan["plan_id"]},
+        "soridormi.activity.execute",
+        {"compiled_activity_id": plan["compiled_activity_id"]},
     )
 
     assert plan["status"] == "planned"
@@ -235,7 +239,7 @@ def test_runtime_executes_walk_gaze_and_blink_concurrently() -> None:
             control_hz=100.0,
         )
         plan = await service.call_tool(
-            "soridormi.activity.create_plan",
+            "soridormi.activity.compile",
             {
                 "coordination_id": "song-walk-1",
                 "members": _concurrent_members(),
@@ -243,8 +247,8 @@ def test_runtime_executes_walk_gaze_and_blink_concurrently() -> None:
         )
         execution = asyncio.create_task(
             service.call_tool(
-                "soridormi.activity.execute_plan",
-                {"plan_id": plan["plan_id"]},
+                "soridormi.activity.execute",
+                {"compiled_activity_id": plan["compiled_activity_id"]},
             )
         )
         for _ in range(1000):
@@ -299,20 +303,20 @@ def test_runtime_activity_cancel_preempts_physical_and_visual_members() -> None:
             "intensity": 1.0,
         }
         plan = await service.call_tool(
-            "soridormi.activity.create_plan",
+            "soridormi.activity.compile",
             {"members": members},
         )
         execution = asyncio.create_task(
             service.call_tool(
-                "soridormi.activity.execute_plan",
-                {"plan_id": plan["plan_id"]},
+                "soridormi.activity.execute",
+                {"compiled_activity_id": plan["compiled_activity_id"]},
             )
         )
         while "locomotion" not in service.active_lanes:
             await asyncio.sleep(0)
         cancelled = await service.call_tool(
             "soridormi.activity.cancel",
-            {"plan_id": plan["plan_id"], "reason": "user changed request"},
+            {"compiled_activity_id": plan["compiled_activity_id"], "reason": "user changed request"},
         )
         result = await asyncio.wait_for(execution, timeout=3.0)
 
@@ -323,3 +327,34 @@ def test_runtime_activity_cancel_preempts_physical_and_visual_members() -> None:
         assert service.active_lanes == {}
 
     asyncio.run(exercise())
+
+
+def test_skill_list_projects_canonical_concurrency_for_chromie() -> None:
+    service = SoridormiLocalToolService()
+    skills = {item["skill_id"]: item for item in service.call_tool("soridormi.skill.list", {})["skills"]}
+
+    walk = skills["walk_velocity"]
+    blink = skills["blink_eyes"]
+    gaze = skills["look_at_person"]
+
+    assert walk["concurrency"]["control_coupling"] == "primary_body_controller"
+    assert walk["resource_claims"] == ["body.primary_motion"]
+    assert blink["concurrency"]["control_coupling"] == "independent_output"
+    assert blink["resource_claims"] == ["visual.eyes"]
+    assert gaze["concurrency"]["control_coupling"] == "body_command_overlay"
+    assert gaze["resource_claims"] == ["body.head_pose"]
+
+
+def test_legacy_activity_aliases_remain_hidden_and_callable() -> None:
+    service = SoridormiLocalToolService()
+    plan = service.call_tool(
+        "soridormi.activity.create_plan",
+        {"members": _concurrent_members()},
+    )
+    result = service.call_tool(
+        "soridormi.activity.execute_plan",
+        {"plan_id": plan["plan_id"]},
+    )
+
+    assert plan["compiled_activity_id"] == plan["plan_id"]
+    assert result["completed"] is True

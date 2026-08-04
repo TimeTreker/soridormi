@@ -13,8 +13,8 @@ Soridormi exports robot tools such as:
 - `soridormi.motion.execute_plan`
 - `soridormi.motion.stop`
 - `soridormi.activity.get_capabilities`
-- `soridormi.activity.create_plan`
-- `soridormi.activity.execute_plan`
+- `soridormi.activity.compile`
+- `soridormi.activity.execute`
 - `soridormi.activity.status`
 - `soridormi.activity.cancel`
 - `soridormi.task.get_capabilities`
@@ -77,9 +77,9 @@ For “walk toward me while singing and blinking,” the safe shape is:
 2. the planner selects `chromie.vocal.perform`, a locomotion skill, and
    `blink_eyes` or a bounded gaze skill;
 3. `soridormi.activity.get_capabilities` checks current body concurrency;
-4. `soridormi.activity.create_plan` validates exact body members and resources;
+4. `soridormi.activity.compile` validates exact body members and resources;
 5. Chromie's coordinator starts the Speaking lane and
-   `soridormi.activity.execute_plan` using the same `coordination_id`;
+   `soridormi.activity.execute` using the same `coordination_id`;
 6. `soridormi.safety.monitor_motion` and `soridormi.activity.status` monitor
    physical execution;
 7. interaction cancellation propagates to the selected lanes, while Soridormi

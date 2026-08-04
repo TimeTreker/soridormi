@@ -294,8 +294,8 @@ def test_task_submit_records_contract_only_task_and_can_cancel() -> None:
     ]
     assert submitted["plan_steps"][-1]["recommended_tools"] == [
         "soridormi.activity.get_capabilities",
-        "soridormi.activity.create_plan",
-        "soridormi.activity.execute_plan",
+        "soridormi.activity.compile",
+        "soridormi.activity.execute",
     ]
     assert status["task_type"] == "speak_while_moving"
     assert status["phase"] == "planning"
@@ -567,7 +567,7 @@ def test_task_get_capabilities_reports_soridormi_readiness() -> None:
     assert by_type["speak_while_moving"]["recommended_actions"] == [
         "preview_task",
         "select_exact_speech_and_body_capabilities",
-        "create_body_activity_plan",
+        "compile_body_activity",
         "coordinate_peer_lanes",
         "monitor_or_cancel_coordinated_group",
     ]

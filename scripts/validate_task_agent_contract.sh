@@ -89,7 +89,7 @@ run_docs_gate() {
   rg -n "Social-Attention Proposal Lane|Speaking Execution Lane|Activity Execution Lane" \
     docs/CHROMIE_COGNITIVE_CONCURRENCY_MODEL.md \
     docs/CHROMIE_SORIDORMI_MULTI_AGENT_ARCHITECTURE.md >/dev/null
-  rg -n "soridormi.activity.create_plan|one final.*motor|one final motor" \
+  rg -n "soridormi.activity.compile|one final.*motor|one final motor" \
     docs/SORIDORMI_BODY_CONCURRENCY.md \
     docs/SORIDORMI_MCP_SERVER.md \
     docs/mcp_capability_manifest.md \

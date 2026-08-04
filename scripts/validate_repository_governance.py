@@ -176,8 +176,8 @@ def main() -> int:
     mcp_manifest = (ROOT / "src/soridormi_runtime/mcp/manifest.py").read_text(encoding="utf-8")
     for tool_name in (
         "soridormi.activity.get_capabilities",
-        "soridormi.activity.create_plan",
-        "soridormi.activity.execute_plan",
+        "soridormi.activity.compile",
+        "soridormi.activity.execute",
         "soridormi.activity.status",
         "soridormi.activity.cancel",
     ):

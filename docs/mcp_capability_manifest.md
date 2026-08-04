@@ -17,8 +17,8 @@ Soridormi therefore exports only `soridormi.*` tools:
 - `soridormi.skill.create_plan`
 - `soridormi.skill.execute_plan`
 - `soridormi.activity.get_capabilities`
-- `soridormi.activity.create_plan`
-- `soridormi.activity.execute_plan`
+- `soridormi.activity.compile`
+- `soridormi.activity.execute`
 - `soridormi.activity.status`
 - `soridormi.activity.cancel`
 - `soridormi.task.get_capabilities`

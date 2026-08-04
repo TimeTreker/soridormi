@@ -58,8 +58,8 @@ moves down/up at least twice, and ends straight.
 ## Concurrency boundary
 
 Direct scripted-skill execution is still useful for isolated tests. Concurrent
-execution uses `soridormi.activity.create_plan` and
-`soridormi.activity.execute_plan` so resource compatibility is validated before
+execution uses `soridormi.activity.compile` and
+`soridormi.activity.execute` so resource compatibility is validated before
 execution.
 
 A gaze overlay is permitted only inside its declared locomotion envelope. The
