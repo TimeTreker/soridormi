@@ -1,6 +1,6 @@
 # Soridormi dataset scenario gate
 
-M9D adds a strict pre-training gate for policy-supervision datasets.  It is
+scenario coverage gate adds a strict pre-training gate for policy-supervision datasets.  It is
 separate from the descriptive dataset coverage report: the coverage report tells
 what is present, while this gate fails when required scenario evidence is
 missing or too narrow for behavior-cloning use.
@@ -126,4 +126,4 @@ flags include:
 
 Do not use this gate as evidence of hardware readiness.  It validates dataset
 metadata and command coverage only; runtime behavior still needs MuJoCo scenario
-acceptance reports from M9A/M9C.
+acceptance reports from scenario rollout evaluation/scenario suite evaluation.

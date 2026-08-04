@@ -1,108 +1,80 @@
 # CLAUDE.md
 
-Project-local instructions for Claude Code or any coding assistant working on
-Soridormi.
+Project-local instructions for coding assistants working on Soridormi.
 
-## Project Identity
+## Project identity
 
 Soridormi is a reusable sim-to-real humanoid robotics stack for Open Duck Mini
-v2. The goal is not a one-off walking demo. Soridormi should preserve clean
-runtime/API/backend contracts so the same policy runtime can run in MuJoCo,
-support model replacement/training, and eventually transfer to real hardware.
+v2. It preserves clean runtime/API/backend contracts so the same body runtime
+can run in MuJoCo, support model replacement and training, and later transfer to
+qualified hardware.
 
-Soridormi is the robot cerebellum: body control, locomotion, safety,
-simulation, training/evaluation, and future hardware execution. Chromie is the
-robot brain in `TimeTreker/chromie.git` on `main`: conversation, memory, human
-interaction, high-level planning, and skill selection.
+Soridormi is the robot cerebellum. Chromie is the separate cognitive/social
+brain in `TimeTreker/chromie.git` on `main`.
 
-Official Open Duck code is the behavioral reference. Soridormi should reproduce
-official behavior through its own runtime contracts, logging, profiles, and
-Docker host workflows.
+## Current direction
 
-## Current Direction
+Read `docs/STATUS.md`. This file contains durable rules only.
 
-Current active direction: M9 context-aware locomotion data and behavior cloning.
-
-Near-term policy contract:
+Policy direction:
 
 ```text
 robot_state + desired_command + task_context + environment_context + short_history -> action_14d
 ```
 
-Near-term trainable stage:
+Command-conditioned policy input:
 
 ```text
 robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps) -> action_14d
 ```
 
-The Stage 1 context input mode is offline training only until runtime context
-plumbing is implemented. Do not package a context-mode policy as runtime ONNX
-unless the runtime can provide the same context features.
+Do not package a richer context model unless runtime produces the exact declared
+features and ordering.
 
-## Core Rules
+## Core rules
 
-- Focus on Soridormi unless the user explicitly asks for Chromie or another
-  project.
+- Focus on Soridormi unless the user explicitly asks for another project.
 - Keep MuJoCo-first validation before hardware.
-- Do not replace locomotion work with open-loop gait.
-- Do not hide failures behind tuning.
 - Preserve official baseline, replay, comparison, and parity scripts.
-- Preserve Docker host wrapper behavior; users usually run scripts from the
-  host, and wrappers should enter the correct Docker service internally.
-- If official compatibility needs reference files, fail fast when they are
-  missing.
-- Do not feed raw natural language or raw perception directly into the low-level
-  14D action policy. Convert it to bounded structured context first.
-- Hardware work must default to read-only or dry-run validation unless the user
-  explicitly asks to send actuator commands.
+- Preserve Docker host wrappers.
+- Do not feed raw language or raw perception into the low-level action policy.
+- Do not invent targets, body state, capability, or completion results.
+- Project `safe_idle` and active motion from the live body runtime.
+- Use semantic issue names rather than numbered project sequences.
+- Hardware work defaults to read-only or dry-run unless actuator commands are
+  explicitly requested and qualified.
 
-## Important Docs
-
-Read these before changing direction:
+## Important docs
 
 ```text
 README.md
+docs/STATUS.md
+docs/DOCUMENTATION_GOVERNANCE.md
 docs/README.md
 docs/PROJECT_SOP.md
+docs/architecture.md
 docs/PATCH_DELIVERY_AND_VALIDATION.md
 docs/SORIDORMI_TARGET_AND_ROADMAP.md
 docs/SORIDORMI_EXECUTION_ROADMAP.md
 docs/SORIDORMI_POLICY_CONTEXT_CONTRACT.md
 docs/SORIDORMI_BC_TRAINING_CONTRACT.md
-docs/SORIDORMI_DATA_PIPELINE_M9.md
+docs/SORIDORMI_CONTEXT_DATA_PIPELINE.md
 ```
 
 ## Validation
 
-Preferred local validation:
-
 ```bash
+python scripts/validate_repository_governance.py
 pytest -q
 python -m compileall -q src
 ```
 
-For live simulator tests, use MuJoCo explicitly:
+Live simulator tests use an explicit MuJoCo backend and profile. Random teacher
+collection owns its temporary simulator lifecycle and must not be paired with a
+second simulator server.
 
-```bash
-./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
-```
+## Patch style
 
-Optional visual inspection:
-
-```bash
-./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
-```
-
-Exception: `collect_random_teacher_dataset.sh` owns its temporary MuJoCo
-simulator lifecycle. Do not pair it with a second `run_sim_server.sh`; use the
-collector's own `--viewer` and usually `--follow-camera` flags.
-
-## Patch Style
-
-The user prefers plain git patch files, not zip archives. Assume downloaded
-patches live in `~/Downloads` unless the user says otherwise.
-
-Every patch response must include both patch integrity and functional validation
-commands. For docs-only patches, still validate expected sections and Markdown
-fences. For code, run relevant tests and compile checks. For sim/training, give
-local checks plus live MuJoCo validation commands.
+Deliver plain git patches with both integrity and functional validation. Rebuild
+Docker only when dependencies, Dockerfiles, system packages, or base images
+change.

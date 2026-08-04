@@ -1,4 +1,4 @@
-# M2.6 Fixed-base debug mode
+# Fixed-base debug mode
 
 Fixed-base mode is a MuJoCo-only debug mode for inspecting joint poses while gravity remains enabled.
 

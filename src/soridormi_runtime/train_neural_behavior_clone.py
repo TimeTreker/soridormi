@@ -68,7 +68,7 @@ def _import_torch() -> Any:
         import torch  # type: ignore[import-not-found]
     except Exception as exc:  # pragma: no cover - depends on environment
         raise RuntimeError(
-            "PyTorch is required for M6.12 neural behavior cloning.\n"
+            "PyTorch is required for neural behavior-cloning training.\n"
             "Build the runtime image with training dependencies, then rerun training:\n"
             "  ./scripts/build_runtime_training.sh\n"
             "This installs torch from the CUDA wheel index selected by PYTORCH_INDEX_URL "
@@ -554,7 +554,7 @@ def train_neural_behavior_clone(
                 name=profile_name or output.name,
                 model_path=_runtime_model_path(onnx_path),
                 template=profile_template,
-                description="Neural behavior-cloning policy trained by Soridormi M6.12.",
+                description="Neural behavior-cloning policy trained by Soridormi.",
                 output_dir=profile_output_dir,
                 force=profile_force,
                 input_name="obs",

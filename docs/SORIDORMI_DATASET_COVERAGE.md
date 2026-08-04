@@ -2,7 +2,7 @@
 
 Soridormi behavior-cloning data should be accepted only after the dataset shows
 useful coverage across scenario, skill, command, ramp, terrain, and failure
-metadata. The M8C coverage reporter is an offline gate for collected JSONL data
+metadata. The dataset coverage reporting coverage reporter is an offline gate for collected JSONL data
 and prepared train/val/test directories.
 
 The reporter summarizes:

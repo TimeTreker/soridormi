@@ -20,7 +20,7 @@ from soridormi_runtime.walking_reward import WalkingRewardConfig, compute_walkin
 
 
 ACTION_SIZE = 14
-DEFAULT_OUTPUT = Path("/data/rl_finetune_env/m617_smoke.json")
+DEFAULT_OUTPUT = Path("/data/rl_finetune_env/rl_finetune_smoke.json")
 ResidualActionSource = np.ndarray | list[float] | Callable[[np.ndarray], np.ndarray | list[float]] | None
 
 
@@ -149,7 +149,7 @@ class RlFineTuneEnv:
     """Synchronous MuJoCo residual fine-tuning environment boundary.
 
     This class is intentionally small: it does not implement an RL algorithm.
-    It exposes the backbone primitive needed by M6.18/M6.19:
+    It exposes the backbone primitive needed by walking-quality reward/residual policy training:
 
         state -> teacher action -> residual correction -> MotorCommand -> sim step
 
@@ -436,7 +436,7 @@ def _transition_metrics(before: RobotState, after: RobotState, command: MotorCom
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run the M6.17 MuJoCo residual fine-tuning environment smoke loop.")
+    parser = argparse.ArgumentParser(description="Run the MuJoCo fine-tuning environment MuJoCo residual fine-tuning environment smoke loop.")
     parser.add_argument("--profile", default="open_duck_forward", help="Teacher policy profile name or YAML path")
     parser.add_argument("--steps", type=int, default=20, help="Number of synchronous sim steps to run")
     parser.add_argument("--residual-scale", type=float, default=0.05, help="Scale applied to clipped residual action")

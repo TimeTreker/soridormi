@@ -57,9 +57,9 @@ Raw natural language should not be passed to the low-level policy. Chromie or an
 
 ## Stage plan
 
-### Stage 1: flat command-conditioned locomotion
+### Flat command-conditioned locomotion
 
-Initial behavior cloning and the M10 promotion gate should cover continuous
+Initial behavior cloning and the clearance qualification promotion gate should cover continuous
 command variation on flat ground:
 
 - `flat_walk_varied_speed_v1`
@@ -69,9 +69,9 @@ command variation on flat ground:
 These scenarios are registry-ready first because they do not require new
 obstacle objects or perception features. They focus on continuous `vx`, `vy`,
 and `yaw` ranges plus smooth command ramps. Keep this three-scenario set as the
-stable M10 promotion core unless a milestone explicitly changes the gate.
+stable clearance qualification promotion core unless the owning contract explicitly changes the gate.
 
-### Stage 2: transition and tracking robustness
+### Transition and tracking robustness
 
 Before WBC tuning, enrich the ready MuJoCo suite with flat-ground cases that
 stress known clearance and settling problems:
@@ -84,11 +84,11 @@ These scenarios stay in bounded skill/context space. They add startup tails,
 stop tails, yaw reversal, and turn-to-stop settling pressure without introducing
 terrain, obstacle, or hardware dependencies.
 
-Use the Stage 1 and Stage 2 ready scenarios together to evaluate command
+Use the flat and transition-ready scenarios together to evaluate command
 tracking, stop quality, stuck ratio, terminal velocity, and swing-foot
 clearance. Do not rely on a single clean walking rollout.
 
-### Stage 3: terrain context
+### Terrain context
 
 Terrain scenarios add bounded environment context:
 
@@ -97,7 +97,7 @@ Terrain scenarios add bounded environment context:
 
 Surviving rough ground is not enough. Evaluation should measure progress, fall status, stuck ratio, and foot clearance.
 
-### Stage 4: obstacle context
+### Obstacle context
 
 Obstacle scenarios introduce explicit obstacle metadata before any full navigation stack:
 
@@ -107,7 +107,7 @@ Obstacle scenarios introduce explicit obstacle metadata before any full navigati
 
 The stop-before-obstacle scenario should precede step-over behavior. Step-over should remain conservative until stride and clearance metrics are trustworthy.
 
-### Stage 5: recovery and safe social behaviors
+### Recovery and safe social behaviors
 
 Recovery and social behaviors should be staged after baseline locomotion is stable:
 
@@ -208,7 +208,7 @@ When `--json` is set, the wrapper keeps stdout machine-readable and sends Docker
 Use the patch-specific test first:
 
 ```bash
-PYTHONPATH=src pytest -q tests/test_scenario_manifest_m8.py
+PYTHONPATH=src pytest -q tests/test_scenario_manifest.py
 ```
 
 Then run the broader static checks:

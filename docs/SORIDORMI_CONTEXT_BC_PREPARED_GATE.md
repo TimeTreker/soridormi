@@ -1,6 +1,6 @@
 # Soridormi prepared context BC dataset gate
 
-M9H adds a final offline gate between context BC dataset preparation and BC
+prepared context dataset gate adds a final offline gate between context BC dataset preparation and BC
 training. It validates the prepared train/validation/test artifact instead of
 raw collection rows.
 

@@ -1,4 +1,4 @@
-# M2.9: MCAP runtime logging
+# MCAP runtime logging
 
 Soridormi runtime can record robot state and motor commands to MCAP.
 
@@ -71,7 +71,7 @@ python -m soridormi_runtime.inspect_log /data/logs/runtime_YYYYMMDD_HHMMSS.mcap
 
 ## Rebuild note
 
-This milestone adds the Python package `mcap`, so rebuild once after applying it:
+This capability adds the Python package `mcap`, so rebuild once after applying it:
 
 ```bash
 ./scripts/build_sim.sh

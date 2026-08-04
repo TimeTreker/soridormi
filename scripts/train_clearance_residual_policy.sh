@@ -16,10 +16,10 @@ per-step objective normalization, keep worst-case pressure on the weakest
 objective, and write a final per-objective score breakdown.
 
 Options:
-  --teacher-profile PROFILE       Teacher profile (default: context_stage1_three_scenario_10ep_e80).
+  --teacher-profile PROFILE       Teacher profile (default: context_command_three_scenario_10ep_e80).
   --profile-name NAME             Generated residual profile name (default: clearance_gap_sequence_s83).
   --output-dir DIR                Training output dir (default: /data/rl_finetune/PROFILE_NAME).
-  --initial-checkpoint PATH       Warm-start checkpoint (default: /data/rl_finetune/m10_command_state_mlp_cem4x14_s79/residual_policy.pt).
+  --initial-checkpoint PATH       Warm-start checkpoint (default: /data/rl_finetune/clearance_command_state_mlp_cem4x14_s79/residual_policy.pt).
   --iterations N                  CEM iterations (default: 4).
   --population N                  CEM population (default: 14).
   --steps-per-episode N           Simulator steps per objective (default: 300).
@@ -40,10 +40,10 @@ Anything after "--" is forwarded to train_residual_policy.sh.
 EOF
 }
 
-teacher_profile="context_stage1_three_scenario_10ep_e80"
+teacher_profile="context_command_three_scenario_10ep_e80"
 profile_name="clearance_gap_sequence_s83"
 output_dir=""
-initial_checkpoint="/data/rl_finetune/m10_command_state_mlp_cem4x14_s79/residual_policy.pt"
+initial_checkpoint="/data/rl_finetune/clearance_command_state_mlp_cem4x14_s79/residual_policy.pt"
 iterations="4"
 population="14"
 steps_per_episode="300"

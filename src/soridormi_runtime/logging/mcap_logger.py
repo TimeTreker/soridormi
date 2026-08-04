@@ -142,7 +142,7 @@ class McapRuntimeLogger:
         except ImportError as exc:
             raise RuntimeError(
                 "MCAP logging requested, but the 'mcap' Python package is not installed. "
-                "Run './scripts/build_sim.sh' after applying the M2.9 update, or set "
+                "Run './scripts/build_sim.sh' after applying the MCAP runtime logging update, or set "
                 "SORIDORMI_RUNTIME_LOG_FORMAT=jsonl."
             ) from exc
 

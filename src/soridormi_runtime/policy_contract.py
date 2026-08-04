@@ -192,7 +192,7 @@ def build_policy_contract(
         "robot_observation_size": obs_size,
         "description": "Policy input fed to model after optional runtime context features are appended",
     }
-    if input_mode == "context_stage1_command":
+    if input_mode == "context_command_v1":
         policy_input_payload["segments"] = [
             {"name": "robot_state.observation", "size": obs_size, "start": 0, "end": obs_size},
             {"name": "desired_command.vx_vy_yaw", "size": 3, "start": obs_size, "end": policy_input_size},

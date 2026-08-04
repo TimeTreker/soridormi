@@ -329,7 +329,7 @@ emit_startup_failure_json() {
 import json
 payload = {
     "ok": False,
-    "schema_version": "m9.random_teacher_wrapper_failure.v2",
+    "schema_version": "soridormi.random_teacher_wrapper_failure.v2",
     "errors": ["collector-owned simulator failed to start before dataset collection"],
 }
 print(json.dumps(payload, indent=2, sort_keys=True))
@@ -408,7 +408,7 @@ if not stdout_text.strip():
     errors.append("collector stdout was empty")
 payload = {
     "ok": False,
-    "schema_version": "m9.random_teacher_wrapper_failure.v1",
+    "schema_version": "soridormi.random_teacher_wrapper_failure.v1",
     "docker_exit_code": rc,
     "errors": errors,
     "stdout_preview": stdout_text[:2000],

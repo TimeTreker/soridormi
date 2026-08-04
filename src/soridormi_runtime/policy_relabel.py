@@ -146,7 +146,7 @@ def relabel_policy_rollouts_with_teacher(
 
     Candidate rollout logs contain the states visited by a replacement policy. This
     function keeps those observations but replaces the action target with the
-    teacher profile's action. That is the core M6.15 data-iteration loop:
+    teacher profile's action. That is the core teacher relabeling data-iteration loop:
     collect candidate states -> ask teacher for labels -> retrain on the expanded
     state distribution.
     """
@@ -419,7 +419,7 @@ def _merge_main(args: argparse.Namespace) -> MergeDatasetResult:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="M6.15 DAgger-style teacher relabel and dataset merge utilities.")
+    parser = argparse.ArgumentParser(description="teacher relabeling DAgger-style teacher relabel and dataset merge utilities.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     relabel = sub.add_parser("relabel", help="Relabel candidate rollout observations with a teacher policy")

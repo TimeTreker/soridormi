@@ -7,7 +7,7 @@ usage() {
   cat <<'USAGE'
 Usage: ./scripts/run_skill_in_sim.sh SKILL [options]
 
-Resolve an available M7 locomotion skill into a high-level velocity command and
+Resolve an available structured body-skill interface locomotion skill into a high-level velocity command and
 execute it through the Soridormi policy runtime against an already-running MuJoCo
 simulator. This is sim-only orchestration; it does not talk to hardware.
 

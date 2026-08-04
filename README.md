@@ -45,6 +45,11 @@ soridormi-api
   Shared message/API package used by both runtime and simulator.
 ```
 
+The repository's `soridormi_runtime` source package also contains optional MCP,
+evaluation, packaging, and training support. The production runtime process and
+runtime dependency set must still remain free of MuJoCo, desktop viewer, and
+training-only imports.
+
 In simulation:
 
 ```text
@@ -65,17 +70,23 @@ For fresh-machine simulator bootstrap, use
 
 ## Target hardware
 
-Long-term primary target:
+Primary robot deployment targets:
+
+- NVIDIA Jetson Orin NX
+- NVIDIA Jetson AGX Orin
+- the matching JetPack/L4T/CUDA container base
+
+Constrained compatibility target:
+
+- NVIDIA Jetson Orin Nano-class hardware with an explicitly reduced runtime
+  profile
+
+Exploratory target:
 
 - NVIDIA Jetson AGX Thor
-- Ubuntu 24.04 / JetPack 7.x-class system
-- CUDA 13.x-class runtime
 
-Compatibility target:
-
-- NVIDIA Jetson AGX Orin
-- JetPack 6.x-class system, typically Ubuntu 22.04 today
-- CUDA 12.x-class runtime
+Thor compatibility is useful, but it is not a prerequisite or the current
+primary robot-compute target.
 
 Development host:
 
@@ -359,16 +370,16 @@ Soridormi live MuJoCo commands use two patterns:
   a second `run_sim_server.sh` for `collect_random_teacher_dataset.sh`; pass
   `--viewer` to the collector itself when visual inspection is needed.
 
-For the current M9 dataset pipeline, see
-`docs/SORIDORMI_DATA_PIPELINE_M9.md`.
+For the scenario-aware context data pipeline, see
+`docs/SORIDORMI_CONTEXT_DATA_PIPELINE.md`.
 
 For the curated documentation map, see `docs/README.md`. Keep durable project
 contracts and runbooks in `docs/`; generated reports should go under
 `artifacts/` and stay out of git.
 
-For the system target and current candidate evidence, see
-`docs/SORIDORMI_TARGET_AND_ROADMAP.md`. For the gated milestone sequence,
-acceptance criteria, and immediate work queue, see
+For verified current capability and blockers, see `docs/STATUS.md`. For the
+durable target and gated capability sequence, see
+`docs/SORIDORMI_TARGET_AND_ROADMAP.md` and
 `docs/SORIDORMI_EXECUTION_ROADMAP.md`.
 
 ## Runtime backend selection

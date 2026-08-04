@@ -688,7 +688,7 @@ class MujocoBackend:
     def _read_feet_positions(self) -> list[list[float]] | None:
         contact = self.config.policy_observation.foot_contact
 
-        # Backward compatibility: older M4.0/M4.3 configs/models did not have
+        # Backward compatibility: older first-walk integration/ONNX stepping compatibility configs/models did not have
         # left_site/right_site fields. Fall back to geom positions in that case.
         left_site = getattr(contact, "left_site", "")
         right_site = getattr(contact, "right_site", "")

@@ -14,7 +14,7 @@ usage() {
 Usage: ./scripts/validate_pre_wbc_scenario_surface.sh [options]
 
 Validate the dry/offline pre-WBC scenario surface. This checks that the default
-ready locomotion suite, M10 core scenarios, and WBC clearance contract agree
+ready locomotion suite, clearance qualification core scenarios, and WBC clearance contract agree
 before WBC tuning starts. It does not train, launch MuJoCo, create runtime
 profiles, launch hardware, or send actuator commands.
 
@@ -115,8 +115,8 @@ if [ "${run_pytest}" = "1" ]; then
   echo "Running focused pre-WBC scenario-surface tests..."
   pytest -q \
     tests/test_pre_wbc_scenario_surface.py \
-    tests/test_scenario_suite_eval_m9c.py \
-    tests/test_scenario_suite_wrapper_m9c.py \
+    tests/test_scenario_suite_eval.py \
+    tests/test_scenario_suite_wrapper.py \
     tests/test_wbc_clearance_contract.py
 else
   echo "Skipping focused pytest gate (--skip-pytest)."

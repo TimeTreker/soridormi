@@ -1,6 +1,6 @@
-# M3.3 Action-to-MotorCommand Mapping
+# Action-to-MotorCommand mapping
 
-M3.3 adds the bridge from a 14-dimensional ONNX policy action to a Soridormi `MotorCommand`.
+action-to-motor-command mapping adds the bridge from a 14-dimensional ONNX policy action to a Soridormi `MotorCommand`.
 
 This section still does **not** enable closed-loop ONNX walking. It only validates the mapping:
 
@@ -62,7 +62,7 @@ Probe OK
 
 ## Next section
 
-M3.4 will add an experimental runtime mode:
+experimental ONNX runtime mode will add an experimental runtime mode:
 
 ```bash
 SORIDORMI_RUNTIME_MODE=onnx_policy

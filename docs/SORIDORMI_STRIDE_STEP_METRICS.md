@@ -1,6 +1,6 @@
 # Soridormi stride/step metrics evaluation
 
-M8D adds an offline JSONL analyzer for MuJoCo-first walking validation. It is meant to complement dataset coverage reports and foot-clearance checks before any hardware work.
+stride and control-step metrics adds an offline JSONL analyzer for MuJoCo-first walking validation. It is meant to complement dataset coverage reports and foot-clearance checks before any hardware work.
 
 The analyzer reads runtime JSONL rows with `state.base_position_xyz`, optional `state.base_quat_wxyz`, `state.feet_position_xyz`, and `state.feet_contacts`. It also preserves scenario-aware metadata when rows include `scenario_id` and `skill_id`.
 
@@ -24,7 +24,7 @@ These metrics are intentionally acceptance-gate friendly. A rollout that merely 
 ## Static validation
 
 ```bash
-PYTHONPATH=src pytest -q tests/test_stride_step_metrics_eval_m8d.py
+PYTHONPATH=src pytest -q tests/test_stride_step_metrics_eval.py
 python -m compileall -q src tests
 bash -n scripts/run_stride_step_metrics_eval.sh
 ```

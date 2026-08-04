@@ -253,4 +253,4 @@ def test_dag_contract_uses_semantic_status_language() -> None:
         "task submission is contract-only and no-motion" in rule
         for rule in bundle.dag_contract["rules"]
     )
-    assert all("M11" not in rule for rule in bundle.dag_contract["rules"])
+    assert all("embodied task contract" not in rule for rule in bundle.dag_contract["rules"])

@@ -1,5 +1,5 @@
 {
-  "schema_version": "m8.scenario_curriculum.v1",
+  "schema_version": "soridormi.scenario_curriculum.v1",
   "robot_profile": "open_duck_mini_v2",
   "purpose": "MuJoCo-first scenario curriculum for Soridormi skill execution, behavior validation, and context-conditioned teacher data collection.",
   "policy_context_contract": {
@@ -105,13 +105,13 @@
         "maximum_stuck_ratio": 0.2
       },
       "dataset_tags": [
-        "bc_stage_1",
+        "command_conditioned_bc",
         "velocity_conditioned",
         "flat_ground",
         "ramp_commands"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.15,
         "min_mean_forward_speed_mps": 0.03,
         "max_stuck_sample_ratio": 0.2,
@@ -191,13 +191,13 @@
         "maximum_stuck_ratio": 0.25
       },
       "dataset_tags": [
-        "bc_stage_1",
+        "command_conditioned_bc",
         "transitions",
         "ramp_alpha",
         "start_stop"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.1,
         "min_mean_forward_speed_mps": 0.02,
         "max_stuck_sample_ratio": 0.25,
@@ -276,13 +276,13 @@
         "maximum_stuck_ratio": 0.3
       },
       "dataset_tags": [
-        "bc_stage_1",
+        "command_conditioned_bc",
         "yaw_conditioned",
         "curves",
         "turning"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.06,
         "min_mean_forward_speed_mps": 0.015,
         "max_stuck_sample_ratio": 0.3,
@@ -370,7 +370,7 @@
         "clearance"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.06,
         "min_mean_forward_speed_mps": 0.01,
         "max_stuck_sample_ratio": 0.3,
@@ -456,7 +456,7 @@
         "clearance"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.05,
         "min_mean_forward_speed_mps": 0.01,
         "max_stuck_sample_ratio": 0.35,
@@ -544,7 +544,7 @@
         "clearance"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.03,
         "min_mean_forward_speed_mps": 0.005,
         "max_stuck_sample_ratio": 0.4,
@@ -627,7 +627,7 @@
         "clearance"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.1,
         "min_mean_forward_speed_mps": 0.015,
         "max_stuck_sample_ratio": 0.35,
@@ -721,7 +721,7 @@
         "clearance"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.1,
         "min_mean_forward_speed_mps": 0.012,
         "max_stuck_sample_ratio": 0.4,
@@ -814,7 +814,7 @@
         "obstacle_context"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.12,
         "min_mean_forward_speed_mps": 0.015,
         "max_stuck_sample_ratio": 0.35,
@@ -910,7 +910,7 @@
         "approach"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.05,
         "min_mean_forward_speed_mps": 0.005,
         "max_stuck_sample_ratio": 0.45,
@@ -1009,7 +1009,7 @@
         "crossing"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.12,
         "min_mean_forward_speed_mps": 0.012,
         "max_stuck_sample_ratio": 0.45,
@@ -1097,7 +1097,7 @@
         "robustness"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.0,
         "min_mean_forward_speed_mps": 0.0,
         "max_stuck_sample_ratio": 1.0,
@@ -1173,7 +1173,7 @@
         "structured_context"
       ],
       "acceptance_thresholds": {
-        "schema_version": "m9.scenario_rollout_acceptance.v1",
+        "schema_version": "soridormi.scenario_rollout_acceptance.v1",
         "min_distance_m": 0.0,
         "min_mean_forward_speed_mps": 0.0,
         "max_stuck_sample_ratio": 1.0,
@@ -1187,5 +1187,5 @@
       }
     }
   ],
-  "acceptance_threshold_schema_version": "m9.scenario_rollout_acceptance.v1"
+  "acceptance_threshold_schema_version": "soridormi.scenario_rollout_acceptance.v1"
 }

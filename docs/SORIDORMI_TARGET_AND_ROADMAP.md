@@ -1,378 +1,91 @@
-# Soridormi target and roadmap
+# Soridormi target and capability roadmap
 
-This document defines the system target, ownership boundaries, milestone
-direction, and current candidate evidence. For the gated execution sequence,
-acceptance criteria, risks, and immediate work queue, see
-`docs/SORIDORMI_EXECUTION_ROADMAP.md`. For the agreed Chromie/Soridormi
-multi-agent split, see
-`docs/CHROMIE_SORIDORMI_MULTI_AGENT_ARCHITECTURE.md`.
+This document defines the durable target and semantic capability sequence.
+Current status lives in `docs/STATUS.md`; candidate metrics live in generated
+evidence.
 
-## System target
+## Target
 
-Soridormi is the robot cerebellum: the body-control, locomotion, safety, and
-sim-to-real runtime for Open Duck Mini v2.
+Build a reusable Open Duck Mini v2 body/cerebellum runtime that:
 
-Chromie is the robot brain, maintained separately at:
+- preserves a trusted official-policy baseline;
+- runs the same body contracts against MuJoCo and future hardware;
+- exposes bounded skills and structured embodied tasks to Chromie;
+- validates, monitors, interrupts, recovers, and refuses independently;
+- supports replaceable policies and reproducible training/evaluation;
+- never exposes raw low-level body control as LLM authority.
 
-```text
-https://github.com/TimeTreker/chromie.git
-branch: main
-```
+## Runtime and parity foundation
 
-The intended whole-robot stack is:
+Maintain stable Robot API, observation, action, controller, profile, logging,
+replay, and official parity contracts.
 
-```text
-human / environment
-  -> Chromie brain
-       conversation, memory, intent, high-level planning, skill choice
-  -> structured skill/context request
-  -> Soridormi cerebellum
-       validation, body skills, locomotion policy, safety, MuJoCo/hardware backend
-  -> robot body
-```
+Gate: unexplained parity divergence is closed and baseline tools remain usable.
 
-Chromie should decide what the robot should do. Soridormi decides whether the
-body can safely do it and how to execute it.
+## Replaceable policy and evidence loop
 
-## Boundary
+Support versioned profiles, model validation, deterministic datasets, training,
+closed-loop scenarios, teacher comparison, packaging, retention, and rollback.
 
-Chromie must not directly emit joint targets, motor commands, or low-level 14D
-policy actions. It should call bounded structured skills or provide bounded
-structured context:
+Gate: model/profile compatibility and required MuJoCo scenarios pass; offline
+loss alone is insufficient.
 
-```text
-stand_idle()
-stop()
-walk_velocity(vx_mps, vy_mps, yaw_radps, duration_s)
-turn_in_place(yaw_radps, duration_s)
-curve_walk(vx_mps, yaw_radps, duration_s)
-look_at_person(target_id or target bearing)
-look_direction(yaw_rad, pitch_rad)
-nod_yes()
-shake_no()
-```
+## Named body skills
 
-Soridormi validates command ranges, skill availability, task context,
-environment context, runtime state, and safety limits before running any body
-controller.
+Expose bounded semantic body behavior with availability, argument schemas,
+effects, interruption, refusal, and safe-idle confirmation.
 
-Destination language such as "walk forward to the house" is not a locomotion
-command. It is a navigation goal. Soridormi must refuse it until a sensing and
-navigation layer resolves the target, localizes the robot, plans a route,
-checks local obstacles, and produces bounded local trajectory or velocity
-segments. See `docs/SORIDORMI_NAVIGATION_GOAL_CONTRACT.md`.
+Gate: no caller supplies raw joint, motor, torque, coordinate, or policy-action
+authority.
 
-Low-level policy direction:
+## Embodied task contract
 
-```text
-robot_state + desired_command + task_context + environment_context + short_history -> action_14d
-```
+Accept richer structured goals, keep a Soridormi-owned body-task lifecycle and
+graph, expose blocked subsystems and events, and fail closed for missing
+capability.
 
-Natural language belongs to Chromie. Physical execution belongs to Soridormi.
-Both systems may use a DAG engine: Chromie for global human-facing
-orchestration, Soridormi for embodied task execution and safety-critical local
-planning.
+Gate: contract behavior is deterministic, retry-safe, timeout-safe, no-motion,
+and paired with Chromie integration tests.
 
-## Main milestones
+## Monitored task execution
 
-### M4: official policy parity
+Add physical task execution only after sensing, planning, skill selection,
+monitoring, cancellation, recovery, and completion evidence exist.
 
-Reproduce the official Open Duck walking policy through Soridormi's own runtime,
-logging, profiles, and backend contracts. Preserve official baseline, replay,
-comparison, and parity tooling.
+Gate: a task cannot claim completion from preview, dry run, partial execution,
+or unsupported fallback.
 
-### M5: model replacement interface
+## Generalization and control improvement
 
-Make policy profiles, model validation, ONNX/provider checks, packaging,
-install/restore, and contract export reliable enough that compatible models can
-be swapped without rewriting runtime code.
+Expand scenario coverage, context features, clearance/stability, recovery,
+rough terrain, turning, lateral behavior, and held-out evaluation. Add WBC,
+residual, or adaptive control only behind explicit contracts and evidence.
 
-### M6: training and evaluation backbone
+Gate: retained candidates beat the reference on named objectives without safety
+or generalization regression.
 
-Turn runtime logs into supervised datasets, prepare deterministic splits, train
-linear/neural BC baselines, and evaluate candidate policies offline and in
-MuJoCo.
+## Hardware commissioning
 
-### M7: skill/task interface
+Implement a hardware backend through read-only state, dry-run commands, limits,
+watchdog, independent stop, low-power tests, standing, tethered movement, and
+broader validation.
 
-Define safe named body skills and map them to structured commands/context. Keep
-unsupported hardware skills declared but unavailable. This is the explicit body
-interface Chromie should call.
+Gate: no hardware actuation before simulator, commissioning, and operator
+evidence are complete.
 
-### M8: interaction and scenario layer
+## Hardware direction
 
-Add scripted head/social skills, scenario rollout evaluation, readiness reports,
-and interaction-oriented body behaviors. Validate in MuJoCo before hardware.
+Near-term robot deployment prioritizes Jetson Orin-class platforms that fit the
+Open Duck Mini power, size, and software envelope. AGX Orin and Orin NX are the
+primary engineering targets; Orin Nano-class deployment may use a reduced
+profile. Jetson Thor remains exploratory, not a prerequisite.
 
-### M9: context BC data pipeline
-
-Collect scenario-aware teacher rows, export context BC datasets, validate the
-context contract, gate scenario coverage, prepare grouped splits, and train
-Stage 1 context BC:
-
-```text
-robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps) -> action_14d
-```
-
-### M10: runtime context policy plumbing
-
-Extend runtime policy execution so it can provide the same context features used
-for training. Add profile/model contracts for 104D+ context inputs, then allow
-context-mode neural policies to export as runnable ONNX profiles.
-
-M10 Stage 1 starts with the explicit policy input mode:
-
-```text
-context_stage1_command:
-  robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps)
-```
-
-Profiles must declare this mode and a `[1, 104]` model input shape before a
-context-trained model is allowed to run through the runtime path.
-
-The next checkpoint is to train/export a real Stage 1 context neural candidate,
-validate its profile/model contract, and compare it in MuJoCo against the
-official teacher before any promotion.
-
-Current Stage 1 context candidates:
-
-```text
-profile: context_stage1_flat_walk_v1_10ep
-input: robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps)
-model input shape: [1, 104]
-model path: /data/training_runs/context_stage1_flat_walk_v1_10ep_neural_bc_m10/neural_behavior_clone.onnx
-
-profile: context_stage1_flat_walk_v1_10ep_e80
-input: robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps)
-model input shape: [1, 104]
-model path: /data/training_runs/context_stage1_flat_walk_v1_10ep_neural_bc_m10_e80/neural_behavior_clone.onnx
-
-profile: context_stage1_three_scenario_10ep_e80
-input: robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps)
-model input shape: [1, 104]
-model path: /data/training_runs/context_stage1_three_scenario_10ep_neural_bc_m10_e80/neural_behavior_clone.onnx
-```
-
-Initial candidate checkpoint evidence:
-
-```text
-profile: context_stage1_flat_walk_v1_10ep
-model/profile contract: OK
-offline evaluation on flat_walk_varied_speed_v1_10ep: test MAE ~= 0.00953
-bounded MuJoCo smoke: 200 steps, 104D inputs, no resets, forward_x ~= 0.259 m
-```
-
-Scenario-suite evidence:
-
-```text
-context_stage1_flat_walk_v1_10ep:
-  flat/start-stop/curve suite: FAIL, 0/3 scenarios accepted
-  total_forward_distance_m ~= 0.0419
-  mean_forward_speed_mps ~= 0.00251
-  fallen_count: 0
-
-open_duck_forward teacher baseline on the same suite:
-  PASS, 3/3 scenarios accepted
-  total_forward_distance_m ~= 0.728
-  mean_forward_speed_mps ~= 0.0435
-```
-
-Conclusion: M10 runtime plumbing is useful, but this Stage 1 context candidate
-is not promotable. It stays upright but mostly stands still at scenario nominal
-commands.
-
-E80 candidate checkpoint evidence:
-
-```text
-profile: context_stage1_flat_walk_v1_10ep_e80
-model/profile contract: OK
-offline evaluation on flat_walk_varied_speed_v1_10ep: test MAE ~= 0.00596
-bounded MuJoCo velocity smoke:
-  vx=0.125 -> forward_x ~= 0.226 m, mean speed ~= 0.0568 m/s
-  vx=0.140 -> forward_x ~= 0.308 m, mean speed ~= 0.0774 m/s
-  vx=0.150 -> forward_x ~= 0.348 m, mean speed ~= 0.0874 m/s
-flat/start-stop/curve suite: FAIL, 2/3 scenarios accepted
-  flat_walk_varied_speed_v1: PASS
-  start_stop_velocity_ramp_v1: PASS
-  curve_turn_walk_v1: FAIL
-  total_forward_distance_m ~= 0.502
-  mean_forward_speed_mps ~= 0.0307
-  fallen_count: 0
-```
-
-Conclusion: E80 is a better experimental runtime profile and fixes the
-low-speed command-response threshold, but it is still not promotable because
-the curve/turning scenario gets stuck. The next M10/M11 work is broader
-multi-scenario context-policy data, especially curve/yaw coverage, followed by
-retraining and scenario-suite comparison against the official teacher.
-
-Three-scenario candidate checkpoint evidence:
-
-```text
-profile: context_stage1_three_scenario_10ep_e80
-prepared dataset: /data/training_datasets/context_bc/prepared/context_stage1_three_scenario_10ep/prepared_manifest.json
-raw scenario data:
-  flat_walk_varied_speed_v1_10ep: 3000 samples
-  start_stop_velocity_ramp_v1_10ep: 3000 samples
-  curve_turn_walk_v1_10ep: 3000 samples
-prepared splits: train 7200, val 900, test 900
-model/profile contract: OK
-offline evaluation:
-  train MAE ~= 0.00720
-  val MAE ~= 0.01101
-  test MAE ~= 0.01244
-flat/start-stop/curve suite: PASS, 3/3 scenarios accepted
-  flat_walk_varied_speed_v1: forward_distance ~= 0.312 m, mean speed ~= 0.0627 m/s
-  start_stop_velocity_ramp_v1: forward_distance ~= 0.267 m, mean speed ~= 0.0411 m/s
-  curve_turn_walk_v1: forward_distance ~= 0.155 m, mean speed ~= 0.0282 m/s
-  total_forward_distance_m ~= 0.733
-  mean_forward_speed_mps ~= 0.0440
-  fallen_count: 0
-```
-
-Conclusion: the three-scenario candidate remains the best restored context-BC
-baseline, but it is superseded for M10 core evidence by the later retained
-residual reference. On 2026-06-22 the historical ONNX was restored locally with sha256
-`2a7e41afe855702638aed56ec32e0f5e067a6b76fdcd76af4d43a101191730b7`; the
-locally regenerated ONNX was preserved separately because it did not reproduce
-the historical pass. The restored model reproduces the old movement behavior,
-but all three scenarios remain below the `0.015 m` swing-clearance target.
-
-The strongest retained residual reference has advanced beyond
-`m10_command_state_mlp_cem4x14_s79`. The first restored warm-start candidate,
-`clearance_gap_sequence_restored_s83`, was reproducible and profile-contract
-valid, but failed `0/3` scenarios and did not beat `s79` because the wrapper
-changed residual scale from the retained checkpoint's `0.1` to `0.05`. The
-wrapper now preserves `0.1` by default.
-
-The current retained residual reference is
-`clearance_liftscale_stack_s143_step090_offset005`. Under the stable-swing M10
-core gate it now passes all three core scenarios with no falls:
-
-```text
-artifact: artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005_stable_swing_gate
-flat_walk_varied_speed_v1: distance 0.70473m, p50 clearance 0.01966m, low-clearance ratio 0.16667
-start_stop_velocity_ramp_v1: distance 0.90519m, p50 clearance 0.02027m, low-clearance ratio 0.15441
-curve_turn_walk_v1: distance 0.79266m, p50 clearance 0.02061m, low-clearance ratio 0.15000
-suite: PASS, 3/3, total distance 2.40258m, fallen_count 0
-```
-
-This is the retained M10 core simulator reference, not a broad WBC/control or
-hardware promotion. The expanded pre-WBC six-scenario run
-`artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005_min012_six_scenario`
-still remains blocked at `1/6` passed with max low-clearance ratio `0.36232`.
-Do not promote intermediate stacked, phase, scale, postprocess, continuation,
-guarded, pre-roll, or reflex probes documented in
-`docs/SORIDORMI_EXECUTION_ROADMAP.md` unless they beat `s143` on the retained
-core and improve the six-scenario lower tail. The next control-side work should
-use the WBC/pre-WBC six-scenario surface or a higher-clearance teacher to reduce
-startup and turning lower-tail low-clearance ratios without sacrificing no-fall
-behavior or strong movement distance, followed by quantitative clearance
-readiness and a direct human follow-camera visual pass before any broader
-promotion.
+## Clearance qualification tools
 
 ```bash
 ./scripts/report_clearance_candidate_history.sh
-./scripts/validate_m10_engineering_process.sh
+./scripts/validate_clearance_engineering_process.sh
 ```
 
-After that engineering-process gate is stable, motion-control and WBC model
-fine-tuning should become the focus. The control work must still use the same
-M10 evidence path: scenario suite, clearance readiness, follow-camera review,
-and teacher comparison before any promotion claim.
-
-The first control-side artifact is the sim-only WBC clearance contract:
-
-```bash
-./scripts/plan_wbc_clearance_experiment.sh
-./scripts/validate_wbc_clearance_contract.sh
-```
-
-This contract only plans bounded parameter candidates. It does not create a WBC
-runtime backend yet, and it does not authorize hardware or raw action control.
-
-### M11A: task-agent contract foundation
-
-Expose rich embodied goals to Chromie without pretending that full autonomy is
-implemented. This milestone adds a no-motion task-level MCP contract above the
-existing named-skill surface:
-
-```text
-soridormi.task.get_capabilities
-soridormi.task.preview
-soridormi.task.submit
-soridormi.task.status
-soridormi.task.events
-soridormi.task.cancel
-```
-
-Soridormi keeps its own task readiness table in
-`configs/task_capabilities/open_duck_mini_v2_task_capabilities.json`, returns
-structured `plan_steps`, `blocked_subsystems`, `recommended_next_actions`, and
-a Soridormi-owned `task_graph`, and refuses missing navigation, perception,
-manipulation, unsafe physical tasks, and stop-through-task requests by default.
-
-Validation:
-
-```bash
-./scripts/validate_task_agent_contract.sh
-```
-
-Passing this gate means Chromie can inspect and monitor Soridormi's embodied
-interpretation safely. It does not mean Soridormi can physically navigate,
-fetch objects, or execute task-level plans yet.
-
-### M11: broader locomotion generalization
-
-Expand scenario coverage to start/stop transitions, turning, curves, lateral
-motion, rough ground, slopes, obstacles, and held-out randomized suites. Add
-task context, environment context, and bounded short history in staged policy
-contracts.
-
-### M12: residual/RL improvement
-
-Use BC as initialization. Improve beyond the teacher only where evaluation shows
-a specific weakness, such as stride length, foot clearance, rough-ground
-progress, obstacle crossing, recovery, or velocity tracking.
-
-### M13: hardware bridge
-
-Move to hardware in strict phases: read-only state streaming, motor-command
-dry-run, safety limits, watchdog, emergency stop, low-power single-joint test,
-standing pose, then tethered low-speed walking after MuJoCo gates pass.
-
-### M14: Chromie brain integration
-
-Expose Soridormi skills and status as a structured API for Chromie. Chromie
-chooses high-level actions such as talking, walking, looking, nodding, or
-stopping; Soridormi validates and executes body actions. The first integration
-target is MuJoCo-only.
-
-Current integration direction: Chromie now treats Soridormi as a named-skill
-provider through MCP. The intended body path is `soridormi.skill.list`,
-`soridormi.skill.create_plan`, safety monitoring, `soridormi.skill.execute_plan`,
-and post-action `soridormi.robot.get_status` safe-idle confirmation. The older
-bounded `soridormi.motion.*` tools remain useful for low-level velocity-plan
-tests and stop/cancel controls, but Chromie-facing body behavior should be
-expressed as named skills.
-
-Soridormi remains authoritative for availability, command bounds, cancellation,
-safe hold, emergency stop, MuJoCo execution, and future hardware execution.
-Chromie remains authoritative for conversation, confirmation, speech, task
-choice, and interaction-scoped scheduling.
-
-Status feedback should include at least:
-
-```text
-idle
-walking
-turning
-looking
-executing_skill
-failed
-unsafe
-stopped
-```
-
-Soridormi must return explicit refusal/failure reasons for unsafe, unsupported,
-or unavailable skill requests.
+These commands summarize retained evidence and validate the offline
+clearance process. They do not train, launch MuJoCo, or authorize hardware.

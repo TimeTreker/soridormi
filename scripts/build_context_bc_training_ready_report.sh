@@ -17,7 +17,7 @@ Options:
   --profile-name NAME       Candidate profile name for the neural command
   --linear-output-dir DIR   Linear BC output directory
   --neural-output-dir DIR   Neural BC output directory
-  --input-mode MODE         Policy input mode (default: context_stage1_command)
+  --input-mode MODE         Policy input mode (default: context_command_v1)
   --output PATH             Optional Markdown report path
   --output-dir DIR          Write training_ready_manifest.json/md into DIR
   --json                    Print machine-readable JSON to stdout
@@ -25,11 +25,11 @@ Options:
 
 Example:
   ./scripts/build_context_bc_training_ready_report.sh \
-    /data/training_datasets/context_bc/prepared/context_stage1_three_scenario_10ep/prepared_manifest.json \
-    --scenario-gate artifacts/dataset_coverage/context_stage1_three_scenario_10ep/dataset_scenario_gate_summary.json \
-    --prepared-gate artifacts/training/context_bc/prepared_gate/context_stage1_three_scenario_10ep/prepared_context_gate_report.json \
-    --profile-name context_stage1_candidate \
-    --output-dir artifacts/training/context_bc/training_ready/context_stage1_three_scenario_10ep \
+    /data/training_datasets/context_bc/prepared/context_command_three_scenario_10ep/prepared_manifest.json \
+    --scenario-gate artifacts/dataset_coverage/context_command_three_scenario_10ep/dataset_scenario_gate_summary.json \
+    --prepared-gate artifacts/training/context_bc/prepared_gate/context_command_three_scenario_10ep/prepared_context_gate_report.json \
+    --profile-name context_command_candidate \
+    --output-dir artifacts/training/context_bc/training_ready/context_command_three_scenario_10ep \
     --json | python -m json.tool
 USAGE
 }

@@ -93,5 +93,5 @@ def test_analyze_policy_log_reports_missing_policy_debug(tmp_path: Path) -> None
 
     assert summary["policy_records"] == 0
     assert summary["diagnosis"] == [
-        "No policy debug topics were found. Re-run with the M3.6 logger patch applied."
+        "No policy debug topics were found. Re-run with the policy debug logging logger patch applied."
     ]

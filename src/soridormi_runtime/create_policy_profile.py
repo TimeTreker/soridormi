@@ -99,7 +99,7 @@ def build_replacement_profile_payload(
     metadata.setdefault("format_version", 1)
     metadata.setdefault("policy_family", "open_duck_mini_v2")
     metadata["derived_from_profile"] = template_profile.name
-    metadata["generated_by"] = "soridormi_m5_profile_scaffold"
+    metadata["generated_by"] = "soridormi_policy_profile_scaffold"
     payload["metadata"] = metadata
 
     contract_payload = _mapping(payload.get("contract"))

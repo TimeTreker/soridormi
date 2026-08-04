@@ -37,7 +37,7 @@ class ActionMapperConfig:
 
         raw_target = default_pose + action_scale * action
 
-    M3.5 adds a motor target speed limit:
+    command, gait-phase, and speed limits adds a motor target speed limit:
 
         target = clip(raw_target, previous_target ± max_motor_velocity * dt)
 

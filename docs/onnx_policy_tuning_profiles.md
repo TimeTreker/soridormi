@@ -1,6 +1,6 @@
-# M3.8 ONNX policy tuning profiles
+# ONNX policy tuning profiles and log comparison
 
-M3.8 makes closed-loop policy debugging repeatable. Instead of manually changing several environment variables at once, run named profiles and compare the resulting logs.
+policy tuning profiles and log comparison makes closed-loop policy debugging repeatable. Instead of manually changing several environment variables at once, run named profiles and compare the resulting logs.
 
 ## Profiles
 

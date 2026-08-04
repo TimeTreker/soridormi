@@ -1,6 +1,6 @@
 # ONNX policy debug logging
 
-M3.6 adds policy-specific runtime logging for closed-loop ONNX debugging.
+policy debug logging adds policy-specific runtime logging for closed-loop ONNX debugging.
 
 The normal runtime state and command topics are still logged:
 

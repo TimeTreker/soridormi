@@ -246,7 +246,7 @@ def check_profile_model(
 ) -> PolicyCheckResult:
     """Validate a policy profile against the runtime contract and ONNX metadata.
 
-    This is the M5 replacement-model gate used by scripts/check_policy_model.sh
+    This is the replaceable policy interface replacement-model gate used by scripts/check_policy_model.sh
     and run_policy_experiment.sh. It combines the static profile/robot contract
     from policy_contract.py with the actual ONNX file IO check, so a profile
     cannot pass merely by declaring shapes that disagree with Soridormi's runtime

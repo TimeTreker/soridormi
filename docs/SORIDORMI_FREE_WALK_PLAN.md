@@ -19,7 +19,7 @@ The policy direction is context-conditioned control:
 robot_state + desired_command + task_context + environment_context + short_history -> action_14d
 ```
 
-For M6, `desired_command` is continuous `vx_mps`, `vy_mps`, and `yaw_radps`. For later terrain and obstacle skills, task/environment context should include fields such as `skill_id`, gait style, target clearance, terrain type, obstacle distance, and obstacle height. See `docs/SORIDORMI_POLICY_CONTEXT_CONTRACT.md`.
+For training and evaluation backbone, `desired_command` is continuous `vx_mps`, `vy_mps`, and `yaw_radps`. For later terrain and obstacle skills, task/environment context should include fields such as `skill_id`, gait style, target clearance, terrain type, obstacle distance, and obstacle height. See `docs/SORIDORMI_POLICY_CONTEXT_CONTRACT.md`.
 
 ## Current main-branch progress
 
@@ -36,20 +36,20 @@ The current main branch already has the important simulation-learning pieces:
 - residual policy wrapper, residual training scaffold, RL fine-tune environment, and walking reward;
 - hardware backend is still a placeholder and should not be used for walking.
 
-That means the next Soridormi milestone is **not** MCP, LLM routing, or hardware walking. The next milestone is proving command-conditioned walking in MuJoCo.
+That means the next Soridormi issue is **not** MCP, LLM routing, or hardware walking. The next issue is proving command-conditioned walking in MuJoCo.
 
-## Updated milestone order
+## Updated issue order
 
 ```text
-M6A: Commanded free-walk evaluation in MuJoCo
-M6B: Command-distribution teacher data collection
-M6B.1: Continuous-speed teacher data with smooth command ramps and coverage reports
-M6C: Neural BC policy trained on command-grid/random-command data
-M6D: Teacher-vs-candidate closed-loop comparison across the command suite
-M6E: Residual policy improvement only after BC and evaluation are reliable
-M6F: Sim acceptance gate for free-walk candidates
-M7: Hardware read-only / dry-run bridge, then low-power bring-up
-M8: Chromie/MCP/LLM orchestration after Soridormi exposes reliable robot capabilities
+free-walk evaluation: Commanded free-walk evaluation in MuJoCo
+random teacher collection: Command-distribution teacher data collection
+random teacher collection.1: Continuous-speed teacher data with smooth command ramps and coverage reports
+clearance and rough-ground evaluation: Neural BC policy trained on command-grid/random-command data
+candidate training: Teacher-vs-candidate closed-loop comparison across the command suite
+candidate evaluation: Residual policy improvement only after BC and evaluation are reliable
+policy iteration workflow: Sim acceptance gate for free-walk candidates
+structured body-skill interface: Hardware read-only / dry-run bridge, then low-power bring-up
+scenario and interaction layer: Chromie/MCP/LLM orchestration after Soridormi exposes reliable robot capabilities
 ```
 
 ## Why evaluation comes before more training
@@ -128,11 +128,11 @@ A candidate that only improves supervised MAE is not accepted unless it also sur
 
 ### Current blocker: official-vs-Soridormi runtime parity
 
-If `run_official_forward_baseline.sh` walks but `run_policy_rollout_smoke.sh open_duck_forward` only wiggles, stop all random teacher data collection. The ONNX model is good, but Soridormi's engineering path is not yet parity-compatible with the official `MjInfer` loop. See `docs/official_sync_preroll_m6_debug.md` for the sync pre-roll compatibility hook and the required MuJoCo validation commands.
+If `run_official_forward_baseline.sh` walks but `run_policy_rollout_smoke.sh open_duck_forward` only wiggles, stop all random teacher data collection. The ONNX model is good, but Soridormi's engineering path is not yet parity-compatible with the official `MjInfer` loop. See `docs/OFFICIAL_SYNC_PREROLL_DEBUG.md` for the sync pre-roll compatibility hook and the required MuJoCo validation commands.
 
-## M6A free-walk evaluation entrypoint
+## Free-walk evaluation entrypoint
 
-The first M6A implementation artifact is a conservative fixed-command evaluation suite:
+The first free-walk evaluation implementation artifact is a conservative fixed-command evaluation suite:
 
 ```text
 configs/teacher_suites/open_duck_free_walk_eval_v1.yaml
@@ -185,9 +185,9 @@ Use `--dry-run` first when checking profiles and generated rollout commands:
 The wrapper delegates to the existing command-grid comparison path, so the output should include per-scenario teacher/candidate rollout comparisons plus a command-grid summary.
 
 
-## M6B random teacher data collection
+## random teacher collection random teacher data collection
 
-After the fixed-command M6A suite is measurable, collect teacher data from random piecewise velocity commands. This produces trajectories that include command transitions instead of one constant command per episode. The random collector owns its MuJoCo collection lifecycle, so do not start a separate `run_sim_server.sh` for this command. Use `--viewer` on the collector command when visual inspection is needed.
+After the fixed-command free-walk evaluation suite is measurable, collect teacher data from random piecewise velocity commands. This produces trajectories that include command transitions instead of one constant command per episode. The random collector owns its MuJoCo collection lifecycle, so do not start a separate `run_sim_server.sh` for this command. Use `--viewer` on the collector command when visual inspection is needed.
 
 Collect a conservative random-command teacher dataset:
 
@@ -214,11 +214,11 @@ This collector should be used for walking, turning, stopping, small lateral moti
 
 ## Hardware rule
 
-Do not start hardware walking from this milestone. Hardware work may only begin as read-only state, dry-run command validation, watchdog, emergency stop, and low-power single-joint tests. Walking hardware execution is blocked until commanded free-walk simulation acceptance exists.
+Do not start hardware walking from this issue. Hardware work may only begin as read-only state, dry-run command validation, watchdog, emergency stop, and low-power single-joint tests. Walking hardware execution is blocked until commanded free-walk simulation acceptance exists.
 
-## M6C foot-clearance and rough-ground evaluation
+## clearance and rough-ground evaluation foot-clearance and rough-ground evaluation
 
-If the duck walks but its swing feet stay very close to the ground, do not change motor limits first. Measure clearance and rough-ground robustness before changing the policy. The M6C evaluation layer adds two tools:
+If the duck walks but its swing feet stay very close to the ground, do not change motor limits first. Measure clearance and rough-ground robustness before changing the policy. The clearance and rough-ground evaluation layer adds two tools:
 
 ```text
 src/soridormi_runtime/foot_clearance_eval.py

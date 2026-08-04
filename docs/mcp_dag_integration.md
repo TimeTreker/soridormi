@@ -70,7 +70,7 @@ structured body goals to Soridormi:
    `soridormi.safety.emergency_stop` handles cancellation or safety stop.
 7. `chromie.report` tells the user the result.
 
-In M11, `soridormi.task.preview` and `soridormi.task.submit` are contract-only
+In embodied task contract, `soridormi.task.preview` and `soridormi.task.submit` are contract-only
 and no-motion. Preview uses `preview_id` and does not persist a task record.
 Submit uses `task_id` and records lifecycle state. They are schema and lifecycle
 boundaries, not navigation, manipulation, or autonomous execution claims.

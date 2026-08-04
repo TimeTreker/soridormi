@@ -1,6 +1,6 @@
 """Promote an offline-evaluated Soridormi policy candidate to a named runtime profile.
 
-M6.9 is the controlled bridge from offline leaderboard artifacts to a runtime
+candidate promotion is the controlled bridge from offline leaderboard artifacts to a runtime
 profile YAML that can be selected by ``run_policy_experiment.sh``.  Promotion is
 intentionally explicit and auditable: it copies an existing candidate profile,
 adds promotion metadata, writes a promotion record/report, and never launches
@@ -142,7 +142,7 @@ def _promotion_payload(
         metadata = {}
     metadata.update(
         {
-            "generated_by": "soridormi_m69_policy_candidate_promotion",
+            "generated_by": "soridormi_policy_candidate_promotion",
             "promoted_from_profile": source.name,
             "promotion_generated_at_utc": generated_at_utc,
             "promotion_leaderboard_path": str(leaderboard_path),

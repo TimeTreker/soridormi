@@ -34,10 +34,10 @@ def test_pre_wbc_surface_matches_default_suite_and_contract() -> None:
     assert report.status == "PRE_WBC_SCENARIO_SURFACE_READY"
     assert report.wbc_scenario_ids == EXPECTED_SURFACE
     assert report.default_suite_scenario_ids == EXPECTED_SURFACE
-    assert report.m10_core_scenarios == EXPECTED_SURFACE[:3]
+    assert report.clearance_core_scenarios == EXPECTED_SURFACE[:3]
     assert report.enrichment_scenarios == EXPECTED_SURFACE[3:]
     assert {item["role"] for item in report.selected_scenarios} == {
-        "m10_core",
+        "clearance_core",
         "wbc_enrichment",
     }
     assert all(item["run_plan"] for item in report.selected_scenarios)

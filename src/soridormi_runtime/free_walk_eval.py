@@ -114,7 +114,7 @@ def _collect_block_scalar(
 
 
 def _load_free_walk_yaml_subset(text: str) -> dict[str, Any]:
-    """Parse the small YAML subset used by the M6A free-walk suite.
+    """Parse the small YAML subset used by the free-walk evaluation free-walk suite.
 
     PyYAML remains the preferred parser when installed. This fallback keeps
     `free_walk_eval` usable on host machines that have not installed the full
@@ -273,7 +273,7 @@ def validate_free_walk_suite(
 ) -> FreeWalkSuiteCheck:
     """Validate a conservative command-conditioned free-walk suite.
 
-    This is a static gate for M6A. It does not prove locomotion quality by
+    This is a static gate for free-walk evaluation. It does not prove locomotion quality by
     itself; it checks that the suite is present, bounded, and covers the command
     categories needed before running MuJoCo rollouts.
     """
@@ -432,7 +432,7 @@ def render_free_walk_suite_check(result: FreeWalkSuiteCheck) -> str:
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Validate the M6A commanded free-walk evaluation suite.")
+    parser = argparse.ArgumentParser(description="Validate the free-walk evaluation commanded free-walk evaluation suite.")
     parser.add_argument("--suite", default=str(DEFAULT_FREE_WALK_SUITE))
     parser.add_argument("--max-abs-x", type=float, default=DEFAULT_MAX_ABS_X)
     parser.add_argument("--max-abs-y", type=float, default=DEFAULT_MAX_ABS_Y)

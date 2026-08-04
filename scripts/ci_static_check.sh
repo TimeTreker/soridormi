@@ -52,6 +52,9 @@ fi
 echo "Soridormi CI static check"
 echo "========================="
 
+echo "Checking repository governance..."
+python scripts/validate_repository_governance.py
+
 robot_config="${SORIDORMI_CI_ROBOT_CONFIG:-configs/robots/open_duck_mini_v2.yaml}"
 echo "Checking canonical policy contract..."
 python -m soridormi_runtime.policy_contract open_duck_forward --robot-config "${robot_config}" --validate-only
@@ -88,7 +91,7 @@ python -m soridormi_runtime.policy_package install "${package_path}" \
   --json >/dev/null
 
 
-echo "Checking M6 training dataset export smoke workflow..."
+echo "Checking policy-training dataset export smoke workflow..."
 SORIDORMI_TMPDIR="${tmpdir}" python - <<'PY_DATASET'
 import json
 import os
@@ -158,27 +161,27 @@ python -m soridormi_runtime.rollout_acceptance "${tmpdir}/runtime_training_smoke
   --json >/dev/null
 
 if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
-  echo "Running M5 unit tests..."
+  echo "Running replaceable policy interface unit tests..."
   pytest -q \
-    tests/test_check_policy_model_m42.py \
-    tests/test_policy_contract_m5.py \
-    tests/test_policy_model_contract_gate_m52.py \
-    tests/test_onnx_providers_m53.py \
-    tests/test_create_policy_profile_m54.py \
-    tests/test_validate_policy_profiles_m55.py \
-    tests/test_ci_static_check_m56.py \
-    tests/test_policy_manifest_m57.py \
-    tests/test_policy_acceptance_m58.py \
-    tests/test_policy_package_m59.py \
-    tests/test_policy_package_index_m511.py \
-    tests/test_training_dataset_m61.py \
-    tests/test_training_dataset_prepare_m62.py \
-    tests/test_training_dataset_stats_m63.py \
-    tests/test_train_behavior_clone_m64.py \
-    tests/test_linear_behavior_clone_policy_m65.py \
-    tests/test_evaluate_policy_profile_m66.py \
-    tests/test_policy_candidate_leaderboard_m68.py \
-    tests/test_promote_policy_candidate_m69.py \
-    tests/test_runtime_limits_m610.py \
-    tests/test_rollout_acceptance_m611.py
+    tests/test_check_policy_model.py \
+    tests/test_policy_contract.py \
+    tests/test_policy_model_contract_gate.py \
+    tests/test_onnx_providers.py \
+    tests/test_create_policy_profile.py \
+    tests/test_validate_policy_profiles.py \
+    tests/test_ci_static_check.py \
+    tests/test_policy_manifest.py \
+    tests/test_policy_acceptance.py \
+    tests/test_policy_package.py \
+    tests/test_policy_package_index.py \
+    tests/test_training_dataset.py \
+    tests/test_training_dataset_prepare.py \
+    tests/test_training_dataset_stats.py \
+    tests/test_train_behavior_clone.py \
+    tests/test_linear_behavior_clone_policy.py \
+    tests/test_evaluate_policy_profile.py \
+    tests/test_policy_candidate_leaderboard.py \
+    tests/test_promote_policy_candidate.py \
+    tests/test_runtime_limits.py \
+    tests/test_rollout_acceptance.py
 fi

@@ -12,7 +12,7 @@ model:
   - 14
   input_type: tensor(float)
   output_type: tensor(float)
-  input_mode: context_stage1_command
+  input_mode: context_command_v1
   kind: residual_onnx
 runtime:
   mode: onnx_policy
@@ -67,7 +67,7 @@ metadata:
   format_version: 1
   policy_family: open_duck_mini_v2
   derived_from_profile: clearance_liftscale_stack_s127
-  generated_by: soridormi_m10_phase_probe
+  generated_by: soridormi_clearance_phase_probe
   promotion_status: blocked_clearance_gate
   training_output: /data/rl_finetune/clearance_liftscale_stack_s127
 contract:
@@ -88,7 +88,7 @@ contract:
   - right_hip_pitch
   - right_knee
   - right_ankle
-  input_mode: context_stage1_command
+  input_mode: context_command_v1
   policy_input_size: 104
 residual_policy:
   teacher_profile: clearance_contactlift_stack_s121

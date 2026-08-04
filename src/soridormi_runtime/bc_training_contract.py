@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 DEFAULT_CONTRACT_PATH = Path("configs/training/open_duck_mini_v2_context_bc_contract_v1.json")
-CONTRACT_SCHEMA_VERSION = "m9.bc_training_contract.v1"
+CONTRACT_SCHEMA_VERSION = "soridormi.bc_training_contract.v1"
 CONTEXT_SAMPLE_TYPE = "soridormi.policy_supervision.context_v1"
 LEGACY_SAMPLE_TYPE = "soridormi.policy_supervision.v1"
 
@@ -264,7 +264,7 @@ def validate_sample_against_contract(
         kind = "context"
     elif sample_type == LEGACY_SAMPLE_TYPE and allow_legacy:
         kind = "legacy"
-        warnings.append("legacy soridormi.policy_supervision.v1 sample accepted for Stage 1 only")
+        warnings.append("legacy soridormi.policy_supervision.v1 sample accepted for the command-conditioned compatibility mode only")
     else:
         kind = "unknown"
         errors.append(f"sample_type must be {CONTEXT_SAMPLE_TYPE}" + (f" or {LEGACY_SAMPLE_TYPE}" if allow_legacy else ""))
@@ -464,7 +464,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate the Soridormi context-conditioned BC training contract.")
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT_PATH, help="BC training contract JSON path")
     parser.add_argument("--sample-jsonl", type=Path, default=None, help="Optional dataset JSONL to validate against the contract")
-    parser.add_argument("--allow-legacy", action="store_true", help="Allow legacy soridormi.policy_supervision.v1 samples for Stage 1 preflight")
+    parser.add_argument("--allow-legacy", action="store_true", help="Allow legacy soridormi.policy_supervision.v1 samples for command-conditioned compatibility preflight")
     parser.add_argument("--output", type=Path, default=None, help="Optional Markdown report output path")
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON report")
     args = parser.parse_args(argv)

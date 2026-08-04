@@ -18,7 +18,7 @@
     "hardware_allowed": false,
     "raw_action_14d_allowed": false,
     "chromie_raw_control_allowed": false,
-    "requires_m10_engineering_gate": true
+    "requires_clearance_engineering_gate": true
   },
   "parameters": {
     "target_clearance_m": {

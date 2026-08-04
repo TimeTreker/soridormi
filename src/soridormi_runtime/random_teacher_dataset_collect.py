@@ -344,7 +344,7 @@ def collect_random_teacher_dataset(
 
     Unlike ``teacher_dataset_collect.collect_teacher_dataset``, this collector
     changes the policy command several times inside each episode. This is the
-    M6B data path for continuous command-conditioned free walking: one rollout
+    random teacher collection data path for continuous command-conditioned free walking: one rollout
     contains stand, stop, turn, curve, lateral, forward, and backward command
     changes sampled from conservative ranges. By default, command changes are
     ramped over a short number of control steps so the BC dataset contains

@@ -1,4 +1,4 @@
-# Soridormi M4.3 policy profile.
+# Soridormi ONNX stepping compatibility policy profile.
 name: open_duck_stepping_debug
 description: ONNX forward policy with leg-action boost and head damping to test whether feet can unload/step.
 

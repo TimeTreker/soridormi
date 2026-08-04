@@ -138,16 +138,19 @@ Hardware patch:
   - explicit statement that no real actuator command was sent
 ```
 
-## Soridormi current priority reminder
+## Current-work authority
 
-Soridormi's current priority is command-conditioned free walking in MuJoCo. MCP/Chromie integration is useful later, but it should not replace the locomotion validation path.
-
-Every future patch should make clear whether it affects:
+Do not encode the current project priority in this patch-delivery contract. Read
+`docs/STATUS.md` for the current work order. Every patch should state which
+semantic contract it affects, for example:
 
 ```text
-M6 commanded free-walk simulation
-M7 hardware bring-up
-M8 Chromie/MCP orchestration
+locomotion and closed-loop evaluation
+body-skill or embodied-task contract
+simulator/runtime/backend boundary
+hardware commissioning
+documentation governance
 ```
 
-Do not let an orchestration patch imply that walking capability has improved unless it includes sim rollout evidence.
+An orchestration or contract patch must not imply improved walking capability
+without closed-loop MuJoCo evidence.

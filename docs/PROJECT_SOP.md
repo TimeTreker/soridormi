@@ -1,192 +1,123 @@
 # Soridormi project SOP
 
-This document defines the project backbone. Future work should first strengthen this path; helper scripts and reports are secondary unless they directly support one of these steps.
+This SOP defines the durable engineering loop. Current capability and blocker
+status lives only in `docs/STATUS.md`.
 
-Milestone order and promotion decisions are governed by
-`docs/SORIDORMI_EXECUTION_ROADMAP.md`. A later SOP stage may be developed in
-parallel, but it must not be promoted past an unmet roadmap gate.
+## Target and ownership
 
-## SOP-0: Target definition
-
-Goal: Soridormi is the robot cerebellum for Open Duck Mini v2. It makes the
-body walk and act reliably in MuJoCo first, then uses the same runtime contracts
-to control hardware through a hardware backend.
-
-Chromie is the robot brain in `TimeTreker/chromie.git` on `main`. Chromie owns
-conversation, memory, human interaction, high-level planning, and choosing which
-body skill should run. Soridormi owns body-control validation, locomotion,
-policy execution, safety, simulation, and hardware execution.
-
-Core invariant:
+Soridormi is the Open Duck Mini v2 body/cerebellum runtime. Chromie owns
+conversation, memory, user-facing reasoning, confirmation, and global task
+orchestration. Soridormi owns robot state, body feasibility, skill lowering,
+locomotion, safety, execution, monitoring, recovery, and backend selection.
 
 ```text
-Same runtime.
-Same policy interface.
-Same RobotState.
-Same MotorCommand.
-Different backend.
+Same RobotState and MotorCommand contracts.
+Same body-skill semantics.
+Different simulator or hardware backend.
 ```
 
-Brain/cerebellum boundary:
+Chromie never authorizes raw joints, motors, torques, physical coordinates, or
+`action_14d`. Soridormi may refuse every request.
+
+## Trusted baseline
+
+Run the official Open Duck policy as the permanent teacher/reference. Retain
+the official baseline, replay, parity, first-divergence, and trace-comparison
+tools. Later policies may replace execution, not baseline evidence.
+
+## Parity qualification
+
+Reproduce observation construction, command and gait-phase handling, policy
+inference, action mapping, loop order, reset behavior, and closed-loop rollout
+through Soridormi's own API/runtime/backend contracts.
+
+A tuning change does not close an unexplained parity failure.
+
+## Closed-loop evaluation
+
+Promotion requires MuJoCo behavior, not only offline error. Evaluate fall/reset
+state, displacement, speed tracking, drift, contacts, clearance, action/joint
+ranges, stability, interruption, and safe-idle recovery as relevant.
+
+## Data and policy contracts
+
+The official teacher baseline uses:
 
 ```text
-Chromie chooses structured intent.
-Soridormi validates and executes body skills.
-Chromie never sends raw joint actions or low-level 14D policy actions.
+observation[101] -> action_14d
 ```
 
-## SOP-1: Official baseline
-
-Run the official Open Duck policy as the trusted teacher. Record reference traces and rollouts.
-
-Outputs:
+Command-conditioned policy profiles use:
 
 ```text
-data/official_baseline/*.trace.jsonl
-data/logs/policy_open_duck_forward_*.mcap
+observation[101] + desired_command[3] -> action_14d
 ```
 
-## SOP-2: Soridormi parity
+Future task, environment, or history features require an explicit versioned
+training/runtime contract. A model may run only when profile, input shape,
+feature ordering, and runtime producer match.
 
-Run the same policy through Soridormi. Match observation, action, motor target history, loop order, reset state, and rollout state against the official baseline.
+Raw natural language and raw perception never enter the low-level action policy.
 
-Exit criteria:
+## Training and replacement loop
 
 ```text
-first-divergence analyzer reports no meaningful mismatch
-history offsets match official loop order
-same policy contract is used by sim and future hardware
+collect qualified teacher rollouts
+validate scenario and distribution coverage
+split without rollout leakage
+train a candidate
+validate the model/profile contract
+run bounded MuJoCo evaluation
+compare with the retained reference
+diagnose a named failure
+retain, reject, or iterate with evidence
 ```
 
-## SOP-3: Rollout evaluation
+Offline loss is diagnostic, never a promotion gate.
 
-Evaluate whether a policy actually walks in MuJoCo, not just whether its offline action error is low.
+## Skill boundary
 
-Primary metrics:
+Externally callable body behavior is a bounded named skill or structured body
+context. Soridormi validates availability, parameters, current state, safety,
+interruptibility, and backend support before execution.
 
-```text
-rollout duration
-reset/fall count
-forward displacement
-forward speed
-lateral drift
-yaw drift
-action magnitude
-joint magnitude
-contacts / obvious instability
-```
+## Task boundary
 
-## SOP-4: Data collection
+The task API accepts richer structured embodied goals and returns Soridormi's
+body interpretation, lifecycle, blocked subsystems, events, and routing hints.
+It is currently no-motion. Supported tasks may compile to named-skill dry runs;
+physical execution remains on the validated skill/motion path until a monitored
+task executor is qualified.
 
-Export supervised training data from trusted successful rollouts.
+Task records project live body state. They do not invent targets or infer
+`safe_idle` from the absence of emergency stop alone.
 
-Contract:
+## Hardware bridge
 
-```text
-observation: 101 floats
-action: 14 floats
-sample: obs -> policy action
-```
-
-## SOP-5: Policy training
-
-Train replacement policies for the same high-level runtime slot:
+Hardware work is gated and fail-closed:
 
 ```text
-obs[101] -> continuous_actions[14]
-```
-
-This is not torque learning, not a MuJoCo dynamics model, and not a replacement for the low-level position controller.
-
-## SOP-6: Policy deployment
-
-Export trained policies into runtime-compatible profiles and model artifacts. The runtime should not need special training-only code paths.
-
-Minimum deployment check:
-
-```text
-./scripts/check_policy_model.sh --profile <profile>
-./scripts/run_policy_rollout_smoke.sh <profile> --steps <N>
-```
-
-## SOP-7: Policy improvement loop
-
-Use rollout failures to improve the policy distribution.
-
-Loop:
-
-```text
-train candidate
-run candidate in MuJoCo
-compare against teacher rollout
-diagnose failure mode
-relabel candidate states with teacher policy
-merge dataset
-retrain
-promote better candidate
-```
-
-## SOP-8: Hardware bridge
-
-Implement the real robot backend while keeping the existing runtime, policy, observation, and command contracts.
-
-Phases:
-
-```text
-read-only hardware state streaming
-motor command dry-run
+read-only state
+command dry run
 limits and watchdog
-single-joint low-power test
-standing pose
-low-speed tethered walk
+independent stop
+low-power single-joint test
+standing
+tethered low-speed motion
+broader qualification
 ```
 
-## SOP-9: Chromie brain integration
+No simulator result silently authorizes hardware.
 
-Expose Soridormi skills and status as a structured API that Chromie can call.
-The first integration target is MuJoCo-only.
+## Patch and validation
 
-Chromie-facing requests should look like bounded skills/context, not motor
-targets:
+Deliver plain git patches unless the user requests another format. Every patch
+must include integrity checks and scope-appropriate functional validation.
 
-```text
-walk_velocity(vx_mps, vy_mps, yaw_radps, duration_s)
-turn_in_place(yaw_radps, duration_s)
-look_at_person(target_id or target bearing)
-nod_yes()
-stand_idle()
-stop()
+```bash
+git apply --check ~/Downloads/<patch>.patch
+git apply ~/Downloads/<patch>.patch
+python scripts/validate_repository_governance.py
 ```
-
-Soridormi responses must include status and explicit refusal/failure reasons for
-unsafe, unsupported, unavailable, or out-of-range requests.
-
-## SOP-10: Hardware safety and staged rollout
-
-Before walking on hardware, add hard safety boundaries:
-
-```text
-emergency stop
-joint limits
-velocity/current/torque limits
-command timeout
-watchdog heartbeat
-thermal / voltage checks
-operator checklist
-log everything
-```
-
-## SOP-11: Patch delivery and validation
-
-Future LLM sessions must deliver plain `.patch` files unless the user asks for another format. The user normally downloads patches to `~/Downloads`, so user-facing commands should use that path.
-
-Every patch response must include:
-
-```text
-1. Patch integrity check: git apply --check ~/Downloads/<patch>.patch
-2. Functional validation: tests, CLI smoke checks, sim commands, or docs sanity checks that prove the patch behavior
-```
-
-For docs-only changes, functional validation is still required: check that the expected files/sections exist and that Markdown fences are balanced. For code changes, run the relevant unit tests and compile checks. For sim or training changes, separate local/unit validation from live MuJoCo validation.
 
 See `docs/PATCH_DELIVERY_AND_VALIDATION.md`.

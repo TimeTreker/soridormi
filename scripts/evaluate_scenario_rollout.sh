@@ -247,7 +247,7 @@ if [ -z "${scenario}" ]; then
   exit 2
 fi
 if [ "${backend}" != "mujoco" ]; then
-  echo "error: M9A scenario rollout evaluation is MuJoCo-only; use --backend mujoco" >&2
+  echo "error: scenario rollout evaluation is MuJoCo-only; use --backend mujoco" >&2
   exit 2
 fi
 if [ -z "${output_dir}" ]; then
@@ -339,7 +339,7 @@ if [ -z "${log_path}" ]; then
 
   host_log_dir="data/logs"
   if [[ "${log_dir}" != "/data/logs" ]]; then
-    # M9A supports the default container log mount directly.  Custom container
+    # scenario rollout evaluation supports the default container log mount directly.  Custom container
     # paths are still accepted for runtime execution, but callers should pass
     # --log explicitly if they choose a custom mount.
     echo "warning: custom --log-dir was used; falling back to data/logs host search" >&2

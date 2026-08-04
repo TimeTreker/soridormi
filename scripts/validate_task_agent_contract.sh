@@ -4,7 +4,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${repo_root}"
 
-use_docker="${SORIDORMI_TASK_AGENT_USE_DOCKER:-${SORIDORMI_M11_TASK_AGENT_USE_DOCKER:-auto}}"
+use_docker="${SORIDORMI_TASK_AGENT_USE_DOCKER:-auto}"
 
 usage() {
   cat <<'USAGE'
@@ -48,19 +48,23 @@ run_python_gate() {
 
   echo "Running task-agent contract tests..."
   pytest -q \
-    tests/test_task_capability_manifest_m11.py \
+    tests/test_task_capability_manifest.py \
     tests/test_mcp_capability_manifest.py \
     tests/test_mcp_local_tools.py \
     tests/test_mcp_runtime_tools.py \
     tests/test_mcp_http_server.py \
-    tests/test_task_acceptance_cases_m11.py \
+    tests/test_task_acceptance_cases.py \
     tests/test_chromie_text_input_acceptance.py \
-    tests/test_training_cases_m11.py \
-    tests/test_navigation_goal_contract_m11.py \
-    tests/test_skill_manifest_m7.py
+    tests/test_training_cases.py \
+    tests/test_navigation_goal_contract.py \
+    tests/test_task_semantic_integrity.py \
+    tests/test_skill_manifest.py
 }
 
 run_docs_gate() {
+  echo "Checking repository governance..."
+  python scripts/validate_repository_governance.py
+
   echo "Checking task-agent docs..."
   rg -n "task_graph" \
     docs/SORIDORMI_MCP_SERVER.md \
@@ -103,16 +107,16 @@ if [ "${use_docker}" != "0" ]; then
       python -m soridormi_runtime.mcp.export_capabilities --compact >/tmp/soridormi_task_agent_manifest.json
       python -m json.tool /tmp/soridormi_task_agent_manifest.json >/dev/null
       pytest -q \
-        tests/test_task_capability_manifest_m11.py \
+        tests/test_task_capability_manifest.py \
         tests/test_mcp_capability_manifest.py \
         tests/test_mcp_local_tools.py \
         tests/test_mcp_runtime_tools.py \
         tests/test_mcp_http_server.py \
-        tests/test_task_acceptance_cases_m11.py \
+        tests/test_task_acceptance_cases.py \
         tests/test_chromie_text_input_acceptance.py \
-        tests/test_training_cases_m11.py \
-        tests/test_navigation_goal_contract_m11.py \
-        tests/test_skill_manifest_m7.py
+        tests/test_training_cases.py \
+        tests/test_navigation_goal_contract.py \
+        tests/test_skill_manifest.py
     '
   elif [ "${use_docker}" = "1" ]; then
     echo "ERROR: SORIDORMI_TASK_AGENT_USE_DOCKER=1 was requested, but Docker Compose is not available." >&2

@@ -363,7 +363,7 @@ def build_diagnosis(summary: dict[str, Any]) -> list[str]:
 
     obs = summary["metrics"]["observation"]
     if obs["count"] == 0:
-        findings.append("Soridormi did not log raw policy observations. Re-run after M4.6 logging is applied.")
+        findings.append("Soridormi did not log raw policy observations. Re-run after official trace comparison logging is applied.")
     else:
         findings.append(
             f"Observation mean MAE over compared steps: {obs['mean_mae']:.6f}; max_abs_diff={obs['max_abs_diff']:.6f}."

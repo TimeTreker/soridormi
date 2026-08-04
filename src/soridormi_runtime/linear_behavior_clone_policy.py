@@ -160,9 +160,9 @@ def load_linear_behavior_clone_model(
 
 
 class LinearBehaviorClonePolicy:
-    """Runtime policy wrapper for M6 linear behavior-cloning baseline artifacts.
+    """Runtime policy wrapper for training and evaluation backbone linear behavior-cloning baseline artifacts.
 
-    This is intentionally a lightweight deployment path for M6 sanity checks. It
+    This is intentionally a lightweight deployment path for training and evaluation backbone sanity checks. It
     does not replace the long-term ONNX path; it lets a trained
     ``linear_behavior_clone.npz`` run through the same ObservationBuilder,
     action-history update, ActionPostprocessor, and PolicyActionMapper as the

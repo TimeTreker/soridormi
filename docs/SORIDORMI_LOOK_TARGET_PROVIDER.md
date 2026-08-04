@@ -1,7 +1,7 @@
 # Soridormi look-target provider boundary
 
-M8K made `look_at_person` executable in MuJoCo, but it intentionally did not run
-camera perception. M8L adds the structured target-provider boundary that future
+look-at-person skill made `look_at_person` executable in MuJoCo, but it intentionally did not run
+camera perception. look-target provider adds the structured target-provider boundary that future
 perception, Chromie, or a planner can call before the scripted head executor.
 
 The contract is:
@@ -16,7 +16,7 @@ camera/person detector/planner/Chromie
 Soridormi still does **not** know where the person is by itself. This patch only
 converts already-structured target hints into bounded `look_at_person` arguments.
 
-M8M changes the default gaze behavior: after acquiring a person target,
+social eye behavior changes the default gaze behavior: after acquiring a person target,
 `look_at_person` now keeps looking at that target instead of immediately
 returning to neutral. Use `--end-mode return_neutral` only for tests or explicit
 "glance then reset" behavior.

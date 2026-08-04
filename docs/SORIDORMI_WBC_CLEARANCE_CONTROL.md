@@ -1,12 +1,12 @@
 # Soridormi WBC clearance-control contract
 
-This document starts the motion-control section after the M10 engineering
+This document starts the motion-control section after the clearance qualification engineering
 process gate. The goal is to make WBC/body-control work testable before tuning
 or learning any model.
 
 The first stage is deliberately sim-only and parameter-bounded. It does not
 create hardware commands, does not let Chromie send raw joint or `action_14d`
-commands, and does not replace the M10 scenario evidence path.
+commands, and does not replace the clearance qualification scenario evidence path.
 
 ## Contract
 
@@ -38,7 +38,7 @@ The WBC clearance scenario surface is deliberately small and flat-ground:
 - `s_turn_reversal_v1`
 - `turn_stop_settle_v1`
 
-The first three remain the M10 promotion core. The last three enrich the suite
+The first three remain the clearance qualification promotion core. The last three enrich the suite
 before WBC tuning by stressing startup/stop tails, turn reversal, and
 turn-to-stop settling.
 
@@ -54,7 +54,7 @@ Validate that surface before tuning:
 ```
 
 This is a dry/offline gate. It checks the WBC contract, the default ready
-locomotion suite, run-plan generation, and the M10 core/enrichment split; it
+locomotion suite, run-plan generation, and the clearance qualification core/enrichment split; it
 does not launch MuJoCo or create candidate profiles.
 
 ## Current Six-Scenario Evidence
@@ -70,8 +70,8 @@ six-scenario MuJoCo suite was regenerated at:
 
 ```text
 artifacts/scenario_eval/clearance_liftscale_stack_s143_step090_offset005_min012_six_scenario/suite_summary.md
-artifacts/m10_engineering_process/clearance_liftscale_stack_s143_step090_offset005_min012_six_scenario/readiness_six/clearance_readiness.md
-artifacts/m10_engineering_process/clearance_liftscale_stack_s143_step090_offset005_min012_six_scenario/evidence_six/clearance_evidence_package.md
+artifacts/clearance_engineering_process/clearance_liftscale_stack_s143_step090_offset005_min012_six_scenario/readiness_six/clearance_readiness.md
+artifacts/clearance_engineering_process/clearance_liftscale_stack_s143_step090_offset005_min012_six_scenario/evidence_six/clearance_evidence_package.md
 ```
 
 This run is a better pre-WBC baseline than the older six-scenario artifact
@@ -87,7 +87,7 @@ command instead of an underpowered wiggle. It still remains blocked:
 
 The next WBC/control candidate must reduce low-clearance ratio across the full
 six-scenario surface while preserving no-fall behavior, forward progress, and
-the original three-scenario M10 core.
+the original three-scenario clearance qualification core.
 
 ## Planning Harness
 
@@ -124,7 +124,7 @@ A WBC clearance candidate cannot be promoted from this contract alone. After a
 runtime backend exists, each candidate must still pass:
 
 ```bash
-./scripts/validate_m10_engineering_process.sh
+./scripts/validate_clearance_engineering_process.sh
 ./scripts/evaluate_scenario_suite.sh \
   --backend mujoco \
   --profile <candidate_profile> \

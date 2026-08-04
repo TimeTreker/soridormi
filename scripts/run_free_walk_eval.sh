@@ -7,7 +7,7 @@ usage() {
   cat <<'USAGE'
 Usage: ./scripts/run_free_walk_eval.sh CANDIDATE_PROFILE [options]
 
-Run the M6A command-conditioned free-walk evaluation suite against a candidate
+Run the free-walk evaluation command-conditioned free-walk evaluation suite against a candidate
 policy profile. This wraps the existing teacher-vs-candidate command-grid
 comparison flow with conservative free-walk defaults.
 

@@ -230,11 +230,13 @@ class SoridormiLocalToolService:
                 return self.create_skill_plan(args)
             if tool_name == "soridormi.skill.execute_plan":
                 return self.execute_skill_plan(str(args.get("plan_id", "")))
+            body_safe_idle = not self.emergency_stop
             if tool_name == "soridormi.task.get_capabilities":
                 return task_capabilities_payload(
                     mode=self.mode,
                     backend=self.backend,
                     emergency_stop=self.emergency_stop,
+                    safe_idle=body_safe_idle,
                     skill_registry=self.skill_registry,
                 )
             if tool_name == "soridormi.task.preview":
@@ -243,6 +245,7 @@ class SoridormiLocalToolService:
                     mode=self.mode,
                     backend=self.backend,
                     emergency_stop=self.emergency_stop,
+                    safe_idle=body_safe_idle,
                     skill_registry=self.skill_registry,
                 )
             if tool_name == "soridormi.task.submit":
@@ -251,22 +254,26 @@ class SoridormiLocalToolService:
                     mode=self.mode,
                     backend=self.backend,
                     emergency_stop=self.emergency_stop,
+                    safe_idle=body_safe_idle,
                     skill_registry=self.skill_registry,
                 )
             if tool_name == "soridormi.task.status":
                 return self.task_store.task_status(
                     args,
                     emergency_stop=self.emergency_stop,
+                    safe_idle=body_safe_idle,
                 )
             if tool_name == "soridormi.task.events":
                 return self.task_store.task_events(
                     args,
                     emergency_stop=self.emergency_stop,
+                    safe_idle=body_safe_idle,
                 )
             if tool_name == "soridormi.task.cancel":
                 return self.task_store.cancel_task(
                     args,
                     emergency_stop=self.emergency_stop,
+                    safe_idle=body_safe_idle,
                 )
             if tool_name == "soridormi.safety.monitor_motion":
                 return {

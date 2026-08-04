@@ -1,12 +1,12 @@
-# M3.7 ONNX policy log analysis
+# ONNX policy log analysis
 
-M3.6 added policy-specific runtime log topics:
+policy debug logging added policy-specific runtime log topics:
 
 - `/soridormi/policy_action`
 - `/soridormi/policy_debug`
 - `/soridormi/policy_observation_stats`
 
-M3.7 adds an analyzer that summarizes those topics and detects reset cycles from
+policy log analysis adds an analyzer that summarizes those topics and detects reset cycles from
 robot-time drops. This is meant to help diagnose repeated falls before tuning
 random gait parameters.
 

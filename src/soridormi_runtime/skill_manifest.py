@@ -80,10 +80,8 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
         errors.append("schema_version must be 1")
     if not manifest.get("robot"):
         errors.append("robot is required")
-    if not manifest.get("capability_profile") and not manifest.get("milestone"):
+    if not manifest.get("capability_profile"):
         errors.append("capability_profile is required")
-    if manifest.get("milestone") and not manifest.get("capability_profile"):
-        warnings.append("milestone is deprecated; use capability_profile")
 
     statuses = _as_set(manifest.get("status_vocab"))
     executions = _as_set(manifest.get("execution_vocab"))
@@ -108,9 +106,9 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
     elif defaults.get("hardware_enabled") is not False:
         errors.append("defaults.hardware_enabled must remain false for sim-first skill work")
 
-    phases = {phase.get("id") for phase in manifest.get("implementation_phases", []) if isinstance(phase, dict)}
-    if not phases:
-        errors.append("implementation_phases must declare at least one phase")
+    groups = {group.get("id") for group in manifest.get("capability_groups", []) if isinstance(group, dict)}
+    if not groups:
+        errors.append("capability_groups must declare at least one group")
 
     skills = manifest.get("skills")
     if not isinstance(skills, list) or not skills:
@@ -132,7 +130,7 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
             errors.append(f"duplicate skill id: {skill_id}")
         seen_ids.add(skill_id)
 
-        for field in ["category", "display_name", "description", "status", "execution", "implementation_phase"]:
+        for field in ["category", "display_name", "description", "status", "execution", "capability_group"]:
             if not skill.get(field):
                 errors.append(f"skill {skill_id}: {field} is required")
 
@@ -142,8 +140,8 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
             errors.append(f"skill {skill_id}: unknown status {status!r}")
         if execution not in executions:
             errors.append(f"skill {skill_id}: unknown execution {execution!r}")
-        if skill.get("implementation_phase") not in phases:
-            errors.append(f"skill {skill_id}: implementation_phase is not declared")
+        if skill.get("capability_group") not in groups:
+            errors.append(f"skill {skill_id}: capability_group is not declared")
 
         required_groups = _as_set(skill.get("required_actuator_groups"))
         unknown_groups = required_groups - all_groups
@@ -218,22 +216,22 @@ def summarize_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     skills = [skill for skill in manifest.get("skills", []) if isinstance(skill, dict)]
     by_category: dict[str, int] = {}
     by_status: dict[str, int] = {}
-    by_phase: dict[str, int] = {}
+    by_group: dict[str, int] = {}
     for skill in skills:
         by_category[str(skill.get("category", "unknown"))] = by_category.get(str(skill.get("category", "unknown")), 0) + 1
         by_status[str(skill.get("status", "unknown"))] = by_status.get(str(skill.get("status", "unknown")), 0) + 1
-        by_phase[str(skill.get("implementation_phase", "unknown"))] = by_phase.get(
-            str(skill.get("implementation_phase", "unknown")), 0
+        by_group[str(skill.get("capability_group", "unknown"))] = by_group.get(
+            str(skill.get("capability_group", "unknown")), 0
         ) + 1
     return {
         "robot": manifest.get("robot"),
-        "capability_profile": manifest.get("capability_profile") or manifest.get("milestone"),
+        "capability_profile": manifest.get("capability_profile"),
         "skill_count": len(skills),
         "available_sim_count": sum(1 for skill in skills if skill.get("status") in AVAILABLE_STATUSES),
         "unsupported_count": sum(1 for skill in skills if skill.get("status") in UNSUPPORTED_STATUSES),
         "by_category": dict(sorted(by_category.items())),
         "by_status": dict(sorted(by_status.items())),
-        "by_phase": dict(sorted(by_phase.items())),
+        "by_group": dict(sorted(by_group.items())),
     }
 
 

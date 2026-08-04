@@ -1,4 +1,4 @@
-# M4.0 policy observation compatibility settings.
+# first-walk integration policy observation compatibility settings.
 # Merge this into configs/robots/open_duck_mini_v2.yaml after inspecting it.
 # These values mirror Open Duck Mini v2's MuJoCo inference assumptions.
 

@@ -1,4 +1,4 @@
-# M2.7 default_pose tuning examples.
+# default pose tuning default_pose tuning examples.
 #
 # Do not include this file from the program directly. Copy one block into
 # configs/robots/open_duck_mini_v2.yaml under:
@@ -6,7 +6,7 @@
 #   default_pose:
 #     positions:
 #
-# Tune only default_pose during M2.7. Leave reset_pose unchanged.
+# Tune only default_pose during default pose tuning. Leave reset_pose unchanged.
 
 # Conservative pose
 default_pose_conservative:

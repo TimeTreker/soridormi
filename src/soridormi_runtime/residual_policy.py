@@ -69,7 +69,7 @@ def _action_array(values: Any, name: str) -> np.ndarray:
 class ResidualOnnxPolicy:
     """Teacher ONNX policy plus a learned residual ONNX correction.
 
-    This is the M6.19/M6.20 deployment form for residual fine-tuning. The
+    This is the residual policy training and deployment form for residual fine-tuning. The
     residual model keeps the same Soridormi model IO contract, but its output is
     interpreted as a bounded correction, not a full action:
 

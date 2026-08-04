@@ -190,11 +190,11 @@ RL reward and termination conditions must reference the same context fields used
 Use a staged policy input roadmap:
 
 ```text
-Stage 1: robot_state + continuous velocity command -> action_14d
-Stage 2: add skill_id, gait_style, stride, clearance context
-Stage 3: add terrain context such as flat/rough/slope/friction
-Stage 4: add obstacle context such as distance and height
-Stage 5: add bounded perception features or height-map embeddings
+Command-conditioned locomotion: robot_state + continuous velocity command -> action_14d
+Skill and gait context: add skill_id, gait_style, stride, and clearance context
+Terrain context: add flat, rough, slope, and friction context
+Obstacle context: add bounded distance and height context
+Bounded perception context: add validated features or height-map embeddings
 ```
 
 Each stage needs its own manifest/schema update, collector support, fixed eval suite, randomized eval suite, and acceptance gate before hardware exposure.

@@ -11,7 +11,8 @@ import yaml
 from soridormi_api import RobotState
 
 
-DEFAULT_ROBOT_CONFIG_PATH = Path("/app/configs/robots/open_duck_mini_v2.yaml")
+DEFAULT_ROBOT_CONFIG_PATH = Path("configs/robots/open_duck_mini_v2.yaml")
+CONTAINER_ROBOT_CONFIG_PATH = Path("/app/configs/robots/open_duck_mini_v2.yaml")
 
 
 def _env_float(name: str, default: float) -> float:
@@ -30,7 +31,11 @@ def _env_bool(name: str, default: bool) -> bool:
 
 def resolve_robot_config_path(path: str | os.PathLike[str] | None = None) -> Path:
     explicit = path or os.environ.get("SORIDORMI_ROBOT_CONFIG")
-    return Path(explicit) if explicit else DEFAULT_ROBOT_CONFIG_PATH
+    if explicit:
+        return Path(explicit)
+    if DEFAULT_ROBOT_CONFIG_PATH.exists():
+        return DEFAULT_ROBOT_CONFIG_PATH
+    return CONTAINER_ROBOT_CONFIG_PATH
 
 
 def load_default_pose_positions(

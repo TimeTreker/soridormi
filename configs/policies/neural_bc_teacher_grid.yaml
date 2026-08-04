@@ -1,5 +1,5 @@
 name: neural_bc_teacher_grid
-description: Neural behavior-cloning policy trained by Soridormi M6.12.
+description: Neural behavior-cloning policy trained by Soridormi neural behavior-cloning training.
 model:
   path: /data/training_pipelines/neural_bc_teacher_grid/neural_bc/neural_behavior_clone.onnx
   input_name: obs
@@ -64,7 +64,7 @@ metadata:
   format_version: 1
   policy_family: open_duck_mini_v2
   derived_from_profile: open_duck_forward
-  generated_by: soridormi_m5_profile_scaffold
+  generated_by: soridormi_policy_profile_scaffold
 contract:
   observation_size: 101
   action_size: 14

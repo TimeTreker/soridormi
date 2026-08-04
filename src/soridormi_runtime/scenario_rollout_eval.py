@@ -28,7 +28,7 @@ DEFAULT_PROFILE = "open_duck_forward"
 class ScenarioRolloutThresholds:
     """Acceptance thresholds for one MuJoCo scenario rollout report.
 
-    M9B treats the scenario manifest as the default source of truth and keeps
+    scenario acceptance thresholds treats the scenario manifest as the default source of truth and keeps
     the CLI flags as explicit overrides for local experiments.
     """
 
@@ -73,7 +73,7 @@ def thresholds_from_scenario_manifest(
 ) -> ScenarioRolloutThresholds:
     """Resolve scenario-specific rollout thresholds from manifest metadata.
 
-    The normalized M9B field is ``acceptance_thresholds``.  Older M8
+    The normalized scenario acceptance thresholds field is ``acceptance_thresholds``.  Older scenario and interaction layer
     ``success_metrics`` fields remain a compatibility fallback so historical
     manifests can still be evaluated.
     """
@@ -331,7 +331,7 @@ def build_scenario_run_plan(
     else:
         raise ScenarioCurriculumError(
             f"scenario {scenario.id!r} primary skill {skill_id!r} is not a locomotion policy skill "
-            "for M9A scenario rollout evaluation"
+            "for scenario rollout evaluation"
         )
 
     return ScenarioRunPlan(

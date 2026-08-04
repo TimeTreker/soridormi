@@ -1,7 +1,7 @@
-# Soridormi M8G scripted social acceptance gates
+# Soridormi scripted social acceptance gates
 
-M8G adds an acceptance layer for the head/neck-only scripted social skills that
-were promoted in M8E/M8F. The goal is to keep social behaviors inspectable before
+scripted social acceptance adds an acceptance layer for the head/neck-only scripted social skills that
+were promoted in scripted social skills/scripted social simulation. The goal is to keep social behaviors inspectable before
 more skills are promoted from `planned` to `available_sim_experimental`.
 
 The acceptance command has two modes:
@@ -101,14 +101,14 @@ The single-skill runner also prints the same live telemetry:
 
 ```bash
 PYTHONPATH=src pytest -q \
-  tests/test_scripted_social_acceptance_m8g.py \
-  tests/test_scripted_social_skill_m8e.py \
-  tests/test_skill_execution_m7c.py \
-  tests/test_skill_sim_execution_m7d.py \
-  tests/test_skill_manifest_m7.py \
-  tests/test_skill_manifest_cli_m7.py \
-  tests/test_scenario_curriculum_m8b.py \
-  tests/test_scenario_manifest_m8.py
+  tests/test_scripted_social_acceptance.py \
+  tests/test_scripted_social_skill.py \
+  tests/test_skill_execution.py \
+  tests/test_skill_sim_execution.py \
+  tests/test_skill_manifest.py \
+  tests/test_skill_manifest_cli.py \
+  tests/test_scenario_curriculum.py \
+  tests/test_scenario_manifest.py
 
 python -m compileall -q src tests
 bash -n scripts/run_scripted_social_skill_in_sim.sh
@@ -116,7 +116,7 @@ bash -n scripts/evaluate_scripted_social_skills.sh
 ```
 
 
-## M8H neutral-home gate
+## neutral-head skill neutral-home gate
 
 The acceptance suite now includes `neutral_head` because the social manifest uses it as the fallback for scripted head skills. In dry-run mode the gate verifies that the planned command remains at the neutral straight-ahead pose. In live MuJoCo mode it also reports base-height stability like the other social skills.
 
@@ -135,7 +135,7 @@ For live validation, start MuJoCo first with the `open_duck_forward` profile and
   --require-observed
 ```
 
-## M8I bow acceptance gate
+## bow skill bow acceptance gate
 
 The acceptance suite now includes `bow`. Dry-run acceptance verifies that `bow` commands a visible negative `head_pitch` range, allows only bounded `neck_pitch`/`head_pitch` motion, and keeps `head_yaw` and `head_roll` neutral. Live acceptance reuses the same base-height fall telemetry used for `nod_yes` and `shake_no`.
 
@@ -158,9 +158,9 @@ Live MuJoCo validation:
 ```
 
 
-## M8J express_attention gate
+## express-attention skill express_attention gate
 
-M8J adds `express_attention` to the default scripted social acceptance suite. The dry-run gate checks that the planned trajectory contains the subtle attention yaw cue for `style=curious` while keeping unsupported/non-moving axes bounded. Live MuJoCo mode can additionally require observed head motion and base-height stability:
+express-attention skill adds `express_attention` to the default scripted social acceptance suite. The dry-run gate checks that the planned trajectory contains the subtle attention yaw cue for `style=curious` while keeping unsupported/non-moving axes bounded. Live MuJoCo mode can additionally require observed head motion and base-height stability:
 
 ```bash
 ./scripts/evaluate_scripted_social_skills.sh \
@@ -170,9 +170,9 @@ M8J adds `express_attention` to the default scripted social acceptance suite. Th
   --require-observed
 ```
 
-## M8K look_at_person gate
+## look-at-person skill look_at_person gate
 
-M8K adds `look_at_person` to the default scripted social acceptance suite. The
+look-at-person skill adds `look_at_person` to the default scripted social acceptance suite. The
 gate validates the structured-target contract rather than perception: the plan
 must command visible yaw toward a provided `target_yaw_rad`, command bounded
 pitch from `target_pitch_rad`, keep non-moving axes neutral, and return to

@@ -13,7 +13,7 @@ optionally, validate a JSONL dataset against that contract.
 Options:
   --contract PATH       Contract JSON path (default: configs/training/open_duck_mini_v2_context_bc_contract_v1.json)
   --sample-jsonl PATH   Optional dataset JSONL to validate against the contract
-  --allow-legacy        Accept soridormi.policy_supervision.v1 samples for Stage 1 only
+  --allow-legacy        Accept soridormi.policy_supervision.v1 samples for the command-conditioned compatibility mode only
   --output PATH         Optional Markdown report path
   --json                Print machine-readable JSON to stdout
   -h, --help            Show this help

@@ -29,8 +29,8 @@ Options:
 
 Example:
   ./scripts/build_clearance_evidence_package.sh \
-    --profile-name context_stage1_three_scenario_10ep_e80 \
-    --output-dir artifacts/clearance_evidence/context_stage1_three_scenario_10ep_e80 \
+    --profile-name context_command_three_scenario_10ep_e80 \
+    --output-dir artifacts/clearance_evidence/context_command_three_scenario_10ep_e80 \
     --json
 USAGE
 }
@@ -40,4 +40,4 @@ if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   exit 0
 fi
 
-PYTHONPATH=src python -m soridormi_runtime.m10_evidence_package "$@"
+PYTHONPATH=src python -m soridormi_runtime.clearance_evidence_package "$@"

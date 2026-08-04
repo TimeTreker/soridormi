@@ -60,4 +60,3 @@ def test_step_phase_matches_official_advance_before_observation() -> None:
 
     assert abs(first[0]) < 1e-6
     assert math.isclose(first[1], 1.0, abs_tol=1e-6)
-

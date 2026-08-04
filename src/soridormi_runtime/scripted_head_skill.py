@@ -163,7 +163,7 @@ def target_positions_for_segment_step(
 ) -> dict[str, float]:
     """Return the command target for one step in a keyframe segment.
 
-    Earlier M8F code ramped for the entire keyframe duration. For a gesture
+    Earlier scripted social simulation code ramped for the entire keyframe duration. For a gesture
     like ``shake_no`` this means the command reached the left/right extreme
     only on the last step, then immediately reversed. The sim's position
     actuator often never visibly reached the yaw/pitch extreme. This helper

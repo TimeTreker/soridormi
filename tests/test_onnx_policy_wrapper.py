@@ -5,7 +5,7 @@ import numpy as np
 from soridormi_api import IMUState, JointState, RobotState
 from soridormi_runtime.observation_builder import ObservationBuilder, ObservationBuilderConfig
 from soridormi_runtime.onnx_policy import OnnxPolicy
-from soridormi_runtime.policy_input_features import INPUT_MODE_CONTEXT_STAGE1_COMMAND
+from soridormi_runtime.policy_input_features import INPUT_MODE_CONTEXT_COMMAND_V1
 
 
 JOINT_NAMES = [
@@ -129,8 +129,8 @@ def test_onnx_policy_describe_contains_metadata() -> None:
     assert info["joint_names"] == JOINT_NAMES
 
 
-def test_onnx_policy_stage1_context_mode_appends_velocity_command(monkeypatch) -> None:
-    monkeypatch.setenv("SORIDORMI_POLICY_INPUT_MODE", INPUT_MODE_CONTEXT_STAGE1_COMMAND)
+def test_onnx_policy_command_context_mode_appends_velocity_command(monkeypatch) -> None:
+    monkeypatch.setenv("SORIDORMI_POLICY_INPUT_MODE", INPUT_MODE_CONTEXT_COMMAND_V1)
     monkeypatch.setenv("SORIDORMI_POLICY_EXPECTED_INPUT_SHAPE", "1,104")
     builder = ObservationBuilder(
         ObservationBuilderConfig(
@@ -152,5 +152,5 @@ def test_onnx_policy_stage1_context_mode_appends_velocity_command(monkeypatch) -
     assert policy.get_observation() is not None
     assert len(policy.get_observation() or []) == 104
     info = policy.describe()
-    assert info["input_mode"] == INPUT_MODE_CONTEXT_STAGE1_COMMAND
+    assert info["input_mode"] == INPUT_MODE_CONTEXT_COMMAND_V1
     assert info["policy_input_size"] == 104

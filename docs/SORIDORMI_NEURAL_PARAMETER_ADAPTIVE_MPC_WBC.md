@@ -421,15 +421,15 @@ Every implementation stage should be evaluated with at least:
 - parameter smoothness and range-bound violations;
 - solver infeasibility/fallback count.
 
-For Soridormi's current M10 direction, the clearance gate remains critical:
+For Soridormi's current clearance qualification direction, the clearance gate remains critical:
 new controllers must not hide low swing-foot clearance behind aggregate pass
 metrics.
 
-Before using this WBC direction as the main development focus, close the M10
+Before using this WBC direction as the main development focus, close the clearance qualification
 engineering-process gate:
 
 ```bash
-./scripts/validate_m10_engineering_process.sh
+./scripts/validate_clearance_engineering_process.sh
 ```
 
 After that, WBC/model fine-tuning can focus on better clearance, startup/tail

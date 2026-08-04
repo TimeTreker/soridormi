@@ -1,9 +1,9 @@
-# Soridormi M8E scripted social skills
+# Soridormi scripted social skills
 
-M8E lands the first safe social skill for Open Duck Mini v2: `look_direction`.
-M8F expands the same safe path with `nod_yes` and `shake_no`. M8J adds `express_attention` as a subtle listening/attention cue. The visual-expression path adds `blink_eyes` as a simulator-only eye cue. M8F.1 fixes
+scripted social skills lands the first safe social skill for Open Duck Mini v2: `look_direction`.
+scripted social simulation expands the same safe path with `nod_yes` and `shake_no`. express-attention skill adds `express_attention` as a subtle listening/attention cue. The visual-expression path adds `blink_eyes` as a simulator-only eye cue. scripted social simulation.1 fixes
 those repeated gestures so they are visible two-cycle motions rather than tiny
-near-neutral keyframes. M8F.2 makes repeated social gestures strict neutral-home
+near-neutral keyframes. scripted social simulation.2 makes repeated social gestures strict neutral-home
 axis gestures: pre-center the head, move only the intended axis, then return to
 neutral. These skills are intentionally narrow, MuJoCo-first, and head/neck-only.
 They do not use arms, hands, speech, natural language, or hardware.
@@ -133,18 +133,18 @@ module path requires the project Python dependencies, including `pyzmq`.
 
 ```bash
 PYTHONPATH=src pytest -q \
-  tests/test_scripted_social_skill_m8e.py \
-  tests/test_skill_execution_m7c.py \
-  tests/test_skill_sim_execution_m7d.py \
-  tests/test_skill_manifest_m7.py \
-  tests/test_scenario_curriculum_m8b.py \
-  tests/test_scenario_manifest_m8.py
+  tests/test_scripted_social_skill.py \
+  tests/test_skill_execution.py \
+  tests/test_skill_sim_execution.py \
+  tests/test_skill_manifest.py \
+  tests/test_scenario_curriculum.py \
+  tests/test_scenario_manifest.py
 
 python -m compileall -q src tests
 bash -n scripts/run_scripted_social_skill_in_sim.sh
 ```
 
-## M8F visible gesture execution note
+## scripted social simulation visible gesture execution note
 
 For repeated gestures (`nod_yes`, `shake_no`), each keyframe target is now
 ramped only for the first part of the segment and then held. The default
@@ -160,7 +160,7 @@ that `head_pitch` has a negative and positive commanded range. If commanded
 ranges are correct but observed ranges remain near zero, the next thing to debug
 is actuator/joint mapping or simulator control response, not the skill plan.
 
-## M8F.2 neutral-home axis isolation
+## scripted social simulation.2 neutral-home axis isolation
 
 `shake_no` is now treated as a yaw-only gesture. During live execution the
 non-yaw head joints (`neck_pitch`, `head_pitch`, `head_roll`) are commanded
@@ -180,7 +180,7 @@ keyframe, two right/left cycles, and a neutral end keyframe. The commanded
   --control-hz 50
 ```
 
-## M8F.3 head pose trajectory and stability fix
+## scripted social simulation.3 head pose trajectory and stability fix
 
 Scripted social skills now follow a stricter execution model:
 
@@ -235,9 +235,9 @@ Commanded target head range:
 For debugging only, `--no-auto-stretch-duration` or
 `--max-head-velocity-radps 0.8` can restore the earlier debug speed, and `--max-head-velocity-radps 0` disables the limiter entirely. Those faster modes are not recommended for viewer validation.
 
-## M8G scripted social acceptance gates
+## Scripted social acceptance gates
 
-M8G adds `scripts/evaluate_scripted_social_skills.sh`, a Docker-wrapper command
+scripted social acceptance adds `scripts/evaluate_scripted_social_skills.sh`, a Docker-wrapper command
 that validates the scripted social skills before more behaviors are promoted.
 Dry-run mode checks the planned trajectory; live MuJoCo mode also reports
 observed head ranges and base-height fall telemetry.
@@ -260,7 +260,7 @@ observed head ranges and base-height fall telemetry.
 See `docs/SORIDORMI_SCRIPTED_SOCIAL_ACCEPTANCE.md` for the full gate definition.
 
 
-## M8H neutral head fallback
+## neutral-head skill neutral head fallback
 
 `neutral_head` is the explicit scripted fallback/home command for head/neck social skills. It plans a slow straight-ahead head pose trajectory and streams pose commands while preserving non-head actuator controls from the simulator. This keeps the fallback compatible with the stable MuJoCo posture controller instead of retargeting leg joints from transient qpos.
 
@@ -275,7 +275,7 @@ Example:
 
 `neutral_head` remains `available_sim_experimental` until it passes live acceptance gates together with `look_direction`, `nod_yes`, and `shake_no`.
 
-## M8I: gentle head/neck bow
+## bow skill: gentle head/neck bow
 
 `bow` is now available as a MuJoCo-only experimental scripted social skill. It is intentionally **head/neck only**: the planner does not command torso, hips, knees, ankles, arms, or hands. This keeps the gesture inside the same stable trajectory path used by `nod_yes`, `shake_no`, and `neutral_head`.
 
@@ -327,7 +327,7 @@ Second terminal:
 Use `neutral_head` as the fallback/home command if a bow test leaves the head in an unexpected pose.
 
 
-## M8J: express attention/listening cue
+## express-attention skill: express attention/listening cue
 
 `express_attention` is a subtle head-only social cue for “I am listening” or “I am paying attention.” It is intentionally not a perception skill: it does not track a person, consume camera input, or resolve a target. Higher-level layers can choose this skill when they want a body-language acknowledgement, while Soridormi only executes the bounded pose trajectory.
 
@@ -374,7 +374,7 @@ Acceptance gate:
   --require-observed
 ```
 
-## M8K look_at_person structured target skill
+## look-at-person skill look_at_person structured target skill
 
 `look_at_person` is now available as a MuJoCo-only experimental scripted social
 skill, but it intentionally does **not** run perception. A higher-level planner,
@@ -435,7 +435,7 @@ Second terminal:
   --control-hz 50
 ```
 
-## M8L look-target provider boundary
+## Look-target provider boundary
 
 `look_at_person` still does not run perception. Use
 `./scripts/run_look_at_person_target.sh` or

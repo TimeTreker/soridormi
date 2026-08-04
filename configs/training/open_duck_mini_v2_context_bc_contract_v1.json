@@ -1,5 +1,5 @@
 {
-  "schema_version": "m9.bc_training_contract.v1",
+  "schema_version": "soridormi.bc_training_contract.v1",
   "contract_id": "open_duck_mini_v2_context_bc_v1",
   "robot_profile": "open_duck_mini_v2",
   "status": "contract_ready",
@@ -15,7 +15,7 @@
   "dataset_rows": {
     "target_sample_type": "soridormi.policy_supervision.context_v1",
     "legacy_sample_type": "soridormi.policy_supervision.v1",
-    "legacy_allowed_for_stage_1": true,
+    "legacy_allowed_for_command_context": true,
     "required_context_fields": [
       "scenario_id",
       "skill_id",

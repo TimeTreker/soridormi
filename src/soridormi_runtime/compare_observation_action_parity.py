@@ -73,7 +73,7 @@ def _record_pairs(
     steps: int,
 ) -> list[tuple[TraceRecord, TraceRecord]]:
     # Compare by ordinal policy step. We intentionally do not match by robot_time,
-    # because M4.x debug is about reproducing the official policy-step loop.
+    # because official policy parity.x debug is about reproducing the official policy-step loop.
     return list(zip(official[:steps], soridormi[:steps]))
 
 

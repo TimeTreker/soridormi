@@ -11,8 +11,8 @@ from typing import Any, Iterable
 import numpy as np
 
 from soridormi_runtime.policy_input_features import (
-    CONTEXT_STAGE1_COMMAND_FIELDS,
-    INPUT_MODE_CONTEXT_STAGE1_COMMAND,
+    CONTEXT_COMMAND_V1_FIELDS,
+    INPUT_MODE_CONTEXT_COMMAND_V1,
     INPUT_MODE_OBSERVATION,
     INPUT_MODES,
     input_size_for,
@@ -157,12 +157,12 @@ def _policy_input_from_sample(
     if input_mode == INPUT_MODE_OBSERVATION:
         return observation, None
 
-    if input_mode == INPUT_MODE_CONTEXT_STAGE1_COMMAND:
+    if input_mode == INPUT_MODE_CONTEXT_COMMAND_V1:
         desired_command = sample.get("desired_command")
         if not isinstance(desired_command, dict):
-            return None, "desired_command must be an object for context_stage1_command input mode"
+            return None, "desired_command must be an object for context_command_v1 input mode"
         command_values: list[float] = []
-        for field_name in CONTEXT_STAGE1_COMMAND_FIELDS:
+        for field_name in CONTEXT_COMMAND_V1_FIELDS:
             value = desired_command.get(field_name)
             if not _is_finite_number(value):
                 return None, f"desired_command.{field_name} must be a finite number"

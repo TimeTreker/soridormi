@@ -1,6 +1,6 @@
 # ONNX Observation Mapping
 
-M3.1 adds a Soridormi observation builder for the Open Duck Mini v2 ONNX policy.
+observation builder adds a Soridormi observation builder for the Open Duck Mini v2 ONNX policy.
 
 The inspected policy expects:
 

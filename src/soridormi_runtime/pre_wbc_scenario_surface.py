@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from soridormi_runtime.m10_clearance_readiness import DEFAULT_REQUIRED_SCENARIOS
+from soridormi_runtime.clearance_readiness import DEFAULT_REQUIRED_SCENARIOS
 from soridormi_runtime.scenario_curriculum import (
     DEFAULT_SCENARIO_MANIFEST,
     get_scenario_definition,
@@ -27,7 +27,7 @@ class PreWbcScenarioSurfaceReport:
     status: str
     scenario_manifest: str
     wbc_contract: str
-    m10_core_scenarios: list[str]
+    clearance_core_scenarios: list[str]
     enrichment_scenarios: list[str]
     wbc_scenario_ids: list[str]
     default_suite_scenario_ids: list[str]
@@ -59,7 +59,7 @@ def _scenario_row(scenario_id: str, *, manifest_path: str | Path, run_plan: Mapp
     return {
         "scenario_id": scenario.id,
         "title": scenario.title,
-        "role": "m10_core" if scenario.id in DEFAULT_REQUIRED_SCENARIOS else "wbc_enrichment",
+        "role": "clearance_core" if scenario.id in DEFAULT_REQUIRED_SCENARIOS else "wbc_enrichment",
         "status": scenario.status,
         "family": scenario.family,
         "primary_skill": scenario.primary_skill,
@@ -129,12 +129,12 @@ def build_pre_wbc_scenario_surface_report(
         blockers.append("WBC contract does not declare scenario_ids")
     if wbc_scenario_ids[: len(core_scenarios)] != core_scenarios:
         blockers.append(
-            "WBC contract scenario_ids must start with the stable M10 core: "
+            "WBC contract scenario_ids must start with the stable clearance qualification core: "
             f"{core_scenarios}"
         )
     missing_core = [item for item in core_scenarios if item not in wbc_scenario_ids]
     if missing_core:
-        blockers.append(f"WBC contract is missing M10 core scenarios: {missing_core}")
+        blockers.append(f"WBC contract is missing clearance qualification core scenarios: {missing_core}")
     if len(enrichment_scenarios) < minimum_enrichment_count:
         blockers.append(
             "WBC contract must include at least "
@@ -186,7 +186,7 @@ def build_pre_wbc_scenario_surface_report(
         status=status,
         scenario_manifest=str(scenario_manifest),
         wbc_contract=str(contract_path),
-        m10_core_scenarios=core_scenarios,
+        clearance_core_scenarios=core_scenarios,
         enrichment_scenarios=enrichment_scenarios,
         wbc_scenario_ids=wbc_scenario_ids,
         default_suite_scenario_ids=default_suite_scenario_ids,
@@ -231,8 +231,8 @@ def render_markdown(report: PreWbcScenarioSurfaceReport) -> str:
                 clearance=_format_value(item.get("min_swing_clearance_m")),
             )
         )
-    lines.extend(["", "## M10 core", ""])
-    lines.extend(f"- `{item}`" for item in report.m10_core_scenarios)
+    lines.extend(["", "## clearance qualification core", ""])
+    lines.extend(f"- `{item}`" for item in report.clearance_core_scenarios)
     lines.extend(["", "## Pre-WBC enrichment", ""])
     lines.extend(f"- `{item}`" for item in report.enrichment_scenarios) if report.enrichment_scenarios else lines.append("- none")
     lines.extend(["", "## Blockers", ""])

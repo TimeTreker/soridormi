@@ -1,10 +1,10 @@
 # Soridormi context BC dataset prepare
 
-M9G prepares exported context-conditioned BC rows into train/val/test JSONL files.
+context dataset preparation prepares exported context-conditioned BC rows into train/val/test JSONL files.
 It is an offline dataset step only: it does not change training code, simulator
 control, or hardware behavior.
 
-The input rows should already satisfy the M9E context contract:
+The input rows should already satisfy the behavior-cloning training contract context contract:
 
 ```text
 robot_state + desired_command + task_context + environment_context + short_history -> action_14d
@@ -14,7 +14,7 @@ robot_state + desired_command + task_context + environment_context + short_histo
 
 Walking datasets contain highly correlated adjacent timesteps. A sample-level
 random split can place timestep `N` in train and timestep `N+1` in validation,
-which makes validation look better than true closed-loop generalization. M9G
+which makes validation look better than true closed-loop generalization. context dataset preparation
 therefore defaults to grouping by `rollout_id`. All rows from one rollout stay in
 the same split.
 
@@ -92,13 +92,13 @@ Then run the scenario gate against the prepared manifest:
 ## Validation template
 
 ```bash
-git apply --check ~/Downloads/soridormi_m9g_context_bc_dataset_prepare.patch
-git apply ~/Downloads/soridormi_m9g_context_bc_dataset_prepare.patch
+git apply --check ~/Downloads/soridormi_context_dataset_prepare.patch
+git apply ~/Downloads/soridormi_context_dataset_prepare.patch
 
 PYTHONPATH=src pytest -q \
-  tests/test_context_bc_dataset_prepare_m9g.py \
-  tests/test_context_bc_dataset_export_m9f.py \
-  tests/test_bc_training_contract_m9e.py
+  tests/test_context_bc_dataset_prepare.py \
+  tests/test_context_bc_dataset_export.py \
+  tests/test_bc_training_contract.py
 
 python -m compileall -q src tests
 bash -n scripts/prepare_context_bc_dataset.sh scripts/export_context_bc_dataset.sh
@@ -107,7 +107,7 @@ bash -n scripts/prepare_context_bc_dataset.sh scripts/export_context_bc_dataset.
 
 ## Final prepared dataset gate
 
-After preparing train/val/test splits, run the M9H prepared dataset gate before BC training:
+After preparing train/val/test splits, run the prepared context dataset gate prepared dataset gate before BC training:
 
 ```bash
 ./scripts/gate_context_bc_prepared_dataset.sh \

@@ -73,7 +73,7 @@
       "actuators": []
     }
   },
-  "implementation_phases": [
+  "capability_groups": [
     {
       "id": "skill_manifest",
       "goal": "Declare full skill universe and validate manifest."
@@ -119,7 +119,7 @@
       "description": "Hold a stable standing posture with zero velocity command.",
       "status": "available_sim",
       "execution": "policy_velocity",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {},
       "preconditions": [
         "not_fallen",
@@ -152,7 +152,7 @@
       "description": "Cancel active locomotion and command zero velocity.",
       "status": "available_sim",
       "execution": "policy_velocity",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {},
       "preconditions": [
         "not_emergency_stopped"
@@ -183,7 +183,7 @@
       "description": "Track a bounded body velocity command vx, vy, and yaw.",
       "status": "available_sim",
       "execution": "policy_velocity",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {
         "vx_mps": {
           "min": -0.03,
@@ -239,7 +239,7 @@
       "description": "Human-facing wrapper for natural requests like walk forward, walk slowly, and walk quickly. The speed label is lowered to a bounded positive vx command.",
       "status": "available_sim",
       "execution": "skill_wrapper",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {
         "speed": {
           "type": "string",
@@ -296,7 +296,7 @@
       "description": "Human-facing wrapper for walk_velocity with small negative vx.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {
         "speed": {
           "enum": [
@@ -341,7 +341,7 @@
       "description": "Rotate left or right with near-zero forward velocity.",
       "status": "available_sim",
       "execution": "policy_velocity",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {
         "yaw_radps": {
           "min": -0.2,
@@ -386,7 +386,7 @@
       "description": "Human-facing wrapper for positive-yaw turn_in_place.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {
         "angle_deg": {
           "min": 5,
@@ -432,7 +432,7 @@
       "description": "Human-facing wrapper for negative-yaw turn_in_place.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {
         "angle_deg": {
           "min": 5,
@@ -478,7 +478,7 @@
       "description": "Walk forward while tracking a yaw command.",
       "status": "available_sim",
       "execution": "policy_velocity",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {
         "vx_mps": {
           "min": 0.03,
@@ -528,7 +528,7 @@
       "description": "Human-facing wrapper for forward walk with positive yaw.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {
         "radius": {
           "enum": [
@@ -573,7 +573,7 @@
       "description": "Human-facing wrapper for forward walk with negative yaw.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {
         "radius": {
           "enum": [
@@ -618,7 +618,7 @@
       "description": "Track a small lateral velocity command.",
       "status": "available_sim_experimental",
       "execution": "policy_velocity",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {
         "vy_mps": {
           "min": -0.03,
@@ -662,7 +662,7 @@
       "description": "Human-facing wrapper for positive lateral sidestep.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {
         "distance_m": {
           "min": 0.02,
@@ -699,7 +699,7 @@
       "description": "Human-facing wrapper for negative lateral sidestep.",
       "status": "planned_wrapper",
       "execution": "skill_wrapper",
-      "implementation_phase": "locomotion_wrappers",
+      "capability_group": "locomotion_wrappers",
       "parameters": {
         "distance_m": {
           "min": 0.02,
@@ -736,7 +736,7 @@
       "description": "Follow a short body-frame trajectory composed of velocity or waypoint segments.",
       "status": "future_evaluation",
       "execution": "trajectory_policy",
-      "implementation_phase": "obstacle_and_terrain",
+      "capability_group": "obstacle_and_terrain",
       "parameters": {
         "max_duration_s": {
           "min": 1.0,
@@ -778,7 +778,7 @@
       "description": "Move toward a resolved world target by sensing, localizing, routing, planning short local trajectory segments, and executing only bounded locomotion skills. This skill must refuse raw natural-language goals such as 'the house' until a trusted target resolver supplies structured target and route data.",
       "status": "future_perception",
       "execution": "navigation_pipeline",
-      "implementation_phase": "navigation_goal_pipeline",
+      "capability_group": "navigation_goal_pipeline",
       "parameters": {
         "target_ref": {
           "type": "string"
@@ -840,7 +840,7 @@
       "description": "Track trajectory while lifting swing foot to clear a detected or specified obstacle.",
       "status": "future_residual_rl",
       "execution": "residual_policy",
-      "implementation_phase": "obstacle_and_terrain",
+      "capability_group": "obstacle_and_terrain",
       "parameters": {
         "obstacle_height_m": {
           "min": 0.005,
@@ -887,7 +887,7 @@
       "description": "Maintain trajectory progress on low rough terrain.",
       "status": "future_residual_rl",
       "execution": "residual_policy",
-      "implementation_phase": "obstacle_and_terrain",
+      "capability_group": "obstacle_and_terrain",
       "parameters": {
         "max_stone_height_m": {
           "min": 0.005,
@@ -927,7 +927,7 @@
       "description": "Fast locomotion beyond current walking envelope.",
       "status": "future",
       "execution": "future_policy",
-      "implementation_phase": "fast_locomotion",
+      "capability_group": "fast_locomotion",
       "parameters": {
         "vx_mps": {
           "min": 0.25,
@@ -966,7 +966,7 @@
       "description": "Transition from stable standing to sitting/rest pose.",
       "status": "future_pose_teacher",
       "execution": "pose_transition",
-      "implementation_phase": "posture_transitions",
+      "capability_group": "posture_transitions",
       "parameters": {
         "duration_s": {
           "min": 0.5,
@@ -1006,7 +1006,7 @@
       "description": "Transition from sitting/rest pose to stable standing.",
       "status": "future_pose_teacher",
       "execution": "pose_transition",
-      "implementation_phase": "posture_transitions",
+      "capability_group": "posture_transitions",
       "parameters": {
         "duration_s": {
           "min": 0.5,
@@ -1046,7 +1046,7 @@
       "description": "Lower the body height while maintaining balance.",
       "status": "future_pose_teacher",
       "execution": "pose_transition",
-      "implementation_phase": "posture_transitions",
+      "capability_group": "posture_transitions",
       "parameters": {
         "duration_s": {
           "min": 0.5,
@@ -1086,7 +1086,7 @@
       "description": "Recover from a safe fallen/crouched pose to standing.",
       "status": "future_pose_teacher",
       "execution": "pose_transition",
-      "implementation_phase": "posture_transitions",
+      "capability_group": "posture_transitions",
       "parameters": {
         "duration_s": {
           "min": 0.5,
@@ -1126,7 +1126,7 @@
       "description": "Small corrective recovery after disturbance without a full fall.",
       "status": "future_pose_teacher",
       "execution": "pose_transition",
-      "implementation_phase": "posture_transitions",
+      "capability_group": "posture_transitions",
       "parameters": {
         "duration_s": {
           "min": 0.5,
@@ -1166,7 +1166,7 @@
       "description": "Slowly return supported head/neck joints to the neutral straight-ahead pose using a scripted MuJoCo trajectory.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "head_social",
+      "capability_group": "head_social",
       "parameters": {
         "duration_s": {
           "min": 1.0,
@@ -1204,7 +1204,7 @@
       "description": "Turn head/neck toward a specified yaw/pitch direction using a scripted MuJoCo keyframe plan.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "head_social",
+      "capability_group": "head_social",
       "parameters": {
         "head_yaw_rad": {
           "min": -0.6,
@@ -1250,7 +1250,7 @@
       "description": "Turn head toward a structured person target direction provided by an external planner/perception layer and, by default, hold gaze on that target. Soridormi does not run perception here; it only executes bounded yaw/pitch offsets.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "head_social",
+      "capability_group": "head_social",
       "parameters": {
         "target_yaw_rad": {
           "min": -0.55,
@@ -1263,8 +1263,7 @@
           "default": 0.0
         },
         "target_ref": {
-          "type": "string",
-          "default": "person"
+          "type": "string"
         },
         "duration_s": {
           "min": 2.0,
@@ -1317,7 +1316,7 @@
       "description": "Continuously track a person with head/neck while body remains safe.",
       "status": "future_perception",
       "execution": "scripted_tracking",
-      "implementation_phase": "head_social",
+      "capability_group": "head_social",
       "parameters": {
         "max_duration_s": {
           "min": 1.0,
@@ -1355,7 +1354,7 @@
       "description": "Blink the simulated social eyes by toggling Soridormi visual-expression geoms. This is simulator-only and does not add motors or policy actions.",
       "status": "available_sim_experimental",
       "execution": "visual_expression",
-      "implementation_phase": "head_social",
+      "capability_group": "head_social",
       "parameters": {
         "count": {
           "min": 1,
@@ -1406,7 +1405,7 @@
       "description": "Visible repeated bounded head pitch motion for yes/acknowledgement using scripted MuJoCo keyframes.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "head_social",
+      "capability_group": "head_social",
       "parameters": {
         "count": {
           "min": 2,
@@ -1455,7 +1454,7 @@
       "description": "Visible repeated bounded head yaw motion for no/decline using scripted MuJoCo keyframes.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "head_social",
+      "capability_group": "head_social",
       "parameters": {
         "count": {
           "min": 2,
@@ -1504,7 +1503,7 @@
       "description": "Gentle head/neck-only bow gesture using a neutral-home scripted MuJoCo trajectory. No torso or leg bow is attempted.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "head_social",
+      "capability_group": "head_social",
       "parameters": {
         "depth": {
           "enum": [
@@ -1554,7 +1553,7 @@
       "description": "Composite social behavior for greeting a person.",
       "status": "future_composite",
       "execution": "composite",
-      "implementation_phase": "head_social",
+      "capability_group": "head_social",
       "parameters": {},
       "preconditions": [
         "not_fallen"
@@ -1590,7 +1589,7 @@
       "description": "Small head-only attention/listening gesture using a bounded neutral-home MuJoCo trajectory.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
-      "implementation_phase": "head_social",
+      "capability_group": "head_social",
       "parameters": {
         "style": {
           "type": "string",
@@ -1641,7 +1640,7 @@
       "description": "Arm/hand wave greeting. Current Open Duck Mini v2 actuator map has no arm/hand actuators, so this is a future hardware-extension skill.",
       "status": "unsupported_current_robot",
       "execution": "future_hardware_extension",
-      "implementation_phase": "future_hardware_extensions",
+      "capability_group": "future_hardware_extensions",
       "parameters": {},
       "preconditions": [
         "future_arm_actuators_available"
@@ -1671,7 +1670,7 @@
       "description": "Point toward an object or direction. Requires arm/hand hardware not present in the current actuator map.",
       "status": "unsupported_current_robot",
       "execution": "future_hardware_extension",
-      "implementation_phase": "future_hardware_extensions",
+      "capability_group": "future_hardware_extensions",
       "parameters": {},
       "preconditions": [
         "future_arm_actuators_available"
@@ -1701,7 +1700,7 @@
       "description": "Interactive arm/hand contact gesture. Requires future arm/hand hardware and contact safety.",
       "status": "unsupported_current_robot",
       "execution": "future_hardware_extension",
-      "implementation_phase": "future_hardware_extensions",
+      "capability_group": "future_hardware_extensions",
       "parameters": {},
       "preconditions": [
         "future_arm_actuators_available"

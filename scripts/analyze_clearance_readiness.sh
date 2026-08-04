@@ -30,8 +30,8 @@ Options:
 
 Example:
   ./scripts/analyze_clearance_readiness.sh \
-    --profile-name context_stage1_three_scenario_10ep_e80 \
-    --output-dir artifacts/clearance_readiness/context_stage1_three_scenario_10ep_e80
+    --profile-name context_command_three_scenario_10ep_e80 \
+    --output-dir artifacts/clearance_readiness/context_command_three_scenario_10ep_e80
 USAGE
 }
 
@@ -40,4 +40,4 @@ if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   exit 0
 fi
 
-PYTHONPATH=src python -m soridormi_runtime.m10_clearance_readiness "$@"
+PYTHONPATH=src python -m soridormi_runtime.clearance_readiness "$@"

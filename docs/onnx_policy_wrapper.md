@@ -1,10 +1,10 @@
-# M3.2 ONNX Policy Wrapper
+# Persistent ONNX policy wrapper
 
-M3.2 adds a persistent ONNX Runtime policy wrapper.
+persistent ONNX policy wrapper adds a persistent ONNX Runtime policy wrapper.
 
 The wrapper loads the ONNX session once, owns an `ObservationBuilder`, keeps action history, and returns a 14-dimensional action vector for each `RobotState`.
 
-It does **not** convert actions to motor commands yet. That happens in M3.3.
+It does **not** convert actions to motor commands yet. That happens in action-to-motor-command mapping.
 
 ## Probe
 

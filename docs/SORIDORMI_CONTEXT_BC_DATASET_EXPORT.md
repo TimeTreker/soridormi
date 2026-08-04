@@ -1,7 +1,7 @@
 # Soridormi context BC dataset export
 
-M9F adds the first adapter from collected teacher rows into the context-conditioned
-BC contract introduced by M9E.
+context dataset export adds the first adapter from collected teacher rows into the context-conditioned
+BC contract introduced by behavior-cloning training contract.
 
 The target row type is:
 
@@ -51,7 +51,7 @@ Continue only when the collection JSON reports `ok: true` and a positive
   --json | python -m json.tool
 ```
 
-Then validate the exported rows against the M9E contract:
+Then validate the exported rows against the behavior-cloning training contract:
 
 ```bash
 ./scripts/validate_bc_training_contract.sh \

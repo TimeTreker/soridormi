@@ -212,11 +212,20 @@ def reject_low_level_fields(value: Any, *, path: str = "$") -> None:
             reject_low_level_fields(nested, path=f"{path}[{index}]")
 
 
+def _effective_safe_idle(*, emergency_stop: bool, safe_idle: bool | None) -> bool:
+    if emergency_stop:
+        return False
+    if safe_idle is None:
+        return True
+    return bool(safe_idle)
+
+
 def task_capabilities_payload(
     *,
     mode: str,
     backend: str,
     emergency_stop: bool,
+    safe_idle: bool | None = None,
     skill_registry: SkillExecutionRegistry | None = None,
 ) -> dict[str, Any]:
     executable_skill_ids = (
@@ -272,12 +281,11 @@ def task_capabilities_payload(
         "mode": mode,
         "backend": backend,
         "emergency_stop": emergency_stop,
-        "safe_idle": not emergency_stop,
-        "readiness_profile": str(
-            _TASK_CAPABILITY_MANIFEST.get("readiness_profile")
-            or _TASK_CAPABILITY_MANIFEST.get("milestone")
-            or ""
+        "safe_idle": _effective_safe_idle(
+            emergency_stop=emergency_stop,
+            safe_idle=safe_idle,
         ),
+        "readiness_profile": str(_TASK_CAPABILITY_MANIFEST["readiness_profile"]),
         "task_api_no_motion": bool(_TASK_CAPABILITY_MANIFEST["task_api_no_motion"]),
         "physical_execution_note": str(_TASK_CAPABILITY_MANIFEST["physical_execution_note"]),
         "ready_subsystems": list(TASK_READY_SUBSYSTEMS),
@@ -415,7 +423,18 @@ def _skill_request_for_task(record: EmbodiedTaskRecord) -> tuple[str, dict[str, 
             "end_mode",
         )
         if "target_ref" not in skill_parameters:
-            skill_parameters["target_ref"] = str(parameters.get("target_label") or "person")
+            target_label = str(parameters.get("target_label") or "").strip()
+            if not target_label:
+                raise ValueError(
+                    "look_at_target requires target_ref or target_label; "
+                    "Soridormi must not invent a target"
+                )
+            skill_parameters["target_ref"] = target_label
+        if "target_yaw_rad" not in skill_parameters and "target_pitch_rad" not in skill_parameters:
+            raise ValueError(
+                "look_at_target requires target_yaw_rad or target_pitch_rad; "
+                "Soridormi must not invent a body direction"
+            )
         return "look_at_person", skill_parameters
     if record.task_type == "perform_gesture":
         skill_id = _gesture_skill_id(parameters)
@@ -1121,8 +1140,13 @@ class EmbodiedTaskStore:
         mode: str,
         backend: str,
         emergency_stop: bool,
+        safe_idle: bool | None = None,
         skill_registry: SkillExecutionRegistry | None = None,
     ) -> dict[str, Any]:
+        body_safe_idle = _effective_safe_idle(
+            emergency_stop=emergency_stop,
+            safe_idle=safe_idle,
+        )
         reject_low_level_fields(args)
         client_ref = _client_task_ref(args)
         request_fingerprint = _task_request_fingerprint(args)
@@ -1134,7 +1158,7 @@ class EmbodiedTaskStore:
                 )
             self._expire_if_timed_out(existing)
             return existing.status_payload(
-                safe_idle=not emergency_stop,
+                safe_idle=body_safe_idle,
                 idempotent_replay=True,
             )
         record = self._record_from_args(
@@ -1145,11 +1169,15 @@ class EmbodiedTaskStore:
             id_prefix="soridormi-task",
             field_context="task submit",
         )
-        self._apply_initial_lifecycle(record, skill_registry=skill_registry)
+        self._apply_initial_lifecycle(
+            record,
+            skill_registry=skill_registry,
+            safe_idle=body_safe_idle,
+        )
         self.tasks[record.task_id] = record
         if record.client_task_ref is not None:
             self.client_task_refs[record.client_task_ref] = record.task_id
-        return record.status_payload(safe_idle=not emergency_stop)
+        return record.status_payload(safe_idle=body_safe_idle)
 
     def preview_task(
         self,
@@ -1158,8 +1186,13 @@ class EmbodiedTaskStore:
         mode: str,
         backend: str,
         emergency_stop: bool,
+        safe_idle: bool | None = None,
         skill_registry: SkillExecutionRegistry | None = None,
     ) -> dict[str, Any]:
+        body_safe_idle = _effective_safe_idle(
+            emergency_stop=emergency_stop,
+            safe_idle=safe_idle,
+        )
         record = self._record_from_args(
             args,
             mode=mode,
@@ -1168,8 +1201,12 @@ class EmbodiedTaskStore:
             id_prefix="soridormi-preview",
             field_context="task preview",
         )
-        self._apply_initial_lifecycle(record, skill_registry=skill_registry)
-        return record.preview_payload(safe_idle=not emergency_stop)
+        self._apply_initial_lifecycle(
+            record,
+            skill_registry=skill_registry,
+            safe_idle=body_safe_idle,
+        )
+        return record.preview_payload(safe_idle=body_safe_idle)
 
     @staticmethod
     def _record_from_args(
@@ -1236,20 +1273,42 @@ class EmbodiedTaskStore:
         record: EmbodiedTaskRecord,
         *,
         skill_registry: SkillExecutionRegistry | None,
+        safe_idle: bool,
     ) -> None:
         if record.accepted:
             record.append_event("task_accepted")
-            EmbodiedTaskStore._prime_lifecycle(record, skill_registry=skill_registry)
+            EmbodiedTaskStore._prime_lifecycle(
+                record,
+                skill_registry=skill_registry,
+                safe_idle=safe_idle,
+            )
         else:
             EmbodiedTaskStore._populate_refusal_plan(record)
             record.append_event("task_refused", message=record.reason)
 
-    def task_status(self, args: dict[str, Any], *, emergency_stop: bool) -> dict[str, Any]:
+    def task_status(
+        self,
+        args: dict[str, Any],
+        *,
+        emergency_stop: bool,
+        safe_idle: bool | None = None,
+    ) -> dict[str, Any]:
         record = self._record_for_lookup(args)
         self._expire_if_timed_out(record)
-        return record.status_payload(safe_idle=not emergency_stop)
+        return record.status_payload(
+            safe_idle=_effective_safe_idle(
+                emergency_stop=emergency_stop,
+                safe_idle=safe_idle,
+            )
+        )
 
-    def task_events(self, args: dict[str, Any], *, emergency_stop: bool) -> dict[str, Any]:
+    def task_events(
+        self,
+        args: dict[str, Any],
+        *,
+        emergency_stop: bool,
+        safe_idle: bool | None = None,
+    ) -> dict[str, Any]:
         record = self._record_for_lookup(args)
         after_sequence = int(args.get("after_sequence", 0) or 0)
         if after_sequence < 0:
@@ -1266,7 +1325,10 @@ class EmbodiedTaskStore:
             "status": record.status,
             "phase": record.phase,
             "terminal": record.terminal,
-            "safe_idle": not emergency_stop,
+            "safe_idle": _effective_safe_idle(
+                emergency_stop=emergency_stop,
+                safe_idle=safe_idle,
+            ),
             "deadline_at": record.deadline_at,
             "expired": record.expired,
             "timeout_elapsed_s": record.timeout_elapsed_s,
@@ -1286,7 +1348,12 @@ class EmbodiedTaskStore:
         args: dict[str, Any],
         *,
         emergency_stop: bool,
+        safe_idle: bool | None = None,
     ) -> dict[str, Any]:
+        body_safe_idle = _effective_safe_idle(
+            emergency_stop=emergency_stop,
+            safe_idle=safe_idle,
+        )
         record = self._record_for_lookup(args)
         self._expire_if_timed_out(record)
         if record.status in TERMINAL_STATUSES or record.terminal:
@@ -1297,7 +1364,7 @@ class EmbodiedTaskStore:
                 "status": record.status,
                 "phase": record.phase,
                 "terminal": record.terminal,
-                "safe_idle": not emergency_stop,
+                "safe_idle": body_safe_idle,
                 "reason_code": record.reason_code,
             }
         reason = str(args.get("reason") or "Task cancelled by caller.")
@@ -1315,7 +1382,7 @@ class EmbodiedTaskStore:
             "status": record.status,
             "phase": record.phase,
             "terminal": record.terminal,
-            "safe_idle": not emergency_stop,
+            "safe_idle": body_safe_idle,
             "reason_code": record.reason_code,
         }
 
@@ -1378,6 +1445,7 @@ class EmbodiedTaskStore:
         record: EmbodiedTaskRecord,
         *,
         skill_registry: SkillExecutionRegistry | None,
+        safe_idle: bool,
     ) -> None:
         record.transition_to(
             "resolving",
@@ -1391,11 +1459,23 @@ class EmbodiedTaskStore:
         )
         record.plan_steps = _contract_only_plan_steps(record)
         if record.task_type in SAFE_IDLE_TASK_TYPES:
-            record.transition_to(
-                "completed",
-                event_type="task_completed",
-                message="Robot is already in a contract-level safe-idle state; no motion was sent.",
-            )
+            if safe_idle:
+                record.transition_to(
+                    "completed",
+                    event_type="task_completed",
+                    message="Live body state confirms safe idle; no motion was sent.",
+                )
+            else:
+                record.transition_to(
+                    "failed",
+                    event_type="task_failed",
+                    reason_code="robot_not_safe_idle",
+                    reason=(
+                        "Live body state does not confirm safe idle; "
+                        "Soridormi will not manufacture a safe-idle result."
+                    ),
+                    accepted=False,
+                )
             return
         if record.task_type in SKILL_BACKED_TASK_TYPES and skill_registry is not None:
             EmbodiedTaskStore._complete_skill_dry_run(record, skill_registry)

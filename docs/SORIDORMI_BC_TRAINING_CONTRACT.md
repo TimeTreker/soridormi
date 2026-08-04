@@ -1,6 +1,6 @@
 # Soridormi BC training contract
 
-M9E adds a versioned behavior-cloning contract before changing the learner
+behavior-cloning training contract adds a versioned behavior-cloning contract before changing the learner
 architecture. The goal is to keep the low-level Soridormi policy structured and
 bounded:
 
@@ -21,7 +21,7 @@ work must satisfy.
 ## Why this exists
 
 Earlier datasets can still use `soridormi.policy_supervision.v1`, where the
-learner consumes an observation vector and 14D action. That is useful for Stage 1
+learner consumes an observation vector and 14D action. That is useful for the command-conditioned baseline
 walking BC, but it hides important context in scripts and filenames. New
 context-conditioned rows should use:
 
@@ -66,7 +66,7 @@ Validate a context JSONL dataset:
   --json | python -m json.tool
 ```
 
-Legacy Stage 1 validation is explicit:
+Legacy command-conditioned validation is explicit:
 
 ```bash
 ./scripts/validate_bc_training_contract.sh \
@@ -74,7 +74,7 @@ Legacy Stage 1 validation is explicit:
   --allow-legacy
 ```
 
-`--allow-legacy` is only a preflight bridge for Stage 1. Stage 2+ work should
+`--allow-legacy` is only a compatibility bridge for the command-conditioned input. Richer context work should
 require context rows with `task_context`, `environment_context`, and scenario
 metadata.
 
@@ -98,16 +98,16 @@ Before a stage is used for training, run:
 This keeps BC data variation and scenario coverage central before policy
 architecture changes.
 
-## Stage 1 offline training mode
+## Command-conditioned offline training mode
 
 The linear and neural BC trainers keep the legacy 101D observation input by
-default. For Stage 1 context-conditioned experiments, use the explicit input
+default. For command-conditioned context experiments, use the explicit input
 mode:
 
 ```bash
 ./scripts/train_behavior_clone.sh \
   /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1/prepared_manifest.json \
-  --input-mode context_stage1_command
+  --input-mode context_command_v1
 ```
 
 This trains on a 104D feature vector:
@@ -117,7 +117,7 @@ robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps)
 ```
 
 The default normalization artifact for this mode is
-`normalization.context_stage1_command.json`, so it does not overwrite the
+`normalization.context_command_v1.json`, so it does not overwrite the
 legacy 101D `normalization.json`.
 
 For neural smoke runs without runtime artifacts:
@@ -125,17 +125,17 @@ For neural smoke runs without runtime artifacts:
 ```bash
 ./scripts/train_neural_behavior_clone.sh \
   /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1/prepared_manifest.json \
-  --input-mode context_stage1_command \
+  --input-mode context_command_v1 \
   --skip-onnx \
   --no-profile
 ```
 
-## Runtime Stage 1 context input
+## Runtime command-conditioned context input
 
-M10 adds the matching runtime/profile input mode:
+clearance qualification adds the matching runtime/profile input mode:
 
 ```text
-context_stage1_command
+context_command_v1
 ```
 
 This runtime mode appends the first three policy command values to the 101D
@@ -149,21 +149,21 @@ A runnable context policy profile must declare both:
 
 ```yaml
 contract:
-  input_mode: context_stage1_command
+  input_mode: context_command_v1
   policy_input_size: 104
 model:
   input_shape: [1, 104]
-  input_mode: context_stage1_command
+  input_mode: context_command_v1
 ```
 
-After M10 profile plumbing, neural context-mode training can export an ONNX
+After clearance qualification profile plumbing, neural context-mode training can export an ONNX
 model and generate this profile metadata:
 
 ```bash
 ./scripts/train_neural_behavior_clone.sh \
   /data/training_datasets/context_bc/prepared/flat_walk_varied_speed_v1/prepared_manifest.json \
-  --input-mode context_stage1_command \
-  --profile-name context_stage1_candidate \
+  --input-mode context_command_v1 \
+  --profile-name context_command_candidate \
   --force-profile
 ```
 

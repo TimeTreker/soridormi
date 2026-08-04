@@ -48,13 +48,13 @@ class MapperLike(Protocol):
 class OnnxPolicyController:
     """Experimental ONNX policy runtime controller.
 
-    M3.5 adds the dynamic pieces required by the Open Duck policy observation:
+    command, gait-phase, and speed limits adds the dynamic pieces required by the Open Duck policy observation:
       - 7D command vector from environment variables
       - gait/imitation phase oscillator
       - action-to-motor speed limiting via PolicyActionMapper
       - motor target feedback into the next observation
 
-    M3.6 adds policy debug payloads for MCAP/JSONL logging.
+    policy debug logging adds policy debug payloads for MCAP/JSONL logging.
 
     It is intentionally explicit and opt-in. Enable it only with:
 
@@ -135,7 +135,7 @@ class OnnxPolicyController:
         try:
             command = self.mapper.action_to_command(action, state=state, dt=self.dt)
         except TypeError as exc:
-            # Compatibility for tests or custom mappers written before M3.5,
+            # Compatibility for tests or custom mappers written before command, gait-phase, and speed limits,
             # where action_to_command(action, state=state) did not accept dt.
             if "unexpected keyword argument 'dt'" not in str(exc):
                 raise

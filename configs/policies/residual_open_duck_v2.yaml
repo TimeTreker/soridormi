@@ -65,7 +65,7 @@ metadata:
   format_version: 1
   policy_family: open_duck_mini_v2
   derived_from_profile: open_duck_forward
-  generated_by: soridormi_m619_residual_rl
+  generated_by: soridormi_residual_policy_training
 contract:
   observation_size: 101
   action_size: 14

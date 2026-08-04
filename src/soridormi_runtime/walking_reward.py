@@ -17,8 +17,8 @@ _EPS = 1e-9
 class WalkingRewardConfig:
     """Walking-quality reward for residual policy fine-tuning.
 
-    The reward is intentionally decomposed and inspectable. M6.18 is the reward
-    backbone; M6.19 can tune these weights once the residual trainer exists.
+    The reward is intentionally decomposed and inspectable. walking-quality reward is the reward
+    backbone; residual policy training can tune these weights once the residual trainer exists.
     """
 
     alive_bonus: float = 0.05

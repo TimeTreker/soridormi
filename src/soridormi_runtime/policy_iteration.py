@@ -260,7 +260,7 @@ def print_iteration_summary(result: PolicyIterationResult) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="M6.16 DAgger-style retrain/evaluate/promote iteration from candidate rollouts.")
+    parser = argparse.ArgumentParser(description="iterative retraining and promotion DAgger-style retrain/evaluate/promote iteration from candidate rollouts.")
     parser.add_argument("iteration_name", help="Name for the trained iteration profile")
     parser.add_argument("--candidate-log", action="append", required=True, help="Candidate rollout log to relabel; repeatable")
     parser.add_argument("--base-dataset", action="append", required=True, help="Existing supervised JSONL dataset; repeatable")

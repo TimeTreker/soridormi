@@ -7,7 +7,7 @@ usage() {
   cat <<'USAGE'
 Usage: ./scripts/report_clearance_candidate_history.sh [options]
 
-Summarize existing M10 clearance scenario-evaluation artifacts and compare each
+Summarize existing clearance qualification clearance scenario-evaluation artifacts and compare each
 candidate against the retained s143 reference. This is an offline report; it
 does not launch MuJoCo or train a policy.
 
@@ -37,4 +37,4 @@ if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   exit 0
 fi
 
-PYTHONPATH=src python -m soridormi_runtime.m10_clearance_history "$@"
+PYTHONPATH=src python -m soridormi_runtime.clearance_candidate_history "$@"

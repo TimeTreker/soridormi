@@ -1,6 +1,6 @@
-# M3.5: ONNX Policy Command, Phase, and Motor Speed Limit
+# ONNX policy command, gait phase, and motor-speed limits
 
-M3.5 makes the experimental ONNX policy loop dynamic. Earlier M3 milestones proved that the ONNX model loads and that the runtime can turn actions into `MotorCommand`. This section adds the pieces that make the Open Duck policy observation less static:
+command, gait-phase, and speed limits makes the experimental ONNX policy loop dynamic. Earlier policy runtime foundation issues proved that the ONNX model loads and that the runtime can turn actions into `MotorCommand`. This section adds the pieces that make the Open Duck policy observation less static:
 
 - a 7D command vector
 - a gait/imitation phase oscillator

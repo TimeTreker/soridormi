@@ -406,7 +406,7 @@ def print_export_summary(result: TrainingDatasetExportResult) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Export Soridormi runtime logs into an M6 training dataset JSONL.")
+    parser = argparse.ArgumentParser(description="Export Soridormi runtime logs into a policy-training dataset JSONL.")
     parser.add_argument("logs", nargs="+", help="Runtime .jsonl/.mcap logs to export")
     parser.add_argument("--output", type=Path, default=None, help="Output dataset JSONL path")
     parser.add_argument("--manifest", type=Path, default=None, help="Output manifest JSON path")

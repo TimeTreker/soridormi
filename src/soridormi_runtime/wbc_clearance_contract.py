@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from soridormi_runtime.m10_clearance_readiness import DEFAULT_REQUIRED_SCENARIOS
+from soridormi_runtime.clearance_readiness import DEFAULT_REQUIRED_SCENARIOS
 from soridormi_runtime.scenario_curriculum import (
     DEFAULT_SCENARIO_MANIFEST,
     get_scenario_definition,
@@ -193,7 +193,7 @@ def _candidate_commands(
     reference_suite_dir = Path(scenario_eval_root) / reference_profile
     return {
         "validate_engineering_process": [
-            "./scripts/validate_m10_engineering_process.sh",
+            "./scripts/validate_clearance_engineering_process.sh",
         ],
         "start_mujoco_no_viewer": [
             "./scripts/run_sim_server.sh",
@@ -370,7 +370,7 @@ def build_wbc_clearance_experiment_plan(
         "Keep the contract sim-only until a WBC runtime backend can consume these parameters.",
         "Implement profile generation for WBC clearance candidates before running "
         "evaluation commands.",
-        "Run each implemented candidate through the M10 scenario suite and clearance "
+        "Run each implemented candidate through the clearance qualification scenario suite and clearance "
         "readiness gate.",
         "Promote nothing without follow-camera review and teacher comparison evidence.",
     ]

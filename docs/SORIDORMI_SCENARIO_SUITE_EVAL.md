@@ -1,13 +1,13 @@
 # Soridormi scenario suite evaluation
 
-M9C adds a batch runner around the M9A single-scenario rollout evaluator.  The
+scenario suite evaluation adds a batch runner around the scenario rollout evaluation single-scenario rollout evaluator.  The
 suite is still MuJoCo-first and does not touch hardware.
 
 The default suite includes only scenario-registry entries that are both:
 
 - in a ready status (`mujoco_registry_ready`, `mujoco_eval_ready`, or
   `training_ready`), and
-- backed by a locomotion policy skill that M9A can evaluate.
+- backed by a locomotion policy skill that scenario rollout evaluation can evaluate.
 
 This intentionally excludes scripted social skills, because they are governed by
 `evaluate_scripted_social_skills.sh` and the social readiness report.
@@ -18,13 +18,13 @@ below `0.12 m/s` when the scenario command range can support it. This avoids
 evaluating "walking" scenarios with near-zero commands that mostly wiggle in
 place.
 
-The M10 core clearance gate evaluates stable swing clearance.  The scenario
+The clearance qualification core clearance gate evaluates stable swing clearance.  The scenario
 manifest keeps `min_swing_clearance_m: 0.015` and
 `max_low_clearance_ratio: 0.25`, while `swing_boundary_exclusion_samples: 1`
 excludes the first and last sample of each contiguous swing segment so toe-off
 and touchdown transitions do not dominate the low-clearance ratio.
 
-The current default ready locomotion suite contains the three-scenario M10 core
+The current default ready locomotion suite contains the three-scenario clearance qualification core
 plus the pre-WBC clearance enrichment:
 
 - `flat_walk_varied_speed_v1`
@@ -40,7 +40,7 @@ Before WBC tuning, run the dry/offline surface gate:
 ./scripts/validate_pre_wbc_scenario_surface.sh
 ```
 
-That command checks that the default suite, the M10 core scenarios, and the WBC
+That command checks that the default suite, the clearance qualification core scenarios, and the WBC
 clearance contract all agree on this six-scenario surface.
 
 ## Dry-run plan

@@ -8,7 +8,7 @@ usage() {
 Usage: ./scripts/run_policy_rollout_smoke.sh PROFILE [options]
 
 Run a bounded Soridormi policy rollout against an already-running simulator.
-This is the M6.10 smoke harness for promoted/replacement policy profiles.
+This is the bounded rollout smoke harness for promoted/replacement policy profiles.
 
 Options:
   --steps N                    Stop runtime after N control steps (default: 200).

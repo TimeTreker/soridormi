@@ -92,14 +92,14 @@ soridormi.task.events
 soridormi.task.cancel
 ```
 
-This M11 surface is contract-first and no-motion. `soridormi.task.preview`
-returns Soridormi's embodied interpretation without creating a persistent task
-record. `soridormi.task.submit` validates and records structured embodied goals,
-returns `execution_mode=contract_only` or a dry-run compilation mode, and
-refuses missing or unsafe capability paths such as navigation, perception,
-manipulation, and immediate stop-through-task. Until the task state machine and
-execution adapter are implemented, it must not be treated as proof that the
-robot actually performed the submitted goal.
+This embodied task contract surface is contract-first and no-motion.
+`soridormi.task.preview` returns Soridormi's embodied interpretation without
+creating a persistent task record. `soridormi.task.submit` validates and records
+structured embodied goals, returns `execution_mode=contract_only` or a dry-run
+compilation mode, and refuses missing or unsafe capability paths such as
+navigation, perception, manipulation, and immediate stop-through-task. The
+lifecycle skeleton exists; the physical task executor does not. A task result
+must not be treated as proof that the robot performed the submitted goal.
 
 `soridormi.task.get_capabilities` is Soridormi's own readiness catalog. It
 declares which task types can dry-run now, which are planning holds, which
@@ -123,14 +123,14 @@ requests can compile into a bounded `skill_sequence` and complete as
 Soridormi run its own sensing, planning, gait, monitoring, and recovery loop
 internally after a task has been accepted.
 
-`soridormi.task.events` is the M11B monitoring cursor. Callers pass
+`soridormi.task.events` is the task event cursor. Callers pass
 `after_sequence` and receive a versioned `soridormi.task_events.v1` payload with
 the matching event slice, `latest_sequence`, `next_after_sequence`, terminal
 state, safe-idle state, and `poll_recommendation`. Chromie can keep polling
 with the returned cursor while a task is active, cancel if needed, and stop
 polling once `terminal=true`.
 
-`client_task_ref` is the M11C retry key. Chromie may include it on
+`client_task_ref` is the retry-safe task identity. Chromie may include it on
 `soridormi.task.submit`; if the same reference and payload are submitted again,
 Soridormi returns the original `task_id` with `idempotent_replay=true` instead
 of creating a duplicate task. Reusing a `client_task_ref` with a different
@@ -138,7 +138,7 @@ payload is rejected. `soridormi.task.status`, `soridormi.task.events`, and
 `soridormi.task.cancel` can look up the task by either Soridormi `task_id` or
 Chromie `client_task_ref`.
 
-M11D adds timeout expiry for no-motion planning holds. A non-terminal task that
+No-motion planning holds have timeout expiry. A non-terminal task that
 passes its `deadline_at = created_at + timeout_s` transitions to terminal
 `failed` when status, events, or cancel is read. The response reports
 `expired=true`, `timeout_elapsed_s`, and a `task_timed_out` event. If the task
@@ -146,6 +146,11 @@ used `cancellation_policy=emergency_stop_on_timeout`, Soridormi reports the
 reason `task_timeout_emergency_stop_required` and recommends the dedicated
 emergency-stop path; it still does not send physical motion through the task
 API.
+
+Body-wide `safe_idle` is projected from the live Soridormi runtime. It is
+false while physical motion is active or emergency stop is set, even though
+the task API itself is no-motion. `recover_safe_idle` fails rather than
+claiming success when the live body state is not safe idle.
 
 Task status also includes `plan_steps` and `blocked_subsystems`. These fields
 explain Soridormi's embodied interpretation: for a blocked navigation task the
@@ -174,7 +179,7 @@ MCP task service using both preview and submit paths and are intentionally
 no-motion: they validate the contract boundary, refusal reasons, and skill
 compilation without claiming the robot physically executed the task.
 
-Run the M11A task-agent contract gate from the Soridormi repo root:
+Run the task-agent contract gate from the Soridormi repo root:
 
 ```bash
 ./scripts/validate_task_agent_contract.sh

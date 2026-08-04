@@ -115,9 +115,9 @@ def build_scenario_suite_plan(
     log_dir: str = "/data/logs",
     log_prefix_root: str = "scenario_suite",
 ) -> ScenarioSuitePlan:
-    """Return the deterministic M9C scenario suite selection and run plans.
+    """Return the deterministic scenario suite evaluation scenario suite selection and run plans.
 
-    M9C is intentionally locomotion-only.  Social scenarios live in the same
+    scenario suite evaluation is intentionally locomotion-only.  Social scenarios live in the same
     curriculum but are covered by the scripted-social readiness gates instead.
     """
 
@@ -163,7 +163,7 @@ def build_scenario_suite_plan(
                     priority=scenario.priority,
                     primary_skill=scenario.primary_skill,
                     selected=False,
-                    reason=f"primary skill {scenario.primary_skill!r} is not supported by M9 locomotion rollout eval",
+                    reason=f"primary skill {scenario.primary_skill!r} is not supported by context data pipeline locomotion rollout eval",
                 ).to_dict()
             )
             continue
@@ -298,7 +298,7 @@ def build_scenario_suite_report(
     expected_scenarios: Sequence[str] | None = None,
     output_dir: str | Path | None = None,
 ) -> ScenarioSuiteReport:
-    """Aggregate per-scenario M9A reports into one suite report."""
+    """Aggregate per-scenario rollout evaluation reports into one suite report."""
 
     expected = list(_normalise_csv(expected_scenarios)) if expected_scenarios else []
     expected_set = set(expected)

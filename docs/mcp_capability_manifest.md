@@ -67,7 +67,7 @@ PYTHONPATH=agent python -m app.list_capabilities \
   --llm-context --language zh
 ```
 
-For the full M11A task-agent contract gate, including task capability
+For the full task-agent contract gate, including task capability
 readiness, manifest export, acceptance cases, `task_graph`, and docs checks:
 
 ```bash
@@ -81,7 +81,7 @@ controls, task-level contract tools, and status checks.
 `soridormi.robot.get_status` includes a `safe_idle` field for Chromie's
 post-action and cancellation checks.
 
-The `soridormi.task.*` tools are intentionally contract-first in M11.
+The `soridormi.task.*` tools are intentionally contract-first in embodied task contract.
 `soridormi.task.get_capabilities` is read-only and reports Soridormi-owned
 embodied readiness by task type: readiness state, required subsystems, ready
 subsystems, missing subsystems, external dependencies, and whether persistent
@@ -116,23 +116,24 @@ low-level policy input.
 Task status also exposes `task_graph`, a derived Soridormi body-task DAG. It
 uses stable node IDs and sequence edges around the plan steps, reports the
 current task phase and terminal state, and always marks
-`raw_control_allowed=false` in the M11 contract surface. This gives Chromie a
+`raw_control_allowed=false` in the embodied task contract surface. This gives Chromie a
 monitorable body graph without transferring low-level control ownership.
 
-`soridormi.task.events` exposes the M11B event cursor contract. The response is
+`soridormi.task.events` exposes the task event cursor contract. The response is
 versioned as `soridormi.task_events.v1` and includes `status`, `phase`,
 `terminal`, `safe_idle`, `returned_count`, `latest_sequence`,
 `next_after_sequence`, `has_more`, and `poll_recommendation`. This lets Chromie
 track long-running Soridormi tasks with an explicit cursor instead of inferring
 task completion from raw event lists.
 
-M11C adds retry-safe task identity. `soridormi.task.submit` accepts optional
+The retry-safe task contract uses `client_task_ref`.
+`soridormi.task.submit` accepts optional
 `client_task_ref`; a duplicate submit with the same reference and identical
 payload returns the original Soridormi `task_id` with `idempotent_replay=true`.
 The same reference with a different payload is rejected. `task.status`,
 `task.events`, and `task.cancel` accept either `task_id` or `client_task_ref`.
 
-M11D adds timeout visibility and expiry. Task status payloads include
+No-motion planning holds expose timeout visibility and expiry. Task status payloads include
 `deadline_at`, `expired`, and `timeout_elapsed_s`. Non-terminal planning-hold
 tasks that exceed `timeout_s` become terminal `failed` tasks with a
 `task_timed_out` event and timeout-specific `recommended_next_actions`.

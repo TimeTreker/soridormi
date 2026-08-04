@@ -1,6 +1,6 @@
-# M3.4 ONNX Policy Runtime Mode
+# Experimental ONNX policy runtime mode
 
-This milestone adds an explicit experimental runtime mode:
+This capability adds an explicit experimental runtime mode:
 
 ```bash
 SORIDORMI_RUNTIME_MODE=onnx_policy
@@ -54,6 +54,6 @@ CONTROL_HZ=50
 - Runtime loop keeps running until stopped or until MuJoCo auto-reset triggers.
 - `data/logs/*.mcap` is created when logging is enabled.
 
-## Next milestone
+## Next semantic issue
 
-M3.5 should add policy-specific logging fields such as raw action, clipped targets, observation summary, and action history.
+command, gait-phase, and speed limits should add policy-specific logging fields such as raw action, clipped targets, observation summary, and action history.

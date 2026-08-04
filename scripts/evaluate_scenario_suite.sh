@@ -8,7 +8,7 @@ usage() {
 Usage: ./scripts/evaluate_scenario_suite.sh [options]
 
 Run or plan a batch Soridormi MuJoCo scenario-evaluation suite.  By default the
-suite includes registry-ready locomotion scenarios that M9A can evaluate.  It
+suite includes registry-ready locomotion scenarios that scenario rollout evaluation can evaluate.  It
 continues after individual scenario failures so the final suite report captures
 all pass/fail results.
 
@@ -187,7 +187,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ "${backend}" != "mujoco" ]; then
-  echo "error: M9C scenario suite evaluation is MuJoCo-only; use --backend mujoco" >&2
+  echo "error: scenario suite evaluation is MuJoCo-only; use --backend mujoco" >&2
   exit 2
 fi
 

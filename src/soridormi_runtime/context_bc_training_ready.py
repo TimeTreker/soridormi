@@ -11,7 +11,7 @@ from soridormi_runtime.bc_training_contract import DEFAULT_CONTRACT_PATH
 from soridormi_runtime.context_bc_dataset_prepare import PREPARED_CONTEXT_DATASET_TYPE
 from soridormi_runtime.training_dataset import sha256_file
 
-CONTEXT_BC_TRAINING_READY_SCHEMA_VERSION = "m9.context_bc_training_ready.v1"
+CONTEXT_BC_TRAINING_READY_SCHEMA_VERSION = "soridormi.context_bc_training_ready.v1"
 DEFAULT_OUTPUT_DIR = Path("artifacts/training/context_bc/training_ready")
 SPLIT_NAMES = ("train", "val", "test")
 
@@ -194,10 +194,10 @@ def build_training_ready_report(
     scenario_gate_report_path: str | Path,
     prepared_gate_report_path: str | Path,
     contract_path: str | Path = DEFAULT_CONTRACT_PATH,
-    profile_name: str = "context_stage1_candidate",
-    linear_output_dir: str | Path = "/data/training_runs/context_stage1_candidate_linear_bc",
-    neural_output_dir: str | Path = "/data/training_runs/context_stage1_candidate_neural_bc",
-    input_mode: str = "context_stage1_command",
+    profile_name: str = "context_command_candidate",
+    linear_output_dir: str | Path = "/data/training_runs/context_command_candidate_linear_bc",
+    neural_output_dir: str | Path = "/data/training_runs/context_command_candidate_neural_bc",
+    input_mode: str = "context_command_v1",
 ) -> ContextBcTrainingReadyResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -390,16 +390,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="prepared_context_gate_report.json",
     )
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT_PATH)
-    parser.add_argument("--profile-name", default="context_stage1_candidate")
+    parser.add_argument("--profile-name", default="context_command_candidate")
     parser.add_argument(
         "--linear-output-dir",
-        default="/data/training_runs/context_stage1_candidate_linear_bc",
+        default="/data/training_runs/context_command_candidate_linear_bc",
     )
     parser.add_argument(
         "--neural-output-dir",
-        default="/data/training_runs/context_stage1_candidate_neural_bc",
+        default="/data/training_runs/context_command_candidate_neural_bc",
     )
-    parser.add_argument("--input-mode", default="context_stage1_command")
+    parser.add_argument("--input-mode", default="context_command_v1")
     parser.add_argument("--output", type=Path, default=None, help="Optional Markdown report path")
     parser.add_argument(
         "--output-dir",

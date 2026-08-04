@@ -85,15 +85,18 @@ Soridormi should expose multiple MCP levels, not a single skill endpoint:
 soridormi.robot.*       read status, mode, battery, active task, safe_idle
 soridormi.safety.*      monitor, stop, cancel, emergency stop
 soridormi.skill.*       atomic body skills and skill plans
-soridormi.task.*        future embodied task submission/status/events/cancel
+soridormi.task.*        no-motion embodied task contract/status/events/cancel
 ```
 
 `soridormi.skill.*` is appropriate for atomic body behaviors such as
 `nod_yes`, `look_at_person`, `turn_in_place`, or explicit low-level test cases.
 
-`soridormi.task.*` is the intended future surface for rich embodied requests
-such as `navigate_to`, `approach_person`, `inspect_target`, `perform_dance`,
-`recover`, or unsupported tasks such as `deliver_object`.
+`soridormi.task.*` is implemented as a contract-first, no-motion surface for
+rich embodied requests such as navigation, approach, inspection, gesture,
+recovery, or unsupported object delivery. Supported requests may compile to
+named-skill dry runs; that is not physical task execution. A future monitored
+task executor may use the validated skill path internally only after its own
+qualification.
 
 ## Examples
 
@@ -157,6 +160,10 @@ Soridormi maintains:
 - local target/route/motion context;
 - selected gait, skill, controller, and fallback;
 - execution telemetry, progress, blocked state, and recovery state.
+
+Body-wide state remains runtime-owned. Task and capability payloads project
+live `safe_idle`, active-motion, and emergency-stop state; task-local
+lifecycle does not manufacture those facts.
 
 ## Promotion rule
 

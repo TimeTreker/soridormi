@@ -12,7 +12,7 @@ class PolicyTuningProfile:
     """A repeatable ONNX-policy runtime tuning profile.
 
     Profiles are intentionally small and conservative. They are not meant to
-    solve walking by themselves; they make log collection repeatable so M3.7+
+    solve walking by themselves; they make log collection repeatable so policy log analysis+
     analysis can compare like-for-like experiments.
     """
 
@@ -67,7 +67,7 @@ BUILTIN_PROFILES: tuple[PolicyTuningProfile, ...] = (
     ),
     PolicyTuningProfile(
         name="crawl_safe",
-        description="Recommended first dynamic walking test after M3.7 logging.",
+        description="Recommended first dynamic walking test after policy log analysis logging.",
         command_x=0.01,
         phase_frequency=1.0,
         action_scale=0.10,

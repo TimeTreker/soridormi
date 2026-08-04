@@ -1,4 +1,4 @@
-# Soridormi M4.2 policy profile.
+# Soridormi runnable policy engine policy profile.
 name: open_duck_forward
 description: Open Duck Mini v2 pretrained ONNX forward policy experiment.
 

@@ -1,9 +1,9 @@
 # Soridormi Skill Taxonomy and Behavior Platform
 
-Status: M7 bootstrap proposal.
+Status: structured body-skill interface bootstrap proposal.
 
 Soridormi is the robot cerebellum/body runtime. Chromie is the robot brain in
-`TimeTreker/chromie.git` on `main`. M7 starts the body-skill interface between
+`TimeTreker/chromie.git` on `main`. structured body-skill interface starts the body-skill interface between
 them: Chromie or another high-level planner should ask Soridormi for safe named
 behaviors instead of directly manipulating velocity commands, joint targets, or
 motor commands.
@@ -205,7 +205,7 @@ available_sim_experimental    executable in MuJoCo but still weak/experimental
 planned                       planned controller, not executable yet
 planned_wrapper               planned human-facing wrapper around an existing lower-level skill
 planned_external_target       needs target information from perception/Chromie/etc.
-future                        future milestone
+future                        future capability issue
 future_pose_teacher           needs pose/keyframe/teacher controller
 future_residual_rl            needs residual/RL or terrain-aware training
 future_evaluation             needs evaluation infrastructure first
@@ -234,9 +234,9 @@ composite                    composition of multiple Soridormi and external skil
 ```
 
 
-## M7B skill listing and validation CLI
+## skill capability export skill listing and validation CLI
 
-M7B turns the JSON skill universe into an inspectable runtime contract. It still does not execute skills. It only answers what Soridormi declares, what is currently available in simulation, and what remains future or unsupported.
+skill capability export turns the JSON skill universe into an inspectable runtime contract. It still does not execute skills. It only answers what Soridormi declares, what is currently available in simulation, and what remains future or unsupported.
 
 Use the host-side wrapper:
 
@@ -314,14 +314,14 @@ Recommended order:
 6. evaluate trajectory/progress/clearance;
 7. use residual/RL to improve skills that need adaptation.
 
-## Out of scope for M7A
+## Out of scope for skill taxonomy
 
-M7A does not implement skill execution. It only defines the taxonomy and manifest so future code and future LLM/MCP sessions share the same vocabulary.
+skill taxonomy does not implement skill execution. It only defines the taxonomy and manifest so future code and future LLM/MCP sessions share the same vocabulary.
 
 
-## M7C dry-run skill execution registry
+## skill execution contract dry-run skill execution registry
 
-M7C turns the manifest into a safe execution-facing registry without moving the robot.
+skill execution contract turns the manifest into a safe execution-facing registry without moving the robot.
 The registry resolves available simulation skills into high-level velocity command plans
 and rejects future or unsupported skills.  Use:
 
@@ -331,4 +331,4 @@ and rejects future or unsupported skills.  Use:
 ```
 
 This is intentionally dry-run only.  MuJoCo execution, MCP exposure, and hardware
-execution must be added in later milestones after controller-specific validation.
+execution must be added in later capability issues after controller-specific validation.

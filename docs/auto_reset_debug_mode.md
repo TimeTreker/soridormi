@@ -1,6 +1,6 @@
 # MuJoCo Auto Reset Debug Mode
 
-M2.8 adds an optional simulation safety loop that resets the MuJoCo robot after a fall.
+simulator fall detection and reset adds an optional simulation safety loop that resets the MuJoCo robot after a fall.
 
 This is a development/debug tool. It is useful while tuning poses and policies because the robot can fall many times without requiring the simulator server to be restarted manually.
 

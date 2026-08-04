@@ -149,7 +149,7 @@ def package_policy_profile(
     """Build a portable tar.gz handoff package for one replacement profile.
 
     The package is source-control friendly by default: it always includes the
-    profile YAML and M5 acceptance artifacts, but it only embeds the ONNX file
+    profile YAML and replaceable policy interface acceptance artifacts, but it only embeds the ONNX file
     when ``include_model`` is requested. Use ``require_model`` for release
     packages where the artifact must be present.
     """

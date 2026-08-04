@@ -1,45 +1,75 @@
-# Architecture
+# Soridormi architecture
 
-Soridormi uses a split sim-to-real architecture:
-
-```text
-runtime image  <---- shared API ---->  sim image or hardware backend
-```
-
-The runtime should contain controller and policy code only. It should not import MuJoCo.
-
-The simulator should implement the same API contract as the real robot backend.
-
-## Why not one image?
-
-A single giant image is convenient at the beginning, but it makes real robot deployment harder. MuJoCo, OpenGL, training libraries, and desktop dependencies should not pollute the robot runtime.
-
-## Why not make simulator environment identical to robot?
-
-The PC simulator is usually x86_64 and desktop-GPU based. Jetson hardware is ARM64 and JetPack-based. Identical binary environments are not realistic, but identical APIs are realistic and important.
-
-## Config-driven robot models
-
-`soridormi_sim.mujoco_backend.MujocoBackend` is intentionally model-independent. It reads robot-specific details from YAML config files under `configs/robots/`.
-
-The current default config is:
+## System split
 
 ```text
-configs/robots/open_duck_mini_v2.yaml
+Chromie cognitive/social brain
+  -> structured proposal, skill, or embodied task over MCP
+Soridormi body/cerebellum
+  -> validation, body planning, safety, execution, monitoring
+Robot API
+  -> MuJoCo backend now, qualified hardware backend later
 ```
 
-The design rule is:
+Chromie owns human meaning and global orchestration. Soridormi owns physical
+meaning and body authority.
+
+## Runtime/backend split
 
 ```text
-Code defines behavior.
-Config defines robot structure.
+runtime process <---- shared Robot API ----> simulator or hardware backend
 ```
 
-When a new MuJoCo robot model is introduced, add a new config file instead of hardcoding actuator names, base slices, or model paths in Python.
+The production runtime process contains policy inference, controllers, body
+skills, safety, and the robot API client. It must not import MuJoCo.
 
+The simulator process contains MuJoCo, model loading, physics, simulated
+sensors/actuators, and the robot API server. A hardware backend must implement
+the same API semantics without changing policy or skill meaning.
 
-## Optional MuJoCo viewer
+## Package versus process
 
-The simulator backend can launch a passive MuJoCo viewer when the robot config's `viewer.enabled_env` environment variable is true. The backend still owns physics stepping and API timing; the viewer only displays the latest MuJoCo `model`/`data` state and is synchronized after API steps.
+The `soridormi_runtime` source package also contains optional MCP, evaluation,
+policy packaging, and training support for repository convenience. That does
+not make those dependencies part of the production robot process.
 
-This keeps runtime code unchanged: runtime sends the same `MotorCommand` messages whether the simulator is headless or visible in the viewer.
+- runtime execution: no MuJoCo or desktop viewer dependency;
+- simulator: MuJoCo and visualization allowed;
+- training/evaluation: explicit optional dependencies;
+- MCP: body capability projection and validated runtime calls;
+- hardware: target-specific backend behind the shared API.
+
+## Robot configuration
+
+Code defines behavior; versioned configuration defines robot structure.
+Robot-specific actuator names, model paths, slices, limits, and viewer settings
+belong under `configs/robots/`, not hardcoded in generic backend logic.
+
+## Body capability layers
+
+```text
+robot.*   body state and mode
+safety.*  monitoring, stop, cancel, emergency stop
+motion.*  bounded engineering motion plans
+skill.*   named atomic body behaviors
+task.*    richer embodied contract, lifecycle, and body-task graph
+```
+
+The task surface is no-motion until a task executor is independently qualified.
+A task dry run is not a physical execution receipt.
+
+## State authority
+
+Robot state, active motion, emergency stop, and `safe_idle` are body-wide runtime
+facts. Task and capability payloads project those facts; they do not derive
+them from task-local state.
+
+Plan creation, preview, and offline compilation are non-effectful. Effectful
+execution remains behind explicit runtime calls, cancellation, monitoring, and
+safe-idle confirmation.
+
+## Sim-to-real invariant
+
+Simulation and hardware expose the same high-level body contracts. Backend
+selection, feasibility, limits, and refusal remain Soridormi-owned. Chromie does
+not lower user goals differently based on simulator implementation details.

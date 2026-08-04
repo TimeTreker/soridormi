@@ -1,4 +1,4 @@
-# M6A commanded free-walk evaluation suite for Open Duck Mini v2.
+# free-walk evaluation commanded free-walk evaluation suite for Open Duck Mini v2.
 #
 # This suite is intentionally conservative. It is an evaluation gate, not a
 # maximum-speed demo. Keep commands inside the policy envelope until teacher and

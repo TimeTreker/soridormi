@@ -1,7 +1,7 @@
 """End-to-end supervised training pipeline planner/runner for Soridormi policies.
 
-M6.7 intentionally stays at the workflow layer.  It orchestrates the already
-validated M6 data/export/train/evaluate tools without changing policy runtime
+training pipeline orchestration intentionally stays at the workflow layer.  It orchestrates the already
+validated training and evaluation backbone data/export/train/evaluate tools without changing policy runtime
 semantics.
 """
 
@@ -235,7 +235,7 @@ def build_training_pipeline_plan(
         "--template",
         template_profile,
         "--description",
-        f"Linear BC candidate trained by M6.7 pipeline from {template_profile}",
+        f"Linear BC candidate trained by training pipeline orchestration pipeline from {template_profile}",
     ]
     if force_profile:
         create_profile_cmd.append("--force")
@@ -371,7 +371,7 @@ def run_training_pipeline(plan: PipelinePlan, *, dry_run: bool = False, env: dic
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Run or print the M6.7 end-to-end linear BC training pipeline")
+    parser = argparse.ArgumentParser(description="Run or print the training pipeline orchestration end-to-end linear BC training pipeline")
     parser.add_argument("candidate_profile", help="Name for the generated candidate policy profile")
     parser.add_argument("logs", nargs="+", help="Runtime logs to export, typically data/logs/policy_*.mcap")
     parser.add_argument("--template", default=DEFAULT_TEMPLATE_PROFILE, help="Template profile to clone")
@@ -423,7 +423,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.json:
         print(json.dumps(result.to_dict(), indent=2, sort_keys=True))
     else:
-        print("Soridormi M6.7 training pipeline")
+        print("Soridormi training pipeline orchestration training pipeline")
         print("================================")
         print(f"Candidate profile: {plan.candidate_profile}")
         print(f"Output root: {plan.output_root}")

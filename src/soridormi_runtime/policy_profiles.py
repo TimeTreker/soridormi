@@ -13,7 +13,7 @@ import yaml
 from soridormi_runtime.policy_input_features import INPUT_MODE_OBSERVATION, normalize_policy_input_mode
 
 DEFAULT_PROFILE_NAME = "open_duck_forward"
-DEFAULT_PROFILE_DIRS = (Path("/app/configs/policies"), Path("configs/policies"))
+DEFAULT_PROFILE_DIRS = (Path("configs/policies"), Path("/app/configs/policies"))
 
 
 def _as_bool(value: Any, default: bool = False) -> bool:

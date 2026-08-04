@@ -31,8 +31,8 @@ Options:
 
 Example:
   ./scripts/plan_policy_visual_inspection.sh \
-    --profile-name context_stage1_three_scenario_10ep_e80 \
-    --output-dir artifacts/policy_visual_inspection/context_stage1_three_scenario_10ep_e80 \
+    --profile-name context_command_three_scenario_10ep_e80 \
+    --output-dir artifacts/policy_visual_inspection/context_command_three_scenario_10ep_e80 \
     --json
 USAGE
 }
@@ -42,4 +42,4 @@ if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   exit 0
 fi
 
-PYTHONPATH=src python -m soridormi_runtime.m10_visual_inspection "$@"
+PYTHONPATH=src python -m soridormi_runtime.clearance_visual_inspection "$@"

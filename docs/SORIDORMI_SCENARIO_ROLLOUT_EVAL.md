@@ -1,6 +1,6 @@
 # Soridormi scenario rollout evaluation
 
-M9A added a MuJoCo-first scenario rollout evaluator.  M9B adds scenario-specific
+scenario rollout evaluation added a MuJoCo-first scenario rollout evaluator.  scenario acceptance thresholds adds scenario-specific
 acceptance thresholds in `configs/scenarios/open_duck_mini_v2_scenarios.json`.
 This is a measurement gate, not a training patch and not a hardware bridge.
 
@@ -76,7 +76,7 @@ without launching the runtime container.
 
 ## Scenario-specific thresholds
 
-M9B stores normalized rollout thresholds under each scenario's
+scenario acceptance thresholds stores normalized rollout thresholds under each scenario's
 `acceptance_thresholds` object.  The evaluator uses those manifest thresholds by
 default.  CLI threshold flags now mean **override the manifest**, not global
 defaults.
@@ -87,7 +87,7 @@ Example manifest fragment:
 {
   "id": "flat_walk_varied_speed_v1",
   "acceptance_thresholds": {
-    "schema_version": "m9.scenario_rollout_acceptance.v1",
+    "schema_version": "soridormi.scenario_rollout_acceptance.v1",
     "min_distance_m": 0.15,
     "min_mean_forward_speed_mps": 0.03,
     "max_stuck_sample_ratio": 0.20,
@@ -103,7 +103,7 @@ Example manifest fragment:
 }
 ```
 
-For M10 clearance-gate scenarios, `low_clearance_swing_ratio` is measured on
+For clearance qualification clearance-gate scenarios, `low_clearance_swing_ratio` is measured on
 stable swing samples.  `swing_boundary_exclusion_samples: 1` excludes one
 sample immediately after toe-off and one sample immediately before touchdown
 from each contiguous swing segment.  The 15 mm swing-clearance threshold and the
@@ -139,5 +139,5 @@ stride, clearance, stuck, and fall metrics.  The scenario layer adds scenario
 context, scenario/skill metadata checks, report files, and pass/fail acceptance
 for a single scenario.
 
-The next logical patch is M9C: a batch scenario evaluation suite that runs all
+The next logical patch is scenario suite evaluation: a batch scenario evaluation suite that runs all
 registry-ready scenarios and summarizes pass/fail status in one place.

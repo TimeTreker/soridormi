@@ -7,7 +7,7 @@ usage() {
   cat <<'USAGE'
 Usage: ./scripts/run_context_bc_training_ready_pipeline.sh INPUT... [options]
 
-Run the context BC M9 pipeline from prepare through prepared-gate and
+Run the context BC data pipeline from prepare through prepared-gate and
 training-ready report generation.
 
 Options:
@@ -59,10 +59,10 @@ scenario_gate=''
 require_scenario=''
 report_path=''
 contract_path=''
-profile_name='context_stage1_candidate'
-input_mode='context_stage1_command'
-linear_output_dir='/data/training_runs/context_stage1_candidate_linear_bc'
-neural_output_dir='/data/training_runs/context_stage1_candidate_neural_bc'
+profile_name='context_command_candidate'
+input_mode='context_command_v1'
+linear_output_dir='/data/training_runs/context_command_candidate_linear_bc'
+neural_output_dir='/data/training_runs/context_command_candidate_neural_bc'
 json_flag=''
 
 prepare_args=()

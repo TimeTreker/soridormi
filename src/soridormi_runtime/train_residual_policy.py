@@ -156,7 +156,7 @@ def optimize_residual_bias(
 ) -> ResidualOptimizationResult:
     """Cross-entropy optimizer for a safe 14D residual bias policy.
 
-    This is intentionally simple and robust: M6.19 starts residual RL with a
+    This is intentionally simple and robust: residual policy training starts residual RL with a
     bounded constant residual, then later work can replace the optimizer/model
     with PPO/SAC or a recurrent residual actor without changing the deployment
     contract.
@@ -2072,7 +2072,7 @@ def _write_residual_profile(
         output_shape=[1, 14],
     )
     metadata = payload.setdefault("metadata", {})
-    metadata["generated_by"] = "soridormi_m619_residual_rl"
+    metadata["generated_by"] = "soridormi_residual_policy_training"
     metadata["training_output"] = str(Path(residual_onnx_path).parent)
     metadata["promotion_status"] = "blocked_clearance_gate"
     for stale_key in ("initial_checkpoint", "scenario_suite", "clearance_readiness"):

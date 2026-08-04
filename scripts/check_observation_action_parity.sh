@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/latest_policy_log.sh
 
-# Host-side wrapper for the M4.11 parity checker.
+# Host-side wrapper for the observation and action parity checker.
 # Usage on host:
 #   ./scripts/check_observation_action_parity.sh [official_trace] [soridormi_log]
 #

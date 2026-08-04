@@ -1,4 +1,4 @@
-# M2.5: Reset Pose and Default Pose Tuning
+# Reset and default-pose tuning
 
 This step makes MuJoCo startup repeatable by moving reset/default pose data into the robot config.
 

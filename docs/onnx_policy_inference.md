@@ -1,6 +1,6 @@
-# M3.0 ONNX Policy Inspection
+# ONNX policy inspection
 
-M3.0 is the safe starting point for policy work. It only inspects the ONNX model
+ONNX policy inspection is the safe starting point for policy work. It only inspects the ONNX model
 and runs one dummy inference. It does not connect the policy to the robot control loop.
 
 ## Goal
@@ -80,7 +80,7 @@ python -m soridormi_runtime.inspect_onnx_policy \
   --json
 ```
 
-## M3.0 success criteria
+## ONNX policy inspection success criteria
 
 - `./scripts/inspect_policy.sh` runs successfully
 - the policy input shape is known
@@ -90,10 +90,10 @@ python -m soridormi_runtime.inspect_onnx_policy \
 
 ## Next sections
 
-After M3.0:
+After ONNX policy inspection:
 
-- M3.1 observation builder
-- M3.2 action-to-MotorCommand mapper
-- M3.3 `onnx_policy` runtime mode
-- M3.4 policy logging
-- M3.5 policy test in MuJoCo with auto-reset
+- observation builder
+- persistent ONNX policy wrapper action-to-MotorCommand mapper
+- action-to-motor-command mapping `onnx_policy` runtime mode
+- experimental ONNX runtime mode policy logging
+- command, gait-phase, and speed limits policy test in MuJoCo with auto-reset

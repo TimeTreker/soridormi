@@ -1,6 +1,6 @@
-# Soridormi M7C Skill Execution Registry
+# Soridormi skill execution contract
 
-M7C adds the first execution-facing layer for the M7 skill platform.  It is
+skill execution contract adds the first execution-facing layer for the structured body-skill interface skill platform.  It is
 still **dry-run only**: it resolves manifest-declared skills into high-level
 velocity command plans, but it does not connect to MuJoCo, hardware, MCP, or
 motor commands.
@@ -61,7 +61,7 @@ Machine-readable output:
 
 ## Executable subset
 
-M7C only registers dry-run planners for the currently available locomotion
+skill execution contract only registers dry-run planners for the currently available locomotion
 wrappers:
 
 - `stand_idle`
@@ -86,7 +86,7 @@ task mode / gait style / clearance intent
 environment labels such as terrain or obstacle metadata
 ```
 
-The current M7C/M7D implementation only lowers single-segment locomotion skills to velocity command overrides. Future skill execution should preserve the same boundary: validate manifest parameters, build policy context, then call the runtime policy that outputs the 14D action.
+The current skill execution contract/skill simulation execution implementation only lowers single-segment locomotion skills to velocity command overrides. Future skill execution should preserve the same boundary: validate manifest parameters, build policy context, then call the runtime policy that outputs the 14D action.
 
 `walk_forward`, `walk_velocity`, and `curve_walk` also apply the shared minimum
 useful forward walk speed of `0.12 m/s`. The resolved plan keeps
@@ -108,9 +108,9 @@ sent to the runtime.
 
 ```bash
 PYTHONPATH=src pytest -q \
-  tests/test_skill_manifest_m7.py \
-  tests/test_skill_manifest_cli_m7.py \
-  tests/test_skill_execution_m7c.py
+  tests/test_skill_manifest.py \
+  tests/test_skill_manifest_cli.py \
+  tests/test_skill_execution.py
 
 python -m compileall -q src tests
 
@@ -123,9 +123,9 @@ bash -n scripts/run_skill_dry_run.sh
   --json | python -m json.tool >/dev/null
 ```
 
-## M7D: MuJoCo skill execution wrapper
+## skill simulation execution: MuJoCo skill execution wrapper
 
-`M7C` only dry-runs skills into high-level velocity segments. `M7D` adds a
+`skill execution contract` only dry-runs skills into high-level velocity segments. `skill simulation execution` adds a
 safe sim-only wrapper that takes one available locomotion skill, converts it to
 runtime command overrides, and runs the existing policy rollout harness against
 an already-running MuJoCo simulator.
@@ -190,7 +190,7 @@ This is important because policy profiles such as `open_duck_forward` define
 command defaults; skill execution must intentionally override those defaults
 without mutating profile YAML files.
 
-## M8E: scripted head/neck social skill
+## scripted social skills: scripted head/neck social skill
 
 `look_direction` is now the first experimental sim-available social skill. It
 uses a scripted head/neck keyframe path instead of the walking policy velocity

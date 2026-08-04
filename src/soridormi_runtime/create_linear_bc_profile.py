@@ -88,13 +88,13 @@ def build_linear_bc_profile_payload(
 
     payload = copy.deepcopy(template_profile.payload)
     payload["name"] = profile_name
-    payload["description"] = description or "Linear behavior-clone baseline profile generated from an M6 training run."
+    payload["description"] = description or "Linear behavior-clone baseline profile generated from a policy-training run."
 
     metadata = _mapping(payload.get("metadata"))
     metadata.setdefault("format_version", 1)
     metadata.setdefault("policy_family", "open_duck_mini_v2")
     metadata["derived_from_profile"] = template_profile.name
-    metadata["generated_by"] = "soridormi_m65_linear_bc_profile"
+    metadata["generated_by"] = "soridormi_linear_bc_profile"
     payload["metadata"] = metadata
 
     contract_payload = _mapping(payload.get("contract"))
@@ -163,7 +163,7 @@ def create_linear_bc_profile(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Create a runtime policy profile for an M6 linear behavior-clone baseline.")
+    parser = argparse.ArgumentParser(description="Create a runtime policy profile for an training and evaluation backbone linear behavior-clone baseline.")
     parser.add_argument("name", help="New profile name, used for configs/policies/NAME.yaml by default")
     parser.add_argument("--training-run", default=None, help="Training run directory containing train_metrics.json / linear_behavior_clone.npz")
     parser.add_argument("--model", default=None, help="Explicit linear_behavior_clone.npz path")

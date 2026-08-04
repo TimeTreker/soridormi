@@ -350,7 +350,7 @@ def summarize_policy_log(dataset: PolicyLogDataset) -> dict[str, Any]:
     obs_min = _debug_series(policy_records, "observation_min")
     obs_max = _debug_series(policy_records, "observation_max")
     obs_l2 = _debug_series(policy_records, "observation_l2_norm")
-    # M3.6 stores observation stats on a separate topic. Prefer those when present.
+    # policy debug logging stores observation stats on a separate topic. Prefer those when present.
     for record in policy_records:
         if not isinstance(record.observation_stats, dict):
             continue
@@ -428,7 +428,7 @@ def build_diagnosis(
     findings: list[str] = []
 
     if not policy_records:
-        findings.append("No policy debug topics were found. Re-run with the M3.6 logger patch applied.")
+        findings.append("No policy debug topics were found. Re-run with the policy debug logging logger patch applied.")
         return findings
 
     reset_count = max(0, len(cycles) - 1)

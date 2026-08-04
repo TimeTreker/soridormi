@@ -40,7 +40,7 @@ class RobotState(BaseModel):
     # [left_foot_contact, right_foot_contact] as floats 0.0/1.0.
     # Hardware backends can leave it unset until contact sensing exists.
     feet_contacts: list[float] | None = None
-    # Optional floating-base pose. The simulator backend fills this so M4.2
+    # Optional floating-base pose. The simulator backend fills this so runnable policy engine
     # analysis can report forward/lateral displacement. Real hardware backends
     # can leave it unset until state estimation is available.
     base_position_xyz: list[float] | None = None

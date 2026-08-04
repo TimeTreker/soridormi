@@ -11,7 +11,7 @@ from soridormi_runtime.context_bc_dataset_prepare import PREPARED_CONTEXT_DATASE
 from soridormi_runtime.scenario_curriculum import COLLECTOR_READY_STATUSES, DEFAULT_SCENARIO_MANIFEST, list_scenarios
 from soridormi_runtime.training_dataset import sha256_file
 
-PREPARED_CONTEXT_GATE_SCHEMA_VERSION = "m9.context_bc_prepared_gate.v1"
+PREPARED_CONTEXT_GATE_SCHEMA_VERSION = "soridormi.context_bc_prepared_gate.v1"
 DEFAULT_PREPARED_GATE_OUTPUT_DIR = Path("artifacts/training/context_bc/prepared_gate")
 SPLIT_NAMES = ("train", "val", "test")
 

@@ -1,6 +1,6 @@
-# M2.7 Default Pose Tuning
+# Default pose tuning
 
-M2.7 is a visual/debugging milestone. The goal is to tune `default_pose` while keeping the
+default pose tuning is a visual/debugging qualification issue. The goal is to tune `default_pose` while keeping the
 MuJoCo base fixed so the robot does not immediately fall away from the camera.
 
 This is **not** a walking controller and not a balance controller.
@@ -15,7 +15,7 @@ default_pose:
     ...
 ```
 
-Do not change `reset_pose` during M2.7 unless you are deliberately starting a reset-pose
+Do not change `reset_pose` during default pose tuning unless you are deliberately starting a reset-pose
 tuning section.
 
 ## Fixed-base test
@@ -91,7 +91,7 @@ You usually do not need to restart the sim server unless you changed `reset_pose
 
 ## Success criteria
 
-M2.7 is complete when:
+default pose tuning is complete when:
 
 - fixed-base mode keeps the body stable
 - stand mode smoothly moves legs to `default_pose`

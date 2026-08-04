@@ -1,6 +1,6 @@
 # Soridormi scripted social readiness reports
 
-M8N adds a promotion-readiness report for scripted social skills.  The report is
+scripted social readiness adds a promotion-readiness report for scripted social skills.  The report is
 an explicit gate between `available_sim_experimental` and `available_sim`; it
 never edits the skill manifest by itself.
 

@@ -1,6 +1,6 @@
 """Offline candidate leaderboard for trained Soridormi policy profiles.
 
-M6.8 sits after training/evaluation/package workflows.  It scans policy
+candidate leaderboard sits after training/evaluation/package workflows.  It scans policy
 ``evaluation.json`` artifacts, ranks candidates by held-out metrics, and writes a
 small promotion-oriented report.  It does not modify runtime profiles or launch
 simulation.
