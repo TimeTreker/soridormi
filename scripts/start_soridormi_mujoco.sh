@@ -74,6 +74,7 @@ else
 fi
 cd "$ROOT_DIR"
 
+
 for cmd in docker git python3; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "[soridormi][error] Required command not found: $cmd" >&2
@@ -107,12 +108,16 @@ for path in \
   compose.sim.yaml \
   scripts/setup_env.sh \
   scripts/build_sim.sh \
-  scripts/run_sim_server.sh; do
+  scripts/run_sim_server.sh \
+  scripts/x11_access.sh; do
   [ -e "$path" ] || {
     echo "[soridormi][error] Missing repository file: $path" >&2
     exit 1
   }
 done
+
+# shellcheck source=scripts/x11_access.sh
+source ./scripts/x11_access.sh
 
 if [ ! -f .env ]; then
   ./scripts/setup_env.sh
@@ -280,6 +285,16 @@ trap cleanup EXIT INT TERM
 export SIM_PORT
 export SORIDORMI_MCP_PORT="$MCP_PORT"
 export SORIDORMI_MCP_PATH="$MCP_PATH"
+
+# Validate viewer authorization before stopping a working simulator. The child
+# run_sim_server.sh owns the actual scoped authorization for the simulator
+# process lifetime and restores it when that process exits.
+if [ "$VIEWER" = "1" ]; then
+  if [ "$REUSE_EXISTING_SIM" = "0" ] \
+      || ! python_tcp_check 127.0.0.1 "$SIM_PORT"; then
+    soridormi_x11_preflight "$VIEWER"
+  fi
+fi
 
 if python_tcp_check 127.0.0.1 "$SIM_PORT"; then
   if [ "$REUSE_EXISTING_SIM" = "1" ]; then

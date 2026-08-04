@@ -3,6 +3,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# shellcheck source=scripts/x11_access.sh
+source ./scripts/x11_access.sh
+
 usage() {
   cat <<'USAGE'
 Usage: ./scripts/run_sim_server.sh [options]
@@ -159,50 +162,20 @@ if [ ! -f .env ]; then
   ./scripts/setup_env.sh
 fi
 
-AUTO_XHOST="${SORIDORMI_XHOST_AUTO:-1}"
-XHOST_ADDED=0
-
-is_true() {
-  case "${1,,}" in
-    1|true|yes|on|y) return 0 ;;
-    *) return 1 ;;
-  esac
+X11_CLEANED=0
+cleanup_x11() {
+  local rc=$?
+  if [ "$X11_CLEANED" = "0" ]; then
+    X11_CLEANED=1
+    soridormi_x11_cleanup "$rc"
+  fi
+  return "$rc"
 }
+trap cleanup_x11 EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
-enable_xhost_if_needed() {
-  if ! is_true "$AUTO_XHOST"; then
-    return 0
-  fi
-
-  if ! is_true "$VIEWER_ENABLED"; then
-    return 0
-  fi
-
-  if [ -z "${DISPLAY:-}" ]; then
-    echo "Warning: DISPLAY is not set. MuJoCo viewer may not open."
-    return 0
-  fi
-
-  if ! command -v xhost >/dev/null 2>&1; then
-    echo "Warning: xhost not found. Install it with: sudo apt install x11-xserver-utils"
-    return 0
-  fi
-
-  echo "Allowing local Docker containers to access X11..."
-  xhost +local:docker >/dev/null || true
-  XHOST_ADDED=1
-}
-
-cleanup_xhost() {
-  if [ "$XHOST_ADDED" = "1" ]; then
-    echo "Removing local Docker X11 access..."
-    xhost -local:docker >/dev/null 2>&1 || true
-  fi
-}
-
-trap cleanup_xhost EXIT INT TERM
-
-enable_xhost_if_needed
+soridormi_x11_acquire "$VIEWER_ENABLED"
 
 export SORIDORMI_SIM_BACKEND="${SIM_BACKEND}"
 export SORIDORMI_MUJOCO_VIEWER="${VIEWER_ENABLED}"
@@ -236,6 +209,7 @@ else
 fi
 
 docker compose -f compose.sim.yaml run --rm \
+  "${SORIDORMI_X11_DOCKER_ARGS[@]}" \
   -e SORIDORMI_SIM_POLICY_PROFILE="${SORIDORMI_SIM_POLICY_PROFILE}" \
   -e SORIDORMI_SIM_BACKEND_OVERRIDE="${SORIDORMI_SIM_BACKEND}" \
   -e SORIDORMI_MUJOCO_VIEWER_OVERRIDE="${SORIDORMI_MUJOCO_VIEWER}" \
