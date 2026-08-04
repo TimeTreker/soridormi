@@ -85,10 +85,23 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
 
     statuses = _as_set(manifest.get("status_vocab"))
     executions = _as_set(manifest.get("execution_vocab"))
+    ability_classes = _as_set(manifest.get("ability_class_vocab"))
+    control_couplings = _as_set(manifest.get("control_coupling_vocab"))
     if not statuses:
         errors.append("status_vocab must be a non-empty list")
     if not executions:
         errors.append("execution_vocab must be a non-empty list")
+    if not ability_classes:
+        errors.append("ability_class_vocab must be a non-empty list")
+    if not control_couplings:
+        errors.append("control_coupling_vocab must be a non-empty list")
+
+    physical_resources = manifest.get("physical_resources", {})
+    if not isinstance(physical_resources, dict) or not physical_resources:
+        errors.append("physical_resources must be a non-empty object")
+        declared_resources: set[str] = set()
+    else:
+        declared_resources = {str(name) for name in physical_resources}
 
     actuator_groups = manifest.get("actuator_groups", {})
     if not isinstance(actuator_groups, dict) or not actuator_groups:
@@ -166,6 +179,39 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
                 errors.append(f"skill {skill_id}: safety.fallback is required")
             if safety.get("hardware_enabled") is not False:
                 errors.append(f"skill {skill_id}: hardware execution must remain disabled in manifest")
+
+        if status in AVAILABLE_STATUSES:
+            concurrency = skill.get("concurrency")
+            if not isinstance(concurrency, dict):
+                errors.append(f"skill {skill_id}: available skill requires concurrency contract")
+            else:
+                ability_class = concurrency.get("ability_class")
+                control_coupling = concurrency.get("control_coupling")
+                write_resources = concurrency.get("write_resources")
+                if ability_class not in ability_classes:
+                    errors.append(
+                        f"skill {skill_id}: unknown concurrency ability_class {ability_class!r}"
+                    )
+                if control_coupling not in control_couplings:
+                    errors.append(
+                        f"skill {skill_id}: unknown concurrency control_coupling {control_coupling!r}"
+                    )
+                if not isinstance(write_resources, list) or not write_resources:
+                    errors.append(
+                        f"skill {skill_id}: concurrency.write_resources must be a non-empty list"
+                    )
+                else:
+                    unknown_resources = {str(item) for item in write_resources} - declared_resources
+                    if unknown_resources:
+                        errors.append(
+                            f"skill {skill_id}: unknown concurrency resources {sorted(unknown_resources)}"
+                        )
+                if control_coupling == "body_command_overlay":
+                    envelope = concurrency.get("locomotion_envelope")
+                    if not isinstance(envelope, dict) or not envelope:
+                        errors.append(
+                            f"skill {skill_id}: body_command_overlay requires locomotion_envelope"
+                        )
 
         parameters = skill.get("parameters", {})
         if not isinstance(parameters, dict):
@@ -266,6 +312,7 @@ def build_llm_skill_context(manifest: dict[str, Any], *, language: str = "en") -
                 "- 普通人类口令优先使用 walk_forward(speed=slow/normal/medium/quick/fast_limited)，不要要求用户给 vx_mps。",
                 "- 所有技能默认 sim-first，hardware_enabled=false。",
                 "- 社交语音/TTS 属于 Chromie，不属于 Soridormi。",
+                "- 需要并发身体行为时，先选择精确技能，再通过 soridormi.activity.* 做资源校验和执行。",
             ]
         )
         return "\n".join(lines)
@@ -294,6 +341,7 @@ def build_llm_skill_context(manifest: dict[str, Any], *, language: str = "en") -
             "- Prefer walk_forward(speed=slow/normal/medium/quick/fast_limited) for ordinary human walking requests; do not ask users for vx_mps.",
             "- All skills are sim-first and hardware_enabled=false by default.",
             "- Social speech/TTS belongs to Chromie, not Soridormi.",
+            "- For concurrent body behavior, select exact skills first and use soridormi.activity.* for resource validation and execution.",
         ]
     )
     return "\n".join(lines)

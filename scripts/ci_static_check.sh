@@ -55,6 +55,11 @@ echo "========================="
 echo "Checking repository governance..."
 python scripts/validate_repository_governance.py
 
+if [ "${SORIDORMI_CI_SKIP_PYTEST:-0}" != "1" ]; then
+  echo "Checking concurrent body-activity contracts..."
+  ./scripts/validate_body_concurrency.sh
+fi
+
 robot_config="${SORIDORMI_CI_ROBOT_CONFIG:-configs/robots/open_duck_mini_v2.yaml}"
 echo "Checking canonical policy contract..."
 python -m soridormi_runtime.policy_contract open_duck_forward --robot-config "${robot_config}" --validate-only

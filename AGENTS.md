@@ -41,6 +41,14 @@ robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps) -> act
 - Do not let Chromie or any planner send raw joint actions, motor commands,
   physical coordinates, or low-level `action_14d` outputs.
 - Runtime body state is authoritative for `safe_idle`, active motion, and safety.
+- Chromie has one Cognitive Core with Social-Attention Proposal, Speaking
+  Execution, and Activity Execution lanes; they are coordination lanes, not
+  independent minds.
+- Speech and singing remain Chromie-owned peer capabilities. Soridormi owns
+  physical resource arbitration, body-command composition, and safety.
+- Permit concurrent body behavior only through declared resources and
+  `soridormi.activity.*`; keep one primary locomotion member and one final
+  motor-command authority.
 - Never invent a target, pose, capability, or completion result.
 - Preserve Docker host wrapper behavior; host scripts should enter the correct
   Docker service internally when package imports are required.
@@ -76,6 +84,7 @@ See `docs/PATCH_DELIVERY_AND_VALIDATION.md`.
 
 ```bash
 python scripts/validate_repository_governance.py
+./scripts/validate_body_concurrency.sh
 pytest -q
 python -m compileall -q src
 ```

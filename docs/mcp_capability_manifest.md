@@ -16,6 +16,11 @@ Soridormi therefore exports only `soridormi.*` tools:
 - `soridormi.skill.list`
 - `soridormi.skill.create_plan`
 - `soridormi.skill.execute_plan`
+- `soridormi.activity.get_capabilities`
+- `soridormi.activity.create_plan`
+- `soridormi.activity.execute_plan`
+- `soridormi.activity.status`
+- `soridormi.activity.cancel`
 - `soridormi.task.get_capabilities`
 - `soridormi.task.preview`
 - `soridormi.task.submit`
@@ -32,7 +37,9 @@ adapter and the runtime adapter:
 - local adapter: motion and named-skill execution are no-motion provider
   contract checks;
 - runtime adapter: named-skill execution may move the MuJoCo robot in `sim`
-  mode through bounded velocity or scripted head/body skills;
+  mode through bounded velocity or scripted head/body skills; body-activity
+  execution may run resource-compatible locomotion, bounded gaze, and visual
+  expressions concurrently;
 - hardware shadow/dry-run profiles remain no-motion until a hardware adapter is
   implemented and separately commissioned.
 
@@ -76,10 +83,32 @@ readiness, manifest export, acceptance cases, `task_graph`, and docs checks:
 
 ## Safety boundary
 
-The manifest exposes named body skills, short velocity-plan tools, safety
-controls, task-level contract tools, and status checks.
-`soridormi.robot.get_status` includes a `safe_idle` field for Chromie's
-post-action and cancellation checks.
+The manifest exposes named body skills, short velocity-plan tools,
+resource-aware body-activity tools, safety controls, task-level contract tools,
+and status checks. `soridormi.robot.get_status` includes `safe_idle`,
+`activity_idle`, and `active_lanes` so Chromie can monitor body execution
+without receiving low-level commands.
+
+`soridormi.activity.*` is the exact concurrent body-execution surface. Its
+members are already-selected named skills. Every member declares:
+
+```text
+ability_class
+control_coupling
+write_resources
+optional concurrency envelope
+```
+
+The plan validator permits one primary locomotion/whole-body controller and
+multiple compatible subtle expressions, while enforcing one writer per
+physical resource. Bounded head/gaze overlays are composed into the final
+motor command. Eye animation is an independent visual output. Speech and
+singing remain an external peer lane owned by Chromie and are linked through
+`coordination_id`, never inserted into Soridormi's physical plan.
+
+The activity executor reports per-member results, aggregate status, resource
+claims, cancellation state, and the invariants
+`one_final_motor_command_authority=true` and `safety_authority=soridormi`.
 
 The `soridormi.task.*` tools are intentionally contract-first in embodied task contract.
 `soridormi.task.get_capabilities` is read-only and reports Soridormi-owned

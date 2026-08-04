@@ -9,9 +9,21 @@ For the staged implementation plan, see
 
 ## Core agreement
 
-Chromie is the cognitive and social agent. It understands the user, keeps
-conversation and task context, asks clarifying questions, manages confirmation,
-uses memory/search/speech tools, and builds global task DAGs.
+Chromie has one authoritative Cognitive Core with three concurrent coordination
+lanes:
+
+```text
+Social-Attention Proposal Lane
+Speaking Execution Lane
+Activity Execution Lane
+```
+
+The lanes are not independent minds. The Cognitive Core owns user meaning,
+Goal Association, Goal lifecycle, planning, personality, and authored
+communication. Social Attention proposes only. Speaking delivers authored
+communication. Activity executes and monitors provider work. One Cognitive
+Runtime Coordinator validates timing, confirmation, cancellation, and outcome
+reconciliation across the execution lanes.
 
 Soridormi is the embodied robot agent. It owns robot state, body capability
 availability, embodied task planning, sensing/localization hooks, local routing,
@@ -21,11 +33,12 @@ recovery, MuJoCo execution, and future hardware execution.
 The boundary is MCP:
 
 ```text
-Chromie global task DAG
-  -> Soridormi MCP embodied task or skill request
-  -> Soridormi embodied task DAG / state machine
-  -> bounded skills, trajectories, gait, controller, recovery
-  -> structured status/events back to Chromie
+Chromie authoritative plan and coordinated execution group
+  -> Speaking Execution Lane for speech or singing
+  -> Activity Execution Lane for provider work
+       -> Soridormi task, skill, or concurrent body-activity request
+       -> bounded body skills, resources, command composition, recovery
+  -> structured outcomes reconciled by the Cognitive Runtime Coordinator
 ```
 
 Chromie should send what should be achieved and why. Soridormi decides whether
@@ -38,7 +51,11 @@ provenance only. It rejects executable semantics, low-level controls, and
 physical coordinates in that metadata, then independently validates and plans
 the named skill through its owned runtime boundary.
 
-## Two DAG scopes
+## Coordination and DAG scopes
+
+The lane model and the DAG model are complementary. The Cognitive Core and
+planner author one global plan; the coordinator schedules peer execution lanes.
+
 
 ### Chromie global DAG
 
@@ -85,11 +102,18 @@ Soridormi should expose multiple MCP levels, not a single skill endpoint:
 soridormi.robot.*       read status, mode, battery, active task, safe_idle
 soridormi.safety.*      monitor, stop, cancel, emergency stop
 soridormi.skill.*       atomic body skills and skill plans
+soridormi.activity.*    exact concurrent body-skill groups
 soridormi.task.*        no-motion embodied task contract/status/events/cancel
 ```
 
 `soridormi.skill.*` is appropriate for atomic body behaviors such as
 `nod_yes`, `look_at_person`, `turn_in_place`, or explicit low-level test cases.
+
+`soridormi.activity.*` is appropriate when the authoritative planner has
+selected exact compatible body skills that must overlap. It supports one
+primary locomotion member, compatible bounded head/gaze overlays, and
+independent visual expressions. Speech is not an activity member; Chromie runs
+it as a peer Speaking lane under the same `coordination_id`.
 
 `soridormi.task.*` is implemented as a contract-first, no-motion surface for
 rich embodied requests such as navigation, approach, inspection, gesture,
@@ -97,6 +121,32 @@ recovery, or unsupported object delivery. Supported requests may compile to
 named-skill dry runs; that is not physical task execution. A future monitored
 task executor may use the validated skill path internally only after its own
 qualification.
+
+
+### Coordinated walking, gaze, blinking, and speech
+
+```text
+Cognitive Core:
+  understands "walk toward me while singing and blinking"
+
+Planner:
+  selects chromie.vocal.perform
+  selects soridormi.walk_velocity
+  selects soridormi.look_at_person
+  selects soridormi.blink_eyes
+
+Coordinator:
+  starts the Speaking and Activity lanes with one coordination_id
+
+Soridormi:
+  validates body resource compatibility
+  composes locomotion and bounded head overlay into one motor command
+  runs eye expression on its independent output
+  preempts physical behavior whenever safety requires it
+```
+
+Social Attention may propose gaze or blinking, but the Cognitive Core and
+planner decide whether the proposal becomes an exact provider request.
 
 ## Examples
 
@@ -148,7 +198,9 @@ not lower it into body motion.
 Chromie maintains:
 
 - user intent and conversation history;
-- parent goals and task DAG state;
+- Goal meaning, Goal Association, lifecycle, and global task DAG state;
+- social-attention proposals and their acceptance or suppression;
+- speaking and activity coordination groups;
 - clarifications and confirmations;
 - user preferences and memories;
 - cross-capability orchestration.
@@ -159,7 +211,9 @@ Soridormi maintains:
 - embodied task state and substeps;
 - local target/route/motion context;
 - selected gait, skill, controller, and fallback;
-- execution telemetry, progress, blocked state, and recovery state.
+- execution telemetry, progress, blocked state, and recovery state;
+- physical resource claims, per-member activity state, final motor-command
+  composition, and safety preemption.
 
 Body-wide state remains runtime-owned. Task and capability payloads project
 live `safe_idle`, active-motion, and emergency-stop state; task-local
@@ -177,3 +231,5 @@ ask for it. Soridormi promotion requires:
 - explicit unsupported status for missing hardware capabilities;
 - no exposure of raw natural language, raw perception, joint targets, motor
   commands, torque commands, or `action_14d` outputs to Chromie.
+
+See `docs/CHROMIE_COGNITIVE_CONCURRENCY_MODEL.md` and `docs/SORIDORMI_BODY_CONCURRENCY.md` for the detailed lane and provider contracts.

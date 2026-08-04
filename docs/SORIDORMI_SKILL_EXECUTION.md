@@ -1,16 +1,15 @@
 # Soridormi skill execution contract
 
-skill execution contract adds the first execution-facing layer for the structured body-skill interface skill platform.  It is
-still **dry-run only**: it resolves manifest-declared skills into high-level
-velocity command plans, but it does not connect to MuJoCo, hardware, MCP, or
-motor commands.
+Soridormi's skill registry resolves manifest-declared named skills into bounded,
+validated plans. The local provider supports dry-run planning; the runtime MCP
+adapter executes the qualified subset in MuJoCo. Hardware remains unavailable.
 
-This registry is the planned Chromie-to-Soridormi body boundary. Chromie is the
-brain that chooses high-level actions; Soridormi is the cerebellum that
-validates skill parameters, checks availability/safety, and executes body
-controllers.
+Chromie's authoritative planner selects exact high-level capabilities.
+Soridormi validates skill parameters, availability, physical resources, safety,
+and runtime support before body execution. Neither Chromie nor the task API
+supplies raw motor or policy actions.
 
-The purpose is to make skill implementation incremental and testable:
+The implementation remains incremental and testable:
 
 1. declare a skill in `configs/skills/open_duck_mini_v2_skills.json`;
 2. validate it with `./scripts/list_skills.sh --validate-only`;
@@ -93,6 +92,36 @@ useful forward walk speed of `0.12 m/s`. The resolved plan keeps
 `requested_vx_mps` and `min_forward_speed_mps` metadata when a numeric command
 is adjusted, so debugging can see both the user/planner request and the command
 sent to the runtime.
+
+## Concurrent body-activity execution
+
+Atomic skills can also participate in an exact Soridormi body-activity plan.
+The manifest declares `ability_class`, `control_coupling`, and
+`write_resources` for every available skill.
+
+```text
+one primary locomotion / whole-body member
++ compatible bounded head/gaze overlay
++ compatible independent visual expressions
+-> one resource-validated body activity
+```
+
+The current runtime composes a bounded head/gaze target into each locomotion
+controller command before sending one final `MotorCommand`. Eye blinking uses
+an independent visual output and does not write motor commands. Standalone
+head/whole-body gestures remain incompatible with locomotion unless explicitly
+qualified.
+
+Speech and singing are peer Chromie capabilities. They are never skill members
+inside Soridormi's body plan. Chromie's coordinator may link speech and body
+execution with `coordination_id` and propagate interaction cancellation, while
+Soridormi retains independent physical stop and recovery authority.
+
+Validate this path with:
+
+```bash
+./scripts/validate_body_concurrency.sh
+```
 
 ## Safety rules
 

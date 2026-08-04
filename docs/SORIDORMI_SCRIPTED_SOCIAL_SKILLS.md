@@ -1,12 +1,23 @@
 # Soridormi scripted social skills
 
-scripted social skills lands the first safe social skill for Open Duck Mini v2: `look_direction`.
-scripted social simulation expands the same safe path with `nod_yes` and `shake_no`. express-attention skill adds `express_attention` as a subtle listening/attention cue. The visual-expression path adds `blink_eyes` as a simulator-only eye cue. scripted social simulation.1 fixes
-those repeated gestures so they are visible two-cycle motions rather than tiny
-near-neutral keyframes. scripted social simulation.2 makes repeated social gestures strict neutral-home
-axis gestures: pre-center the head, move only the intended axis, then return to
-neutral. These skills are intentionally narrow, MuJoCo-first, and head/neck-only.
-They do not use arms, hands, speech, natural language, or hardware.
+Soridormi provides bounded MuJoCo-first head, gaze, and visual-expression
+skills for Open Duck Mini v2. These are body capability primitives; Chromie's
+Social-Attention Proposal Lane decides when an expression may be socially
+appropriate, and the single Cognitive Core decides whether and how to include it
+in an authoritative plan.
+
+The current set includes `look_direction`, `look_at_person`, `nod_yes`,
+`shake_no`, `express_attention`, and `blink_eyes`. They do not author speech,
+interpret natural language, or operate hardware.
+
+The skills are divided by physical coupling:
+
+- `blink_eyes` is an independent visual output and may run with locomotion;
+- bounded `look_direction` and `look_at_person` may run as head/gaze overlays
+  inside a validated body-activity plan;
+- repeated nodding, shaking, bowing, and other standalone head/whole-body
+  gestures do not run concurrently with primary locomotion unless separately
+  qualified.
 
 ## What is executable
 
@@ -43,6 +54,23 @@ pose, the gesture moves only its intended axis, and the final keyframe returns t
 neutral. This matches the expected social behavior: `shake_no` starts straight,
 turns left/right at least twice, and ends straight; `nod_yes` starts straight,
 moves down/up at least twice, and ends straight.
+
+## Concurrency boundary
+
+Direct scripted-skill execution is still useful for isolated tests. Concurrent
+execution uses `soridormi.activity.create_plan` and
+`soridormi.activity.execute_plan` so resource compatibility is validated before
+execution.
+
+A gaze overlay is permitted only inside its declared locomotion envelope. The
+runtime composer applies the requested head joints to the locomotion command
+and sends one final motor command. It does not start a second motor controller.
+`blink_eyes` uses the visual-expression API and can run independently.
+
+If balance or hardware safety requires immediate intervention, Soridormi may
+cancel or preempt expression without waiting for Chromie. Dynamic balance-margin
+reduction of an overlay is not yet claimed; the current implementation uses
+static declared envelopes and fail-closed resource checks.
 
 ## Safety boundary
 

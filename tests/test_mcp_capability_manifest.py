@@ -254,3 +254,64 @@ def test_dag_contract_uses_semantic_status_language() -> None:
         for rule in bundle.dag_contract["rules"]
     )
     assert all("embodied task contract" not in rule for rule in bundle.dag_contract["rules"])
+
+
+def test_body_activity_surface_declares_resource_validated_concurrency() -> None:
+    bundle = build_soridormi_capability_bundle(mode="sim")
+    tools = {tool.name: tool for agent in bundle.agents for tool in agent.tools}
+
+    expected = {
+        "soridormi.activity.get_capabilities",
+        "soridormi.activity.create_plan",
+        "soridormi.activity.execute_plan",
+        "soridormi.activity.status",
+        "soridormi.activity.cancel",
+    }
+    assert expected <= set(tools)
+
+    capabilities = tools["soridormi.activity.get_capabilities"]
+    assert capabilities.execution.side_effect_free is True
+    assert capabilities.output_schema["properties"]["speech_owner"]["const"] == "chromie"
+
+    create_plan = tools["soridormi.activity.create_plan"]
+    member_schema = create_plan.input_schema["properties"]["members"]["items"]
+    assert "skill_id" in member_schema["properties"]
+    assert "optional" in member_schema["properties"]
+    assert "coordination_id" in create_plan.input_schema["properties"]
+    assert "Do not include speech" in create_plan.llm_hints["when_to_use"]
+
+    execute = tools["soridormi.activity.execute_plan"]
+    assert execute.safety_class == "physical_motion"
+    assert execute.confirmation.required is True
+    assert execute.monitoring.requires_safety_monitor is True
+    assert execute.execution.exclusive_group == "soridormi.body_activity_scheduler"
+    assert execute.output_schema["properties"]["one_final_motor_command_authority"]["type"] == "boolean"
+
+
+def test_status_schema_exposes_concurrent_body_lanes() -> None:
+    bundle = build_soridormi_capability_bundle(mode="sim")
+    tools = {tool.name: tool for agent in bundle.agents for tool in agent.tools}
+    properties = tools["soridormi.robot.get_status"].output_schema["properties"]
+
+    assert properties["active_lanes"]["type"] == "object"
+    assert properties["activity_idle"]["type"] == "boolean"
+
+
+def test_dag_contract_freezes_single_core_three_lane_model() -> None:
+    bundle = build_soridormi_capability_bundle(mode="sim")
+    contract = bundle.dag_contract
+
+    assert contract["chromie_concurrency_model"] == {
+        "cognitive_core": "single_authoritative_mind",
+        "lanes": [
+            "social_attention_proposal",
+            "speaking_execution",
+            "activity_execution",
+        ],
+        "runtime_coordinator": "chromie",
+        "speech_owner": "chromie",
+        "body_provider": "soridormi",
+    }
+    assert contract["soridormi_concurrency_model"]["one_final_motor_command_authority"] is True
+    assert "soridormi.activity.execute_plan" in contract["physical_motion_tools"]
+    assert any("Speech or singing is never a Soridormi activity member" in rule for rule in contract["rules"])

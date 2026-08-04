@@ -81,6 +81,24 @@ Externally callable body behavior is a bounded named skill or structured body
 context. Soridormi validates availability, parameters, current state, safety,
 interruptibility, and backend support before execution.
 
+## Concurrent body-activity boundary
+
+When exact body skills must overlap, Chromie's Activity Execution Lane uses the
+Soridormi body-activity path. Soridormi permits at most one primary locomotion or
+whole-body member plus resource-compatible subtle expressions.
+
+```text
+exact named skills
+  -> resource and envelope validation
+  -> one primary controller plus compatible overlays/visual output
+  -> one final motor command and authoritative body evidence
+```
+
+Speech and singing remain in Chromie's peer Speaking Execution Lane. A shared
+`coordination_id` may relate the lanes, but it does not transfer speech meaning
+or physical authority. Soridormi can reject, constrain, cancel, stop, or recover
+physical execution independently for safety.
+
 ## Task boundary
 
 The task API accepts richer structured embodied goals and returns Soridormi's
@@ -118,6 +136,7 @@ must include integrity checks and scope-appropriate functional validation.
 git apply --check ~/Downloads/<patch>.patch
 git apply ~/Downloads/<patch>.patch
 python scripts/validate_repository_governance.py
+./scripts/validate_body_concurrency.sh
 ```
 
 See `docs/PATCH_DELIVERY_AND_VALIDATION.md`.

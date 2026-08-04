@@ -10,7 +10,8 @@ in `docs/STATUS.md`.
 - Replaceable policy profiles and packaging
 - Scenario-aware data, training, and closed-loop evaluation
 - Bounded named skills and scripted interaction behaviors
-- MCP robot, safety, motion, skill, and task surfaces
+- Resource-aware concurrent body activities with one final motor command
+- MCP robot, safety, motion, skill, activity, and task surfaces
 - No-motion embodied task lifecycle, graph, events, idempotency, and timeout
 - Source-revision projection for paired evidence
 
@@ -51,6 +52,25 @@ Acceptance:
 - explicit labels are preserved as references;
 - physical coordinates remain Soridormi-owned.
 
+## Concurrent cognitive and embodied execution
+
+Preserve one Cognitive Core with Social-Attention Proposal, Speaking Execution,
+and Activity Execution lanes. The Soridormi provider executes exact compatible
+body members through physical resource arbitration and final command
+composition.
+
+Acceptance:
+
+- social attention remains proposal-only;
+- speaking and activity are peer execution lanes;
+- speech is not a Soridormi body member;
+- at most one primary locomotion member is accepted;
+- head/gaze overlays stay inside declared envelopes;
+- visual expressions do not write motor commands;
+- interaction cancellation is propagated by Chromie;
+- physical safety preemption remains independent and Soridormi-owned;
+- per-member and aggregate outcomes prevent unsupported completion claims.
+
 ## Paired Chromie integration qualification
 
 Verify provider discovery, proposal metadata, task preview/submit, event
@@ -79,6 +99,7 @@ process. Hardware remains disabled by default.
 
 ```bash
 python scripts/validate_repository_governance.py
+./scripts/validate_body_concurrency.sh
 SORIDORMI_TASK_AGENT_USE_DOCKER=0 ./scripts/validate_task_agent_contract.sh
 pytest -q
 ```

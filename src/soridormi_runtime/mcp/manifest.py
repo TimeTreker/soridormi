@@ -217,6 +217,8 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                     "fallen": {"type": "boolean"},
                     "emergency_stop": {"type": "boolean"},
                     "active_task": {"type": ["object", "null"]},
+                    "active_lanes": {"type": "object"},
+                    "activity_idle": {"type": "boolean"},
                     "safe_idle": {"type": "boolean"},
                     "robot_time": {"type": "number"},
                     "source_revision": {
@@ -531,6 +533,240 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                     hard_interrupt_events=["emergency_stop"],
                 ),
                 default_failure_policy=FailurePolicy(strategy="stop_and_report"),
+            ),
+        ],
+    )
+
+    activity_member_schema = {
+        "type": "object",
+        "properties": {
+            "member_id": {"type": "string", "minLength": 1},
+            "skill_id": {"type": "string", "minLength": 1},
+            "parameters": {"type": "object", "additionalProperties": True},
+            "optional": {"type": "boolean"},
+        },
+        "required": ["skill_id"],
+        "additionalProperties": False,
+    }
+    activity_plan_schema = _object_schema(
+        {
+            "coordination_id": {"type": "string", "minLength": 1},
+            "members": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 8,
+                "items": activity_member_schema,
+            },
+            "profile": {"type": "string"},
+            "chromie_intent": _chromie_intent_schema(),
+        },
+        required=["members"],
+    )
+    activity_plan_schema["additionalProperties"] = False
+    activity_status_schema = _object_schema(
+        {
+            "schema_version": {"type": "string"},
+            "plan_id": {"type": "string"},
+            "coordination_id": {"type": ["string", "null"]},
+            "mode": {"type": "string"},
+            "backend": {"type": "string"},
+            "status": {
+                "type": "string",
+                "enum": [
+                    "planned",
+                    "running",
+                    "completed",
+                    "completed_with_degradation",
+                    "cancelled",
+                    "failed",
+                ],
+            },
+            "terminal": {"type": "boolean"},
+            "cancel_requested": {"type": "boolean"},
+            "cancel_reason": {"type": ["string", "null"]},
+            "failure_reason": {"type": ["string", "null"]},
+            "estimated_duration_s": {"type": "number"},
+            "dry_run_only": {"type": "boolean"},
+            "members": {"type": "array", "items": {"type": "object"}},
+            "member_results": {"type": "object"},
+            "resource_claims": {"type": "array", "items": {"type": "string"}},
+            "safety_authority": {"type": "string", "const": "soridormi"},
+            "speech_owner": {"type": "string", "const": "chromie"},
+            "one_final_motor_command_authority": {"type": "boolean", "const": True},
+        },
+        required=[
+            "schema_version",
+            "plan_id",
+            "status",
+            "terminal",
+            "members",
+            "resource_claims",
+            "safety_authority",
+            "speech_owner",
+            "one_final_motor_command_authority",
+        ],
+    )
+    activity_agent = AgentManifest(
+        agent_id="soridormi.activity",
+        display_name="Soridormi Concurrent Body Activity Agent",
+        description=(
+            "Validate and execute exact coordinated body activities containing one "
+            "primary locomotion member plus compatible subtle-expression members. "
+            "Speech remains a peer Chromie execution lane."
+        ),
+        transport=TransportSpec(
+            kind="local_cli",
+            command="python",
+            args=["-m", "soridormi_runtime.mcp.call_tool"],
+        ),
+        status=AgentStatus(available=True, details={"mode": mode}),
+        tags=["soridormi", "body-activity", "concurrency", "safety"],
+        tools=[
+            ToolCapability(
+                name="soridormi.activity.get_capabilities",
+                agent_id="soridormi.activity",
+                description=(
+                    "Read Soridormi's body ability classes, resource model, "
+                    "concurrency rules, and Chromie speech ownership boundary."
+                ),
+                input_schema=_object_schema({}),
+                output_schema=_object_schema(
+                    {
+                        "schema_version": {"type": "string"},
+                        "speech_owner": {"type": "string", "const": "chromie"},
+                        "ability_classes": {"type": "array", "items": {"type": "object"}},
+                        "control_couplings": {"type": "array", "items": {"type": "string"}},
+                        "concurrency_rules": {"type": "object"},
+                        "coordination": {"type": "object"},
+                    },
+                    required=[
+                        "schema_version",
+                        "speech_owner",
+                        "ability_classes",
+                        "control_couplings",
+                        "concurrency_rules",
+                    ],
+                ),
+                effects=["read_only"],
+                safety_class="safe_read",
+                availability=ToolAvailability(modes=safe_modes),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=1.0,
+                    idempotent=True,
+                    side_effect_free=True,
+                ),
+            ),
+            ToolCapability(
+                name="soridormi.activity.create_plan",
+                agent_id="soridormi.activity",
+                description=(
+                    "Validate exact body members, resource compatibility, bounded "
+                    "head-overlay envelopes, and create an opaque body-activity plan."
+                ),
+                input_schema=activity_plan_schema,
+                output_schema=activity_status_schema,
+                effects=["planning_only", "creates_plan", "resource_validation"],
+                safety_class="planning_only",
+                availability=ToolAvailability(modes=safe_modes),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=3.0,
+                    idempotent=False,
+                    side_effect_free=False,
+                ),
+                llm_hints={
+                    "when_to_use": (
+                        "Use after the authoritative planner has selected exact body "
+                        "skills that must run concurrently. Do not include speech here."
+                    ),
+                    "speech_boundary": (
+                        "Chromie's Speaking Execution Lane owns speech and singing; "
+                        "link peer execution with coordination_id only."
+                    ),
+                },
+            ),
+            ToolCapability(
+                name="soridormi.activity.execute_plan",
+                agent_id="soridormi.activity",
+                description=(
+                    "Execute a validated concurrent body-activity plan. Soridormi "
+                    "composes one final motor command and may reject, constrain, stop, "
+                    "or recover independently for physical safety."
+                ),
+                input_schema=_object_schema(
+                    {"plan_id": {"type": "string", "minLength": 1}},
+                    required=["plan_id"],
+                ),
+                output_schema=activity_status_schema,
+                effects=["physical_motion", "visual_expression", "body_activity_execution"],
+                safety_class="physical_motion",
+                availability=ToolAvailability(modes=safe_modes),
+                execution=ExecutionPolicy(
+                    can_run_parallel=False,
+                    exclusive_group="soridormi.body_activity_scheduler",
+                    timeout_s=60.0,
+                    idempotent=False,
+                    side_effect_free=False,
+                ),
+                confirmation=ConfirmationPolicy(
+                    required=True,
+                    reason="A coordinated body activity may move the robot.",
+                    required_in_modes=["hardware_shadow", "hardware_dry_run"],
+                    skippable_in_modes=["sim"],
+                ),
+                monitoring=MonitoringPolicy(
+                    requires_safety_monitor=True,
+                    recommended_monitor_tools=["soridormi.safety.monitor_motion"],
+                    hard_interrupt_events=["emergency_stop"],
+                ),
+                default_failure_policy=FailurePolicy(strategy="stop_and_report"),
+            ),
+            ToolCapability(
+                name="soridormi.activity.status",
+                agent_id="soridormi.activity",
+                description="Read per-member and aggregate body-activity status.",
+                input_schema=_object_schema(
+                    {"plan_id": {"type": "string", "minLength": 1}},
+                    required=["plan_id"],
+                ),
+                output_schema=activity_status_schema,
+                effects=["read_only"],
+                safety_class="safe_read",
+                availability=ToolAvailability(modes=safe_modes),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=1.0,
+                    idempotent=True,
+                    side_effect_free=True,
+                ),
+            ),
+            ToolCapability(
+                name="soridormi.activity.cancel",
+                agent_id="soridormi.activity",
+                description=(
+                    "Cancel one coordinated body activity. Physical safety may still "
+                    "escalate independently to emergency stop or recovery."
+                ),
+                input_schema=_object_schema(
+                    {
+                        "plan_id": {"type": "string", "minLength": 1},
+                        "reason": {"type": "string"},
+                    },
+                    required=["plan_id"],
+                ),
+                output_schema=activity_status_schema,
+                effects=["physical_motion", "safety_control", "activity_lifecycle"],
+                safety_class="safety_critical",
+                availability=ToolAvailability(modes=safe_modes),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=2.0,
+                    idempotent=True,
+                    side_effect_free=False,
+                ),
+                confirmation=ConfirmationPolicy(required=False),
+                default_failure_policy=FailurePolicy(strategy="emergency_stop"),
             ),
         ],
     )
@@ -1050,6 +1286,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
             robot_agent,
             motion_agent,
             skill_agent,
+            activity_agent,
             task_agent,
             safety_agent,
             testing_agent,

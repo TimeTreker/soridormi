@@ -10,47 +10,78 @@ policy_boundary:
   planner_role: Convert compound language into ordered, interruptible Soridormi skill invocations.
 cases:
   - id: compound_skills.walk_while_speaking
-    status: planned
+    status: mujoco_eval_ready
     priority: 10
-    natural_language_command: Walk while speaking.
+    natural_language_command: Walk while speaking, looking at me, and blinking naturally.
     target_skill: walk_velocity
     scenario_id: flat_walk_varied_speed_v1
-    external_capabilities:
-      - chromie.speech
     parameters:
-      vx_mps: 0.08
-      duration_s: 6.0
-      concurrent_body_overlay: express_attention
-      speech_owned_by: chromie
+      coordination_id_required: true
+      interruptible: true
+    coordination:
+      owner: chromie_runtime_coordinator
+      relationship: concurrent_peer_lanes
+      coordination_id_required: true
+    external_capabilities:
+      - chromie.vocal.perform
+    body_activity:
+      capability: soridormi.activity.create_plan
+      members:
+        - member_id: locomotion
+          skill_id: walk_velocity
+          parameters:
+            vx_mps: 0.12
+            duration_s: 6.0
+        - member_id: gaze
+          skill_id: look_at_person
+          parameters:
+            target_ref: person_1
+            target_yaw_rad: 0.08
+            target_pitch_rad: -0.04
+            duration_s: 6.0
+        - member_id: blink
+          skill_id: blink_eyes
+          optional: true
+          parameters:
+            count: 3
+            duration_s: 0.25
     task_context:
-      skill_family: compound
-      intent: locomotion_with_speech
+      skill_family: concurrent_embodied_activity
+      intent: locomotion_with_peer_speech_and_subtle_expression
+      speech_owned_by: chromie
       speech_text_to_policy: false
     environment_context:
       terrain_type: flat
       obstacles: []
     expected_outcome:
-      base_motion: slow_forward_progress
-      head_motion: subtle_attention_motion_only_if_stability_allows
-      final_state: stable_ready_pose
+      speech_lane: externally_coordinated_by_chromie
+      locomotion_lane: slow_forward_progress
+      subtle_expression: bounded_gaze_and_independent_blink
+      final_state: safe_idle_after_group_completion
     safety_checks:
       - no_fall
-      - locomotion_priority_over_expression
+      - one_primary_locomotion_controller
+      - one_writer_per_physical_resource
+      - gaze_composed_into_final_motor_command
+      - blink_does_not_write_motor_commands
+      - emergency_stop_preempts_all_body_members
       - speech_separate_from_low_level_policy
       - no_hardware_actuation
     timeout_s: 9.0
     pass_fail_metrics:
+      - name: activity_status
+        operator: in
+        value:
+          - completed
+          - completed_with_degradation
       - name: fallen
         operator: equals
         value: false
-      - name: forward_progress_m
-        operator: greater_equal
-        value: 0.10
-      - name: body_overlay_cancelled_on_instability
+      - name: one_final_motor_command_authority
         operator: equals
         value: true
     validation:
-      dry_run: ./scripts/run_skill_dry_run.sh walk_velocity --args '{"vx_mps":0.08,"duration_s":6.0}'
+      contract: ./scripts/validate_body_concurrency.sh
 
   - id: compound_skills.walk_then_nod
     status: planned

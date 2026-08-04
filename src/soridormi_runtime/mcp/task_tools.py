@@ -648,15 +648,43 @@ def _contract_only_plan_steps(record: EmbodiedTaskRecord) -> list[dict[str, Any]
                 layer="interaction",
                 kind="speech_coordination",
                 status="external",
-                summary="Chromie owns speech generation and playback timing.",
+                summary=(
+                    "Chromie owns communicative meaning, TTS or singing, playback, "
+                    "and interaction cancellation."
+                ),
+                requires=["chromie_speech_coordination"],
             ),
             _plan_step(
                 2,
+                owner="chromie",
                 layer="planning",
-                kind="body_motion_planning_hold",
+                kind="exact_capability_selection",
                 status="planning_hold",
-                summary="Soridormi needs an executable body-motion plan before moving.",
-                requires=["validated_motion_skill_or_task_executor"],
+                summary=(
+                    "The Cognitive Core and planner must select exact speech and body "
+                    "capabilities plus their timing relationship."
+                ),
+                requires=["authoritative_plan", "coordination_id"],
+            ),
+            _plan_step(
+                3,
+                layer="body_activity",
+                kind="resource_validated_body_activity",
+                status="ready_for_exact_plan",
+                summary=(
+                    "Soridormi can validate and execute a compatible body-activity "
+                    "plan through its resource arbiter and final command composer."
+                ),
+                requires=[
+                    "body_activity_scheduler",
+                    "body_command_composer",
+                    "physical_resource_arbiter",
+                ],
+                recommended_tools=[
+                    "soridormi.activity.get_capabilities",
+                    "soridormi.activity.create_plan",
+                    "soridormi.activity.execute_plan",
+                ],
             ),
         ]
     if record.task_type == "recover_safe_idle":

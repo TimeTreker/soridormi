@@ -12,6 +12,11 @@ Soridormi exports robot tools such as:
 - `soridormi.motion.create_plan`
 - `soridormi.motion.execute_plan`
 - `soridormi.motion.stop`
+- `soridormi.activity.get_capabilities`
+- `soridormi.activity.create_plan`
+- `soridormi.activity.execute_plan`
+- `soridormi.activity.status`
+- `soridormi.activity.cancel`
 - `soridormi.task.get_capabilities`
 - `soridormi.task.preview`
 - `soridormi.task.submit`
@@ -57,6 +62,38 @@ A safe short-motion DAG should follow this shape:
 
 `stop` and `emergency_stop` may preempt any running motion task. Raw motor,
 joint, and torque APIs must remain outside LLM-visible manifests.
+
+## Coordinated speaking and body activity
+
+Chromie has one Cognitive Core and three coordination lanes: Social-Attention
+Proposal, Speaking Execution, and Activity Execution. The lanes do not select
+meaning independently. The authoritative planner chooses exact capabilities,
+and the Cognitive Runtime Coordinator preserves start, dependency, and
+cancellation relationships.
+
+For “walk toward me while singing and blinking,” the safe shape is:
+
+1. the Cognitive Core resolves the Goal and exact target;
+2. the planner selects `chromie.vocal.perform`, a locomotion skill, and
+   `blink_eyes` or a bounded gaze skill;
+3. `soridormi.activity.get_capabilities` checks current body concurrency;
+4. `soridormi.activity.create_plan` validates exact body members and resources;
+5. Chromie's coordinator starts the Speaking lane and
+   `soridormi.activity.execute_plan` using the same `coordination_id`;
+6. `soridormi.safety.monitor_motion` and `soridormi.activity.status` monitor
+   physical execution;
+7. interaction cancellation propagates to the selected lanes, while Soridormi
+   may independently preempt physical work for safety;
+8. completion speech waits for authoritative lane outcomes.
+
+Social Attention may propose gaze, blinking, acknowledgment, or suppression,
+but the proposal is accepted, rejected, or transformed by the single Cognitive
+Core before exact capabilities are dispatched. The Activity lane invokes and
+monitors the selected provider calls; it does not reinterpret the Goal.
+
+Soridormi never receives speech meaning as a body member. It owns physical
+resource arbitration, command composition, emergency stop, recovery, and final
+body evidence.
 
 A rich embodied task DAG should keep global reasoning in Chromie and submit only
 structured body goals to Soridormi:

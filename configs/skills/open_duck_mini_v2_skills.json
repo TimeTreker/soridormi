@@ -143,7 +143,15 @@
         "zero_command_stability",
         "fall_rate",
         "base_drift"
-      ]
+      ],
+      "concurrency": {
+        "ability_class": "locomotion_whole_body",
+        "control_coupling": "primary_body_controller",
+        "write_resources": [
+          "body.primary_motion"
+        ],
+        "safety_preemption": "safe_hold"
+      }
     },
     {
       "id": "stop",
@@ -174,7 +182,15 @@
         "stop_distance",
         "post_stop_drift",
         "fall_rate"
-      ]
+      ],
+      "concurrency": {
+        "ability_class": "locomotion_whole_body",
+        "control_coupling": "primary_body_controller",
+        "write_resources": [
+          "body.primary_motion"
+        ],
+        "safety_preemption": "safe_hold"
+      }
     },
     {
       "id": "walk_velocity",
@@ -230,7 +246,15 @@
         "forward_progress_ratio",
         "fall_rate",
         "stuck_ratio"
-      ]
+      ],
+      "concurrency": {
+        "ability_class": "locomotion_whole_body",
+        "control_coupling": "primary_body_controller",
+        "write_resources": [
+          "body.primary_motion"
+        ],
+        "safety_preemption": "safe_hold"
+      }
     },
     {
       "id": "walk_forward",
@@ -287,7 +311,15 @@
         "quick": 0.16,
         "fast_limited": 0.18
       },
-      "notes": "Executable semantic wrapper for Chromie and human-facing task planners. Use walk_forward(speed=slow|normal|medium|quick|fast_limited) for ordinary speech. It lowers to walk_velocity(vx>0, vy=0, yaw=0). True running remains future and should use run only after a validated controller exists."
+      "notes": "Executable semantic wrapper for Chromie and human-facing task planners. Use walk_forward(speed=slow|normal|medium|quick|fast_limited) for ordinary speech. It lowers to walk_velocity(vx>0, vy=0, yaw=0). True running remains future and should use run only after a validated controller exists.",
+      "concurrency": {
+        "ability_class": "locomotion_whole_body",
+        "control_coupling": "primary_body_controller",
+        "write_resources": [
+          "body.primary_motion"
+        ],
+        "safety_preemption": "safe_hold"
+      }
     },
     {
       "id": "walk_backward",
@@ -377,7 +409,15 @@
         "yaw_tracking",
         "base_drift",
         "fall_rate"
-      ]
+      ],
+      "concurrency": {
+        "ability_class": "locomotion_whole_body",
+        "control_coupling": "primary_body_controller",
+        "write_resources": [
+          "body.primary_motion"
+        ],
+        "safety_preemption": "safe_hold"
+      }
     },
     {
       "id": "turn_left",
@@ -519,7 +559,15 @@
         "yaw_tracking",
         "fall_rate",
         "stuck_ratio"
-      ]
+      ],
+      "concurrency": {
+        "ability_class": "locomotion_whole_body",
+        "control_coupling": "primary_body_controller",
+        "write_resources": [
+          "body.primary_motion"
+        ],
+        "safety_preemption": "safe_hold"
+      }
     },
     {
       "id": "curve_left",
@@ -653,7 +701,15 @@
         "lateral_tracking",
         "yaw_drift",
         "fall_rate"
-      ]
+      ],
+      "concurrency": {
+        "ability_class": "locomotion_whole_body",
+        "control_coupling": "primary_body_controller",
+        "write_resources": [
+          "body.primary_motion"
+        ],
+        "safety_preemption": "safe_hold"
+      }
     },
     {
       "id": "sidestep_left",
@@ -1195,7 +1251,19 @@
         "tracking_error",
         "base_stability"
       ],
-      "notes": "This is the explicit fallback/home command for scripted head social skills; it should preserve non-head actuator controls while homing only head_neck joints."
+      "notes": "This is the explicit fallback/home command for scripted head social skills; it should preserve non-head actuator controls while homing only head_neck joints.",
+      "concurrency": {
+        "ability_class": "subtle_expression",
+        "control_coupling": "standalone_body_motion",
+        "write_resources": [
+          "body.primary_motion",
+          "body.head_pose"
+        ],
+        "parallel_safe_with": [
+          "independent_output"
+        ],
+        "safety_preemption": "safe_hold"
+      }
     },
     {
       "id": "look_direction",
@@ -1241,7 +1309,24 @@
       "evaluation": [
         "joint_limit_margin",
         "tracking_error"
-      ]
+      ],
+      "concurrency": {
+        "ability_class": "subtle_expression",
+        "control_coupling": "body_command_overlay",
+        "write_resources": [
+          "body.head_pose"
+        ],
+        "parallel_safe_with": [
+          "locomotion_whole_body",
+          "independent_output"
+        ],
+        "locomotion_envelope": {
+          "max_abs_head_yaw_rad_during_locomotion": 0.18,
+          "max_abs_head_pitch_rad_during_locomotion": 0.1,
+          "max_head_velocity_radps": 0.2
+        },
+        "safety_preemption": "drop_overlay_keep_primary_safe"
+      }
     },
     {
       "id": "look_at_person",
@@ -1266,7 +1351,7 @@
           "type": "string"
         },
         "duration_s": {
-          "min": 2.0,
+          "min": 0.2,
           "max": 10.0,
           "default": 4.0
         },
@@ -1307,7 +1392,24 @@
         "joint_limit_margin",
         "base_stability"
       ],
-      "notes": "This implementation consumes structured target_yaw_rad/target_pitch_rad only. It uses the default gaze behavior to hold_target so the robot does not immediately return to neutral after looking at somebody. It does not run camera perception, person detection, raw natural language parsing, arms, hands, torso, or hardware."
+      "notes": "This implementation consumes structured target_yaw_rad/target_pitch_rad only. It uses the default gaze behavior to hold_target so the robot does not immediately return to neutral after looking at somebody. It does not run camera perception, person detection, raw natural language parsing, arms, hands, torso, or hardware. Concurrent locomotion overlays use a stricter bounded yaw/pitch and velocity envelope declared in concurrency.locomotion_envelope.",
+      "concurrency": {
+        "ability_class": "subtle_expression",
+        "control_coupling": "body_command_overlay",
+        "write_resources": [
+          "body.head_pose"
+        ],
+        "parallel_safe_with": [
+          "locomotion_whole_body",
+          "independent_output"
+        ],
+        "locomotion_envelope": {
+          "max_abs_head_yaw_rad_during_locomotion": 0.18,
+          "max_abs_head_pitch_rad_during_locomotion": 0.1,
+          "max_head_velocity_radps": 0.2
+        },
+        "safety_preemption": "drop_overlay_keep_primary_safe"
+      }
     },
     {
       "id": "track_person",
@@ -1396,7 +1498,19 @@
         "visual_expression_trace",
         "eye_geom_state"
       ],
-      "notes": "This implementation is visual-only in MuJoCo. It toggles open/closed eye geoms generated by soridormi_sim.social_eye_scene and never modifies the low-level locomotion policy, actuator list, arms, hands, torso, or hardware."
+      "notes": "This implementation is visual-only in MuJoCo. It toggles open/closed eye geoms generated by soridormi_sim.social_eye_scene and never modifies the low-level locomotion policy, actuator list, arms, hands, torso, or hardware.",
+      "concurrency": {
+        "ability_class": "subtle_expression",
+        "control_coupling": "independent_output",
+        "write_resources": [
+          "visual.eyes"
+        ],
+        "parallel_safe_with": [
+          "locomotion_whole_body",
+          "body_command_overlay"
+        ],
+        "safety_preemption": "restore_neutral_output"
+      }
     },
     {
       "id": "nod_yes",
@@ -1445,7 +1559,19 @@
         "joint_limit_margin",
         "tracking_error",
         "base_stability"
-      ]
+      ],
+      "concurrency": {
+        "ability_class": "subtle_expression",
+        "control_coupling": "standalone_body_motion",
+        "write_resources": [
+          "body.primary_motion",
+          "body.head_pose"
+        ],
+        "parallel_safe_with": [
+          "independent_output"
+        ],
+        "safety_preemption": "safe_hold"
+      }
     },
     {
       "id": "shake_no",
@@ -1494,7 +1620,19 @@
         "joint_limit_margin",
         "tracking_error",
         "base_stability"
-      ]
+      ],
+      "concurrency": {
+        "ability_class": "subtle_expression",
+        "control_coupling": "standalone_body_motion",
+        "write_resources": [
+          "body.primary_motion",
+          "body.head_pose"
+        ],
+        "parallel_safe_with": [
+          "independent_output"
+        ],
+        "safety_preemption": "safe_hold"
+      }
     },
     {
       "id": "bow",
@@ -1544,7 +1682,19 @@
         "tracking_error",
         "base_stability"
       ],
-      "notes": "This implementation is intentionally head/neck only. Whole-body torso bow remains future work until posture control is validated."
+      "notes": "This implementation is intentionally head/neck only. Whole-body torso bow remains future work until posture control is validated.",
+      "concurrency": {
+        "ability_class": "subtle_expression",
+        "control_coupling": "standalone_body_motion",
+        "write_resources": [
+          "body.primary_motion",
+          "body.head_pose"
+        ],
+        "parallel_safe_with": [
+          "independent_output"
+        ],
+        "safety_preemption": "safe_hold"
+      }
     },
     {
       "id": "greeting",
@@ -1631,7 +1781,19 @@
         "tracking_error",
         "base_stability"
       ],
-      "notes": "This implementation is a subtle listening/attention cue. It does not use perception, speech, arms, hands, torso, or hardware."
+      "notes": "This implementation is a subtle listening/attention cue. It does not use perception, speech, arms, hands, torso, or hardware.",
+      "concurrency": {
+        "ability_class": "subtle_expression",
+        "control_coupling": "standalone_body_motion",
+        "write_resources": [
+          "body.primary_motion",
+          "body.head_pose"
+        ],
+        "parallel_safe_with": [
+          "independent_output"
+        ],
+        "safety_preemption": "safe_hold"
+      }
     },
     {
       "id": "wave_hand",
@@ -1723,5 +1885,29 @@
       ],
       "notes": "Declared so higher-level planners know the desired behavior exists conceptually, but Soridormi must reject it on the current robot."
     }
-  ]
+  ],
+  "ability_class_vocab": [
+    "subtle_expression",
+    "locomotion_whole_body"
+  ],
+  "control_coupling_vocab": [
+    "independent_output",
+    "body_command_overlay",
+    "primary_body_controller",
+    "standalone_body_motion"
+  ],
+  "physical_resources": {
+    "body.primary_motion": {
+      "description": "Exclusive primary locomotion or whole-body control objective.",
+      "kind": "motor_command_primary"
+    },
+    "body.head_pose": {
+      "description": "Bounded head/neck pose overlay composed into the final body motor command.",
+      "kind": "motor_command_overlay"
+    },
+    "visual.eyes": {
+      "description": "Independent visual eye-expression output that does not write motor commands.",
+      "kind": "independent_output"
+    }
+  }
 }

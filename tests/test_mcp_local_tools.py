@@ -287,6 +287,16 @@ def test_task_submit_records_contract_only_task_and_can_cancel() -> None:
     assert "cancelled" in submitted["allowed_next_phases"]
     assert submitted["execution_mode"] == "contract_only"
     assert submitted["no_motion"] is True
+    assert [step["kind"] for step in submitted["plan_steps"]] == [
+        "speech_coordination",
+        "exact_capability_selection",
+        "resource_validated_body_activity",
+    ]
+    assert submitted["plan_steps"][-1]["recommended_tools"] == [
+        "soridormi.activity.get_capabilities",
+        "soridormi.activity.create_plan",
+        "soridormi.activity.execute_plan",
+    ]
     assert status["task_type"] == "speak_while_moving"
     assert status["phase"] == "planning"
     assert events["events"][0]["type"] == "task_accepted"
@@ -550,8 +560,16 @@ def test_task_get_capabilities_reports_soridormi_readiness() -> None:
     assert by_type["speak_while_moving"]["external_dependencies"] == [
         "chromie_speech_coordination",
     ]
-    assert by_type["speak_while_moving"]["missing_subsystems"] == [
-        "validated_motion_skill_or_task_executor",
+    assert by_type["speak_while_moving"]["missing_subsystems"] == []
+    assert "body_activity_scheduler" in payload["ready_subsystems"]
+    assert "body_command_composer" in payload["ready_subsystems"]
+    assert "physical_resource_arbiter" in payload["ready_subsystems"]
+    assert by_type["speak_while_moving"]["recommended_actions"] == [
+        "preview_task",
+        "select_exact_speech_and_body_capabilities",
+        "create_body_activity_plan",
+        "coordinate_peer_lanes",
+        "monitor_or_cancel_coordinated_group",
     ]
     assert by_type["stop_now"]["readiness"] == "safety_redirect"
     assert by_type["stop_now"]["recommended_actions"] == [

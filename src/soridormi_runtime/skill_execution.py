@@ -506,7 +506,11 @@ def _plan_look_at_person(skill: dict[str, Any], parameters: Mapping[str, Any], p
     skill_id = str(skill["id"])
     target_yaw = float(parameters.get("target_yaw_rad", 0.0))
     target_pitch = float(parameters.get("target_pitch_rad", 0.0))
-    target_ref = str(parameters.get("target_ref", "person") or "person")
+    target_ref = str(parameters.get("target_ref") or "").strip()
+    if not target_ref:
+        raise SkillExecutionError(
+            "look_at_person requires a non-empty structured target_ref"
+        )
     duration = float(parameters.get("duration_s", 4.0))
     hold_fraction = float(parameters.get("hold_fraction", 0.50))
     end_mode = str(parameters.get("end_mode", "hold_target") or "hold_target")

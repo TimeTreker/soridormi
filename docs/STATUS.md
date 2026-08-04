@@ -29,8 +29,13 @@ body plan.
   command-conditioned context-policy profiles.
 - Named skills are catalogued, schema-validated, bounded, interruptible where
   declared, and executable through the runtime adapter in MuJoCo.
+- Exact concurrent body activities are validated and executable through
+  `soridormi.activity.*`: one primary locomotion member may run with compatible
+  bounded head overlays and independent visual expressions.
+- The runtime composes locomotion and head overlays into one final motor command;
+  `blink_eyes` remains an independent non-motor visual output.
 - The MCP service exposes robot state, safety tools, bounded motion plans, named
-  skills, and a task-level contract surface.
+  skills, concurrent body activities, and a task-level contract surface.
 - Task capabilities, preview, submit, status, events, and cancel are implemented
   as no-motion contract operations.
 - Task requests reject low-level control fields recursively and fail closed for
@@ -56,6 +61,12 @@ Soridormi does not silently substitute a person, pose, or coordinate.
 
 ## Not currently claimed
 
+- Chromie's three-lane runtime implementation in this repository; this repo
+  defines only the Soridormi provider-side contract
+- Speech or singing execution inside Soridormi
+- Live balance-margin-based overlay suspension or a production WBC backend
+- Concurrent nodding, bowing, shaking, or other unqualified standalone gestures
+  during locomotion
 - General physical task execution through the task API
 - Autonomous navigation, target tracking, obstacle avoidance, manipulation, or
   object delivery
@@ -74,6 +85,10 @@ Soridormi does not silently substitute a person, pose, or coordinate.
 
 ## Current work order
 
+- Qualify concurrent locomotion, gaze overlay, and visual expression in live
+  MuJoCo and retain evidence for cancellation and safety preemption.
+- Update the companion Chromie repository with the single-core three-lane model
+  and coordinated-group lifecycle.
 - Keep semantic contracts independent of implementation sequence labels.
 - Keep body-state projections grounded in the live Soridormi runtime.
 - Close paired Chromie/Soridormi contract qualification without weakening the
@@ -86,6 +101,7 @@ Soridormi does not silently substitute a person, pose, or coordinate.
 
 ```bash
 python scripts/validate_repository_governance.py
+./scripts/validate_body_concurrency.sh
 SORIDORMI_TASK_AGENT_USE_DOCKER=0 ./scripts/validate_task_agent_contract.sh
 pytest -q
 ```

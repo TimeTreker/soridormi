@@ -58,6 +58,7 @@ run_python_gate() {
     tests/test_training_cases.py \
     tests/test_navigation_goal_contract.py \
     tests/test_task_semantic_integrity.py \
+    tests/test_body_activity_concurrency.py \
     tests/test_skill_manifest.py
 }
 
@@ -85,6 +86,14 @@ run_docs_gate() {
     docs/mcp_capability_manifest.md \
     docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md \
     docs/SORIDORMI_EXECUTION_ROADMAP.md >/dev/null
+  rg -n "Social-Attention Proposal Lane|Speaking Execution Lane|Activity Execution Lane" \
+    docs/CHROMIE_COGNITIVE_CONCURRENCY_MODEL.md \
+    docs/CHROMIE_SORIDORMI_MULTI_AGENT_ARCHITECTURE.md >/dev/null
+  rg -n "soridormi.activity.create_plan|one final.*motor|one final motor" \
+    docs/SORIDORMI_BODY_CONCURRENCY.md \
+    docs/SORIDORMI_MCP_SERVER.md \
+    docs/mcp_capability_manifest.md \
+    docs/mcp_dag_integration.md >/dev/null
   python -c 'from pathlib import Path; paths = [Path(p) for p in ("docs/README.md", "docs/SORIDORMI_EXECUTION_ROADMAP.md", "docs/SORIDORMI_MCP_SERVER.md", "docs/mcp_capability_manifest.md", "docs/mcp_dag_integration.md", "docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md", "docs/SORIDORMI_NAVIGATION_GOAL_CONTRACT.md", "docs/SORIDORMI_TEXT_INPUT_ACCEPTANCE.md")]; bad = [str(p) for p in paths if p.read_text(encoding="utf-8").count("```") % 2]; assert not bad, bad'
 }
 
@@ -116,6 +125,8 @@ if [ "${use_docker}" != "0" ]; then
         tests/test_chromie_text_input_acceptance.py \
         tests/test_training_cases.py \
         tests/test_navigation_goal_contract.py \
+        tests/test_task_semantic_integrity.py \
+        tests/test_body_activity_concurrency.py \
         tests/test_skill_manifest.py
     '
   elif [ "${use_docker}" = "1" ]; then

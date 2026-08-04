@@ -40,6 +40,10 @@ features and ordering.
 - Do not feed raw language or raw perception into the low-level action policy.
 - Do not invent targets, body state, capability, or completion results.
 - Project `safe_idle` and active motion from the live body runtime.
+- Preserve one Cognitive Core and three Chromie coordination lanes: Social-
+  Attention Proposal, Speaking Execution, and Activity Execution.
+- Keep speech outside Soridormi; use `soridormi.activity.*` for compatible
+  physical concurrency with declared resources and one final motor command.
 - Use semantic issue names rather than numbered project sequences.
 - Hardware work defaults to read-only or dry-run unless actuator commands are
   explicitly requested and qualified.
@@ -53,6 +57,8 @@ docs/DOCUMENTATION_GOVERNANCE.md
 docs/README.md
 docs/PROJECT_SOP.md
 docs/architecture.md
+docs/CHROMIE_COGNITIVE_CONCURRENCY_MODEL.md
+docs/SORIDORMI_BODY_CONCURRENCY.md
 docs/PATCH_DELIVERY_AND_VALIDATION.md
 docs/SORIDORMI_TARGET_AND_ROADMAP.md
 docs/SORIDORMI_EXECUTION_ROADMAP.md
@@ -65,6 +71,7 @@ docs/SORIDORMI_CONTEXT_DATA_PIPELINE.md
 
 ```bash
 python scripts/validate_repository_governance.py
+./scripts/validate_body_concurrency.sh
 pytest -q
 python -m compileall -q src
 ```

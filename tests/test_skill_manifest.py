@@ -193,3 +193,50 @@ def test_obstacle_run_and_posture_remain_future_not_executable() -> None:
     assert skills["run"]["status"] == "future"
     assert skills["sit_down"]["status"] == "future_pose_teacher"
     assert skills["stand_up"]["status"] == "future_pose_teacher"
+
+
+def test_available_skills_declare_physical_concurrency_contracts() -> None:
+    manifest = _load_manifest()
+    ability_classes = set(manifest["ability_class_vocab"])
+    control_couplings = set(manifest["control_coupling_vocab"])
+    resources = set(manifest["physical_resources"])
+
+    assert ability_classes == {"subtle_expression", "locomotion_whole_body"}
+    assert control_couplings == {
+        "independent_output",
+        "body_command_overlay",
+        "primary_body_controller",
+        "standalone_body_motion",
+    }
+
+    for skill in manifest["skills"]:
+        if skill["status"] not in {"available_sim", "available_sim_experimental"}:
+            continue
+        concurrency = skill["concurrency"]
+        assert concurrency["ability_class"] in ability_classes
+        assert concurrency["control_coupling"] in control_couplings
+        assert concurrency["write_resources"]
+        assert set(concurrency["write_resources"]) <= resources
+
+
+def test_concurrency_contract_distinguishes_locomotion_overlay_and_visual_output() -> None:
+    skills = _skills_by_id()
+
+    walk = skills["walk_velocity"]["concurrency"]
+    assert walk["ability_class"] == "locomotion_whole_body"
+    assert walk["control_coupling"] == "primary_body_controller"
+    assert walk["write_resources"] == ["body.primary_motion"]
+
+    gaze = skills["look_at_person"]["concurrency"]
+    assert gaze["ability_class"] == "subtle_expression"
+    assert gaze["control_coupling"] == "body_command_overlay"
+    assert gaze["write_resources"] == ["body.head_pose"]
+    assert gaze["locomotion_envelope"]["max_abs_head_yaw_rad_during_locomotion"] <= 0.18
+
+    blink = skills["blink_eyes"]["concurrency"]
+    assert blink["control_coupling"] == "independent_output"
+    assert blink["write_resources"] == ["visual.eyes"]
+
+    nod = skills["nod_yes"]["concurrency"]
+    assert nod["control_coupling"] == "standalone_body_motion"
+    assert "body.primary_motion" in nod["write_resources"]

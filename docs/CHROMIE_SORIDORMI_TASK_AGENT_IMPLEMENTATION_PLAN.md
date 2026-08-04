@@ -9,8 +9,12 @@ Chromie owns user language, clarification, confirmation, memory, global task
 state, provider selection, and user-facing reporting.
 
 Soridormi owns robot state, embodied readiness, body-task interpretation,
-bounded skill lowering, safety, execution authority, monitoring, recovery, and
-refusal.
+bounded skill lowering, physical-resource arbitration, body-command
+composition, safety, execution authority, monitoring, recovery, and refusal.
+
+Chromie has one Cognitive Core and three coordination lanes. Goal meaning and
+capability selection remain in the Cognitive Core/planner; the Activity lane
+only executes and monitors selected provider work.
 
 ## Task-level MCP surface
 
@@ -41,18 +45,25 @@ It provides:
 Task preview and submit do not move the robot. A successful skill dry run proves
 only that Soridormi can validate and compile the structured request.
 
-Physical behavior uses:
+Atomic physical behavior uses the named-skill path. Exact compatible body
+members that must overlap use the body-activity path:
 
 ```text
-skill.list
-  -> skill.create_plan
-  -> safety monitoring
-  -> skill.execute_plan
-  -> robot.get_status safe-idle confirmation
+activity.get_capabilities
+  -> activity.create_plan
+  -> confirmation when required
+  -> safety monitoring during activity.execute_plan
+  -> activity.status or activity.cancel
+  -> robot.get_status and per-member outcome reconciliation
 ```
 
-A future task executor may call that path internally only after monitored
-execution, cancellation, recovery, and completion contracts are qualified.
+The activity API is effectful in the runtime-backed MuJoCo adapter. It is not a
+semantic task executor: the authoritative planner must first select exact body
+skills. Speech or singing remains in Chromie's peer Speaking lane.
+
+A future rich task executor may call the skill or activity path internally only
+after monitored execution, cancellation, recovery, and completion contracts
+are qualified.
 
 ## Embodied task schema
 
@@ -111,11 +122,18 @@ Run end-to-end Chromie/Soridormi tests for discovery, proposal metadata,
 preview, submit, polling, cancellation, timeout, failure wording, source
 revision, and no false physical-completion claims.
 
-### Skill-backed monitored task executor
+### Chromie coordinated-group integration
 
-Introduce a Soridormi-owned executor for a minimal set of already-qualified
-skills. Retain task identity, event ordering, active body state, interruption,
-safe hold, and post-action evidence.
+Implement the companion Chromie coordinator for Social-Attention proposals,
+peer Speaking and Activity execution, shared `coordination_id`, interaction
+cancellation, and Goal outcome reconciliation.
+
+### Rich-task monitored executor
+
+Introduce a Soridormi-owned executor only for task types whose sensing and
+planning dependencies are qualified. It may lower exact subwork through the
+existing skill or body-activity paths while retaining task identity, event
+ordering, interruption, safe hold, and post-action evidence.
 
 ### Sensing and planning expansion
 

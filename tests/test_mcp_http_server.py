@@ -108,7 +108,14 @@ def test_streamable_http_preserves_plan_state_across_requests() -> None:
                     async with ClientSession(read, write) as session:
                         await session.initialize()
                         listed = await session.list_tools()
-                        assert len(listed.tools) == 20
+                        tool_names = {tool.name for tool in listed.tools}
+                        assert {
+                            "soridormi.activity.get_capabilities",
+                            "soridormi.activity.create_plan",
+                            "soridormi.activity.execute_plan",
+                            "soridormi.activity.status",
+                            "soridormi.activity.cancel",
+                        } <= tool_names
                         plan = await session.call_tool(
                             "soridormi.motion.create_plan",
                             {
@@ -131,6 +138,39 @@ def test_streamable_http_preserves_plan_state_across_requests() -> None:
                         assert executed.structuredContent is not None
                         assert executed.structuredContent["completed"] is True
                         assert executed.structuredContent["dry_run_only"] is True
+
+                        activity = await session.call_tool(
+                            "soridormi.activity.create_plan",
+                            {
+                                "coordination_id": "http-contract-1",
+                                "members": [
+                                    {
+                                        "member_id": "walk",
+                                        "skill_id": "walk_velocity",
+                                        "parameters": {
+                                            "vx_mps": 0.12,
+                                            "duration_s": 0.2,
+                                        },
+                                    },
+                                    {
+                                        "member_id": "blink",
+                                        "skill_id": "blink_eyes",
+                                        "parameters": {"count": 1},
+                                        "optional": True,
+                                    },
+                                ],
+                            },
+                        )
+                        assert activity.structuredContent is not None
+                        activity_plan_id = activity.structuredContent["plan_id"]
+                        activity_result = await session.call_tool(
+                            "soridormi.activity.execute_plan",
+                            {"plan_id": activity_plan_id},
+                        )
+                        assert activity_result.structuredContent is not None
+                        assert activity_result.structuredContent["completed"] is True
+                        assert activity_result.structuredContent["dry_run_only"] is True
+                        assert activity_result.structuredContent["speech_owner"] == "chromie"
 
         asyncio.run(exercise_server())
     finally:

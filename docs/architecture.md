@@ -11,8 +11,13 @@ Robot API
   -> MuJoCo backend now, qualified hardware backend later
 ```
 
-Chromie owns human meaning and global orchestration. Soridormi owns physical
-meaning and body authority.
+Chromie owns human meaning and global orchestration. It has one Cognitive Core
+with a Social-Attention Proposal Lane, Speaking Execution Lane, Activity
+Execution Lane, and one shared runtime coordinator. These are coordination
+lanes, not independent minds.
+
+Soridormi owns physical meaning and body authority. Speech is a peer Chromie
+execution lane; it is not nested inside Soridormi or the Activity lane.
 
 ## Runtime/backend split
 
@@ -51,12 +56,25 @@ belong under `configs/robots/`, not hardcoded in generic backend logic.
 robot.*   body state and mode
 safety.*  monitoring, stop, cancel, emergency stop
 motion.*  bounded engineering motion plans
-skill.*   named atomic body behaviors
-task.*    richer embodied contract, lifecycle, and body-task graph
+skill.*    named atomic body behaviors
+activity.* exact concurrent body-skill groups and per-member status
+task.*     richer embodied contract, lifecycle, and body-task graph
 ```
 
 The task surface is no-motion until a task executor is independently qualified.
 A task dry run is not a physical execution receipt.
+
+The activity surface is effectful in the runtime-backed simulation adapter. It
+accepts exact skills selected by the authoritative planner, validates one-writer
+resource claims, and executes compatible body members concurrently. It does not
+interpret user language or author speech.
+
+```text
+zero or one primary locomotion member
++ zero or more compatible subtle-expression members
++ one Soridormi safety authority
+-> one final motor command plus independent non-motor outputs
+```
 
 ## State authority
 

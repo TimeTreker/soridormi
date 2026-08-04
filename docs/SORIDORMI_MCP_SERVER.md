@@ -20,9 +20,10 @@ Soridormi safe tool/runtime boundary
 
 The server exposes the tools declared in `soridormi_runtime.mcp.manifest`.
 The current public surface includes read-only robot state, bounded velocity
-motion plans, named-skill plans, contract-only embodied task requests, safety
-controls, and hidden test-only provider fault injection. Plan, task, and
-emergency-stop state are shared across HTTP requests within one server process.
+motion plans, named-skill plans, resource-aware concurrent body activities,
+contract-only embodied task requests, safety controls, and hidden test-only
+provider fault injection. Plan, activity, task, and emergency-stop state are
+shared across HTTP requests within one server process.
 
 The default adapter wraps `SoridormiLocalToolService`, so motion and named-skill
 execution are dry-run only and never send motor commands:
@@ -56,8 +57,9 @@ revision; otherwise it restarts the MCP service with the current identity.
 
 `motion.stop`, `motion.cancel`, and `safety.emergency_stop` can preempt between
 control ticks. Cancelling an in-flight MCP request also transitions the robot
-to safe hold. `robot.get_status` reports `safe_idle=true` only when no task is
-active and emergency stop is clear. Emergency-stop state remains active until
+to safe hold. `robot.get_status` reports `safe_idle=true` only when no physical body lane is
+active and emergency stop is clear. `activity_idle` separately reports whether
+all Soridormi body-activity lanes are idle. Emergency-stop state remains active until
 the MCP process is restarted; inspect robot state before resuming.
 
 Chromie should prefer the named-skill path for body requests:
@@ -80,6 +82,53 @@ The lower-level `soridormi.motion.*` tools remain available for bounded
 velocity-plan integration tests and emergency controls. Neither path exposes
 raw joint targets, motor commands, torque commands, or low-level 14D policy
 outputs to Chromie.
+
+## Concurrent body activities
+
+Compatible physical behaviors use the body-activity surface:
+
+```text
+soridormi.activity.get_capabilities
+soridormi.activity.create_plan
+soridormi.activity.execute_plan
+soridormi.activity.status
+soridormi.activity.cancel
+```
+
+A body-activity plan contains exact named skills, not natural language. Each
+skill declares an ability class, control coupling, and write resources. The
+resource arbiter permits at most one primary locomotion/whole-body controller,
+prevents multiple writers for one physical resource, validates bounded head
+or gaze overlays, and permits independent visual expressions such as eye
+blinking.
+
+The runtime currently supports these concurrent forms:
+
+- one locomotion skill plus one bounded head/gaze overlay;
+- one locomotion skill plus independent eye expressions;
+- locomotion, bounded gaze, and eye expression together;
+- independent visual expression while another compatible body lane is active.
+
+Large head or whole-body gestures such as bowing and repeated nodding remain
+standalone unless separately qualified. Soridormi rejects incompatible members
+instead of serializing them silently.
+
+The runtime body-command composer is the only motor-command authority. A head
+or gaze overlay is composed into the locomotion controller's command before one
+`MotorCommand` is sent. Independent visual expressions use the visual-output
+API and do not write motor commands. A future WBC may replace the internal
+composer, but it must preserve this single-authority contract.
+
+Speech and singing are not body-activity members. Chromie's Speaking Execution
+Lane starts and controls them as a peer lane. Chromie's Cognitive Runtime
+Coordinator may use one `coordination_id` to relate speech and the Soridormi
+body activity, while Soridormi remains authoritative for physical
+compatibility, cancellation, emergency stop, and recovery.
+
+`activity.cancel` requests cancellation for one coordinated body plan.
+`motion.stop`, `motion.cancel`, and `safety.emergency_stop` retain stronger body
+preemption semantics. Physical safety never waits for Chromie's semantic
+approval.
 
 Rich embodied requests should use the task-level MCP surface:
 

@@ -25,8 +25,10 @@ low-level action_14d outputs as execution authority.
 2. `docs/README.md` — documentation map and authority hierarchy.
 3. `docs/PROJECT_SOP.md` — durable engineering loop.
 4. `docs/architecture.md` — process, package, backend, and MCP boundaries.
-5. `docs/CHROMIE_SORIDORMI_MULTI_AGENT_ARCHITECTURE.md` — ownership split.
-6. `docs/SORIDORMI_MCP_SERVER.md` — current MCP behavior and deployment.
+5. `docs/CHROMIE_COGNITIVE_CONCURRENCY_MODEL.md` — one core and three lanes.
+6. `docs/CHROMIE_SORIDORMI_MULTI_AGENT_ARCHITECTURE.md` — ownership split.
+7. `docs/SORIDORMI_BODY_CONCURRENCY.md` — body resources and composition.
+8. `docs/SORIDORMI_MCP_SERVER.md` — current MCP behavior and deployment.
 7. `docs/DOCUMENTATION_GOVERNANCE.md` — rules preventing status drift.
 8. `docs/SORIDORMI_NEURAL_PARAMETER_ADAPTIVE_MPC_WBC.md` — future adaptive-control design.
 
@@ -35,7 +37,13 @@ low-level action_14d outputs as execution authority.
 - MuJoCo first; hardware remains fail-closed until explicitly qualified.
 - Model output is never body authorization.
 - Task preview/submit is a no-motion contract surface.
-- Physical motion uses validated Soridormi skill/motion execution paths.
+- Physical motion uses validated Soridormi skill, motion, or body-activity paths.
+- Chromie has one Cognitive Core; Social Attention proposes, Speaking delivers,
+  and Activity executes provider work.
+- Speech and singing remain outside Soridormi. Coordinated peer lanes share a
+  `coordination_id` rather than sharing authority.
+- Soridormi allows one primary locomotion member plus compatible subtle
+  expressions and retains one final motor-command authority.
 - Runtime body state is authoritative for `safe_idle`, active motion, and safety.
 - Never invent a target, pose, coordinate, capability, or completion state.
 - Offline loss is not a promotion gate; closed-loop evidence is required.

@@ -38,6 +38,17 @@ effects, interruption, refusal, and safe-idle confirmation.
 Gate: no caller supplies raw joint, motor, torque, coordinate, or policy-action
 authority.
 
+## Concurrent body activities
+
+Execute exact compatible body skills concurrently through declared physical
+resources and control coupling. Support one primary locomotion/whole-body
+controller, bounded motor-command overlays, independent visual expressions,
+per-member status, and global physical preemption.
+
+Gate: speech remains Chromie-owned; one writer owns each physical resource; one
+final Soridormi motor-command authority exists; incompatible activity fails
+closed; cancellation and emergency stop restore safe physical state.
+
 ## Embodied task contract
 
 Accept richer structured goals, keep a Soridormi-owned body-task lifecycle and

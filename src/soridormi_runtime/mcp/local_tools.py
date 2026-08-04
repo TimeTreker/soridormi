@@ -9,6 +9,11 @@ from typing import Any
 from soridormi_runtime.skill_execution import SkillExecutionRegistry, SkillPlan
 from soridormi_runtime.skill_manifest import DEFAULT_SKILL_MANIFEST
 
+from .body_activity import (
+    BodyActivityPlanRecord,
+    body_activity_capabilities_payload,
+    create_body_activity_plan,
+)
 from .source_identity import current_source_revision
 from .task_tools import EmbodiedTaskStore, task_capabilities_payload
 
@@ -179,6 +184,7 @@ class SoridormiLocalToolService:
     source_revision: str | None = field(default_factory=current_source_revision)
     plans: dict[str, MotionPlan] = field(default_factory=dict)
     skill_plans: dict[str, NamedSkillPlan] = field(default_factory=dict)
+    activity_plans: dict[str, BodyActivityPlanRecord] = field(default_factory=dict)
     emergency_stop: bool = False
     skill_registry: SkillExecutionRegistry = field(
         default_factory=lambda: SkillExecutionRegistry.from_manifest_path(
@@ -230,6 +236,22 @@ class SoridormiLocalToolService:
                 return self.create_skill_plan(args)
             if tool_name == "soridormi.skill.execute_plan":
                 return self.execute_skill_plan(str(args.get("plan_id", "")))
+            if tool_name == "soridormi.activity.get_capabilities":
+                return body_activity_capabilities_payload(
+                    mode=self.mode,
+                    backend=self.backend,
+                )
+            if tool_name == "soridormi.activity.create_plan":
+                return self.create_activity_plan(args)
+            if tool_name == "soridormi.activity.execute_plan":
+                return self.execute_activity_plan(str(args.get("plan_id", "")))
+            if tool_name == "soridormi.activity.status":
+                return self.activity_status(str(args.get("plan_id", "")))
+            if tool_name == "soridormi.activity.cancel":
+                return self.cancel_activity(
+                    str(args.get("plan_id", "")),
+                    reason=str(args.get("reason") or "cancelled by caller"),
+                )
             body_safe_idle = not self.emergency_stop
             if tool_name == "soridormi.task.get_capabilities":
                 return task_capabilities_payload(
@@ -399,6 +421,7 @@ class SoridormiLocalToolService:
                     "interruptible": bool(
                         (skill.get("safety") or {}).get("interruptible", True)
                     ),
+                    "concurrency": dict(skill.get("concurrency") or {}),
                 }
             )
         return {"mode": self.mode, "skills": skills}
@@ -448,6 +471,89 @@ class SoridormiLocalToolService:
                 f"{stored.plan.skill_id}; no robot command was sent."
             ),
         }
+
+    def create_activity_plan(self, args: dict[str, Any]) -> dict[str, Any]:
+        validate_chromie_intent(args.get("chromie_intent"))
+        record = create_body_activity_plan(self.skill_registry, args)
+        self.activity_plans[record.plan_id] = record
+        return record.to_dict(
+            mode=self.mode,
+            backend=self.backend,
+            dry_run_only=True,
+        )
+
+    def execute_activity_plan(self, plan_id: str) -> dict[str, Any]:
+        if self.emergency_stop:
+            raise RuntimeError("cannot execute body activity while emergency_stop is active")
+        record = self._activity_record(plan_id)
+        if record.status != "planned":
+            raise RuntimeError(
+                f"body activity {plan_id} cannot execute from status {record.status}"
+            )
+        record.status = "running"
+        record.started_at = time.time()
+        for member in record.members:
+            record.member_results[member.member_id] = {
+                "member_id": member.member_id,
+                "skill_id": member.skill_id,
+                "status": "completed",
+                "completed": True,
+                "no_motion": True,
+                "summary": (
+                    f"Soridormi {self.mode} validated concurrent member "
+                    f"{member.skill_id}; no body command was sent."
+                ),
+            }
+        record.status = "completed"
+        record.completed_at = time.time()
+        payload = record.to_dict(
+            mode=self.mode,
+            backend=self.backend,
+            dry_run_only=True,
+        )
+        payload["completed"] = True
+        payload["no_motion"] = True
+        payload["summary"] = (
+            "Soridormi validated the concurrent body activity; no robot command was sent."
+        )
+        return payload
+
+    def activity_status(self, plan_id: str) -> dict[str, Any]:
+        return self._activity_record(plan_id).to_dict(
+            mode=self.mode,
+            backend=self.backend,
+            dry_run_only=True,
+        )
+
+    def cancel_activity(self, plan_id: str, *, reason: str) -> dict[str, Any]:
+        record = self._activity_record(plan_id)
+        if record.terminal:
+            payload = record.to_dict(
+                mode=self.mode,
+                backend=self.backend,
+                dry_run_only=True,
+            )
+            payload["cancelled"] = False
+            return payload
+        record.cancel_requested = True
+        record.cancel_reason = reason
+        record.status = "cancelled"
+        record.completed_at = time.time()
+        payload = record.to_dict(
+            mode=self.mode,
+            backend=self.backend,
+            dry_run_only=True,
+        )
+        payload["cancelled"] = True
+        return payload
+
+    def _activity_record(self, plan_id: str) -> BodyActivityPlanRecord:
+        if not plan_id:
+            raise ValueError("plan_id is required")
+        record = self.activity_plans.get(plan_id)
+        if record is None:
+            raise KeyError(f"body activity plan not found: {plan_id}")
+        return record
 
     def create_motion_plan(self, args: dict[str, Any]) -> dict[str, Any]:
         commands = args.get("commands")

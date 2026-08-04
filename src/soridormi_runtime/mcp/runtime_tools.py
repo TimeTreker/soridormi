@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import os
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
@@ -15,6 +16,7 @@ from soridormi_runtime.main import make_controller, make_robot
 from soridormi_runtime.policy_command import PolicyCommand
 from soridormi_runtime.scripted_head_skill import (
     DEFAULT_MAX_HEAD_VELOCITY_RADPS,
+    HEAD_JOINT_NAMES,
     DEFAULT_TRANSITION_FRACTION,
     SUPPORTED_SCRIPTED_SKILLS,
     command_positions_by_name,
@@ -35,6 +37,13 @@ from soridormi_runtime.visual_expression_skill import (
     validate_visual_expression_plan,
 )
 
+from .body_activity import (
+    BodyActivityMemberPlan,
+    BodyActivityPlanRecord,
+    CONTROL_COUPLING_INDEPENDENT,
+    body_activity_capabilities_payload,
+    create_body_activity_plan,
+)
 from .local_tools import (
     MotionPlan,
     NamedSkillPlan,
@@ -83,6 +92,7 @@ class SoridormiRuntimeToolService:
     control_hz: float = 50.0
     plans: dict[str, MotionPlan] = field(default_factory=dict)
     skill_plans: dict[str, NamedSkillPlan] = field(default_factory=dict)
+    activity_plans: dict[str, BodyActivityPlanRecord] = field(default_factory=dict)
     skill_registry: SkillExecutionRegistry = field(
         default_factory=lambda: SkillExecutionRegistry.from_manifest_path(
             DEFAULT_SKILL_MANIFEST
@@ -91,8 +101,15 @@ class SoridormiRuntimeToolService:
     task_store: EmbodiedTaskStore = field(default_factory=EmbodiedTaskStore)
     emergency_stop: bool = False
     active_task: dict[str, Any] | None = None
+    active_lanes: dict[str, dict[str, Any]] = field(default_factory=dict)
     _motion_stop_requested: bool = field(default=False, init=False, repr=False)
-    _motion_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
+    _locomotion_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
+    _head_overlay_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
+    _independent_output_locks: dict[str, asyncio.Lock] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+    )
     _robot_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
     _last_state: RobotState | None = field(default=None, init=False, repr=False)
     _robot_executor: ThreadPoolExecutor | None = field(default=None, init=False, repr=False)
@@ -199,7 +216,25 @@ class SoridormiRuntimeToolService:
             return await self.execute_runtime_skill_plan(
                 str(args.get("plan_id", ""))
             )
-        body_safe_idle = self.active_task is None and not self.emergency_stop
+        if tool_name == "soridormi.activity.get_capabilities":
+            return body_activity_capabilities_payload(
+                mode=self.mode,
+                backend=self.backend,
+            )
+        if tool_name == "soridormi.activity.create_plan":
+            return self.create_runtime_activity_plan(args)
+        if tool_name == "soridormi.activity.execute_plan":
+            return await self.execute_runtime_activity_plan(
+                str(args.get("plan_id", ""))
+            )
+        if tool_name == "soridormi.activity.status":
+            return self.runtime_activity_status(str(args.get("plan_id", "")))
+        if tool_name == "soridormi.activity.cancel":
+            return await self.cancel_runtime_activity(
+                str(args.get("plan_id", "")),
+                reason=str(args.get("reason") or "cancelled by caller"),
+            )
+        body_safe_idle = self._body_safe_idle()
         if tool_name == "soridormi.task.get_capabilities":
             return task_capabilities_payload(
                 mode=self.mode,
@@ -247,9 +282,10 @@ class SoridormiRuntimeToolService:
         if tool_name == "soridormi.safety.monitor_motion":
             return {
                 "ok": not self.emergency_stop,
-                "active": self.active_task is not None,
+                "active": bool(self.active_lanes),
+                "active_lanes": sorted(self.active_lanes),
                 "event": "emergency_stop" if self.emergency_stop else None,
-                "safe_idle": self.active_task is None and not self.emergency_stop,
+                "safe_idle": self._body_safe_idle(),
             }
         if tool_name == "soridormi.safety.emergency_stop":
             return await self.emergency_stop_motion(
@@ -327,9 +363,96 @@ class SoridormiRuntimeToolService:
                     "execution": execution,
                     "notes": str(skill.get("notes") or ""),
                     "semantic_speed_presets_mps": dict(skill.get("semantic_speed_presets_mps") or {}),
+                    "concurrency": dict(skill.get("concurrency") or {}),
                 }
             )
         return {"mode": self.mode, "skills": skills}
+
+    def _set_active_lane(self, lane: str, metadata: dict[str, Any]) -> None:
+        self.active_lanes[lane] = dict(metadata)
+        self._refresh_active_task()
+
+    def _clear_active_lane(self, lane: str) -> None:
+        self.active_lanes.pop(lane, None)
+        self._refresh_active_task()
+
+    def _refresh_active_task(self) -> None:
+        if not self.active_lanes:
+            self.active_task = None
+            return
+        if len(self.active_lanes) == 1:
+            lane, metadata = next(iter(self.active_lanes.items()))
+            self.active_task = {"lane": lane, **dict(metadata)}
+            return
+        coordination_ids = {
+            str(metadata.get("coordination_id"))
+            for metadata in self.active_lanes.values()
+            if metadata.get("coordination_id")
+        }
+        self.active_task = {
+            "kind": "concurrent_body_activity",
+            "coordination_id": next(iter(coordination_ids)) if len(coordination_ids) == 1 else None,
+            "lanes": {
+                lane: dict(metadata)
+                for lane, metadata in sorted(self.active_lanes.items())
+            },
+        }
+
+    def _body_safe_idle(self) -> bool:
+        physical_lanes = {
+            lane
+            for lane in self.active_lanes
+            if lane == "locomotion" or lane == "head_overlay" or lane.startswith("standalone_body")
+        }
+        return not physical_lanes and not self.emergency_stop
+
+    def create_runtime_activity_plan(self, args: dict[str, Any]) -> dict[str, Any]:
+        validate_chromie_intent(args.get("chromie_intent"))
+        record = create_body_activity_plan(self.skill_registry, args)
+        self.activity_plans[record.plan_id] = record
+        return record.to_dict(
+            mode=self.mode,
+            backend=self.backend,
+            dry_run_only=False,
+        )
+
+    def runtime_activity_status(self, plan_id: str) -> dict[str, Any]:
+        return self._activity_record(plan_id).to_dict(
+            mode=self.mode,
+            backend=self.backend,
+            dry_run_only=False,
+        )
+
+    async def cancel_runtime_activity(self, plan_id: str, *, reason: str) -> dict[str, Any]:
+        record = self._activity_record(plan_id)
+        if record.terminal:
+            payload = record.to_dict(
+                mode=self.mode,
+                backend=self.backend,
+                dry_run_only=False,
+            )
+            payload["cancelled"] = False
+            return payload
+        record.cancel_requested = True
+        record.cancel_reason = reason
+        if record.primary_member is not None or record.head_overlay_member is not None or record.standalone_members:
+            self._motion_stop_requested = True
+            await self._apply_safe_hold()
+        payload = record.to_dict(
+            mode=self.mode,
+            backend=self.backend,
+            dry_run_only=False,
+        )
+        payload["cancelled"] = True
+        return payload
+
+    def _activity_record(self, plan_id: str) -> BodyActivityPlanRecord:
+        if not plan_id:
+            raise ValueError("plan_id is required")
+        record = self.activity_plans.get(plan_id)
+        if record is None:
+            raise KeyError(f"body activity plan not found: {plan_id}")
+        return record
 
     @staticmethod
     def _motion_commands_from_skill_plan(plan: Any) -> list[dict[str, Any]]:
@@ -426,6 +549,472 @@ class SoridormiRuntimeToolService:
             "recommendation_only": False,
         }
 
+    async def execute_runtime_activity_plan(self, plan_id: str) -> dict[str, Any]:
+        if self.emergency_stop:
+            raise RuntimeError("cannot execute body activity while emergency_stop is active")
+        record = self._activity_record(plan_id)
+        if record.status != "planned":
+            raise RuntimeError(
+                f"body activity {plan_id} cannot execute from status {record.status}"
+            )
+        record.status = "running"
+        record.started_at = time.time()
+        record.cancel_requested = False
+        record.cancel_reason = None
+        self._motion_stop_requested = False
+
+        tasks: list[asyncio.Task[dict[str, Any]]] = []
+        has_physical = bool(
+            record.primary_member
+            or record.head_overlay_member
+            or record.standalone_members
+        )
+        if has_physical:
+            tasks.append(asyncio.create_task(self._execute_physical_activity(record)))
+        for member in record.independent_members:
+            tasks.append(
+                asyncio.create_task(
+                    self._execute_activity_member(record, member)
+                )
+            )
+        if not tasks:
+            record.status = "failed"
+            record.failure_reason = "body activity contains no executable members"
+            record.completed_at = time.time()
+        else:
+            done, pending = await asyncio.wait(
+                tasks,
+                return_when=asyncio.FIRST_EXCEPTION,
+            )
+            errors: list[BaseException] = []
+            for task in done:
+                if task.cancelled():
+                    continue
+                error = task.exception()
+                if error is not None:
+                    errors.append(error)
+            if errors:
+                record.cancel_requested = True
+                self._motion_stop_requested = True
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
+                record.status = "failed"
+                record.failure_reason = "; ".join(str(error) for error in errors)
+                if has_physical:
+                    await self._apply_safe_hold()
+            elif record.cancel_requested or self.emergency_stop or self._motion_stop_requested:
+                record.status = "cancelled"
+            else:
+                optional_failures = [
+                    result
+                    for result in record.member_results.values()
+                    if result.get("status") == "failed" and result.get("optional") is True
+                ]
+                record.status = (
+                    "completed_with_degradation"
+                    if optional_failures
+                    else "completed"
+                )
+            record.completed_at = time.time()
+
+        payload = record.to_dict(
+            mode=self.mode,
+            backend=self.backend,
+            dry_run_only=False,
+        )
+        payload.update(
+            {
+                "completed": record.status in {
+                    "completed",
+                    "completed_with_degradation",
+                },
+                "degraded": record.status == "completed_with_degradation",
+                "cancelled": record.status == "cancelled",
+                "motor_commands_sent": has_physical and record.started_at is not None,
+                "summary": (
+                    f"Soridormi body activity {record.status}; "
+                    f"{len(record.members)} member(s) reconciled."
+                ),
+            }
+        )
+        return payload
+
+    async def _execute_activity_member(
+        self,
+        record: BodyActivityPlanRecord,
+        member: BodyActivityMemberPlan,
+    ) -> dict[str, Any]:
+        try:
+            if member.control_coupling != CONTROL_COUPLING_INDEPENDENT:
+                raise RuntimeError(
+                    f"activity member {member.member_id} is not an independent output"
+                )
+            result = await self._execute_visual_activity_member(record, member)
+            record.member_results[member.member_id] = result
+            return result
+        except asyncio.CancelledError:
+            record.member_results[member.member_id] = {
+                "member_id": member.member_id,
+                "skill_id": member.skill_id,
+                "status": "cancelled",
+                "completed": False,
+                "optional": member.optional,
+            }
+            raise
+        except Exception as exc:
+            result = {
+                "member_id": member.member_id,
+                "skill_id": member.skill_id,
+                "status": "failed",
+                "completed": False,
+                "optional": member.optional,
+                "reason": str(exc),
+            }
+            record.member_results[member.member_id] = result
+            if member.optional:
+                return result
+            raise
+
+    async def _execute_visual_activity_member(
+        self,
+        record: BodyActivityPlanRecord,
+        member: BodyActivityMemberPlan,
+    ) -> dict[str, Any]:
+        plan = member.plan
+        validate_visual_expression_plan(plan.skill_id, plan.execution)
+        applier = getattr(self.robot, "set_visual_expression", None)
+        if not callable(applier):
+            raise RuntimeError("robot backend does not support visual expressions")
+        resource = member.write_resources[0]
+        lane = f"visual:{resource}"
+        async with self._independent_output_lock(resource):
+            self._set_active_lane(
+                lane,
+                {
+                    "plan_id": record.plan_id,
+                    "coordination_id": record.coordination_id,
+                    "member_id": member.member_id,
+                    "skill_id": member.skill_id,
+                    "ability_class": member.ability_class,
+                },
+            )
+            try:
+                for index, expression in enumerate(plan.visual_expressions):
+                    if self.emergency_stop or record.cancel_requested:
+                        await self._apply_visual_expression_command(
+                            applier,
+                            VisualExpressionCommand(
+                                expression="eyes_open",
+                                intensity=1.0,
+                            ),
+                        )
+                        return {
+                            "member_id": member.member_id,
+                            "skill_id": member.skill_id,
+                            "status": "cancelled",
+                            "completed": False,
+                            "optional": member.optional,
+                            "command_index": index,
+                        }
+                    self.active_lanes[lane]["command_index"] = index
+                    self._refresh_active_task()
+                    await self._apply_visual_expression_command(
+                        applier,
+                        VisualExpressionCommand(
+                            expression=expression.expression,
+                            intensity=expression.intensity,
+                        ),
+                    )
+                    await asyncio.sleep(max(0.0, float(expression.duration_s)))
+                await self._apply_visual_expression_command(
+                    applier,
+                    VisualExpressionCommand(
+                        expression="eyes_open",
+                        intensity=1.0,
+                    ),
+                )
+                return {
+                    "member_id": member.member_id,
+                    "skill_id": member.skill_id,
+                    "status": "completed",
+                    "completed": True,
+                    "optional": member.optional,
+                    "visual_expression_steps": len(plan.visual_expressions),
+                }
+            finally:
+                self._clear_active_lane(lane)
+
+    async def _execute_physical_activity(
+        self,
+        record: BodyActivityPlanRecord,
+    ) -> dict[str, Any]:
+        primary = record.primary_member
+        head_member = record.head_overlay_member
+        standalone = record.standalone_members
+        if standalone:
+            if len(standalone) != 1:
+                raise RuntimeError("only one standalone body member is supported")
+            head_member = standalone[0]
+
+        locks: list[asyncio.Lock] = []
+        if primary is not None or standalone or (head_member is not None and primary is None):
+            locks.append(self._locomotion_lock)
+        if head_member is not None:
+            locks.append(self._head_overlay_lock)
+        for lock in locks:
+            await lock.acquire()
+        try:
+            state = await self._read_state()
+            head_trajectory: list[dict[str, float]] = []
+            head_duration_s = 0.0
+            if head_member is not None:
+                head_trajectory, head_duration_s = self._head_trajectory_for_activity(
+                    head_member,
+                    state,
+                )
+                self._set_active_lane(
+                    "head_overlay" if primary is not None else "standalone_body:head",
+                    {
+                        "plan_id": record.plan_id,
+                        "coordination_id": record.coordination_id,
+                        "member_id": head_member.member_id,
+                        "skill_id": head_member.skill_id,
+                        "ability_class": head_member.ability_class,
+                    },
+                )
+            motion_duration_s = 0.0
+            if primary is not None:
+                motion_duration_s = sum(
+                    float(segment.duration_s) for segment in primary.plan.commands
+                )
+                self._set_active_lane(
+                    "locomotion",
+                    {
+                        "plan_id": record.plan_id,
+                        "coordination_id": record.coordination_id,
+                        "member_id": primary.member_id,
+                        "skill_id": primary.skill_id,
+                        "ability_class": primary.ability_class,
+                        "command_index": 0,
+                    },
+                )
+            total_duration_s = max(motion_duration_s, head_duration_s)
+            if total_duration_s <= 0.0:
+                raise RuntimeError("physical activity has no positive duration")
+            period_s = 1.0 / self.control_hz
+            total_ticks = max(1, int(math.ceil(total_duration_s * self.control_hz)))
+            for tick in range(total_ticks):
+                if self.emergency_stop or record.cancel_requested or self._motion_stop_requested:
+                    if primary is not None:
+                        record.member_results[primary.member_id] = {
+                            "member_id": primary.member_id,
+                            "skill_id": primary.skill_id,
+                            "status": "cancelled",
+                            "completed": False,
+                            "optional": primary.optional,
+                        }
+                    if head_member is not None:
+                        record.member_results[head_member.member_id] = {
+                            "member_id": head_member.member_id,
+                            "skill_id": head_member.skill_id,
+                            "status": "cancelled",
+                            "completed": False,
+                            "optional": head_member.optional,
+                        }
+                    return {"completed": False, "cancelled": True}
+                elapsed_s = tick * period_s
+                self.controller.command = self._policy_command_for_elapsed(
+                    primary,
+                    elapsed_s,
+                )
+                if primary is not None and "locomotion" in self.active_lanes:
+                    self.active_lanes["locomotion"]["command_index"] = tick
+                head_target = None
+                if head_trajectory:
+                    head_target = head_trajectory[min(tick, len(head_trajectory) - 1)]
+                    lane = "head_overlay" if primary is not None else "standalone_body:head"
+                    if lane in self.active_lanes:
+                        self.active_lanes[lane]["command_index"] = min(
+                            tick,
+                            len(head_trajectory) - 1,
+                        )
+                self._refresh_active_task()
+                started_at = asyncio.get_running_loop().time()
+                await self._step_composed_controller(head_target)
+                await asyncio.sleep(
+                    max(
+                        0.0,
+                        period_s
+                        - (asyncio.get_running_loop().time() - started_at),
+                    )
+                )
+            if primary is not None:
+                record.member_results[primary.member_id] = {
+                    "member_id": primary.member_id,
+                    "skill_id": primary.skill_id,
+                    "status": "completed",
+                    "completed": True,
+                    "optional": primary.optional,
+                    "estimated_duration_s": motion_duration_s,
+                }
+            if head_member is not None:
+                record.member_results[head_member.member_id] = {
+                    "member_id": head_member.member_id,
+                    "skill_id": head_member.skill_id,
+                    "status": "completed",
+                    "completed": True,
+                    "optional": head_member.optional,
+                    "estimated_duration_s": head_duration_s,
+                    "composed_into_final_motor_command": True,
+                }
+            return {"completed": True}
+        except asyncio.CancelledError:
+            await asyncio.shield(self._apply_safe_hold())
+            raise
+        finally:
+            self.controller.command = PolicyCommand()
+            self._clear_active_lane("locomotion")
+            self._clear_active_lane("head_overlay")
+            self._clear_active_lane("standalone_body:head")
+            for lock in reversed(locks):
+                lock.release()
+
+    def _head_trajectory_for_activity(
+        self,
+        member: BodyActivityMemberPlan,
+        state: RobotState,
+    ) -> tuple[list[dict[str, float]], float]:
+        plan = member.plan
+        validate_scripted_head_plan(plan)
+        initial_positions = joint_positions_by_name(state)
+        initial_controls = command_positions_by_name(state)
+        resolved_targets = resolve_keyframe_targets_for_execution(
+            plan,
+            initial_positions,
+        )
+        requested_duration_s = sum(
+            float(keyframe.duration_s) for keyframe in plan.keyframes
+        )
+        envelope_velocity = member.concurrency_envelope.get("max_head_velocity_radps")
+        max_velocity = (
+            float(envelope_velocity)
+            if envelope_velocity is not None
+            else DEFAULT_MAX_HEAD_VELOCITY_RADPS
+        )
+        effective_duration_s = effective_duration_for_trajectory(
+            requested_duration_s=requested_duration_s,
+            targets=resolved_targets,
+            max_head_velocity_radps=max_velocity,
+            auto_stretch_duration=True,
+            keyframe_durations=[
+                float(keyframe.duration_s) for keyframe in plan.keyframes
+            ],
+        )
+        keyframe_durations = scaled_keyframe_durations(
+            plan,
+            effective_duration_s,
+        )
+        keyframe_steps = keyframe_steps_for_durations(
+            keyframe_durations,
+            self.control_hz,
+        )
+        trajectory = plan_head_pose_trajectory(
+            plan,
+            resolved_targets,
+            keyframe_steps,
+            start_positions_by_name=initial_controls,
+            control_hz=self.control_hz,
+            transition_fraction=DEFAULT_TRANSITION_FRACTION,
+            max_head_velocity_radps=max_velocity,
+        )
+        return trajectory, effective_duration_s
+
+    @staticmethod
+    def _policy_command_for_elapsed(
+        primary: BodyActivityMemberPlan | None,
+        elapsed_s: float,
+    ) -> PolicyCommand:
+        if primary is None:
+            return PolicyCommand()
+        cursor = 0.0
+        for segment in primary.plan.commands:
+            cursor += float(segment.duration_s)
+            if elapsed_s < cursor:
+                return PolicyCommand(
+                    x_velocity=float(segment.vx_mps),
+                    y_velocity=float(segment.vy_mps),
+                    yaw_velocity=float(segment.yaw_radps),
+                )
+        return PolicyCommand()
+
+    async def _step_composed_controller(
+        self,
+        head_target: dict[str, float] | None,
+    ) -> None:
+        async with self._robot_lock:
+            state = self._last_state
+            if state is None:
+                state = await self._call_robot(self.robot.read_state)
+            command = self.controller.compute(state)
+            if head_target is not None:
+                command = self._compose_head_overlay(command, head_target)
+            stepper = getattr(self.robot, "step_motor_command", None)
+            if callable(stepper):
+                self._last_state = await self._call_robot(stepper, command)
+            else:
+                await self._call_robot(self.robot.send_motor_command, command)
+                self._last_state = await self._call_robot(self.robot.read_state)
+
+    @staticmethod
+    def _compose_head_overlay(
+        command: MotorCommand,
+        head_target: dict[str, float],
+    ) -> MotorCommand:
+        index_by_name = {name: index for index, name in enumerate(command.names)}
+        supported = [name for name in HEAD_JOINT_NAMES if name in index_by_name]
+        requested = [name for name in HEAD_JOINT_NAMES if name in head_target]
+        missing = [name for name in requested if name not in index_by_name]
+        if missing:
+            raise RuntimeError(
+                "runtime motor command is missing head overlay joints: "
+                + ", ".join(sorted(missing))
+            )
+        positions = list(command.positions)
+        velocities = list(command.velocities)
+        torques = list(command.torques)
+        for name in requested:
+            index = index_by_name.get(name)
+            if index is None:
+                continue
+            positions[index] = float(head_target[name])
+            if index < len(velocities):
+                velocities[index] = 0.0
+            if index < len(torques):
+                torques[index] = 0.0
+        return command.model_copy(
+            update={
+                "positions": positions,
+                "velocities": velocities,
+                "torques": torques,
+            }
+        )
+
+    def _independent_output_lock(self, resource: str) -> asyncio.Lock:
+        lock = self._independent_output_locks.get(resource)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._independent_output_locks[resource] = lock
+        return lock
+
+    async def _apply_visual_expression_command(
+        self,
+        applier: Callable[..., Any],
+        command: VisualExpressionCommand,
+    ) -> Any:
+        async with self._robot_lock:
+            return await self._call_robot(applier, command)
+
     async def execute_scripted_head_skill(self, plan_id: str) -> dict[str, Any]:
         if self.emergency_stop:
             raise RuntimeError("cannot execute skill while emergency_stop is active")
@@ -435,88 +1024,91 @@ class SoridormiRuntimeToolService:
         plan = stored.plan
         validate_scripted_head_plan(plan)
 
-        async with self._motion_lock:
+        await self._locomotion_lock.acquire()
+        await self._head_overlay_lock.acquire()
+        lane = "standalone_body:head"
+        try:
             if self.emergency_stop:
                 raise RuntimeError("cannot execute skill while emergency_stop is active")
             self._motion_stop_requested = False
-            self.active_task = {
-                "plan_id": plan_id,
-                "skill_id": plan.skill_id,
-                "started_at": time.time(),
-                "command_index": 0,
-            }
-            try:
-                state = await self._read_state()
-                initial_positions = joint_positions_by_name(state)
-                initial_controls = command_positions_by_name(state)
-                resolved_targets = resolve_keyframe_targets_for_execution(
-                    plan,
-                    initial_positions,
-                )
-                requested_duration_s = sum(
+            self._set_active_lane(
+                lane,
+                {
+                    "plan_id": plan_id,
+                    "skill_id": plan.skill_id,
+                    "execution": plan.execution,
+                    "started_at": time.time(),
+                    "command_index": 0,
+                },
+            )
+            state = await self._read_state()
+            initial_positions = joint_positions_by_name(state)
+            initial_controls = command_positions_by_name(state)
+            resolved_targets = resolve_keyframe_targets_for_execution(
+                plan,
+                initial_positions,
+            )
+            requested_duration_s = sum(
+                float(keyframe.duration_s) for keyframe in plan.keyframes
+            )
+            effective_duration_s = effective_duration_for_trajectory(
+                requested_duration_s=requested_duration_s,
+                targets=resolved_targets,
+                max_head_velocity_radps=DEFAULT_MAX_HEAD_VELOCITY_RADPS,
+                auto_stretch_duration=True,
+                keyframe_durations=[
                     float(keyframe.duration_s) for keyframe in plan.keyframes
-                )
-                effective_duration_s = effective_duration_for_trajectory(
-                    requested_duration_s=requested_duration_s,
-                    targets=resolved_targets,
-                    max_head_velocity_radps=DEFAULT_MAX_HEAD_VELOCITY_RADPS,
-                    auto_stretch_duration=True,
-                    keyframe_durations=[
-                        float(keyframe.duration_s) for keyframe in plan.keyframes
-                    ],
-                )
-                keyframe_durations = scaled_keyframe_durations(
-                    plan,
-                    effective_duration_s,
-                )
-                keyframe_steps = keyframe_steps_for_durations(
-                    keyframe_durations,
-                    self.control_hz,
-                )
-                trajectory = plan_head_pose_trajectory(
-                    plan,
-                    resolved_targets,
-                    keyframe_steps,
-                    start_positions_by_name=initial_controls,
-                    control_hz=self.control_hz,
-                    transition_fraction=DEFAULT_TRANSITION_FRACTION,
-                    max_head_velocity_radps=DEFAULT_MAX_HEAD_VELOCITY_RADPS,
-                )
-                period_s = 1.0 / self.control_hz
-                for index, target in enumerate(trajectory):
-                    if self.emergency_stop or self._motion_stop_requested:
-                        return {
-                            "completed": False,
-                            "stopped": True,
-                            "dry_run_only": False,
-                            "summary": (
-                                f"Soridormi runtime stopped skill {plan.skill_id}."
-                            ),
-                        }
-                    assert self.active_task is not None
-                    self.active_task["command_index"] = index
-                    started_at = asyncio.get_running_loop().time()
-                    state = await self._step_head_target(state, target)
-                    await asyncio.sleep(
-                        max(
-                            0.0,
-                            period_s
-                            - (asyncio.get_running_loop().time() - started_at),
-                        )
+                ],
+            )
+            keyframe_durations = scaled_keyframe_durations(
+                plan,
+                effective_duration_s,
+            )
+            keyframe_steps = keyframe_steps_for_durations(
+                keyframe_durations,
+                self.control_hz,
+            )
+            trajectory = plan_head_pose_trajectory(
+                plan,
+                resolved_targets,
+                keyframe_steps,
+                start_positions_by_name=initial_controls,
+                control_hz=self.control_hz,
+                transition_fraction=DEFAULT_TRANSITION_FRACTION,
+                max_head_velocity_radps=DEFAULT_MAX_HEAD_VELOCITY_RADPS,
+            )
+            period_s = 1.0 / self.control_hz
+            for index, target in enumerate(trajectory):
+                if self.emergency_stop or self._motion_stop_requested:
+                    return {
+                        "completed": False,
+                        "stopped": True,
+                        "dry_run_only": False,
+                        "summary": f"Soridormi runtime stopped skill {plan.skill_id}.",
+                    }
+                self.active_lanes[lane]["command_index"] = index
+                self._refresh_active_task()
+                started_at = asyncio.get_running_loop().time()
+                state = await self._step_head_target(state, target)
+                await asyncio.sleep(
+                    max(
+                        0.0,
+                        period_s - (asyncio.get_running_loop().time() - started_at),
                     )
-                return {
-                    "completed": True,
-                    "dry_run_only": False,
-                    "summary": (
-                        f"Soridormi runtime completed skill {plan.skill_id}."
-                    ),
-                    "estimated_duration_s": effective_duration_s,
-                }
-            except asyncio.CancelledError:
-                await asyncio.shield(self._apply_safe_hold())
-                raise
-            finally:
-                self.active_task = None
+                )
+            return {
+                "completed": True,
+                "dry_run_only": False,
+                "summary": f"Soridormi runtime completed skill {plan.skill_id}.",
+                "estimated_duration_s": effective_duration_s,
+            }
+        except asyncio.CancelledError:
+            await asyncio.shield(self._apply_safe_hold())
+            raise
+        finally:
+            self._clear_active_lane(lane)
+            self._head_overlay_lock.release()
+            self._locomotion_lock.release()
 
     async def execute_visual_expression_skill(self, plan_id: str) -> dict[str, Any]:
         if self.emergency_stop:
@@ -530,21 +1122,24 @@ class SoridormiRuntimeToolService:
         if not callable(applier):
             raise RuntimeError("robot backend does not support visual expressions")
 
-        async with self._motion_lock:
+        lane = "visual:visual.eyes"
+        async with self._independent_output_lock("visual.eyes"):
             if self.emergency_stop:
                 raise RuntimeError("cannot execute skill while emergency_stop is active")
-            self._motion_stop_requested = False
-            self.active_task = {
-                "plan_id": plan_id,
-                "skill_id": plan.skill_id,
-                "execution": plan.execution,
-                "started_at": time.time(),
-                "command_index": 0,
-            }
+            self._set_active_lane(
+                lane,
+                {
+                    "plan_id": plan_id,
+                    "skill_id": plan.skill_id,
+                    "execution": plan.execution,
+                    "started_at": time.time(),
+                    "command_index": 0,
+                },
+            )
             try:
                 for index, expression in enumerate(plan.visual_expressions):
-                    if self.emergency_stop or self._motion_stop_requested:
-                        await self._call_robot(
+                    if self.emergency_stop:
+                        await self._apply_visual_expression_command(
                             applier,
                             VisualExpressionCommand(
                                 expression="eyes_open",
@@ -555,13 +1150,11 @@ class SoridormiRuntimeToolService:
                             "completed": False,
                             "stopped": True,
                             "dry_run_only": False,
-                            "summary": (
-                                f"Soridormi runtime stopped skill {plan.skill_id}."
-                            ),
+                            "summary": f"Soridormi runtime stopped skill {plan.skill_id}.",
                         }
-                    assert self.active_task is not None
-                    self.active_task["command_index"] = index
-                    await self._call_robot(
+                    self.active_lanes[lane]["command_index"] = index
+                    self._refresh_active_task()
+                    await self._apply_visual_expression_command(
                         applier,
                         VisualExpressionCommand(
                             expression=expression.expression,
@@ -569,29 +1162,27 @@ class SoridormiRuntimeToolService:
                         ),
                     )
                     await asyncio.sleep(max(0.0, float(expression.duration_s)))
-                await self._call_robot(
+                await self._apply_visual_expression_command(
                     applier,
                     VisualExpressionCommand(expression="eyes_open", intensity=1.0),
                 )
                 return {
                     "completed": True,
                     "dry_run_only": False,
-                    "summary": (
-                        f"Soridormi runtime completed skill {plan.skill_id}."
-                    ),
+                    "summary": f"Soridormi runtime completed skill {plan.skill_id}.",
                     "estimated_duration_s": plan.total_duration_s,
                     "visual_expression_steps": len(plan.visual_expressions),
                 }
             except asyncio.CancelledError:
                 await asyncio.shield(
-                    self._call_robot(
+                    self._apply_visual_expression_command(
                         applier,
                         VisualExpressionCommand(expression="eyes_open", intensity=1.0),
                     )
                 )
                 raise
             finally:
-                self.active_task = None
+                self._clear_active_lane(lane)
 
     async def _call_robot(self, func: Callable[..., Any], *args: Any) -> Any:
         """Run one robot operation without violating ZeroMQ thread affinity."""
@@ -634,7 +1225,10 @@ class SoridormiRuntimeToolService:
         return result
 
     async def get_status(self) -> dict[str, Any]:
-        state = await self._read_state()
+        if self.active_lanes and self._last_state is not None:
+            state = self._last_state
+        else:
+            state = await self._read_state()
         status: dict[str, Any] = {
             "mode": self.mode,
             "backend": self.backend,
@@ -642,7 +1236,12 @@ class SoridormiRuntimeToolService:
             "fallen": False,
             "emergency_stop": self.emergency_stop,
             "active_task": dict(self.active_task) if self.active_task is not None else None,
-            "safe_idle": self.active_task is None and not self.emergency_stop,
+            "active_lanes": {
+                lane: dict(metadata)
+                for lane, metadata in sorted(self.active_lanes.items())
+            },
+            "activity_idle": not self.active_lanes,
+            "safe_idle": self._body_safe_idle(),
             "robot_time": float(state.time),
         }
         if self.source_revision:
@@ -658,19 +1257,23 @@ class SoridormiRuntimeToolService:
         if plan is None:
             raise KeyError(f"plan not found: {plan_id}")
 
-        async with self._motion_lock:
+        lane = "locomotion"
+        async with self._locomotion_lock:
             if self.emergency_stop:
                 raise RuntimeError("cannot execute motion while emergency_stop is active")
             self._motion_stop_requested = False
-            self.active_task = {
-                "plan_id": plan.plan_id,
-                "started_at": time.time(),
-                "command_index": 0,
-            }
+            self._set_active_lane(
+                lane,
+                {
+                    "plan_id": plan.plan_id,
+                    "started_at": time.time(),
+                    "command_index": 0,
+                },
+            )
             try:
                 for index, command in enumerate(plan.commands):
-                    assert self.active_task is not None
-                    self.active_task["command_index"] = index
+                    self.active_lanes[lane]["command_index"] = index
+                    self._refresh_active_task()
                     self.controller.command = PolicyCommand(
                         x_velocity=float(command["vx"]),
                         y_velocity=float(command["vy"]),
@@ -695,7 +1298,7 @@ class SoridormiRuntimeToolService:
                 raise
             finally:
                 self.controller.command = PolicyCommand()
-                self.active_task = None
+                self._clear_active_lane(lane)
 
     async def stop_motion(self, *, cancelled: bool) -> dict[str, Any]:
         self._motion_stop_requested = True

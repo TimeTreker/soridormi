@@ -27,8 +27,10 @@ authority durable document and `docs/STATUS.md`, then add or update a guard.
 
 ## Brain/body and MCP contracts
 
+- `docs/CHROMIE_COGNITIVE_CONCURRENCY_MODEL.md`
 - `docs/CHROMIE_SORIDORMI_MULTI_AGENT_ARCHITECTURE.md`
 - `docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md`
+- `docs/SORIDORMI_BODY_CONCURRENCY.md`
 - `docs/SORIDORMI_MCP_SERVER.md`
 - `docs/mcp_capability_manifest.md`
 - `docs/mcp_dag_integration.md`
@@ -37,8 +39,9 @@ authority durable document and `docs/STATUS.md`, then add or update a guard.
 - `configs/task_capabilities/open_duck_mini_v2_task_capabilities.json`
 - `task_acceptance_cases/mcp_task_acceptance.yaml`
 
-The task API is contract-first and no-motion. Named skill and bounded motion
-execution are separate runtime paths and remain Soridormi-owned.
+The task API is contract-first and no-motion. Named skill, bounded motion, and
+exact concurrent body-activity execution are separate runtime paths and remain
+Soridormi-owned. Speech and singing remain Chromie-owned peer execution.
 
 ## Locomotion, policy, and data contracts
 

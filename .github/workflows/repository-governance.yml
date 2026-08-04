@@ -1,4 +1,4 @@
-name: Repository Governance
+name: Repository Governance and Body Concurrency
 
 on:
   push:
@@ -20,5 +20,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install focused validation dependencies
+        run: python -m pip install -e '.[dev,mcp,runtime]'
+
       - name: Validate semantic repository contracts
         run: python scripts/validate_repository_governance.py
+
+      - name: Validate concurrent body execution
+        run: ./scripts/validate_body_concurrency.sh

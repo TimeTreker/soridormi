@@ -45,6 +45,7 @@ policy-model-replacement
 context-dataset-preparation
 clearance-readiness
 scripted-social-skill-qualification
+concurrent-cognitive-and-embodied-execution
 task-event-cursor
 hardware-state-readonly-bridge
 ```

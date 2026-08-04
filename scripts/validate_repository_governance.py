@@ -19,7 +19,9 @@ CANONICAL_DOCS = (
     Path("docs/SORIDORMI_TARGET_AND_ROADMAP.md"),
     Path("docs/SORIDORMI_EXECUTION_ROADMAP.md"),
     Path("docs/CHROMIE_SORIDORMI_MULTI_AGENT_ARCHITECTURE.md"),
+    Path("docs/CHROMIE_COGNITIVE_CONCURRENCY_MODEL.md"),
     Path("docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md"),
+    Path("docs/SORIDORMI_BODY_CONCURRENCY.md"),
     Path("docs/SORIDORMI_MCP_SERVER.md"),
 )
 
@@ -128,9 +130,63 @@ def main() -> int:
     if 'parameters.get("target_label") or "person"' in task_tools:
         errors.append("task lowering silently invents a person target")
 
-    skill_manifest = (ROOT / "configs/skills/open_duck_mini_v2_skills.json").read_text(encoding="utf-8")
+    skill_manifest_path = ROOT / "configs/skills/open_duck_mini_v2_skills.json"
+    skill_manifest = skill_manifest_path.read_text(encoding="utf-8")
     if '"target_ref"' in skill_manifest and '"default": "person"' in skill_manifest:
         errors.append("skill manifest silently defaults target_ref to person")
+    for required in (
+        '"ability_class_vocab"',
+        '"control_coupling_vocab"',
+        '"physical_resources"',
+        '"concurrency"',
+    ):
+        if required not in skill_manifest:
+            errors.append(f"skill manifest missing body-concurrency contract: {required}")
+
+    body_activity_path = ROOT / "src/soridormi_runtime/mcp/body_activity.py"
+    if not body_activity_path.is_file():
+        errors.append("missing Soridormi body-activity scheduler contract")
+    else:
+        body_activity = body_activity_path.read_text(encoding="utf-8")
+        for required in (
+            'speech_owner": "chromie"',
+            'one_final_motor_command_authority',
+            'max_primary_locomotion_members',
+            'one_writer_per_resource',
+        ):
+            if required not in body_activity:
+                errors.append(f"body-activity contract missing invariant: {required}")
+        if 'ABILITY_CLASS_SPEECH' in body_activity or '"speech" in BODY_ABILITY_CLASSES' in body_activity:
+            errors.append("speech leaked into Soridormi physical ability classes")
+
+    runtime_tools_path = ROOT / "src/soridormi_runtime/mcp/runtime_tools.py"
+    runtime_tools = runtime_tools_path.read_text(encoding="utf-8")
+    if "_motion_lock" in runtime_tools:
+        errors.append("legacy global motion lock remains in runtime body execution")
+    for required in (
+        "_locomotion_lock",
+        "_head_overlay_lock",
+        "_independent_output_locks",
+        "execute_runtime_activity_plan",
+        "active_lanes",
+    ):
+        if required not in runtime_tools:
+            errors.append(f"runtime missing resource-aware body execution: {required}")
+
+    mcp_manifest = (ROOT / "src/soridormi_runtime/mcp/manifest.py").read_text(encoding="utf-8")
+    for tool_name in (
+        "soridormi.activity.get_capabilities",
+        "soridormi.activity.create_plan",
+        "soridormi.activity.execute_plan",
+        "soridormi.activity.status",
+        "soridormi.activity.cancel",
+    ):
+        if tool_name not in mcp_manifest:
+            errors.append(f"MCP manifest missing body-activity tool: {tool_name}")
+
+    skill_execution = (ROOT / "src/soridormi_runtime/skill_execution.py").read_text(encoding="utf-8")
+    if 'or "person"' in skill_execution or 'get("target_ref", "person")' in skill_execution:
+        errors.append("skill execution silently invents a person target")
 
     if errors:
         print("Repository governance validation: FAIL")

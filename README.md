@@ -29,6 +29,13 @@ Chromie must not send raw joint actions or low-level 14D policy actions.
 Chromie should call bounded skills such as `walk_velocity`, `look_at_person`,
 `nod_yes`, `stand_idle`, or `stop`; Soridormi validates and executes them.
 
+Chromie uses one Cognitive Core with Social-Attention Proposal, Speaking
+Execution, and Activity Execution lanes. For exact concurrent body behavior,
+the Activity lane uses `soridormi.activity.*`. Soridormi may combine one primary
+locomotion member with compatible head/gaze overlays and independent visual
+expressions while retaining one final motor-command and safety authority.
+Speech and singing remain a peer Chromie lane.
+
 ## Design goals
 
 ```text
@@ -156,7 +163,9 @@ The runtime adapter executes bounded plans through the existing runtime
 robot/controller interfaces and supports preemptive stop, cancellation, and
 emergency stop. It rejects hardware modes until `HardwareRobot` is implemented.
 See [Soridormi MCP server](docs/SORIDORMI_MCP_SERVER.md) for the deployment
-contract and Chromie endpoint configuration.
+contract and Chromie endpoint configuration. The concurrency contracts are
+[Chromie cognitive concurrency](docs/CHROMIE_COGNITIVE_CONCURRENCY_MODEL.md)
+and [Soridormi body concurrency](docs/SORIDORMI_BODY_CONCURRENCY.md).
 
 ## Quick start on PC
 
