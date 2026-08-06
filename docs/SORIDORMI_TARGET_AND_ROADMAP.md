@@ -13,7 +13,9 @@ Build a reusable Open Duck Mini v2 body/cerebellum runtime that:
 - exposes bounded skills and structured embodied tasks to Chromie;
 - validates, monitors, interrupts, recovers, and refuses independently;
 - supports replaceable policies and reproducible training/evaluation;
-- never exposes raw low-level body control as LLM authority.
+- never exposes raw low-level body control as LLM authority; and
+- remains an embodied body/cerebellum provider unless retained evidence proves
+  that a broader platform-execution boundary is required.
 
 ## Runtime and parity foundation
 
@@ -45,9 +47,26 @@ resources and control coupling. Support one primary locomotion/whole-body
 controller, bounded motor-command overlays, independent visual expressions,
 per-member status, and global physical preemption.
 
-Gate: speech remains Chromie-owned; one writer owns each physical resource; one
-final Soridormi motor-command authority exists; incompatible activity fails
+Gate: speech, singing, TTS, and playback remain Chromie-owned or peer
+capabilities outside Soridormi; one writer owns each physical resource; one
+final Soridormi motor-command authority exists; incompatible body activity fails
 closed; cancellation and emergency stop restore safe physical state.
+
+## Boundary-change admission gate
+
+Backend portability alone does not justify moving vocal, media, microphone, or
+speaker execution into Soridormi. Chromie's current TTS provider contract
+already permits backend replacement without changing the cognitive or body
+boundary, and exact provider-prefixed capability identity must be preserved.
+
+A broader Soridormi hosting proposal may enter active work only when retained
+evidence identifies a concrete blocker such as frame-accurate embodied lip-sync,
+measured cross-provider start skew, cancel-to-silence regression, unavoidable
+platform-adaptation leakage, or unresolved shared-resource contention. The
+proposal must compare the existing peer-provider design, define latency and
+cancellation budgets, preserve rollback, and update all contributor and machine
+contracts together. Architecture analogy or future deployment elegance alone is
+not an admission gate.
 
 ## Embodied task contract
 

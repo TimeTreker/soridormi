@@ -71,6 +71,37 @@ Acceptance:
 - physical safety preemption remains independent and Soridormi-owned;
 - per-member and aggregate outcomes prevent unsupported completion claims.
 
+## Vocal and media hosting boundary
+
+The maintained architecture keeps speech meaning, vocal execution, TTS,
+playback transport, echo handling, and user-level interruption in Chromie. A
+vocal provider may be replaceable behind an exact provider-prefixed capability
+such as `chromie.vocal.perform`; backend replacement does not require Soridormi
+ownership. Media playback is a peer Activity capability with its own lifecycle,
+not a Soridormi body member and not evidence that Chromie sang.
+
+Soridormi must not add a neutral alias such as `vocal.render` that hides the
+exact provider identity selected and authorized by Chromie. Public capability
+identity remains stable from proposal through validation, execution, and
+evidence; simulator or hardware adaptation stays behind the existing
+Soridormi body contracts.
+
+Reconsider hosting only after retained evidence demonstrates a blocker that the
+peer-provider boundary cannot solve, for example:
+
+- frame-accurate viseme, mouth, breath, or body/audio synchronization;
+- measured cross-provider start skew beyond an accepted budget;
+- measured cancel-to-silence latency beyond the interaction budget;
+- unavoidable audio-device or robot-SDK adaptation leaking into Chromie; or
+- shared accelerator or mixer contention that cannot be isolated behind current
+  provider contracts.
+
+Any reconsideration is a separate architecture Issue. It must update
+`AGENTS.md`, durable boundary documents, capability rules, cancellation and
+latency acceptance criteria, and rollback evidence in the same reviewed change.
+Until then, the previous Soridormi vocal/media migration Issues remain closed as
+not planned.
+
 ## Paired Chromie integration qualification
 
 Verify provider discovery, proposal metadata, task preview/submit, event

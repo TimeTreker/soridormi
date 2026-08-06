@@ -21,6 +21,12 @@ Chromie proposals are advisory. Soridormi rejects executable intent metadata,
 raw controls, and physical coordinates, then independently validates every
 body plan.
 
+The maintained boundary keeps speech, singing, TTS synthesis, audible playback,
+and user-level interruption in Chromie's Speaking lane. Media playback is a
+peer Activity capability rather than a Soridormi body capability. Soridormi
+remains the embodied provider beneath Activity; changing the vocal or media
+hosting boundary requires a separate evidence-backed architecture decision.
+
 ## Verified repository surface
 
 - Official Open Duck policy parity and replay/comparison tooling are retained as
@@ -63,7 +69,9 @@ Soridormi does not silently substitute a person, pose, or coordinate.
 
 - Chromie's three-lane runtime implementation in this repository; this repo
   defines only the Soridormi provider-side contract
-- Speech or singing execution inside Soridormi
+- Speech, singing, TTS, or audible playback execution inside Soridormi
+- Media playback, microphone/speaker adaptation, or a unified body/vocal/media
+  execution runtime inside Soridormi
 - Live balance-margin-based overlay suspension or a production WBC backend
 - Concurrent nodding, bowing, shaking, or other unqualified standalone gestures
   during locomotion
@@ -92,7 +100,12 @@ Soridormi does not silently substitute a person, pose, or coordinate.
 - Keep semantic contracts independent of implementation sequence labels.
 - Keep body-state projections grounded in the live Soridormi runtime.
 - Close paired Chromie/Soridormi contract qualification without weakening the
-  body authority boundary.
+  body authority boundary. Chromie's vocal-mode repair requires exact body
+  receipts from Soridormi but no Soridormi vocal or media implementation.
+- Do not reopen TTS, playback, media, or audio-device migration work without
+  retained evidence of a concrete blocker and an explicit boundary exception
+  that updates contributor rules, durable docs, and machine-checked contracts
+  together.
 - Improve locomotion/generalization only through explicit scenario and safety
   gates.
 - Begin hardware work only through the staged commissioning contract.
