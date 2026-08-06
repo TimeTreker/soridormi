@@ -6,33 +6,20 @@ current work priority. Do not copy candidate-by-candidate metrics here.
 
 ## System boundary
 
-Soridormi is currently the embodied body/cerebellum runtime. Chromie is the
-separate cognitive and social brain.
+Soridormi is the embodied body/cerebellum runtime. Chromie is the separate
+cognitive and social brain.
 
 ```text
 human/environment
-  -> Chromie: conversation, goals, confirmation, authorization, interaction orchestration
-  -> structured proposal or embodied request
-  -> Soridormi: body validation, planning, safety, execution, monitoring
+  -> Chromie: conversation, goals, confirmation, global orchestration
+  -> structured proposal or embodied task
+  -> Soridormi: validation, body planning, safety, execution, monitoring
   -> MuJoCo now; qualified hardware later
 ```
 
-The approved target broadens Soridormi into the platform execution plane while
-preserving Chromie semantic authority:
-
-```text
-Chromie Interaction Orchestrator
-  -> immutable platform-neutral execution envelope
-Soridormi Execution Runtime
-  -> body, vocal, media, platform-facing capability execution and evidence
-Soridormi Platform Provider
-  -> MuJoCo, physical robot, desktop audio, sensors, drivers, and hardware safety
-```
-
-This target is documented but **not implemented**. Current Chromie still owns
-TTS synthesis/playback and much of cross-provider scheduling. Current Soridormi
-primarily owns body execution. Documentation must not turn the target into a
-runtime claim.
+Chromie proposals are advisory. Soridormi rejects executable intent metadata,
+raw controls, and physical coordinates, then independently validates every
+body plan.
 
 ## Verified repository surface
 
@@ -70,40 +57,25 @@ Body-wide `safe_idle` is owned by the runtime state. Task records project that
 state; they do not infer safe idle merely because emergency stop is clear.
 
 Target-oriented tasks require explicit structured targets and directions.
-Soridormi does not silently substitute a person, pose, coordinate, vocal mode,
-media item, or other user outcome.
+Soridormi does not silently substitute a person, pose, or coordinate.
 
 ## Not currently claimed
 
-- the general Soridormi Execution Runtime envelope for body, vocal, media, and
-  platform-facing capabilities;
-- speech, expressive speech, recitation, singing, or humming execution inside
-  Soridormi;
-- music, recording, stream, or sound-effect playback inside Soridormi;
-- normalized microphone/speaker or sensor Platform Contracts;
-- synchronized multimodal prepare/start/cancel across body, vocal, and media;
-- a physical or desktop platform provider that implements the approved general
-  Platform Contract;
-- Chromie's three-lane runtime implementation in this repository;
-- live balance-margin-based overlay suspension or a production WBC backend;
-- concurrent nodding, bowing, shaking, or other unqualified standalone gestures
-  during locomotion;
-- general physical task execution through the task API;
-- autonomous navigation, target tracking, obstacle avoidance, manipulation, or
-  object delivery;
-- hardware-ready locomotion or broad terrain/generalization qualification;
-- completion inferred from a plan, prepared state, dry run, offline score, or
-  partial evidence.
+- Chromie's three-lane runtime implementation in this repository; this repo
+  defines only the Soridormi provider-side contract
+- Speech or singing execution inside Soridormi
+- Live balance-margin-based overlay suspension or a production WBC backend
+- Concurrent nodding, bowing, shaking, or other unqualified standalone gestures
+  during locomotion
+- General physical task execution through the task API
+- Autonomous navigation, target tracking, obstacle avoidance, manipulation, or
+  object delivery
+- A hardware backend
+- Hardware-ready locomotion or broad terrain/generalization qualification
+- Completion inferred from a plan, dry run, offline score, or partial evidence
 
 ## Current blockers
 
-- The companion Chromie repository must first repair vocal-mode Goal and Planner
-  semantics. The retained walk/sing/blink episode still fails before a valid
-  Soridormi request, and Soridormi must not absorb that semantic defect.
-- A reviewed immutable Chromie-to-Soridormi execution/evidence envelope is
-  required before body, vocal, or media paths migrate.
-- Vocal providers need explicit mode declarations and mode-specific evidence;
-  expressive TTS is not evidence of singing.
 - Rich embodied tasks need sensing, localization, local planning, monitored
   execution, and recovery before the task API may issue motion.
 - Hardware work remains blocked behind simulator qualification, commissioning,
@@ -113,17 +85,14 @@ media item, or other user outcome.
 
 ## Current work order
 
-- Keep the current body runtime, concurrent-body contracts, cancellation, and
-  MuJoCo evidence passing while the new boundary is designed.
-- Coordinate the vocal-mode Goal/Planner repair in Chromie; do not add phrase
-  rules or silently reinterpret singing inside Soridormi.
-- Define the immutable execution envelope and private Platform Contract.
-- Introduce a Soridormi Execution Runtime facade around existing body behavior
-  before adding vocal or media execution.
-- Add vocal/TTS, media, platform audio/sensors, and multimodal coordination only
-  through the semantic, gate-driven work in the execution roadmaps.
-- Keep body-state and future audio/media projections grounded in live runtime or
-  platform evidence.
+- Qualify concurrent locomotion, gaze overlay, and visual expression in live
+  MuJoCo and retain evidence for cancellation and safety preemption.
+- Update the companion Chromie repository with the single-core three-lane model
+  and coordinated-group lifecycle.
+- Keep semantic contracts independent of implementation sequence labels.
+- Keep body-state projections grounded in the live Soridormi runtime.
+- Close paired Chromie/Soridormi contract qualification without weakening the
+  body authority boundary.
 - Improve locomotion/generalization only through explicit scenario and safety
   gates.
 - Begin hardware work only through the staged commissioning contract.

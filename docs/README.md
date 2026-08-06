@@ -40,11 +40,8 @@ authority durable document and `docs/STATUS.md`, then add or update a guard.
 - `task_acceptance_cases/mcp_task_acceptance.yaml`
 
 The task API is contract-first and no-motion. Named skill, bounded motion, and
-exact concurrent body-activity execution are separate current runtime paths.
-Chromie retains speech meaning, vocal mode, Goal ownership, and user-level
-coordination. The approved target moves vocal synthesis, media playback, and
-other platform-facing execution into a two-container Soridormi execution/
-platform boundary without moving semantic authority.
+exact concurrent body-activity execution are separate runtime paths and remain
+Soridormi-owned. Speech and singing remain Chromie-owned peer execution.
 
 ## Locomotion, policy, and data contracts
 
