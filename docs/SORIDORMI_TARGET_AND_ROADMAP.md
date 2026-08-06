@@ -6,19 +6,48 @@ evidence.
 
 ## Target
 
-Build a reusable Open Duck Mini v2 body/cerebellum runtime that:
+Build a reusable platform execution runtime that keeps Chromie independent from
+the current simulator, robot, audio stack, sensors, and device drivers while
+preserving strict cognitive, authorization, execution, and safety boundaries.
+Open Duck Mini v2 remains the primary body platform and policy baseline, but it
+is one Platform Provider rather than the public meaning of Soridormi.
 
-- preserves a trusted official-policy baseline;
-- runs the same body contracts against MuJoCo and future hardware;
-- exposes bounded skills and structured embodied tasks to Chromie;
-- validates, monitors, interrupts, recovers, and refuses independently;
-- supports replaceable policies and reproducible training/evaluation;
-- never exposes raw low-level body control as LLM authority.
+Soridormi will:
 
-## Runtime and parity foundation
+- preserve a trusted official Open Duck policy baseline;
+- expose the same platform-neutral execution contracts across MuJoCo, desktop,
+  and future hardware providers;
+- execute bounded body, vocal, media, platform-perception, and device
+  capabilities selected and authorized by Chromie;
+- validate, prepare, schedule, monitor, interrupt, recover, refuse, and produce
+  normalized per-member evidence independently;
+- keep one private Platform Contract for simulator, robot, audio, sensor,
+  controller, driver, calibration, and hardware-safety adaptation;
+- support replaceable policies and providers with reproducible evaluation; and
+- never expose raw low-level body, device, or provider authority to a language
+  model.
+
+## Execution-runtime and platform-provider foundation
+
+Retain and generalize the current runtime/simulator separation into two logical
+containers:
+
+```text
+soridormi-runtime <-> soridormi-platform
+```
+
+The execution runtime contains stable capabilities, resources, preparation,
+timing, cancellation, recovery, and evidence. The platform provider contains
+MuJoCo or one qualified physical/desktop adapter and all device-specific code.
+
+Gate: execution runtime code imports no MuJoCo, robot SDK, sound-device backend,
+or platform driver; the private Platform Contract preserves semantics across
+providers.
+
+## Runtime and body-policy parity
 
 Maintain stable Robot API, observation, action, controller, profile, logging,
-replay, and official parity contracts.
+replay, and official parity contracts for the Open Duck body provider.
 
 Gate: unexplained parity divergence is closed and baseline tools remain usable.
 
@@ -45,9 +74,39 @@ resources and control coupling. Support one primary locomotion/whole-body
 controller, bounded motor-command overlays, independent visual expressions,
 per-member status, and global physical preemption.
 
-Gate: speech remains Chromie-owned; one writer owns each physical resource; one
-final Soridormi motor-command authority exists; incompatible activity fails
-closed; cancellation and emergency stop restore safe physical state.
+Gate: response meaning remains Chromie-owned; one writer owns each physical
+resource; one final Soridormi motor-command authority exists; incompatible
+activity fails closed; cancellation and emergency stop restore safe physical
+state.
+
+## Vocal execution
+
+Execute typed Vocal Plans authored by Chromie through provider-declared modes,
+streaming, timing, interruption, delivery, and terminal evidence. Speech,
+expressive speech, recitation, singing, and humming are related vocal modes, not
+proof of one another.
+
+Gate: Soridormi does not rewrite content or vocal mode; expressive TTS cannot
+advertise singing without mode-specific evidence; unsupported modes return an
+exact unavailable result.
+
+## Media execution
+
+Execute existing music, recordings, streams, and sound effects as Activity
+capabilities with independent playback state, progress, cancellation, and
+completion evidence.
+
+Gate: media playback is never reported as singing; shared audio output or mixer
+does not merge vocal and media semantics.
+
+## Multimodal execution coordination
+
+Coordinate compatible body, vocal, and media members through provider-local
+prepared state, monotonic start, declared resources, cancellation, recovery,
+and measured evidence.
+
+Gate: best-effort, synchronized, and atomic guarantees are distinct; requested
+simultaneity is not silently serialized or upgraded beyond retained evidence.
 
 ## Embodied task contract
 
@@ -63,8 +122,8 @@ and paired with Chromie integration tests.
 Add physical task execution only after sensing, planning, skill selection,
 monitoring, cancellation, recovery, and completion evidence exist.
 
-Gate: a task cannot claim completion from preview, dry run, partial execution,
-or unsupported fallback.
+Gate: a task cannot claim completion from preview, prepared state, dry run,
+partial execution, or unsupported fallback.
 
 ## Generalization and control improvement
 
@@ -77,9 +136,9 @@ or generalization regression.
 
 ## Hardware commissioning
 
-Implement a hardware backend through read-only state, dry-run commands, limits,
-watchdog, independent stop, low-power tests, standing, tethered movement, and
-broader validation.
+Implement a hardware Platform Provider through read-only state, dry-run
+commands, limits, watchdog, independent stop, low-power tests, standing,
+tethered movement, audio/sensor qualification, and broader validation.
 
 Gate: no hardware actuation before simulator, commissioning, and operator
 evidence are complete.

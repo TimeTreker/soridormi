@@ -1,235 +1,197 @@
 # Chromie and Soridormi multi-agent architecture
 
-This document records the agreed brain/body split between Chromie and
-Soridormi. Both systems are agent-like, and both may use an orchestrator or DAG
-engine, but they operate at different scopes.
-
-For the staged implementation plan, see
-`docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md`.
+This document records the agreed brain/execution/platform split between Chromie
+and Soridormi. Both systems may use coordinators or DAG engines, but they operate
+at different scopes and share only immutable contracts.
 
 ## Core agreement
 
-Chromie has one authoritative Cognitive Core with three concurrent coordination
+Chromie has one authoritative Cognitive Core with three semantic coordination
 lanes:
 
 ```text
 Social-Attention Proposal Lane
-Speaking Execution Lane
-Activity Execution Lane
+Speaking Lane
+Activity Lane
 ```
 
 The lanes are not independent minds. The Cognitive Core owns user meaning,
-Goal Association, Goal lifecycle, planning, personality, and authored
-communication. Social Attention proposes only. Speaking delivers authored
-communication. Activity executes and monitors provider work. One Cognitive
-Runtime Coordinator validates timing, confirmation, cancellation, and outcome
-reconciliation across the execution lanes.
+Goal Association, Goal lifecycle, planning, personality, authored
+communication, vocal mode, and user-level temporal intent.
 
-Soridormi is the embodied robot agent. It owns robot state, body capability
-availability, embodied task planning, sensing/localization hooks, local routing,
-gait and skill selection, safety monitoring, safe hold, emergency stop,
-recovery, MuJoCo execution, and future hardware execution.
+The Chromie Interaction Orchestrator remains in Chromie. It owns session and
+turn lifecycle, Gateway/Core dispatch, confirmation, user-level cancellation
+scope, immutable authorization, and end-to-end evidence correlation. It must not
+become a device or provider scheduler.
 
-The boundary is MCP:
+Soridormi is the platform execution agent. It owns provider-local capability
+validation, preparation, resource arbitration, execution, timing, cancellation,
+recovery, and normalized evidence for body, vocal, media, sensor, and device
+work. It may reject a request but cannot reinterpret a Goal, rewrite authored
+content, change vocal mode, or widen authorization.
+
+## Two-container Soridormi target
 
 ```text
-Chromie authoritative plan and coordinated execution group
-  -> Speaking Execution Lane for speech or singing
-  -> Activity Execution Lane for provider work
-       -> Soridormi task, skill, or concurrent body-activity request
-       -> bounded body skills, resources, command composition, recovery
-  -> structured outcomes reconciled by the Cognitive Runtime Coordinator
+Chromie Interaction Orchestrator
+  -> immutable platform-neutral execution envelope
+Soridormi Execution Runtime container
+  -> stable capabilities, resources, prepare/start/cancel, recovery, evidence
+Soridormi Platform Provider container
+  -> MuJoCo OR physical robot OR desktop platform, devices, drivers, safety
 ```
 
-Chromie should send what should be achieved and why. Soridormi decides whether
-and how the robot body can safely do it.
+The Platform Contract is private to Soridormi. Chromie must not depend on
+MuJoCo, robot SDKs, joint arrays, controller identities, ALSA/PulseAudio,
+sound-device indexes, TTS backend names, camera SDKs, or calibration data.
 
-For named-skill planning, Chromie may attach a `chromie_intent` object with
-`execution_mode=proposed`, `execution_semantics=proposal_from_chromie`, and
-`requires_runtime_validation=true`. Soridormi validates this as advisory
-provenance only. It rejects executable semantics, low-level controls, and
-physical coordinates in that metadata, then independently validates and plans
-the named skill through its owned runtime boundary.
+The current implementation is a migration baseline, not the target: Soridormi
+already separates runtime from simulator for body execution, while Chromie still
+owns TTS/playback and cross-provider coordination. Each responsibility moves
+only after equivalent tests, cancellation, and target evidence exist.
 
-## Coordination and DAG scopes
-
-The lane model and the DAG model are complementary. The Cognitive Core and
-planner author one global plan; the coordinator schedules peer execution lanes.
-
+## Brain and execution DAG scopes
 
 ### Chromie global DAG
 
-Chromie owns the human-facing and multi-capability DAG. Example for "let's go
-to a nearby grocery":
+Chromie owns the human-facing and multi-capability DAG. Example:
 
 ```text
 understand request
-  -> search candidate groceries
-  -> ask user to choose
-  -> wait for confirmation
-  -> submit Soridormi navigate_to task
-  -> monitor Soridormi task status/events
-  -> speak progress or completion
+  -> preserve independent Goals
+  -> ask for missing context or confirmation
+  -> authorize platform-neutral execution members
+  -> submit immutable group to Soridormi or a peer information provider
+  -> monitor exact evidence
+  -> reconcile every Goal
+  -> compose truthful response
 ```
 
-This DAG may call many MCP capability providers: memory, search, speech, maps,
-vision, Soridormi, and user confirmation.
+This DAG may call memory, external information, user confirmation, and
+Soridormi. It never compiles motor commands, audio devices, or platform-specific
+work.
 
-### Soridormi embodied DAG
+### Soridormi execution DAG
 
-Soridormi owns the body-facing DAG or state machine. For the confirmed
-navigation goal above:
+Soridormi owns the provider-facing execution DAG:
 
 ```text
-check robot state
-  -> resolve target pose or bearing
-  -> localize robot
-  -> plan route or short local segment
-  -> check obstacles and traversability
-  -> choose gait/skill
-  -> execute monitored segment
-  -> replan, stop, recover, or continue
-  -> report completed/blocked/failed/safe_idle
+validate envelope and capability support
+  -> validate resources and safety
+  -> prepare required members
+  -> establish provider-local start relation
+  -> execute and monitor
+  -> stop, recover, degrade according to authorized policy, or continue
+  -> return per-member and aggregate evidence
 ```
 
-This DAG is safety-critical and must remain MuJoCo-first before hardware.
+Body subgraphs may contain localization, gait, controllers, and recovery.
+Vocal subgraphs may contain TTS or singing providers, streaming, timing marks,
+and audio output. Media subgraphs may contain playback, seek, pause, and mixer
+operations. None of these subgraphs author user meaning.
 
-## API levels
+## Capability surfaces
 
-Soridormi should expose multiple MCP levels, not a single skill endpoint:
+Retained current body surfaces remain:
 
 ```text
-soridormi.robot.*       read status, mode, battery, active task, safe_idle
-soridormi.safety.*      monitor, stop, cancel, emergency stop
-soridormi.skill.*       atomic body skills and skill plans
-soridormi.activity.*    exact concurrent body-skill groups
-soridormi.task.*        no-motion embodied task contract/status/events/cancel
+soridormi.robot.*
+soridormi.safety.*
+soridormi.motion.*
+soridormi.skill.*
+soridormi.activity.*
+soridormi.task.*
 ```
 
-`soridormi.skill.*` is appropriate for atomic body behaviors such as
-`nod_yes`, `look_at_person`, `turn_in_place`, or explicit low-level test cases.
-
-`soridormi.activity.*` is appropriate when the authoritative planner has
-selected exact compatible body skills that must overlap. It supports one
-primary locomotion member, compatible bounded head/gaze overlays, and
-independent visual expressions. Speech is not an activity member; Chromie runs
-it as a peer Speaking lane under the same `coordination_id`.
-
-`soridormi.task.*` is implemented as a contract-first, no-motion surface for
-rich embodied requests such as navigation, approach, inspection, gesture,
-recovery, or unsupported object delivery. Supported requests may compile to
-named-skill dry runs; that is not physical task execution. A future monitored
-task executor may use the validated skill path internally only after its own
-qualification.
-
-
-### Coordinated walking, gaze, blinking, and speech
+The migration will add reviewed platform-neutral surfaces for:
 
 ```text
-Cognitive Core:
-  understands "walk toward me while singing and blinking"
+vocal rendering and vocal-mode support
+media playback and media state
+normalized platform input/output streams
+multimodal execution groups and evidence
+```
 
-Planner:
-  selects chromie.vocal.perform
-  selects soridormi.walk_velocity
-  selects soridormi.look_at_person
-  selects soridormi.blink_eyes
+The final names and schemas belong to implementation Issues and API review.
+Soridormi capability declarations, not names or user phrases, are authoritative
+for supported modes, resources, concurrency, interruption, and evidence.
 
-Coordinator:
-  starts the Speaking and Activity lanes with one coordination_id
+## Singing, TTS, and media
+
+Singing and speaking are both generated vocal output, but they are distinct
+vocal modes. A provider may support speech and expressive speech without
+supporting stable singing. Soridormi advertises the supported subset; Chromie
+may claim completion only from matching mode-specific evidence.
+
+```text
+"sing a song a cappella" -> Speaking -> vocal mode=singing
+"recite this"            -> Speaking -> vocal mode=recitation
+"play a song"            -> Activity -> media playback
+```
+
+Playing music is a capability execution, not TTS. Vocal and media providers may
+share a mixer and speaker, but keep distinct Goal, progress, cancellation, and
+completion semantics.
+
+For a request such as walking while singing and blinking:
+
+```text
+Chromie:
+  creates separate body, vocal, and expression responsibilities
+  preserves the requested parallel relation
+  authorizes exact capabilities without platform details
 
 Soridormi:
-  validates body resource compatibility
-  composes locomotion and bounded head overlay into one motor command
-  runs eye expression on its independent output
-  preempts physical behavior whenever safety requires it
+  verifies body/vocal/expression support and resources
+  prepares compatible members
+  starts them according to its declared timing contract
+  returns per-member evidence
 ```
 
-Social Attention may propose gaze or blinking, but the Cognitive Core and
-planner decide whether the proposal becomes an exact provider request.
+If singing is unavailable, neither Chromie nor Soridormi may substitute ordinary
+speech, media playback, blinking, or attention expression and claim that singing
+occurred. Any alternative is explicit, confirmation-bound when material, and
+preserves independent Goal outcomes.
 
-## Examples
-
-### Concrete body command
-
-```text
-walk_velocity(vx_mps=0.2, duration_s=10)
-```
-
-This is already a concrete body command. It can be useful for tests, simple
-explicit requests, or lower-level skill execution, but it should not be the main
-interface for rich user goals.
-
-### Human goal
-
-```text
-Can you bring me some water?
-```
-
-Chromie may understand this as a delivery goal, but Soridormi must check
-embodied feasibility. On the current Open Duck Mini v2, Soridormi should refuse
-object delivery because the robot has no supported manipulator, gripper, carry,
-or handoff capability. It may offer alternatives such as looking toward the
-object, navigating near it after target resolution, or reporting that the task
-is unsupported.
-
-### Destination goal
-
-```text
-Walk forward to the house.
-```
-
-This is not a velocity command. Soridormi must refuse it until target
-resolution, localization, route planning, local obstacle checking, and bounded
-local trajectory planning exist. See
-`docs/SORIDORMI_NAVIGATION_GOAL_CONTRACT.md`.
-
-### Unsafe physical task
-
-```text
-Fight that person.
-```
-
-This must be refused as unsafe. Chromie may explain the refusal. Soridormi must
-not lower it into body motion.
-
-## Task context ownership
+## Context ownership
 
 Chromie maintains:
 
-- user intent and conversation history;
-- Goal meaning, Goal Association, lifecycle, and global task DAG state;
-- social-attention proposals and their acceptance or suppression;
-- speaking and activity coordination groups;
-- clarifications and confirmations;
-- user preferences and memories;
-- cross-capability orchestration.
+- user intent, conversation history, Goal meaning, and Goal lifecycle;
+- personality and response authorship;
+- vocal mode and requested temporal relation;
+- clarifications, confirmations, and user-level cancellation scope;
+- cross-capability orchestration and end-to-end evidence correlation.
 
-Soridormi maintains:
+Soridormi Execution Runtime maintains:
 
-- robot state and safe/unsafe state;
-- embodied task state and substeps;
-- local target/route/motion context;
-- selected gait, skill, controller, and fallback;
-- execution telemetry, progress, blocked state, and recovery state;
-- physical resource claims, per-member activity state, final motor-command
-  composition, and safety preemption.
+- capability availability and provider declarations;
+- provider-local execution groups, resources, preparation, timing, and state;
+- body, vocal, media, platform-perception, and device execution telemetry;
+- per-member cancellation, recovery, failure, and evidence;
+- normalized runtime and platform health.
 
-Body-wide state remains runtime-owned. Task and capability payloads project
-live `safe_idle`, active-motion, and emergency-stop state; task-local
-lifecycle does not manufacture those facts.
+Soridormi Platform Provider maintains:
+
+- simulator or hardware state;
+- controllers, drivers, audio and sensor devices;
+- calibration, state estimation, and hardware safety;
+- platform-specific identities and limits.
 
 ## Promotion rule
 
-No new embodied capability should become executable merely because Chromie can
-ask for it. Soridormi promotion requires:
+No new capability becomes executable merely because Chromie can ask for it.
+Soridormi promotion requires:
 
-- a declared task/skill contract;
-- bounded parameters and refusal conditions;
-- MuJoCo validation;
-- safe-idle and cancellation evidence;
-- explicit unsupported status for missing hardware capabilities;
-- no exposure of raw natural language, raw perception, joint targets, motor
-  commands, torque commands, or `action_14d` outputs to Chromie.
+- a declared semantic capability and supported-mode contract;
+- bounded parameters, resources, interruption, and refusal conditions;
+- simulator or platform validation appropriate to the capability;
+- cancellation, failure, restart, and terminal evidence;
+- explicit unsupported status for missing platform abilities;
+- no exposure of raw natural language, joint targets, motor commands, torque
+  commands, device indexes, SDK objects, or provider-private payloads to
+  Chromie.
 
-See `docs/CHROMIE_COGNITIVE_CONCURRENCY_MODEL.md` and `docs/SORIDORMI_BODY_CONCURRENCY.md` for the detailed lane and provider contracts.
+Centralized deployment is allowed. Centralized semantic and safety authority is
+not: co-location may share compute and devices, but the Chromie/Soridormi and
+runtime/platform contracts remain explicit.

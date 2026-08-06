@@ -6,50 +6,62 @@ The project goal is to replace the original Raspberry Pi-style onboard runtime w
 
 Project name note: the intended bronze dragon name is **Soridormi**.
 
-## Whole-robot role
+## Whole-system role
 
-Soridormi is the robot **cerebellum**: body control, locomotion, safety,
-simulation, training/evaluation, and future hardware execution.
+Soridormi is the platform execution runtime paired with Chromie. Open Duck Mini
+v2 body control, locomotion, safety, simulation, training/evaluation, and future
+hardware remain its verified foundation. The approved target also places
+platform-facing vocal, media, audio/sensor, and device execution behind
+Soridormi.
 
 Chromie is the robot **brain**, maintained in
-`https://github.com/TimeTreker/chromie.git` on `main`. Chromie handles
-conversation, memory, intent understanding, high-level planning, and skill
-selection.
+`https://github.com/TimeTreker/chromie.git` on `main`. Chromie owns conversation,
+memory, Goal meaning, response authorship, vocal mode, confirmation,
+authorization, and user-level interaction orchestration.
 
-The intended boundary is:
+The target boundary is:
 
 ```text
-Chromie brain
-  -> structured skill/context request
-  -> Soridormi cerebellum
-  -> safe body execution in MuJoCo or hardware
+Chromie brain and Interaction Orchestrator
+  -> immutable platform-neutral execution envelope
+Soridormi Execution Runtime
+  -> capability resources, preparation, timing, execution, cancellation, recovery, evidence
+Soridormi Platform Provider
+  -> MuJoCo OR physical robot OR desktop platform, devices, drivers, and safety
 ```
 
-Chromie must not send raw joint actions or low-level 14D policy actions.
-Chromie should call bounded skills such as `walk_velocity`, `look_at_person`,
-`nod_yes`, `stand_idle`, or `stop`; Soridormi validates and executes them.
+Chromie must not send raw joint actions, low-level 14D policy actions, audio-
+device indexes, SDK objects, or platform-specific commands. Soridormi may reject
+an unsupported or unsafe request, but it may not reinterpret Goal meaning,
+rewrite authored content, change vocal mode, or widen confirmation.
 
-Chromie uses one Cognitive Core with Social-Attention Proposal, Speaking
-Execution, and Activity Execution lanes. For exact concurrent body behavior,
-the Activity lane uses `soridormi.activity.*`. Soridormi may combine one primary
-locomotion member with compatible head/gaze overlays and independent visual
-expressions while retaining one final motor-command and safety authority.
-Speech and singing remain a peer Chromie lane.
+Chromie uses one Cognitive Core with Social-Attention, Speaking, and Activity
+semantic lanes. Singing and humming are Speaking outcomes; playing existing
+music is Activity. Under the approved target, Soridormi executes body, vocal,
+and media capabilities and may coordinate compatible members while retaining
+provider-local resource and safety authority.
+
+This is a target architecture, not a current capability claim. Today Soridormi
+primarily executes body work, while Chromie still owns TTS/playback and much of
+cross-provider coordination. See `docs/STATUS.md` before describing a migrated
+capability as implemented.
 
 ## Design goals
 
 ```text
 soridormi-runtime
-  Robot-facing runtime.
-  Runs policy inference, controller loop, and hardware/sim API client.
-  No MuJoCo dependency.
+  Platform-independent execution runtime.
+  Runs stable capabilities, policy inference, provider-local resources,
+  preparation, scheduling, cancellation, recovery, and normalized evidence.
+  No MuJoCo, robot-SDK, or sound-device dependency.
 
-soridormi-sim
-  PC-side simulator.
-  Runs MuJoCo, simulated motors, simulated IMU, simulated joint state, and API server.
+soridormi-platform
+  Exactly one active simulator, physical-robot, or desktop-platform provider.
+  The current PC implementation is soridormi-sim / MuJoCo.
+  Owns devices, drivers, sensors, controllers, calibration, and hardware safety.
 
 soridormi-api
-  Shared message/API package used by both runtime and simulator.
+  Shared public execution envelope and private Platform Contract packages.
 ```
 
 The repository's `soridormi_runtime` source package also contains optional MCP,
@@ -69,7 +81,8 @@ On real robot:
 soridormi-runtime  <---- same robot API ---->  motors / IMU / encoders / power
 ```
 
-The runtime code should not need to know whether it talks to MuJoCo or real hardware.
+The execution runtime should not need to know whether it talks to MuJoCo, a
+physical robot, or a desktop audio/sensor platform.
 
 For fresh-machine simulator bootstrap, use
 [Soridormi Deployment](docs/SORIDORMI_DEPLOYMENT.md) and
