@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-dev \
     python3-pip \
     python3-venv \
+    ripgrep \
     vim \
     wget \
     libusb-1.0-0 \

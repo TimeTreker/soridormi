@@ -17,7 +17,8 @@ if [ "${inside_container}" != "1" ] && [ "${use_docker}" != "0" ]; then
       -e SORIDORMI_CI_STATIC_CHECK_IN_CONTAINER=1 \
       -e SORIDORMI_CI_SKIP_PYTEST="${SORIDORMI_CI_SKIP_PYTEST:-0}" \
       -e SORIDORMI_CI_ROBOT_CONFIG="${SORIDORMI_CI_ROBOT_CONFIG:-configs/robots/open_duck_mini_v2.yaml}" \
-      -v "${repo_root}/scripts:/app/scripts:ro" \
+      -v "${repo_root}:/app" \
+      --workdir /app \
       runtime bash -lc 'source /opt/venvs/runtime/bin/activate && /app/scripts/ci_static_check.sh'
   elif [ "${use_docker}" = "1" ]; then
     echo "ERROR: SORIDORMI_CI_STATIC_CHECK_USE_DOCKER=1 was requested, but Docker Compose is not available." >&2

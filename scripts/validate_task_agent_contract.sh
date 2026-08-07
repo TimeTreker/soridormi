@@ -106,9 +106,11 @@ if [ "${use_docker}" != "0" ]; then
       ./scripts/setup_env.sh >/dev/null
     fi
     echo "Running Python/test gate inside the runtime container."
-    docker compose -f compose.sim.yaml run --rm runtime bash -lc '
+    docker compose -f compose.sim.yaml --profile mcp-runtime run --rm \
+      -v "${repo_root}:/app" \
+      --workdir /app \
+      mcp-runtime bash -lc '
       set -euo pipefail
-      cd /app
       source /opt/venvs/runtime/bin/activate
       export PYTHONPATH=/app/src
       python -m compileall -q src/soridormi_runtime/mcp src/soridormi_runtime/task_capabilities.py
