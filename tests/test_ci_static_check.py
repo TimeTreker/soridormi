@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
+
+
+REQUIRED_COMPOSE_VARIABLE_RE = re.compile(r"\$\{([A-Z0-9_]+):\?")
 
 
 def test_repository_governance_ignores_generated_python_bytecode(
@@ -129,3 +133,21 @@ def test_github_static_check_uses_its_prepared_host_environment() -> None:
     )
 
     assert static_step["env"]["SORIDORMI_CI_STATIC_CHECK_USE_DOCKER"] == "0"
+
+
+def test_example_environment_satisfies_required_compose_variables() -> None:
+    repo = Path(__file__).resolve().parents[1]
+    example_keys = {
+        line.split("=", 1)[0].strip()
+        for line in (repo / ".env.example").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#") and "=" in line
+    }
+    required_keys: set[str] = set()
+    for compose_path in repo.glob("compose.*.yaml"):
+        required_keys.update(
+            REQUIRED_COMPOSE_VARIABLE_RE.findall(
+                compose_path.read_text(encoding="utf-8")
+            )
+        )
+
+    assert required_keys <= example_keys
