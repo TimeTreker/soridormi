@@ -60,6 +60,9 @@ def test_container_validation_mounts_the_full_checkout(
         encoding="utf-8",
     )
     fake_docker.chmod(0o755)
+    fake_rg = tmp_path / "rg"
+    fake_rg.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    fake_rg.chmod(0o755)
     env = os.environ.copy()
     env["PATH"] = f"{tmp_path}:{env['PATH']}"
     env["FAKE_DOCKER_LOG"] = str(docker_log)
