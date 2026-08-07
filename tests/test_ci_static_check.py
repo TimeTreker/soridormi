@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 
 def test_repository_governance_ignores_generated_python_bytecode(
@@ -110,3 +111,18 @@ def test_ci_static_check_script_smoke_without_pytest() -> None:
     assert "Exporting canonical policy manifest" in result.stdout
     assert "Checking replacement-profile scaffold workflow" in result.stdout
     assert "Checking replacement-policy package workflow" in result.stdout
+
+
+def test_github_static_check_uses_its_prepared_host_environment() -> None:
+    repo = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load(
+        (repo / ".github" / "workflows" / "static-check.yml").read_text(
+            encoding="utf-8"
+        )
+    )
+    steps = workflow["jobs"]["static-check"]["steps"]
+    static_step = next(
+        step for step in steps if step.get("name") == "Run Soridormi static checks"
+    )
+
+    assert static_step["env"]["SORIDORMI_CI_STATIC_CHECK_USE_DOCKER"] == "0"
