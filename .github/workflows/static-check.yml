@@ -26,6 +26,8 @@ jobs:
           python -m pip install -e '.[dev]'
 
       - name: Run Soridormi static checks
+        env:
+          SORIDORMI_CI_STATIC_CHECK_USE_DOCKER: '0'
         run: ./scripts/ci_static_check.sh
 
       - name: Validate Compose files

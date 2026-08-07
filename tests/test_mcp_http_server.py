@@ -90,6 +90,10 @@ def test_streamable_http_preserves_plan_state_across_requests() -> None:
             "soridormi_runtime.mcp.http_server",
             "--port",
             str(port),
+            "--mode",
+            "sim",
+            "--adapter",
+            "dry_run",
         ],
         cwd=ROOT,
         stdout=subprocess.PIPE,
@@ -149,7 +153,7 @@ def test_streamable_http_preserves_plan_state_across_requests() -> None:
                                         "skill_id": "walk_velocity",
                                         "parameters": {
                                             "vx_mps": 0.12,
-                                            "duration_s": 0.2,
+                                            "duration_s": 0.5,
                                         },
                                     },
                                     {

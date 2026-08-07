@@ -31,6 +31,8 @@ TEXT_SUFFIXES = {
 }
 
 EXCLUDED_TOP_LEVEL = {".git", "artifacts", "data", "workspace"}
+EXCLUDED_DIRECTORY_NAMES = {"__pycache__"}
+EXCLUDED_FILE_SUFFIXES = {".pyc", ".pyo"}
 OBSOLETE_ACTIVE_NAMES = {
     "NEXT_SESSION_PROMPT.md",
     "PROJECT_STATUS_AFTER_M6.md",
@@ -63,6 +65,10 @@ def first_party_files() -> list[Path]:
             continue
         relative = path.relative_to(ROOT)
         if relative.parts and relative.parts[0] in EXCLUDED_TOP_LEVEL:
+            continue
+        if any(part in EXCLUDED_DIRECTORY_NAMES for part in relative.parts):
+            continue
+        if relative.suffix.lower() in EXCLUDED_FILE_SUFFIXES:
             continue
         result.append(relative)
     return sorted(result)
