@@ -15,48 +15,77 @@ only the `physical_object` scope. Information acquisition remains owned by peer
 providers such as weather or external-information services, while Chromie owns the
 human-facing semantic plan and conversational delivery.
 
-## Single semantic authority
+## Stable authority, dynamic capability granularity
 
 Chromie decides:
 
 - which user-visible responsibilities exist;
-- which exact registered capability can satisfy each responsibility;
-- ordering and dependencies between independently requested responsibilities;
-- whether a result or meaningful progress update should be communicated to the person.
+- which currently advertised capabilities should satisfy each responsibility;
+- ordering and dependencies across Soridormi and peer-provider capabilities.
 
-Soridormi receives an already-selected bounded capability request. It may plan only
-inside that capability contract. Provider-local stages such as source resolution,
-navigation, perception, grasping, carrying, handover, safety, and recovery are not
-new Chromie Goals and must not reinterpret the user's intent.
+Soridormi decides:
 
-A useful boundary test is:
+- which physical capabilities it can truthfully advertise in the current runtime;
+- how each selected Soridormi capability is decomposed and executed internally;
+- local perception, motion, control, monitoring, safety, and recovery within that
+  capability contract.
 
-> If a step can be independently requested, changed, cancelled, or judged by the
-> user, it belongs in Chromie's semantic plan. If the step exists only because the
-> selected capability needs it to satisfy its own contract, it belongs inside
-> Soridormi.
+The boundary between Chromie decomposition and Soridormi decomposition is **dynamic**.
+If Soridormi advertises a complete resource-delivery capability, Chromie can treat it
+as an atomic plan leaf. If Soridormi advertises only smaller capabilities, Chromie
+plans the larger workflow from those public leaves. A later Soridormi release may
+move the boundary upward by qualifying a stronger composite capability without any
+change to Chromie's Goal semantics.
 
-## Named capability
+This does not forbid a Soridormi planner. It defines its authority: Soridormi may use
+rules, state machines, behavior trees, learned planners, trajectory planners, or any
+other local mechanism **inside an already-selected capability**. It does not reinterpret
+the human Goal or coordinate capabilities owned by weather, memory, speech, home
+automation, or other providers.
 
-Soridormi exports one provider-scoped named skill:
+## Public resource capability levels
+
+The simulation provider currently exposes both granular and composite resource
+capabilities so the contract exercises both sides of the dynamic boundary:
 
 ```text
+acquire_resource
+  establishes: resource_acquired
+
+deliver_resource
+  requires:    resource_acquired
+  establishes: resource_delivered
+
 acquire_and_deliver_resource
+  establishes: resource_acquired + resource_delivered
 ```
 
-Its semantic scope is authoritative for capability matching:
+The common provider-neutral contract fields are:
 
 ```json
 {
-  "responsibility_type": "acquire_and_deliver_resource",
-  "resource_kinds": ["physical_object"],
-  "delivery_modes": ["physical_handover"]
+  "semantic_scope": {
+    "responsibility_type": "acquire_and_deliver_resource",
+    "resource_kinds": ["physical_object"]
+  },
+  "resource_contract": {
+    "plan_requires": [],
+    "plan_provides": ["resource_acquired"],
+    "completion_requires": ["resource_acquired"]
+  }
 }
 ```
 
-The capability name is not a phrase router. Chromie matches the Goal contract to the
-exported semantic scope. A future provider may implement the same responsibility for
-a different resource kind without moving that provider into Soridormi.
+`plan_requires` and `plan_provides` describe how an advertised capability composes
+with other public capability leaves. `completion_requires` describes the evidence
+that this exact capability must return before Soridormi/Chromie may accept its own
+execution as complete. These fields do not expose motor recipes or internal planner
+stages.
+
+The complete `acquire_and_deliver_resource` capability is not a permanent mapping
+from Chromie's Goal type. It is simply one stronger capability Soridormi currently
+advertises in simulation. A future hardware target may advertise only the granular
+capabilities, the complete capability, both, or neither according to qualification.
 
 ## Simulation-first mock implementation
 
@@ -125,8 +154,10 @@ recipe.
 
 ## Promotion beyond the mock
 
-Replacing the mock with real embodied execution must preserve the same capability ID
-and semantic/evidence contract. Promotion requires qualified perception, navigation,
-manipulation, carry safety, handover, cancellation, recovery, and MuJoCo evidence
-before hardware execution is enabled. Chromie should not need a semantic architecture
-change when the provider implementation becomes real.
+Promotion does not require preserving today's capability granularity. A target may
+qualify `acquire_resource` before `deliver_resource`, or later qualify the complete
+`acquire_and_deliver_resource` workflow. Each advertised capability must preserve its
+own declared semantic/evidence contract, and hardware exposure requires qualified
+perception, navigation, manipulation, carry safety, handover, cancellation, recovery,
+and target-bound evidence as applicable. Chromie should not need a semantic
+architecture change when Soridormi's advertised capability boundary evolves.

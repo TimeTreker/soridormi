@@ -2,6 +2,13 @@
 
 Status: structured body-skill interface bootstrap proposal.
 
+> **Dynamic capability boundary:** a public Soridormi skill is atomic only from the
+> perspective of Chromie's current global plan. Soridormi may advertise a composite
+> capability, smaller component capabilities, or both as qualification evolves.
+> Chromie plans across those currently advertised leaves; Soridormi may plan locally
+> inside each selected leaf. Today's granularity must not be frozen into Chromie Goal
+> semantics.
+
 Soridormi is the robot cerebellum/body runtime. Chromie is the robot brain in
 `TimeTreker/chromie.git` on `main`. structured body-skill interface starts the body-skill interface between
 them: Chromie or another high-level planner should ask Soridormi for safe named

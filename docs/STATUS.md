@@ -35,6 +35,10 @@ hosting boundary requires a separate evidence-backed architecture decision.
   command-conditioned context-policy profiles.
 - Named skills are catalogued, schema-validated, bounded, interruptible where
   declared, and executable through the runtime adapter in MuJoCo.
+- Resource execution now follows a dynamic capability-boundary contract: the
+  provider may advertise granular acquisition/delivery capabilities, the complete
+  composite, or both. Chromie owns composition across public leaves; Soridormi owns
+  local planning inside each selected capability.
 - `acquire_and_deliver_resource` is exported as a simulation-only scripted/mock
   named skill for the `physical_object + physical_handover` semantic scope. It
   returns explicit `resource_outcome` acquisition/delivery evidence so paired

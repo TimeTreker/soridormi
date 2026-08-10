@@ -52,20 +52,25 @@ physical coordinates in that metadata, then independently validates and plans
 the named skill through its owned runtime boundary.
 
 
-### Semantic plan versus provider-local plan
+### Stable semantic authority, dynamic capability boundary
 
 Chromie and Soridormi may both contain planners without duplicating authority because
-they plan at different abstraction levels. Chromie owns the human-facing semantic
-plan: responsibilities, exact capability selection, ordering, and dependencies.
-Soridormi owns only the implementation plan inside an already-selected embodied
-capability. It may decompose `acquire_and_deliver_resource` into local physical
-stages, but it cannot reinterpret the user's Goal or substitute a different human
-outcome.
+they plan at different scopes. Chromie owns the human-facing Goal and the global plan
+across the capabilities currently advertised by Soridormi and peer providers.
+Soridormi owns the implementation plan inside each Soridormi capability that Chromie
+selects.
 
-The same `AcquireAndDeliverResource` responsibility can therefore be fulfilled by
-peer providers. Soridormi implements the physical-object scope; a weather or external
-information provider implements information acquisition. Shared semantic abstraction
-does not imply one shared provider.
+The decomposition boundary is deliberately **not fixed**. If Soridormi can guarantee a
+complete physical workflow and advertises a composite capability, Chromie treats that
+capability as one atomic global-plan leaf. If Soridormi exposes only smaller resource
+capabilities, Chromie may compose those advertised leaves with each other and with
+capabilities from other providers. Soridormi may expose both levels at once.
+
+Soridormi is free to use deterministic rules, behavior trees, local planners, motion
+planners, learned policies, recovery planners, or other internal hierarchy. What it
+may not do is reinterpret the human Goal or plan across capabilities owned by other
+providers. The live capability catalog is therefore the dynamic SoC/ECU-style boundary:
+semantic authority stays with Chromie while provider capability granularity may evolve.
 
 ## Coordination and DAG scopes
 
@@ -183,12 +188,12 @@ Can you bring me some water?
 ```
 
 Chromie represents this as one `AcquireAndDeliverResource` Goal whose
-`resource.kind=physical_object`. It selects an exact capability by semantic scope,
-not by matching a phrase or inventing grasp/navigation steps. In simulation,
-Soridormi may advertise `acquire_and_deliver_resource` as a scripted/mock provider
-implementation for `physical_object + physical_handover`; Soridormi then owns the
-provider-local source resolution, navigation, acquisition, carrying, handover,
-safety, and recovery stages.
+`resource.kind=physical_object`. It then plans against the current catalog. If
+Soridormi advertises a complete `acquire_and_deliver_resource` capability, Chromie
+may use it as one plan leaf and Soridormi owns the complete provider-local workflow.
+If only smaller capabilities such as `acquire_resource` and `deliver_resource` are
+advertised, Chromie may compose them in order. Chromie never invents hidden Soridormi
+substeps that are absent from the catalog.
 
 The current Open Duck Mini v2 still has no qualified hardware manipulator/gripper
 stack. The simulated capability therefore proves the architecture and evidence

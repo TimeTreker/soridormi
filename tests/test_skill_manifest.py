@@ -10,6 +10,8 @@ MANIFEST = ROOT / "configs" / "skills" / "open_duck_mini_v2_skills.json"
 
 REQUIRED_SKILLS = {
     "acquire_and_deliver_resource",
+    "acquire_resource",
+    "deliver_resource",
     "stand_idle",
     "stop",
     "walk_velocity",
@@ -148,7 +150,7 @@ def test_first_available_subset_is_small_and_supported() -> None:
         for skill in skills.values()
         if skill["status"] in {"available_sim", "available_sim_experimental"}
     ]
-    assert 6 <= len(available) <= 16
+    assert 6 <= len(available) <= 18
 
     for skill in available:
         required = set(skill["required_actuator_groups"])
@@ -157,21 +159,45 @@ def test_first_available_subset_is_small_and_supported() -> None:
 
 
 
-def test_resource_acquisition_skill_is_sim_only_and_semantically_scoped() -> None:
-    skill = _skills_by_id()["acquire_and_deliver_resource"]
-
-    assert skill["status"] == "available_sim_experimental"
-    assert skill["execution"] == "composite"
-    assert skill["sim_mock_only"] is True
-    assert skill["safety"]["hardware_enabled"] is False
-    assert skill["metadata"]["semantic_scope"] == {
-        "responsibility_type": "acquire_and_deliver_resource",
-        "resource_kinds": ["physical_object"],
-        "delivery_modes": ["physical_handover"],
-        "acquisition": "provider_owned",
-        "source_resolution": "provider_owned",
+def test_resource_capabilities_publish_dynamic_plan_coverage() -> None:
+    skills = _skills_by_id()
+    expected = {
+        "acquire_resource": {
+            "requires": [],
+            "provides": ["resource_acquired"],
+            "completion": ["resource_acquired"],
+        },
+        "deliver_resource": {
+            "requires": ["resource_acquired"],
+            "provides": ["resource_delivered"],
+            "completion": ["resource_delivered"],
+        },
+        "acquire_and_deliver_resource": {
+            "requires": [],
+            "provides": ["resource_acquired", "resource_delivered"],
+            "completion": ["resource_acquired", "resource_delivered"],
+        },
     }
-    assert skill["metadata"]["resource_contract"]["result_field"] == "resource_outcome"
+    for skill_id, contract_expected in expected.items():
+        skill = skills[skill_id]
+        assert skill["status"] == "available_sim_experimental"
+        assert skill["execution"] == "composite"
+        assert skill["sim_mock_only"] is True
+        assert skill["safety"]["hardware_enabled"] is False
+        scope = skill["metadata"]["semantic_scope"]
+        assert scope["responsibility_type"] == "acquire_and_deliver_resource"
+        assert scope["resource_kinds"] == ["physical_object"]
+        contract = skill["metadata"]["resource_contract"]
+        assert contract["result_field"] == "resource_outcome"
+        assert contract["plan_requires"] == contract_expected["requires"]
+        assert contract["plan_provides"] == contract_expected["provides"]
+        assert contract["completion_requires"] == contract_expected["completion"]
+    assert skills["deliver_resource"]["metadata"]["semantic_scope"]["delivery_modes"] == [
+        "physical_handover"
+    ]
+    assert skills["acquire_and_deliver_resource"]["metadata"]["semantic_scope"][
+        "delivery_modes"
+    ] == ["physical_handover"]
 
 def test_arm_and_hand_social_skills_are_declared_but_unsupported() -> None:
     skills = _skills_by_id()

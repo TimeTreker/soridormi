@@ -326,6 +326,287 @@
       }
     },
     {
+      "id": "acquire_resource",
+      "category": "resource",
+      "status": "available_sim_experimental",
+      "execution": "composite",
+      "capability_group": "resource_acquisition_delivery",
+      "required_actuator_groups": [
+        "legs"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "safety_class": "physical_motion",
+      "requires_confirmation": false,
+      "sim_mock_only": true,
+      "evaluation": [
+        "resource_acquired_evidence",
+        "safe_idle_after_acquisition"
+      ],
+      "concurrency": {
+        "ability_class": "locomotion_whole_body",
+        "control_coupling": "primary_body_controller",
+        "write_resources": [
+          "body.primary_motion",
+          "world.carried_object"
+        ],
+        "safety_preemption": "safe_hold"
+      },
+      "display_name": "Acquire Resource",
+      "description": "Acquire a described physical object and retain it as the provider-owned carried resource.",
+      "parameters": {
+        "resource": {},
+        "source": {}
+      },
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "physical_object"
+                ]
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "quantity": {
+                "type": "string"
+              },
+              "attributes": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "kind",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "source": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "known",
+                  "unknown",
+                  "provider_resolved"
+                ]
+              },
+              "description": {
+                "type": "string"
+              },
+              "bindings": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "resource",
+          "source"
+        ],
+        "additionalProperties": false
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen",
+        "sim_only_mock"
+      ],
+      "effects": [
+        "physical_motion",
+        "object_manipulation"
+      ],
+      "notes": "Simulation-only granular resource capability. Source resolution/navigation/grasp are idealized provider-local work; no hardware gripper capability is claimed.",
+      "metadata": {
+        "simulation_mock": "resource_acquisition_delivery",
+        "semantic_scope": {
+          "responsibility_type": "acquire_and_deliver_resource",
+          "resource_kinds": [
+            "physical_object"
+          ],
+          "acquisition": "provider_owned",
+          "source_resolution": "provider_owned"
+        },
+        "resource_contract": {
+          "result_field": "resource_outcome",
+          "plan_requires": [],
+          "plan_provides": [
+            "resource_acquired"
+          ],
+          "completion_requires": [
+            "resource_acquired"
+          ],
+          "provider_owns": [
+            "source_resolution",
+            "navigation",
+            "perception",
+            "grasping",
+            "safety",
+            "recovery"
+          ],
+          "implementation": "scripted_simulation_mock"
+        }
+      }
+    },
+    {
+      "id": "deliver_resource",
+      "category": "resource",
+      "status": "available_sim_experimental",
+      "execution": "composite",
+      "capability_group": "resource_acquisition_delivery",
+      "required_actuator_groups": [
+        "legs"
+      ],
+      "safety": {
+        "requires_standing": true,
+        "requires_stable_balance": true,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "stop",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "safety_class": "physical_motion",
+      "requires_confirmation": false,
+      "sim_mock_only": true,
+      "evaluation": [
+        "resource_delivered_evidence",
+        "safe_idle_after_delivery"
+      ],
+      "concurrency": {
+        "ability_class": "locomotion_whole_body",
+        "control_coupling": "primary_body_controller",
+        "write_resources": [
+          "body.primary_motion",
+          "world.carried_object"
+        ],
+        "safety_preemption": "safe_hold"
+      },
+      "display_name": "Deliver Resource",
+      "description": "Deliver the currently acquired physical resource to the intended recipient.",
+      "parameters": {
+        "resource": {},
+        "recipient": {}
+      },
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "resource": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "physical_object"
+                ]
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "quantity": {
+                "type": "string"
+              },
+              "attributes": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "kind",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "recipient": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "referent_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "resource",
+          "recipient"
+        ],
+        "additionalProperties": false
+      },
+      "preconditions": [
+        "standing",
+        "not_fallen",
+        "sim_only_mock",
+        "resource_acquired"
+      ],
+      "effects": [
+        "physical_motion",
+        "resource_delivery"
+      ],
+      "notes": "Simulation-only granular resource capability. Carrying/navigation/handover are idealized provider-local work and require the mock carried-resource state.",
+      "metadata": {
+        "simulation_mock": "resource_acquisition_delivery",
+        "semantic_scope": {
+          "responsibility_type": "acquire_and_deliver_resource",
+          "resource_kinds": [
+            "physical_object"
+          ],
+          "delivery_modes": [
+            "physical_handover"
+          ]
+        },
+        "resource_contract": {
+          "result_field": "resource_outcome",
+          "plan_requires": [
+            "resource_acquired"
+          ],
+          "plan_provides": [
+            "resource_delivered"
+          ],
+          "completion_requires": [
+            "resource_delivered"
+          ],
+          "provider_owns": [
+            "carrying",
+            "navigation",
+            "handover",
+            "safety",
+            "recovery"
+          ],
+          "implementation": "scripted_simulation_mock"
+        }
+      }
+    },
+    {
       "id": "acquire_and_deliver_resource",
       "category": "resource",
       "display_name": "Acquire and Deliver Resource",
@@ -463,6 +744,11 @@
         },
         "resource_contract": {
           "result_field": "resource_outcome",
+          "plan_requires": [],
+          "plan_provides": [
+            "resource_acquired",
+            "resource_delivered"
+          ],
           "completion_requires": [
             "resource_acquired",
             "resource_delivered"

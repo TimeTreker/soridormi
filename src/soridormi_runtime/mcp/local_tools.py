@@ -201,6 +201,7 @@ class SoridormiLocalToolService:
     )
     task_store: EmbodiedTaskStore = field(default_factory=EmbodiedTaskStore)
     faults: FaultInjection = field(default_factory=FaultInjection)
+    _simulated_carried_resource: str | None = field(default=None, init=False, repr=False)
     _lock: RLock = field(default_factory=RLock, init=False, repr=False)
 
     def call_tool(self, tool_name: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -450,7 +451,7 @@ class SoridormiLocalToolService:
             and self.mode != "sim"
         ):
             raise ValueError(
-                "acquire_and_deliver_resource simulation mock is unavailable outside sim mode"
+                "resource acquisition/delivery simulation mocks are unavailable outside sim mode"
             )
         plan = self.skill_registry.create_plan(
             skill_id,
@@ -490,19 +491,39 @@ class SoridormiLocalToolService:
         )
         if is_resource_mock and self.mode != "sim":
             raise RuntimeError(
-                "acquire_and_deliver_resource simulation mock is unavailable outside sim mode"
+                "resource acquisition/delivery simulation mocks are unavailable outside sim mode"
             )
         if is_resource_mock:
+            resource = (stored.plan.parameters or {}).get("resource")
+            description = (
+                " ".join(str(resource.get("description") or "").strip().split())
+                if isinstance(resource, dict)
+                else ""
+            )
+            if stored.plan.skill_id == "acquire_resource":
+                if self._simulated_carried_resource is not None:
+                    raise RuntimeError("simulation mock is already carrying a resource")
+                self._simulated_carried_resource = description
+                summary = "Soridormi simulation mock acquired the physical resource."
+            elif stored.plan.skill_id == "deliver_resource":
+                if self._simulated_carried_resource != description:
+                    raise RuntimeError(
+                        "deliver_resource requires the matching simulated acquired resource"
+                    )
+                self._simulated_carried_resource = None
+                summary = "Soridormi simulation mock delivered the carried resource."
+            else:
+                summary = (
+                    "Soridormi simulation mock completed physical resource "
+                    "acquisition and handover."
+                )
             return {
                 "completed": True,
                 "skill_id": stored.plan.skill_id,
                 "mode": self.mode,
                 "no_motion": True,
                 "recommendation_only": False,
-                "summary": (
-                    "Soridormi simulation mock completed physical resource "
-                    "acquisition and handover."
-                ),
+                "summary": summary,
                 "resource_outcome": simulated_resource_outcome(stored.plan),
             }
         return {

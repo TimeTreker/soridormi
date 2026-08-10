@@ -112,6 +112,9 @@ def test_resource_acquisition_mock_is_sim_only_and_returns_completion_evidence()
         skill["skill_id"]: skill
         for skill in sim.call_tool("soridormi.skill.list", {})["skills"]
     }
+    assert {"acquire_resource", "deliver_resource", "acquire_and_deliver_resource"} <= set(
+        sim_skills
+    )
     resource_skill = sim_skills["acquire_and_deliver_resource"]
     assert resource_skill["metadata"]["semantic_scope"] == {
         "responsibility_type": "acquire_and_deliver_resource",
@@ -163,7 +166,11 @@ def test_resource_acquisition_mock_is_sim_only_and_returns_completion_evidence()
             skill["skill_id"]
             for skill in service.call_tool("soridormi.skill.list", {})["skills"]
         }
-        assert "acquire_and_deliver_resource" not in skill_ids
+        assert {
+            "acquire_resource",
+            "deliver_resource",
+            "acquire_and_deliver_resource",
+        }.isdisjoint(skill_ids)
         with pytest.raises(ValueError, match="unavailable outside sim mode"):
             service.call_tool(
                 "soridormi.skill.create_plan",
@@ -179,6 +186,38 @@ def test_resource_acquisition_mock_is_sim_only_and_returns_completion_evidence()
                     },
                 },
             )
+
+
+def test_granular_resource_mocks_require_acquire_before_deliver() -> None:
+    service = SoridormiLocalToolService(mode="sim")
+    resource = {"kind": "physical_object", "description": "a cup of water"}
+    deliver_plan = service.call_tool(
+        "soridormi.skill.create_plan",
+        {
+            "skill_id": "deliver_resource",
+            "parameters": {"resource": resource, "recipient": {"description": "requester"}},
+        },
+    )
+    with pytest.raises(RuntimeError, match="requires the matching simulated acquired resource"):
+        service.call_tool("soridormi.skill.execute_plan", {"plan_id": deliver_plan["plan_id"]})
+
+    acquire_plan = service.call_tool(
+        "soridormi.skill.create_plan",
+        {
+            "skill_id": "acquire_resource",
+            "parameters": {"resource": resource, "source": {"status": "unknown"}},
+        },
+    )
+    acquired = service.call_tool(
+        "soridormi.skill.execute_plan", {"plan_id": acquire_plan["plan_id"]}
+    )
+    assert acquired["resource_outcome"]["resource_acquired"] is True
+    assert acquired["resource_outcome"]["resource_delivered"] is False
+
+    delivered = service.call_tool(
+        "soridormi.skill.execute_plan", {"plan_id": deliver_plan["plan_id"]}
+    )
+    assert delivered["resource_outcome"]["resource_delivered"] is True
 
 
 def test_named_skill_plan_accepts_valid_chromie_proposal_metadata() -> None:

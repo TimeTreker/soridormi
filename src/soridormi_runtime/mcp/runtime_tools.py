@@ -119,6 +119,7 @@ class SoridormiRuntimeToolService:
     )
     _robot_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
     _last_state: RobotState | None = field(default=None, init=False, repr=False)
+    _simulated_carried_resource: str | None = field(default=None, init=False, repr=False)
     _robot_executor: ThreadPoolExecutor | None = field(default=None, init=False, repr=False)
 
     @classmethod
@@ -564,17 +565,40 @@ class SoridormiRuntimeToolService:
                 raise RuntimeError(
                     "cannot execute resource acquisition while emergency_stop is active"
                 )
+            resource = (stored.plan.parameters or {}).get("resource")
+            description = (
+                " ".join(str(resource.get("description") or "").strip().split())
+                if isinstance(resource, dict)
+                else ""
+            )
+            if stored.plan.skill_id == "acquire_resource" and self._simulated_carried_resource is not None:
+                raise RuntimeError("simulation mock is already carrying a resource")
+            if (
+                stored.plan.skill_id == "deliver_resource"
+                and self._simulated_carried_resource != description
+            ):
+                raise RuntimeError(
+                    "deliver_resource requires the matching simulated acquired resource"
+                )
             motion_result = await self.execute_motion_plan(plan_id)
             if motion_result.get("completed") is not True:
                 result = {**motion_result, "no_motion": False}
             else:
+                if stored.plan.skill_id == "acquire_resource":
+                    self._simulated_carried_resource = description
+                    summary = "Soridormi simulation mock acquired the physical resource."
+                elif stored.plan.skill_id == "deliver_resource":
+                    self._simulated_carried_resource = None
+                    summary = "Soridormi simulation mock delivered the carried resource."
+                else:
+                    summary = (
+                        "Soridormi simulation mock completed its scripted physical "
+                        "resource acquisition and handover sequence."
+                    )
                 result = {
                     **motion_result,
                     "completed": True,
-                    "summary": (
-                        "Soridormi simulation mock completed its scripted physical "
-                        "resource acquisition and handover sequence."
-                    ),
+                    "summary": summary,
                     "no_motion": False,
                     "resource_outcome": simulated_resource_outcome(stored.plan),
                 }

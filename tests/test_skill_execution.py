@@ -24,9 +24,11 @@ def test_registry_lists_manifest_backed_executable_skill_ids() -> None:
     registry = _registry()
     assert registry.executable_skill_ids() == (
         "acquire_and_deliver_resource",
+        "acquire_resource",
         "blink_eyes",
         "bow",
         "curve_walk",
+        "deliver_resource",
         "express_attention",
         "look_at_person",
         "look_direction",
@@ -70,6 +72,32 @@ def test_resource_acquisition_mock_plan_keeps_semantic_parameters() -> None:
     assert plan.commands[2].vx_mps < 0.0
     assert plan.parameters is not None
     assert plan.parameters["resource"]["description"] == "a cup of water"
+
+
+def test_granular_resource_mock_plans_expose_public_phase_boundaries() -> None:
+    registry = _registry()
+    acquire = registry.create_plan(
+        "acquire_resource",
+        {
+            "resource": {"kind": "physical_object", "description": "a cup of water"},
+            "source": {"status": "unknown"},
+        },
+    )
+    deliver = registry.create_plan(
+        "deliver_resource",
+        {
+            "resource": {"kind": "physical_object", "description": "a cup of water"},
+            "recipient": {"description": "requester"},
+        },
+    )
+    assert [segment.label for segment in acquire.commands] == [
+        "resource_mock_approach",
+        "resource_mock_acquire",
+    ]
+    assert [segment.label for segment in deliver.commands] == [
+        "resource_mock_return",
+        "resource_mock_handover",
+    ]
 
 
 def test_resource_acquisition_mock_rejects_information_kind() -> None:

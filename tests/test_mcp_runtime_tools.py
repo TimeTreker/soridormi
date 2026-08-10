@@ -524,7 +524,9 @@ def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> Non
             "quick",
             "fast_limited",
         ]
-        assert "acquire_and_deliver_resource" in skills
+        assert {"acquire_resource", "deliver_resource", "acquire_and_deliver_resource"} <= set(
+            skills
+        )
         resource_skill = skills["acquire_and_deliver_resource"]
         assert resource_skill["execution"] == "composite"
         assert resource_skill["parameters_schema"]["properties"]["resource"]["type"] == "object"
@@ -593,6 +595,41 @@ def test_runtime_service_executes_simulated_resource_acquisition_delivery() -> N
         assert result["resource_outcome"]["mocked_simulation"] is True
 
     asyncio.run(exercise())
+
+def test_runtime_service_executes_granular_resource_chain() -> None:
+    async def exercise() -> None:
+        service = _service()
+        resource = {"kind": "physical_object", "description": "a cup of water"}
+        acquire_plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {
+                "skill_id": "acquire_resource",
+                "parameters": {"resource": resource, "source": {"status": "unknown"}},
+            },
+        )
+        acquired = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": acquire_plan["plan_id"]}
+        )
+        assert acquired["resource_outcome"]["resource_acquired"] is True
+        assert acquired["resource_outcome"]["resource_delivered"] is False
+
+        deliver_plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {
+                "skill_id": "deliver_resource",
+                "parameters": {
+                    "resource": resource,
+                    "recipient": {"description": "requester"},
+                },
+            },
+        )
+        delivered = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": deliver_plan["plan_id"]}
+        )
+        assert delivered["resource_outcome"]["resource_delivered"] is True
+
+    asyncio.run(exercise())
+
 
 def test_runtime_service_executes_named_velocity_skill() -> None:
     async def exercise() -> None:

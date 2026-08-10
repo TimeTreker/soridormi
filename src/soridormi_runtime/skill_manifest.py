@@ -236,6 +236,54 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
             elif not isinstance(explicit_schema.get("properties", {}), dict):
                 errors.append(f"skill {skill_id}: parameters_schema.properties must be an object")
 
+        metadata = skill.get("metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        semantic_scope = metadata.get("semantic_scope")
+        resource_contract = metadata.get("resource_contract")
+        if (
+            isinstance(semantic_scope, dict)
+            and semantic_scope.get("responsibility_type") == "acquire_and_deliver_resource"
+        ):
+            if not isinstance(resource_contract, dict):
+                errors.append(
+                    f"skill {skill_id}: resource responsibility requires resource_contract"
+                )
+            else:
+                state_lists: dict[str, list[str]] = {}
+                for field_name in (
+                    "plan_requires",
+                    "plan_provides",
+                    "completion_requires",
+                ):
+                    raw = resource_contract.get(field_name)
+                    if not isinstance(raw, list):
+                        errors.append(
+                            f"skill {skill_id}: resource_contract.{field_name} must be a list"
+                        )
+                        continue
+                    normalized = [str(item).strip() for item in raw if str(item).strip()]
+                    if len(normalized) != len(raw) or len(normalized) != len(set(normalized)):
+                        errors.append(
+                            f"skill {skill_id}: resource_contract.{field_name} must contain unique non-empty strings"
+                        )
+                    state_lists[field_name] = normalized
+                provides = set(state_lists.get("plan_provides", []))
+                completion = set(state_lists.get("completion_requires", []))
+                if not provides:
+                    errors.append(
+                        f"skill {skill_id}: resource_contract.plan_provides must not be empty"
+                    )
+                if completion and not completion <= provides:
+                    errors.append(
+                        f"skill {skill_id}: completion_requires must be a subset of plan_provides"
+                    )
+                if "resource_delivered" in provides:
+                    delivery_modes = semantic_scope.get("delivery_modes")
+                    if not isinstance(delivery_modes, list) or not delivery_modes:
+                        errors.append(
+                            f"skill {skill_id}: resource_delivered requires semantic_scope.delivery_modes"
+                        )
+
     if available_count < 1:
         warnings.append("no skills are currently available in simulation")
     if available_count > 10:
