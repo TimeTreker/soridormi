@@ -51,6 +51,22 @@ provenance only. It rejects executable semantics, low-level controls, and
 physical coordinates in that metadata, then independently validates and plans
 the named skill through its owned runtime boundary.
 
+
+### Semantic plan versus provider-local plan
+
+Chromie and Soridormi may both contain planners without duplicating authority because
+they plan at different abstraction levels. Chromie owns the human-facing semantic
+plan: responsibilities, exact capability selection, ordering, and dependencies.
+Soridormi owns only the implementation plan inside an already-selected embodied
+capability. It may decompose `acquire_and_deliver_resource` into local physical
+stages, but it cannot reinterpret the user's Goal or substitute a different human
+outcome.
+
+The same `AcquireAndDeliverResource` responsibility can therefore be fulfilled by
+peer providers. Soridormi implements the physical-object scope; a weather or external
+information provider implements information acquisition. Shared semantic abstraction
+does not imply one shared provider.
+
 ## Coordination and DAG scopes
 
 The lane model and the DAG model are complementary. The Cognitive Core and
@@ -160,18 +176,24 @@ This is already a concrete body command. It can be useful for tests, simple
 explicit requests, or lower-level skill execution, but it should not be the main
 interface for rich user goals.
 
-### Human goal
+### Human resource goal
 
 ```text
 Can you bring me some water?
 ```
 
-Chromie may understand this as a delivery goal, but Soridormi must check
-embodied feasibility. On the current Open Duck Mini v2, Soridormi should refuse
-object delivery because the robot has no supported manipulator, gripper, carry,
-or handoff capability. It may offer alternatives such as looking toward the
-object, navigating near it after target resolution, or reporting that the task
-is unsupported.
+Chromie represents this as one `AcquireAndDeliverResource` Goal whose
+`resource.kind=physical_object`. It selects an exact capability by semantic scope,
+not by matching a phrase or inventing grasp/navigation steps. In simulation,
+Soridormi may advertise `acquire_and_deliver_resource` as a scripted/mock provider
+implementation for `physical_object + physical_handover`; Soridormi then owns the
+provider-local source resolution, navigation, acquisition, carrying, handover,
+safety, and recovery stages.
+
+The current Open Duck Mini v2 still has no qualified hardware manipulator/gripper
+stack. The simulated capability therefore proves the architecture and evidence
+contract only; it is not hardware qualification and must not become executable on
+hardware merely because the simulation mock exists.
 
 ### Destination goal
 

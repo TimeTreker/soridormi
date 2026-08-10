@@ -728,11 +728,114 @@ def _plan_blink_eyes(skill: dict[str, Any], parameters: Mapping[str, Any], profi
     return _visual_expression_plan(skill, parameters, profile, visual_expressions=expressions, summary=summary)
 
 
+def _plan_acquire_and_deliver_resource(
+    skill: dict[str, Any],
+    parameters: Mapping[str, Any],
+    profile: str,
+) -> SkillPlan:
+    """Validate the semantic resource contract for the simulation-only mock.
+
+    The mock deliberately does not invent a low-level motion recipe. It records a
+    bounded provider-local composite plan whose execution adapter later returns
+    explicit resource acquisition/delivery evidence.
+    """
+
+    resource = parameters.get("resource")
+    source = parameters.get("source")
+    recipient = parameters.get("recipient")
+    if not isinstance(resource, Mapping):
+        raise SkillExecutionError("resource must be an object")
+    if resource.get("kind") != "physical_object":
+        raise SkillExecutionError(
+            "acquire_and_deliver_resource currently supports resource.kind=physical_object only"
+        )
+    description = " ".join(str(resource.get("description") or "").strip().split())
+    if not description:
+        raise SkillExecutionError("resource.description is required")
+    if not isinstance(source, Mapping):
+        raise SkillExecutionError("source must be an object")
+    source_status = str(source.get("status") or "").strip()
+    if source_status not in {"known", "unknown", "provider_resolved"}:
+        raise SkillExecutionError(
+            "source.status must be known, unknown, or provider_resolved"
+        )
+    if not isinstance(recipient, Mapping):
+        raise SkillExecutionError("recipient must be an object")
+    recipient_description = " ".join(
+        str(recipient.get("description") or "").strip().split()
+    )
+    if not recipient_description:
+        raise SkillExecutionError("recipient.description is required")
+
+    # This is intentionally provider-local and simulation-only.  The short
+    # approach/return motion makes the composite action observable in MuJoCo,
+    # while acquisition and handover remain idealized because the current body
+    # has no qualified manipulator/gripper stack.
+    commands = (
+        VelocitySegment(
+            vx_mps=0.12,
+            duration_s=0.60,
+            label="resource_mock_approach",
+        ),
+        VelocitySegment(duration_s=0.25, label="resource_mock_acquire"),
+        VelocitySegment(
+            vx_mps=-0.12,
+            duration_s=0.60,
+            label="resource_mock_return",
+        ),
+        VelocitySegment(duration_s=0.25, label="resource_mock_handover"),
+    )
+    summary = (
+        "Plan acquire_and_deliver_resource: simulation-only provider-local "
+        f"acquisition and handover of {description!r} to {recipient_description!r}."
+    )
+    return SkillPlan(
+        skill_id=str(skill["id"]),
+        status=str(skill.get("status")),
+        category=str(skill.get("category")),
+        execution=str(skill.get("execution")),
+        profile=profile,
+        dry_run=True,
+        summary=summary,
+        commands=commands,
+        safety=skill.get("safety", {}),
+        parameters=dict(parameters),
+    )
+
+
+def simulated_resource_outcome(plan: SkillPlan) -> dict[str, Any]:
+    """Return bounded completion evidence for the simulation-only resource mock."""
+
+    parameters = dict(plan.parameters or {})
+    resource = parameters.get("resource")
+    recipient = parameters.get("recipient")
+    if not isinstance(resource, Mapping) or not isinstance(recipient, Mapping):
+        raise SkillExecutionError("resource mock plan lost its semantic parameters")
+    description = " ".join(str(resource.get("description") or "").strip().split())
+    recipient_description = " ".join(
+        str(recipient.get("description") or "requester").strip().split()
+    )
+    return {
+        "responsibility_type": "acquire_and_deliver_resource",
+        "resource_kind": "physical_object",
+        "resource_description": description,
+        "resource_acquired": True,
+        "resource_delivered": True,
+        "recipient_description": recipient_description,
+        "mocked_simulation": True,
+        "evidence_summary": (
+            "The simulation resource was acquired, carried, and handed over "
+            "through the scripted provider mock."
+        ),
+    }
+
+
 BUILTIN_SKILL_PLANNERS: dict[str, SkillPlanner] = {
     "stand_idle": _plan_stand_idle,
     "stop": _plan_stop,
     "walk_velocity": _plan_walk_velocity,
     "walk_forward": _plan_walk_forward,
+    "acquire_and_deliver_resource": _plan_acquire_and_deliver_resource,
     "turn_in_place": _plan_turn_in_place,
     "curve_walk": _plan_curve_walk,
     "sidestep": _plan_sidestep,

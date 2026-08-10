@@ -9,10 +9,11 @@ what the robot body claims it can do.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -226,6 +227,15 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
                     if "default" in param and "max" in param and param["default"] > param["max"]:
                         errors.append(f"skill {skill_id}: parameter {param_name} default > max")
 
+        explicit_schema = skill.get("parameters_schema")
+        if explicit_schema is not None:
+            if not isinstance(explicit_schema, dict):
+                errors.append(f"skill {skill_id}: parameters_schema must be an object")
+            elif explicit_schema.get("type") != "object":
+                errors.append(f"skill {skill_id}: parameters_schema.type must be 'object'")
+            elif not isinstance(explicit_schema.get("properties", {}), dict):
+                errors.append(f"skill {skill_id}: parameters_schema.properties must be an object")
+
     if available_count < 1:
         warnings.append("no skills are currently available in simulation")
     if available_count > 10:
@@ -236,6 +246,44 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
 
 def skills_by_id(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {str(skill["id"]): skill for skill in manifest.get("skills", []) if isinstance(skill, dict) and "id" in skill}
+
+
+def parameters_schema_for_skill(skill: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the exact model-facing parameter schema for one manifest skill.
+
+    Most legacy skills use the compact ``parameters`` min/max/enum form. Rich
+    provider capabilities may instead publish an explicit nested JSON schema.
+    Keeping this projection in one place prevents MCP list implementations from
+    drifting into different capability contracts.
+    """
+
+    explicit = skill.get("parameters_schema")
+    if isinstance(explicit, dict):
+        return copy.deepcopy(explicit)
+
+    properties: dict[str, Any] = {}
+    for name, rule in (skill.get("parameters") or {}).items():
+        if not isinstance(rule, dict):
+            continue
+        schema: dict[str, Any] = {}
+        if rule.get("type") == "string" or "enum" in rule:
+            schema["type"] = "string"
+            if isinstance(rule.get("enum"), list):
+                schema["enum"] = list(rule["enum"])
+        else:
+            schema["type"] = "number"
+            if "min" in rule:
+                schema["minimum"] = rule["min"]
+            if "max" in rule:
+                schema["maximum"] = rule["max"]
+        if "default" in rule:
+            schema["default"] = rule["default"]
+        properties[name] = schema
+    return {
+        "type": "object",
+        "properties": properties,
+        "additionalProperties": False,
+    }
 
 
 def iter_skills(manifest: dict[str, Any], query: SkillQuery | None = None) -> list[dict[str, Any]]:

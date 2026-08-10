@@ -35,6 +35,11 @@ hosting boundary requires a separate evidence-backed architecture decision.
   command-conditioned context-policy profiles.
 - Named skills are catalogued, schema-validated, bounded, interruptible where
   declared, and executable through the runtime adapter in MuJoCo.
+- `acquire_and_deliver_resource` is exported as a simulation-only scripted/mock
+  named skill for the `physical_object + physical_handover` semantic scope. It
+  returns explicit `resource_outcome` acquisition/delivery evidence so paired
+  Chromie/Soridormi architecture can be exercised end to end without claiming a
+  real manipulator or hardware grasp capability.
 - Exact concurrent body activities are validated and executable through
   `soridormi.activity.*`: one primary locomotion member may run with compatible
   bounded head overlays and independent visual expressions.
@@ -128,8 +133,8 @@ Soridormi does not silently substitute a person, pose, or coordinate.
 - Concurrent nodding, bowing, shaking, or other unqualified standalone gestures
   during locomotion
 - General physical task execution through the task API
-- Autonomous navigation, target tracking, obstacle avoidance, manipulation, or
-  object delivery
+- Autonomous real-world navigation, target tracking, obstacle avoidance, qualified
+  manipulation, or non-mocked object delivery
 - A hardware backend
 - Hardware-ready locomotion or broad terrain/generalization qualification
 - Completion inferred from a plan, dry run, offline score, or partial evidence

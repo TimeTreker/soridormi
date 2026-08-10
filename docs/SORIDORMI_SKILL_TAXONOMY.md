@@ -123,6 +123,22 @@ For human-facing language, Chromie should prefer semantic wrappers such as
 the user or LLM to provide exact `vx_mps` values. `walk_velocity` remains the
 bounded engineering/debug primitive beneath those wrappers.
 
+
+### resource_acquisition_delivery: provider-local physical resource fulfillment
+
+Declare `acquire_and_deliver_resource` as Soridormi's provider-scoped implementation
+of Chromie's single `AcquireAndDeliverResource` semantic responsibility. The skill
+advertises `resource_kinds=[physical_object]` and
+`delivery_modes=[physical_handover]`; those fields, not the skill name, are the
+matching contract.
+
+The first implementation is simulation-only and scripted/mock because the current
+Open Duck Mini v2 has no qualified manipulator/gripper stack. It may idealize source
+resolution, acquisition, carry, and handover while returning explicit
+`resource_outcome` evidence. This mock validates the Goal → capability → provider →
+evidence architecture and must remain unavailable for hardware execution until the
+real embodied stack is qualified.
+
 ### head_social: head/neck social skills
 
 Implement safe scripted/keyframe social behaviors in MuJoCo first:

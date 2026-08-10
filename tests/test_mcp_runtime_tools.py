@@ -524,6 +524,19 @@ def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> Non
             "quick",
             "fast_limited",
         ]
+        assert "acquire_and_deliver_resource" in skills
+        resource_skill = skills["acquire_and_deliver_resource"]
+        assert resource_skill["execution"] == "composite"
+        assert resource_skill["parameters_schema"]["properties"]["resource"]["type"] == "object"
+        assert resource_skill["metadata"]["semantic_scope"]["resource_kinds"] == [
+            "physical_object"
+        ]
+        assert resource_skill["metadata"]["semantic_scope"]["delivery_modes"] == [
+            "physical_handover"
+        ]
+        assert resource_skill["metadata"]["resource_contract"]["result_field"] == (
+            "resource_outcome"
+        )
         assert "nod_yes" in skills
         assert skills["nod_yes"]["available"] is True
         assert skills["nod_yes"]["execution"] == "scripted_keyframe"
@@ -535,6 +548,51 @@ def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> Non
 
     asyncio.run(exercise())
 
+
+
+
+def test_runtime_service_executes_simulated_resource_acquisition_delivery() -> None:
+    async def exercise() -> None:
+        service = _service()
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {
+                "skill_id": "acquire_and_deliver_resource",
+                "parameters": {
+                    "resource": {
+                        "kind": "physical_object",
+                        "description": "a cup of water",
+                        "quantity": "one",
+                        "attributes": {},
+                    },
+                    "source": {
+                        "status": "unknown",
+                        "description": "",
+                        "bindings": {},
+                    },
+                    "recipient": {
+                        "description": "requester",
+                        "referent_id": None,
+                    },
+                },
+            },
+        )
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan",
+            {"plan_id": plan["plan_id"]},
+        )
+
+        assert plan["skill_id"] == "acquire_and_deliver_resource"
+        assert plan["no_motion"] is False
+        assert result["completed"] is True
+        assert result["no_motion"] is False
+        assert result["skill_id"] == "acquire_and_deliver_resource"
+        assert result["resource_outcome"]["resource_acquired"] is True
+        assert result["resource_outcome"]["resource_delivered"] is True
+        assert result["resource_outcome"]["resource_description"] == "a cup of water"
+        assert result["resource_outcome"]["mocked_simulation"] is True
+
+    asyncio.run(exercise())
 
 def test_runtime_service_executes_named_velocity_skill() -> None:
     async def exercise() -> None:

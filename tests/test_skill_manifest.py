@@ -9,6 +9,7 @@ MANIFEST = ROOT / "configs" / "skills" / "open_duck_mini_v2_skills.json"
 
 
 REQUIRED_SKILLS = {
+    "acquire_and_deliver_resource",
     "stand_idle",
     "stop",
     "walk_velocity",
@@ -84,7 +85,7 @@ def test_skill_ids_are_unique_and_categorized() -> None:
     assert len(skill_ids) == len(set(skill_ids))
 
     categories = {skill["category"] for skill in manifest["skills"]}
-    assert {"locomotion", "navigation", "posture", "social", "hardware_extension"} <= categories
+    assert {"locomotion", "navigation", "posture", "social", "resource", "hardware_extension"} <= categories
 
 
 def test_status_and_execution_values_are_declared() -> None:
@@ -153,6 +154,24 @@ def test_first_available_subset_is_small_and_supported() -> None:
         required = set(skill["required_actuator_groups"])
         assert required <= SUPPORTED_ACTUATOR_GROUPS
 
+
+
+
+def test_resource_acquisition_skill_is_sim_only_and_semantically_scoped() -> None:
+    skill = _skills_by_id()["acquire_and_deliver_resource"]
+
+    assert skill["status"] == "available_sim_experimental"
+    assert skill["execution"] == "composite"
+    assert skill["sim_mock_only"] is True
+    assert skill["safety"]["hardware_enabled"] is False
+    assert skill["metadata"]["semantic_scope"] == {
+        "responsibility_type": "acquire_and_deliver_resource",
+        "resource_kinds": ["physical_object"],
+        "delivery_modes": ["physical_handover"],
+        "acquisition": "provider_owned",
+        "source_resolution": "provider_owned",
+    }
+    assert skill["metadata"]["resource_contract"]["result_field"] == "resource_outcome"
 
 def test_arm_and_hand_social_skills_are_declared_but_unsupported() -> None:
     skills = _skills_by_id()

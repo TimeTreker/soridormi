@@ -6,8 +6,15 @@ from dataclasses import dataclass, field
 from threading import RLock
 from typing import Any
 
-from soridormi_runtime.skill_execution import SkillExecutionRegistry, SkillPlan
-from soridormi_runtime.skill_manifest import DEFAULT_SKILL_MANIFEST
+from soridormi_runtime.skill_execution import (
+    SkillExecutionRegistry,
+    SkillPlan,
+    simulated_resource_outcome,
+)
+from soridormi_runtime.skill_manifest import (
+    DEFAULT_SKILL_MANIFEST,
+    parameters_schema_for_skill,
+)
 
 from .body_activity import (
     BodyActivityPlanRecord,
@@ -388,40 +395,43 @@ class SoridormiLocalToolService:
         skills = []
         for skill_id in self.skill_registry.executable_skill_ids():
             skill = self.skill_registry.skills[skill_id]
-            parameters = skill.get("parameters", {})
-            properties: dict[str, Any] = {}
-            for name, rule in parameters.items():
-                if not isinstance(rule, dict):
-                    continue
-                schema: dict[str, Any] = {}
-                if rule.get("type") == "string":
-                    schema["type"] = "string"
-                    if isinstance(rule.get("enum"), list):
-                        schema["enum"] = rule["enum"]
-                else:
-                    schema["type"] = "number"
-                    if "min" in rule:
-                        schema["minimum"] = rule["min"]
-                    if "max" in rule:
-                        schema["maximum"] = rule["max"]
-                properties[name] = schema
+            metadata = skill.get("metadata")
+            metadata = dict(metadata) if isinstance(metadata, dict) else {}
+            if (
+                metadata.get("simulation_mock") == "resource_acquisition_delivery"
+                and self.mode != "sim"
+            ):
+                continue
+            execution = str(skill.get("execution") or "")
+            if execution == "visual_expression":
+                default_effects = ["visual_expression"]
+                default_safety_class = "low_risk_action"
+            else:
+                default_effects = ["physical_motion"]
+                default_safety_class = "physical_motion"
             skills.append(
                 {
                     "skill_id": skill_id,
                     "version": "0.1.0",
                     "available": True,
                     "description": str(skill.get("description") or ""),
-                    "execution": str(skill.get("execution") or ""),
+                    "execution": execution,
                     "notes": str(skill.get("notes") or ""),
-                    "semantic_speed_presets_mps": dict(skill.get("semantic_speed_presets_mps") or {}),
-                    "parameters_schema": {
-                        "type": "object",
-                        "properties": properties,
-                        "additionalProperties": False,
-                    },
+                    "semantic_speed_presets_mps": dict(
+                        skill.get("semantic_speed_presets_mps") or {}
+                    ),
+                    "parameters_schema": parameters_schema_for_skill(skill),
                     "interruptible": bool(
                         (skill.get("safety") or {}).get("interruptible", True)
                     ),
+                    "effects": list(skill.get("effects") or default_effects),
+                    "safety_class": str(
+                        skill.get("safety_class") or default_safety_class
+                    ),
+                    "requires_confirmation": bool(
+                        skill.get("requires_confirmation", self.mode != "sim")
+                    ),
+                    "metadata": metadata,
                     **skill_concurrency_projection(skill),
                 }
             )
@@ -432,6 +442,16 @@ class SoridormiLocalToolService:
         skill_id = str(args.get("skill_id", ""))
         if not skill_id:
             raise ValueError("skill_id is required")
+        skill = self.skill_registry.skills.get(skill_id)
+        if (
+            isinstance(skill, dict)
+            and (skill.get("metadata") or {}).get("simulation_mock")
+            == "resource_acquisition_delivery"
+            and self.mode != "sim"
+        ):
+            raise ValueError(
+                "acquire_and_deliver_resource simulation mock is unavailable outside sim mode"
+            )
         plan = self.skill_registry.create_plan(
             skill_id,
             args.get("parameters") or {},
@@ -449,7 +469,9 @@ class SoridormiLocalToolService:
             "mode": self.mode,
             "summary": plan.summary,
             "estimated_duration_s": plan.total_duration_s,
-            "requires_confirmation": self.mode != "sim",
+            "requires_confirmation": bool(
+                (skill or {}).get("requires_confirmation", self.mode != "sim")
+            ),
             "interruptible": bool((plan.safety or {}).get("interruptible", True)),
         }
 
@@ -461,6 +483,28 @@ class SoridormiLocalToolService:
         stored = self.skill_plans.get(plan_id)
         if stored is None:
             raise KeyError(f"skill plan not found: {plan_id}")
+        skill = self.skill_registry.skills.get(stored.plan.skill_id) or {}
+        is_resource_mock = (
+            (skill.get("metadata") or {}).get("simulation_mock")
+            == "resource_acquisition_delivery"
+        )
+        if is_resource_mock and self.mode != "sim":
+            raise RuntimeError(
+                "acquire_and_deliver_resource simulation mock is unavailable outside sim mode"
+            )
+        if is_resource_mock:
+            return {
+                "completed": True,
+                "skill_id": stored.plan.skill_id,
+                "mode": self.mode,
+                "no_motion": True,
+                "recommendation_only": False,
+                "summary": (
+                    "Soridormi simulation mock completed physical resource "
+                    "acquisition and handover."
+                ),
+                "resource_outcome": simulated_resource_outcome(stored.plan),
+            }
         return {
             "completed": True,
             "skill_id": stored.plan.skill_id,

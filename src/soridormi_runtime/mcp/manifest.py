@@ -506,6 +506,13 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                         "no_motion": {"type": "boolean"},
                         "recommendation_only": {"type": "boolean"},
                         "summary": {"type": "string"},
+                        "resource_outcome": {
+                            "type": "object",
+                            "description": (
+                                "Provider evidence for acquire_and_deliver_resource "
+                                "skills; omitted for unrelated named skills."
+                            ),
+                        },
                     },
                     required=["completed", "skill_id", "no_motion"],
                 ),

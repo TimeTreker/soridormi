@@ -106,6 +106,81 @@ def test_named_skill_provider_is_no_motion_in_all_safe_modes(
     assert service.get_status()["active_task"] is None
 
 
+def test_resource_acquisition_mock_is_sim_only_and_returns_completion_evidence() -> None:
+    sim = SoridormiLocalToolService(mode="sim")
+    sim_skills = {
+        skill["skill_id"]: skill
+        for skill in sim.call_tool("soridormi.skill.list", {})["skills"]
+    }
+    resource_skill = sim_skills["acquire_and_deliver_resource"]
+    assert resource_skill["metadata"]["semantic_scope"] == {
+        "responsibility_type": "acquire_and_deliver_resource",
+        "resource_kinds": ["physical_object"],
+        "delivery_modes": ["physical_handover"],
+        "acquisition": "provider_owned",
+        "source_resolution": "provider_owned",
+    }
+    assert resource_skill["metadata"]["resource_contract"]["result_field"] == (
+        "resource_outcome"
+    )
+
+    planned = sim.call_tool(
+        "soridormi.skill.create_plan",
+        {
+            "skill_id": "acquire_and_deliver_resource",
+            "parameters": {
+                "resource": {
+                    "kind": "physical_object",
+                    "description": "a cup of water",
+                    "quantity": "one",
+                    "attributes": {},
+                },
+                "source": {
+                    "status": "unknown",
+                    "description": "",
+                    "bindings": {},
+                },
+                "recipient": {
+                    "description": "requester",
+                    "referent_id": None,
+                },
+            },
+        },
+    )
+    executed = sim.call_tool(
+        "soridormi.skill.execute_plan",
+        {"plan_id": planned["plan_id"]},
+    )
+    assert executed["completed"] is True
+    assert executed["no_motion"] is True
+    assert executed["resource_outcome"]["resource_acquired"] is True
+    assert executed["resource_outcome"]["resource_delivered"] is True
+    assert executed["resource_outcome"]["mocked_simulation"] is True
+
+    for mode in ("hardware_shadow", "hardware_dry_run"):
+        service = SoridormiLocalToolService(mode=mode)
+        skill_ids = {
+            skill["skill_id"]
+            for skill in service.call_tool("soridormi.skill.list", {})["skills"]
+        }
+        assert "acquire_and_deliver_resource" not in skill_ids
+        with pytest.raises(ValueError, match="unavailable outside sim mode"):
+            service.call_tool(
+                "soridormi.skill.create_plan",
+                {
+                    "skill_id": "acquire_and_deliver_resource",
+                    "parameters": {
+                        "resource": {
+                            "kind": "physical_object",
+                            "description": "a cup of water",
+                        },
+                        "source": {"status": "unknown"},
+                        "recipient": {"description": "requester"},
+                    },
+                },
+            )
+
+
 def test_named_skill_plan_accepts_valid_chromie_proposal_metadata() -> None:
     service = SoridormiLocalToolService()
 

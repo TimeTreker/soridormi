@@ -23,6 +23,7 @@ def _registry() -> SkillExecutionRegistry:
 def test_registry_lists_manifest_backed_executable_skill_ids() -> None:
     registry = _registry()
     assert registry.executable_skill_ids() == (
+        "acquire_and_deliver_resource",
         "blink_eyes",
         "bow",
         "curve_walk",
@@ -40,6 +41,47 @@ def test_registry_lists_manifest_backed_executable_skill_ids() -> None:
         "walk_velocity",
     )
 
+
+
+
+def test_resource_acquisition_mock_plan_keeps_semantic_parameters() -> None:
+    plan = _registry().create_plan(
+        "acquire_and_deliver_resource",
+        {
+            "resource": {
+                "kind": "physical_object",
+                "description": "a cup of water",
+                "quantity": "one",
+                "attributes": {},
+            },
+            "source": {"status": "unknown", "description": "", "bindings": {}},
+            "recipient": {"description": "requester", "referent_id": None},
+        },
+    )
+
+    assert plan.execution == "composite"
+    assert [segment.label for segment in plan.commands] == [
+        "resource_mock_approach",
+        "resource_mock_acquire",
+        "resource_mock_return",
+        "resource_mock_handover",
+    ]
+    assert plan.commands[0].vx_mps > 0.0
+    assert plan.commands[2].vx_mps < 0.0
+    assert plan.parameters is not None
+    assert plan.parameters["resource"]["description"] == "a cup of water"
+
+
+def test_resource_acquisition_mock_rejects_information_kind() -> None:
+    with pytest.raises(SkillExecutionError, match="physical_object only"):
+        _registry().create_plan(
+            "acquire_and_deliver_resource",
+            {
+                "resource": {"kind": "information", "description": "weather"},
+                "source": {"status": "provider_resolved"},
+                "recipient": {"description": "requester"},
+            },
+        )
 
 def test_walk_velocity_dry_run_uses_validated_parameters() -> None:
     plan = _registry().create_plan(

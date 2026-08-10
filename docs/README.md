@@ -35,6 +35,7 @@ authority durable document and `docs/STATUS.md`, then add or update a guard.
 - `docs/mcp_capability_manifest.md`
 - `docs/mcp_dag_integration.md`
 - `docs/SORIDORMI_NAVIGATION_GOAL_CONTRACT.md`
+- `docs/SORIDORMI_RESOURCE_ACQUISITION_DELIVERY.md`
 - `docs/SORIDORMI_TEXT_INPUT_ACCEPTANCE.md`
 - `configs/task_capabilities/open_duck_mini_v2_task_capabilities.json`
 - `task_acceptance_cases/mcp_task_acceptance.yaml`

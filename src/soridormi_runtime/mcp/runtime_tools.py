@@ -29,8 +29,14 @@ from soridormi_runtime.scripted_head_skill import (
     scaled_keyframe_durations,
     validate_scripted_head_plan,
 )
-from soridormi_runtime.skill_execution import SkillExecutionRegistry
-from soridormi_runtime.skill_manifest import DEFAULT_SKILL_MANIFEST
+from soridormi_runtime.skill_execution import (
+    SkillExecutionRegistry,
+    simulated_resource_outcome,
+)
+from soridormi_runtime.skill_manifest import (
+    DEFAULT_SKILL_MANIFEST,
+    parameters_schema_for_skill,
+)
 from soridormi_runtime.sync_preroll import preroll_sync_simulator
 from soridormi_runtime.visual_expression_skill import (
     SUPPORTED_VISUAL_EXPRESSION_SKILLS,
@@ -308,45 +314,33 @@ class SoridormiRuntimeToolService:
                 and skill_id in SUPPORTED_VISUAL_EXPRESSION_SKILLS
             ):
                 supported.append(skill_id)
+            elif (
+                execution == "composite"
+                and (self.skill_registry.skills[skill_id].get("metadata") or {}).get(
+                    "simulation_mock"
+                ) == "resource_acquisition_delivery"
+                and self.mode == "sim"
+            ):
+                supported.append(skill_id)
         return tuple(supported)
 
     @staticmethod
     def _parameters_schema(skill: dict[str, Any]) -> dict[str, Any]:
-        properties: dict[str, Any] = {}
-        for name, rule in (skill.get("parameters") or {}).items():
-            if not isinstance(rule, dict):
-                continue
-            schema: dict[str, Any] = {}
-            if rule.get("type") == "string" or "enum" in rule:
-                schema["type"] = "string"
-                if isinstance(rule.get("enum"), list):
-                    schema["enum"] = list(rule["enum"])
-            else:
-                schema["type"] = "number"
-                if "min" in rule:
-                    schema["minimum"] = rule["min"]
-                if "max" in rule:
-                    schema["maximum"] = rule["max"]
-            if "default" in rule:
-                schema["default"] = rule["default"]
-            properties[name] = schema
-        return {
-            "type": "object",
-            "properties": properties,
-            "additionalProperties": False,
-        }
+        return parameters_schema_for_skill(skill)
 
     def list_runtime_skills(self) -> dict[str, Any]:
         skills: list[dict[str, Any]] = []
         for skill_id in self._runtime_skill_ids():
             skill = self.skill_registry.skills[skill_id]
-            execution = skill.get("execution")
+            execution = str(skill.get("execution") or "")
             if execution == "visual_expression":
-                effects = ["visual_expression"]
-                safety_class = "low_risk_action"
+                default_effects = ["visual_expression"]
+                default_safety_class = "low_risk_action"
             else:
-                effects = ["physical_motion"]
-                safety_class = "physical_motion"
+                default_effects = ["physical_motion"]
+                default_safety_class = "physical_motion"
+            metadata = skill.get("metadata")
+            metadata = dict(metadata) if isinstance(metadata, dict) else {}
             skills.append(
                 {
                     "skill_id": skill_id,
@@ -357,13 +351,20 @@ class SoridormiRuntimeToolService:
                     "interruptible": bool(
                         (skill.get("safety") or {}).get("interruptible", True)
                     ),
-                    "effects": effects,
-                    "safety_class": safety_class,
-                    "requires_confirmation": self.mode != "sim",
+                    "effects": list(skill.get("effects") or default_effects),
+                    "safety_class": str(
+                        skill.get("safety_class") or default_safety_class
+                    ),
+                    "requires_confirmation": bool(
+                        skill.get("requires_confirmation", self.mode != "sim")
+                    ),
                     "when_to_use": str(skill.get("description") or ""),
                     "execution": execution,
                     "notes": str(skill.get("notes") or ""),
-                    "semantic_speed_presets_mps": dict(skill.get("semantic_speed_presets_mps") or {}),
+                    "semantic_speed_presets_mps": dict(
+                        skill.get("semantic_speed_presets_mps") or {}
+                    ),
+                    "metadata": metadata,
                     **skill_concurrency_projection(skill),
                 }
             )
@@ -504,6 +505,17 @@ class SoridormiRuntimeToolService:
         elif plan.execution == "visual_expression":
             validate_visual_expression_plan(plan.skill_id, plan.execution)
             plan_id = f"soridormi-skill-plan-{uuid.uuid4().hex[:12]}"
+        elif (
+            plan.execution == "composite"
+            and (self.skill_registry.skills[skill_id].get("metadata") or {}).get(
+                "simulation_mock"
+            ) == "resource_acquisition_delivery"
+            and self.mode == "sim"
+        ):
+            motion_result = self.create_motion_plan(
+                {"commands": self._motion_commands_from_skill_plan(plan)}
+            )
+            plan_id = str(motion_result["plan_id"])
         else:  # pragma: no cover - guarded by _runtime_skill_ids
             raise ValueError(
                 f"skill {skill_id!r} execution {plan.execution!r} is unsupported"
@@ -520,7 +532,11 @@ class SoridormiRuntimeToolService:
             "mode": self.mode,
             "summary": plan.summary.replace("Dry-run", "Runtime"),
             "estimated_duration_s": plan.total_duration_s,
-            "requires_confirmation": self.mode != "sim",
+            "requires_confirmation": bool(
+                self.skill_registry.skills[skill_id].get(
+                    "requires_confirmation", self.mode != "sim"
+                )
+            ),
             "interruptible": bool((plan.safety or {}).get("interruptible", True)),
             "no_motion": plan.execution == "visual_expression",
         }
@@ -537,6 +553,31 @@ class SoridormiRuntimeToolService:
             result = await self.execute_scripted_head_skill(plan_id)
         elif stored.plan.execution == "visual_expression":
             result = await self.execute_visual_expression_skill(plan_id)
+        elif (
+            stored.plan.execution == "composite"
+            and (
+                self.skill_registry.skills[stored.plan.skill_id].get("metadata") or {}
+            ).get("simulation_mock") == "resource_acquisition_delivery"
+            and self.mode == "sim"
+        ):
+            if self.emergency_stop:
+                raise RuntimeError(
+                    "cannot execute resource acquisition while emergency_stop is active"
+                )
+            motion_result = await self.execute_motion_plan(plan_id)
+            if motion_result.get("completed") is not True:
+                result = {**motion_result, "no_motion": False}
+            else:
+                result = {
+                    **motion_result,
+                    "completed": True,
+                    "summary": (
+                        "Soridormi simulation mock completed its scripted physical "
+                        "resource acquisition and handover sequence."
+                    ),
+                    "no_motion": False,
+                    "resource_outcome": simulated_resource_outcome(stored.plan),
+                }
         else:  # pragma: no cover - plans are validated at creation
             raise ValueError(
                 f"skill {stored.plan.skill_id!r} execution "
@@ -546,7 +587,12 @@ class SoridormiRuntimeToolService:
             **result,
             "skill_id": stored.plan.skill_id,
             "mode": self.mode,
-            "no_motion": stored.plan.execution == "visual_expression",
+            "no_motion": bool(
+                result.get(
+                    "no_motion",
+                    stored.plan.execution == "visual_expression",
+                )
+            ),
             "recommendation_only": False,
         }
 
