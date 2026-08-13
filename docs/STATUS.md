@@ -49,6 +49,24 @@ hosting boundary requires a separate evidence-backed architecture decision.
   bounded head overlays and independent visual expressions.
 - The runtime composes locomotion and head overlays into one final motor command;
   `blink_eyes` remains an independent non-motor visual output.
+- Every currently executable social named skill exports explicit
+  `behavior_domains` metadata. This lets Chromie's trusted Activity runtime
+  validate an accepted Social Attention decoration against the same live
+  provider contract used for execution instead of relying only on a brain-side
+  catalog preset.
+- Paired dirty-working-tree diagnostic
+  `chromie/.chromie/acceptance/voice-log-water-fixed-67` completed two
+  Social Attention `blink_eyes` event calls and the scripted
+  `acquire_and_deliver_resource` request. The latter returned
+  `no_motion=false`, explicit mocked acquisition/delivery evidence, and final
+  standing safe idle. This is MuJoCo diagnostic evidence, not literal
+  100-metre travel, physical water handling, or hardware qualification.
+- The paired working tree passes repository governance and compile checks. A
+  dependency-complete, full-checkout runtime container passes 742 tests with
+  one target-dependent skip; focused body concurrency passes 126 tests and the
+  task-agent contract passes 131. The current host Python lacks the declared
+  `pyzmq` dependency, so the required host pytest/body gates stop during import
+  collection and are not reported as passed.
 - The MCP service exposes robot state, safety tools, bounded motion plans, named
   skills, concurrent body activities, and a task-level contract surface.
 - Task capabilities, preview, submit, status, events, and cancel are implemented

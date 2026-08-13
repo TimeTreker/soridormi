@@ -547,6 +547,10 @@ def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> Non
         assert skills["blink_eyes"]["execution"] == "visual_expression"
         assert skills["blink_eyes"]["effects"] == ["visual_expression"]
         assert skills["blink_eyes"]["safety_class"] == "low_risk_action"
+        assert skills["blink_eyes"]["metadata"]["behavior_domains"] == [
+            "social_attention",
+            "facial_expression",
+        ]
 
     asyncio.run(exercise())
 

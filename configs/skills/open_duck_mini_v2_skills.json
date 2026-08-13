@@ -1673,6 +1673,12 @@
     {
       "id": "neutral_head",
       "category": "social",
+      "metadata": {
+        "behavior_domains": [
+          "social_attention",
+          "posture_expression"
+        ]
+      },
       "display_name": "Neutral Head",
       "description": "Slowly return supported head/neck joints to the neutral straight-ahead pose using a scripted MuJoCo trajectory.",
       "status": "available_sim_experimental",
@@ -1723,6 +1729,12 @@
     {
       "id": "look_direction",
       "category": "social",
+      "metadata": {
+        "behavior_domains": [
+          "social_attention",
+          "orientation"
+        ]
+      },
       "display_name": "Look Direction",
       "description": "Turn head/neck toward a specified yaw/pitch direction using a scripted MuJoCo keyframe plan.",
       "status": "available_sim_experimental",
@@ -1786,6 +1798,12 @@
     {
       "id": "look_at_person",
       "category": "social",
+      "metadata": {
+        "behavior_domains": [
+          "social_attention",
+          "orientation"
+        ]
+      },
       "display_name": "Look At Person",
       "description": "Turn head toward a structured person target direction provided by an external planner/perception layer and, by default, hold gaze on that target. Soridormi does not run perception here; it only executes bounded yaw/pitch offsets.",
       "status": "available_sim_experimental",
@@ -1907,6 +1925,12 @@
     {
       "id": "blink_eyes",
       "category": "social",
+      "metadata": {
+        "behavior_domains": [
+          "social_attention",
+          "facial_expression"
+        ]
+      },
       "display_name": "Blink Eyes",
       "description": "Blink the simulated social eyes by toggling Soridormi visual-expression geoms. This is simulator-only and does not add motors or policy actions.",
       "status": "available_sim_experimental",
@@ -1970,6 +1994,12 @@
     {
       "id": "nod_yes",
       "category": "social",
+      "metadata": {
+        "behavior_domains": [
+          "social_attention",
+          "acknowledgement"
+        ]
+      },
       "display_name": "Nod Yes",
       "description": "Visible repeated bounded head pitch motion for yes/acknowledgement using scripted MuJoCo keyframes.",
       "status": "available_sim_experimental",
@@ -2031,6 +2061,12 @@
     {
       "id": "shake_no",
       "category": "social",
+      "metadata": {
+        "behavior_domains": [
+          "social_attention",
+          "acknowledgement"
+        ]
+      },
       "display_name": "Shake No",
       "description": "Visible repeated bounded head yaw motion for no/decline using scripted MuJoCo keyframes.",
       "status": "available_sim_experimental",
@@ -2092,6 +2128,12 @@
     {
       "id": "bow",
       "category": "social",
+      "metadata": {
+        "behavior_domains": [
+          "social_attention",
+          "deference"
+        ]
+      },
       "display_name": "Bow",
       "description": "Gentle head/neck-only bow gesture using a neutral-home scripted MuJoCo trajectory. No torso or leg bow is attempted.",
       "status": "available_sim_experimental",
@@ -2190,6 +2232,12 @@
     {
       "id": "express_attention",
       "category": "social",
+      "metadata": {
+        "behavior_domains": [
+          "social_attention",
+          "posture_expression"
+        ]
+      },
       "display_name": "Express Attention",
       "description": "Small head-only attention/listening gesture using a bounded neutral-home MuJoCo trajectory.",
       "status": "available_sim_experimental",

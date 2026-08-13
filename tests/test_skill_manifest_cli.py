@@ -24,7 +24,7 @@ def test_skill_manifest_loader_and_summary() -> None:
     summary = summarize_manifest(manifest)
     assert summary["robot"] == "open_duck_mini_v2"
     assert summary["skill_count"] >= 30
-    assert 6 <= summary["available_sim_count"] <= 15
+    assert 6 <= summary["available_sim_count"] <= 18
     assert summary["unsupported_count"] >= 3
 
 
@@ -33,7 +33,11 @@ def test_iter_skills_filters_available_and_category() -> None:
     available = iter_skills(manifest, SkillQuery(available_only=True))
     assert available
     assert {skill["status"] for skill in available} <= AVAILABLE_STATUSES
-    assert {skill["category"] for skill in available} == {"locomotion", "social"}
+    assert {skill["category"] for skill in available} == {
+        "locomotion",
+        "resource",
+        "social",
+    }
 
     social = iter_skills(manifest, SkillQuery(category="social", include_unsupported=True))
     assert {skill["category"] for skill in social} == {"social"}

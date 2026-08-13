@@ -211,11 +211,22 @@ def test_arm_and_hand_social_skills_are_declared_but_unsupported() -> None:
 
 def test_head_social_skills_are_planned_without_arm_requirement() -> None:
     skills = _skills_by_id()
-    for skill_id in ["neutral_head", "look_direction", "look_at_person", "nod_yes", "shake_no", "bow", "express_attention", "blink_eyes"]:
+    behavior_domains = {
+        "neutral_head": ["social_attention", "posture_expression"],
+        "look_direction": ["social_attention", "orientation"],
+        "look_at_person": ["social_attention", "orientation"],
+        "nod_yes": ["social_attention", "acknowledgement"],
+        "shake_no": ["social_attention", "acknowledgement"],
+        "bow": ["social_attention", "deference"],
+        "express_attention": ["social_attention", "posture_expression"],
+        "blink_eyes": ["social_attention", "facial_expression"],
+    }
+    for skill_id, expected_domains in behavior_domains.items():
         skill = skills[skill_id]
         assert skill["category"] == "social"
         assert set(skill["required_actuator_groups"]) <= SUPPORTED_ACTUATOR_GROUPS
         assert "arms_hands" not in skill["required_actuator_groups"]
+        assert skill["metadata"]["behavior_domains"] == expected_domains
 
 
 def test_blink_eyes_is_visual_expression_not_motor_control() -> None:
