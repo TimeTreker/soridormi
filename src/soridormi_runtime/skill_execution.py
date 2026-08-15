@@ -791,6 +791,10 @@ def _resource_plan(
     )
 
 
+SIMULATED_RESOURCE_PICKUP_LABEL = "resource_mock_pickup_pose"
+SIMULATED_RESOURCE_PICKUP_DURATION_S = 1.10
+
+
 def _plan_acquire_resource(
     skill: dict[str, Any],
     parameters: Mapping[str, Any],
@@ -800,8 +804,10 @@ def _plan_acquire_resource(
         parameters, require_source=True, require_recipient=False
     )
     commands = (
-        VelocitySegment(vx_mps=0.12, duration_s=0.60, label="resource_mock_approach"),
-        VelocitySegment(duration_s=0.25, label="resource_mock_acquire"),
+        VelocitySegment(
+            duration_s=SIMULATED_RESOURCE_PICKUP_DURATION_S,
+            label=SIMULATED_RESOURCE_PICKUP_LABEL,
+        ),
     )
     return _resource_plan(
         skill,
@@ -853,7 +859,10 @@ def _plan_acquire_and_deliver_resource(
     # this stronger advertised contract.
     commands = (
         VelocitySegment(vx_mps=0.12, duration_s=0.60, label="resource_mock_approach"),
-        VelocitySegment(duration_s=0.25, label="resource_mock_acquire"),
+        VelocitySegment(
+            duration_s=SIMULATED_RESOURCE_PICKUP_DURATION_S,
+            label=SIMULATED_RESOURCE_PICKUP_LABEL,
+        ),
         VelocitySegment(vx_mps=-0.12, duration_s=0.60, label="resource_mock_return"),
         VelocitySegment(duration_s=0.25, label="resource_mock_handover"),
     )

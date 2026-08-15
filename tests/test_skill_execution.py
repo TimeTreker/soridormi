@@ -64,7 +64,7 @@ def test_resource_acquisition_mock_plan_keeps_semantic_parameters() -> None:
     assert plan.execution == "composite"
     assert [segment.label for segment in plan.commands] == [
         "resource_mock_approach",
-        "resource_mock_acquire",
+        "resource_mock_pickup_pose",
         "resource_mock_return",
         "resource_mock_handover",
     ]
@@ -91,9 +91,11 @@ def test_granular_resource_mock_plans_expose_public_phase_boundaries() -> None:
         },
     )
     assert [segment.label for segment in acquire.commands] == [
-        "resource_mock_approach",
-        "resource_mock_acquire",
+        "resource_mock_pickup_pose",
     ]
+    assert acquire.commands[0].vx_mps == 0.0
+    assert acquire.commands[0].vy_mps == 0.0
+    assert acquire.commands[0].yaw_radps == 0.0
     assert [segment.label for segment in deliver.commands] == [
         "resource_mock_return",
         "resource_mock_handover",

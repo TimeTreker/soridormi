@@ -8,7 +8,7 @@ from functools import partial
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol
+from typing import Any, Awaitable, Callable, Protocol
 
 from soridormi_api import MotorCommand, RobotState, VisualExpressionCommand
 from soridormi_runtime.controller import HoldPositionController
@@ -30,6 +30,7 @@ from soridormi_runtime.scripted_head_skill import (
     validate_scripted_head_plan,
 )
 from soridormi_runtime.skill_execution import (
+    SIMULATED_RESOURCE_PICKUP_LABEL,
     SkillExecutionRegistry,
     simulated_resource_outcome,
 )
@@ -580,7 +581,21 @@ class SoridormiRuntimeToolService:
                 raise RuntimeError(
                     "deliver_resource requires the matching simulated acquired resource"
                 )
-            motion_result = await self.execute_motion_plan(plan_id)
+
+            async def resource_segment_handler(
+                command: dict[str, Any],
+            ) -> bool | None:
+                if str(command.get("label") or "") != SIMULATED_RESOURCE_PICKUP_LABEL:
+                    return None
+                self.controller.command = PolicyCommand()
+                return await self._execute_simulated_resource_pickup_pose(
+                    float(command["duration_s"])
+                )
+
+            motion_result = await self.execute_motion_plan(
+                plan_id,
+                segment_handler=resource_segment_handler,
+            )
             if motion_result.get("completed") is not True:
                 result = {**motion_result, "no_motion": False}
             else:
@@ -1283,6 +1298,77 @@ class SoridormiRuntimeToolService:
                 self._last_state = await self._call_robot(self.robot.read_state)
             return self._last_state
 
+    async def _execute_simulated_resource_pickup_pose(
+        self,
+        duration_s: float,
+    ) -> bool:
+        """Execute the sim-only acquire phase as a visible squat and restore."""
+
+        if duration_s <= 0.0:
+            raise ValueError("simulation resource pickup duration must be positive")
+        state = await self._read_state()
+        start_controls = command_positions_by_name(state)
+        offsets = {
+            "left_hip_pitch": -0.14,
+            "left_knee": 0.28,
+            "left_ankle": -0.14,
+            "right_hip_pitch": 0.14,
+            "right_knee": -0.28,
+            "right_ankle": 0.14,
+        }
+        missing = [name for name in offsets if name not in start_controls]
+        if missing:
+            raise RuntimeError(
+                "simulation resource pickup requires leg actuator controls: "
+                + ", ".join(sorted(missing))
+            )
+
+        start_pose = {name: start_controls[name] for name in offsets}
+        pickup_pose = {
+            name: start_pose[name] + offset
+            for name, offset in offsets.items()
+        }
+        move_duration_s = duration_s * 0.40
+        hold_duration_s = duration_s * 0.20
+
+        async def move_pose(
+            start: dict[str, float],
+            target: dict[str, float],
+            phase_duration_s: float,
+        ) -> bool:
+            nonlocal state
+            steps = max(1, int(math.ceil(phase_duration_s * self.control_hz)))
+            period_s = 1.0 / self.control_hz
+            loop = asyncio.get_running_loop()
+            for step in range(steps):
+                if self.emergency_stop or self._motion_stop_requested:
+                    return False
+                alpha = float(step + 1) / float(steps)
+                eased = alpha * alpha * (3.0 - 2.0 * alpha)
+                pose = {
+                    name: start[name] + (target[name] - start[name]) * eased
+                    for name in start
+                }
+                started_at = loop.time()
+                state = await self._step_head_target(state, pose)
+                await asyncio.sleep(max(0.0, period_s - (loop.time() - started_at)))
+            return True
+
+        if not await move_pose(start_pose, pickup_pose, move_duration_s):
+            return False
+
+        hold_steps = max(1, int(math.ceil(hold_duration_s * self.control_hz)))
+        period_s = 1.0 / self.control_hz
+        loop = asyncio.get_running_loop()
+        for _ in range(hold_steps):
+            if self.emergency_stop or self._motion_stop_requested:
+                return False
+            started_at = loop.time()
+            state = await self._step_head_target(state, pickup_pose)
+            await asyncio.sleep(max(0.0, period_s - (loop.time() - started_at)))
+
+        return await move_pose(pickup_pose, start_pose, move_duration_s)
+
     def create_motion_plan(self, args: dict[str, Any]) -> dict[str, Any]:
         planner = SoridormiLocalToolService(
             mode=self.mode,
@@ -1319,7 +1405,14 @@ class SoridormiRuntimeToolService:
             status["source_revision"] = self.source_revision
         return status
 
-    async def execute_motion_plan(self, plan_id: str) -> dict[str, Any]:
+    async def execute_motion_plan(
+        self,
+        plan_id: str,
+        *,
+        segment_handler: Callable[
+            [dict[str, Any]], Awaitable[bool | None]
+        ] | None = None,
+    ) -> dict[str, Any]:
         if self.emergency_stop:
             raise RuntimeError("cannot execute motion while emergency_stop is active")
         if not plan_id:
@@ -1345,6 +1438,24 @@ class SoridormiRuntimeToolService:
                 for index, command in enumerate(plan.commands):
                     self.active_lanes[lane]["command_index"] = index
                     self._refresh_active_task()
+                    if (
+                        str(command.get("label") or "") == SIMULATED_RESOURCE_PICKUP_LABEL
+                        and segment_handler is None
+                    ):
+                        raise RuntimeError(
+                            "simulation resource pickup markers require provider skill execution"
+                        )
+                    if segment_handler is not None:
+                        handled = await segment_handler(command)
+                        if handled is not None:
+                            if not handled:
+                                return {
+                                    "completed": False,
+                                    "stopped": True,
+                                    "dry_run_only": False,
+                                    "summary": f"Soridormi runtime stopped plan {plan_id}.",
+                                }
+                            continue
                     self.controller.command = PolicyCommand(
                         x_velocity=float(command["vx"]),
                         y_velocity=float(command["vy"]),

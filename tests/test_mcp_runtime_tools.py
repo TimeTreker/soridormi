@@ -140,6 +140,45 @@ class HeadFakeRobot:
         return self.read_state()
 
 
+class ResourceFakeRobot:
+    def __init__(self) -> None:
+        self.time = 0.0
+        self.commands: list[MotorCommand] = []
+        self.names = [
+            "left_ankle",
+            "left_hip_pitch",
+            "left_knee",
+            "right_ankle",
+            "right_hip_pitch",
+            "right_knee",
+        ]
+        self.positions = [-0.25, -0.25, 0.50, 0.25, 0.25, -0.50]
+        self.initial_positions = list(self.positions)
+
+    def read_state(self) -> RobotState:
+        return RobotState(
+            time=self.time,
+            joints=JointState(
+                names=list(self.names),
+                positions=list(self.positions),
+                velocities=[0.0] * len(self.names),
+                torques=[0.0] * len(self.names),
+            ),
+            imu=IMUState(),
+            base_position_xyz=[0.0, 0.0, 0.3],
+            actuator_ctrl=list(self.positions),
+        )
+
+    def send_motor_command(self, command: MotorCommand) -> None:
+        self.commands.append(command)
+        self.positions = list(command.positions)
+        self.time += 0.01
+
+    def step_motor_command(self, command: MotorCommand) -> RobotState:
+        self.send_motor_command(command)
+        return self.read_state()
+
+
 class FakeController:
     def __init__(self) -> None:
         self.command = PolicyCommand()
@@ -149,19 +188,28 @@ class FakeController:
     def compute(self, state: RobotState) -> MotorCommand:
         self.seen_commands.append(self.command)
         self.seen_state_times.append(float(state.time))
+        n = len(state.joints.names)
         return MotorCommand(
-            names=state.joints.names,
-            positions=state.joints.positions,
-            velocities=[self.command.x_velocity],
-            kp=[5.0],
-            kd=[0.1],
-            torques=[0.0],
+            names=list(state.joints.names),
+            positions=list(state.joints.positions),
+            velocities=[self.command.x_velocity] * n,
+            kp=[5.0] * n,
+            kd=[0.1] * n,
+            torques=[0.0] * n,
         )
 
 
 def _service(*, control_hz: float = 200.0) -> SoridormiRuntimeToolService:
     return SoridormiRuntimeToolService(
         robot=FakeRobot(),
+        controller=FakeController(),
+        control_hz=control_hz,
+    )
+
+
+def _resource_service(*, control_hz: float = 50.0) -> SoridormiRuntimeToolService:
+    return SoridormiRuntimeToolService(
+        robot=ResourceFakeRobot(),
         controller=FakeController(),
         control_hz=control_hz,
     )
@@ -557,9 +605,48 @@ def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> Non
 
 
 
+def test_runtime_acquire_resource_uses_pickup_pose_and_restores_body() -> None:
+    async def exercise() -> None:
+        service = _resource_service()
+        robot = service.robot
+        assert isinstance(robot, ResourceFakeRobot)
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {
+                "skill_id": "acquire_resource",
+                "parameters": {
+                    "resource": {
+                        "kind": "physical_object",
+                        "description": "a cup of water",
+                    },
+                    "source": {"status": "unknown"},
+                },
+            },
+        )
+        with pytest.raises(RuntimeError, match="provider skill execution"):
+            await service.call_tool(
+                "soridormi.motion.execute_plan",
+                {"plan_id": plan["plan_id"]},
+            )
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan",
+            {"plan_id": plan["plan_id"]},
+        )
+
+        left_knee = robot.names.index("left_knee")
+        right_knee = robot.names.index("right_knee")
+        assert result["completed"] is True
+        assert result["resource_outcome"]["resource_acquired"] is True
+        assert max(command.positions[left_knee] for command in robot.commands) > 0.70
+        assert min(command.positions[right_knee] for command in robot.commands) < -0.70
+        assert robot.positions == pytest.approx(robot.initial_positions)
+
+    asyncio.run(exercise())
+
+
 def test_runtime_service_executes_simulated_resource_acquisition_delivery() -> None:
     async def exercise() -> None:
-        service = _service()
+        service = _resource_service()
         plan = await service.call_tool(
             "soridormi.skill.create_plan",
             {
@@ -602,7 +689,7 @@ def test_runtime_service_executes_simulated_resource_acquisition_delivery() -> N
 
 def test_runtime_service_executes_granular_resource_chain() -> None:
     async def exercise() -> None:
-        service = _service()
+        service = _resource_service()
         resource = {"kind": "physical_object", "description": "a cup of water"}
         acquire_plan = await service.call_tool(
             "soridormi.skill.create_plan",
