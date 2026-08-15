@@ -113,10 +113,23 @@ class VisualExpressionCommand(BaseModel):
     intensity: float = Field(default=1.0, ge=0.0, le=1.0)
 
 
+class VisualArmPoseCommand(BaseModel):
+    pose: Literal["rest", "reach", "hold", "place"]
+
+
 class ApiRequest(BaseModel):
-    kind: Literal["ping", "get_state", "send_command", "step_command", "set_visual_expression", "reset"]
+    kind: Literal[
+        "ping",
+        "get_state",
+        "send_command",
+        "step_command",
+        "set_visual_expression",
+        "set_visual_arm_pose",
+        "reset",
+    ]
     command: MotorCommand | None = None
     visual_expression: VisualExpressionCommand | None = None
+    visual_arm_pose: VisualArmPoseCommand | None = None
 
 
 class ApiResponse(BaseModel):

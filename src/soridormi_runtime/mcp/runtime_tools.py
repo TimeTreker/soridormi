@@ -3,21 +3,26 @@ from __future__ import annotations
 import asyncio
 import math
 import os
-from concurrent.futures import ThreadPoolExecutor
-from functools import partial
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any, Awaitable, Callable, Protocol
 
-from soridormi_api import MotorCommand, RobotState, VisualExpressionCommand
+from soridormi_api import (
+    MotorCommand,
+    RobotState,
+    VisualArmPoseCommand,
+    VisualExpressionCommand,
+)
 from soridormi_runtime.controller import HoldPositionController
 from soridormi_runtime.main import make_controller, make_robot
 from soridormi_runtime.policy_command import PolicyCommand
 from soridormi_runtime.scripted_head_skill import (
     DEFAULT_MAX_HEAD_VELOCITY_RADPS,
-    HEAD_JOINT_NAMES,
     DEFAULT_TRANSITION_FRACTION,
+    HEAD_JOINT_NAMES,
     SUPPORTED_SCRIPTED_SKILLS,
     command_positions_by_name,
     effective_duration_for_trajectory,
@@ -30,6 +35,7 @@ from soridormi_runtime.scripted_head_skill import (
     validate_scripted_head_plan,
 )
 from soridormi_runtime.skill_execution import (
+    SIMULATED_RESOURCE_HANDOVER_LABEL,
     SIMULATED_RESOURCE_PICKUP_LABEL,
     SkillExecutionRegistry,
     simulated_resource_outcome,
@@ -45,9 +51,9 @@ from soridormi_runtime.visual_expression_skill import (
 )
 
 from .body_activity import (
+    CONTROL_COUPLING_INDEPENDENT,
     BodyActivityMemberPlan,
     BodyActivityPlanRecord,
-    CONTROL_COUPLING_INDEPENDENT,
     body_activity_capabilities_payload,
     compile_body_activity,
     skill_concurrency_projection,
@@ -102,9 +108,7 @@ class SoridormiRuntimeToolService:
     skill_plans: dict[str, NamedSkillPlan] = field(default_factory=dict)
     activity_plans: dict[str, BodyActivityPlanRecord] = field(default_factory=dict)
     skill_registry: SkillExecutionRegistry = field(
-        default_factory=lambda: SkillExecutionRegistry.from_manifest_path(
-            DEFAULT_SKILL_MANIFEST
-        )
+        default_factory=lambda: SkillExecutionRegistry.from_manifest_path(DEFAULT_SKILL_MANIFEST)
     )
     task_store: EmbodiedTaskStore = field(default_factory=EmbodiedTaskStore)
     emergency_stop: bool = False
@@ -138,9 +142,7 @@ class SoridormiRuntimeToolService:
             )
         controller = controller_factory()
         if not hasattr(controller, "command"):
-            raise ValueError(
-                "the runtime MCP adapter requires SORIDORMI_RUNTIME_MODE=onnx_policy"
-            )
+            raise ValueError("the runtime MCP adapter requires SORIDORMI_RUNTIME_MODE=onnx_policy")
 
         # RobotApiClient owns a ZeroMQ REQ socket. ZeroMQ sockets are strictly
         # thread-affine, so both construction and every subsequent robot call
@@ -204,9 +206,7 @@ class SoridormiRuntimeToolService:
             return {
                 "percent": battery.percent if battery is not None else None,
                 "critical": bool(
-                    battery is not None
-                    and battery.percent is not None
-                    and battery.percent <= 10.0
+                    battery is not None and battery.percent is not None and battery.percent <= 10.0
                 ),
             }
         if tool_name == "soridormi.motion.create_plan":
@@ -222,9 +222,7 @@ class SoridormiRuntimeToolService:
         if tool_name == "soridormi.skill.create_plan":
             return self.create_runtime_skill_plan(args)
         if tool_name == "soridormi.skill.execute_plan":
-            return await self.execute_runtime_skill_plan(
-                str(args.get("plan_id", ""))
-            )
+            return await self.execute_runtime_skill_plan(str(args.get("plan_id", "")))
         if tool_name == "soridormi.activity.get_capabilities":
             return body_activity_capabilities_payload(
                 mode=self.mode,
@@ -237,7 +235,9 @@ class SoridormiRuntimeToolService:
                 str(args.get("compiled_activity_id") or args.get("plan_id") or "")
             )
         if tool_name == "soridormi.activity.status":
-            return self.runtime_activity_status(str(args.get("compiled_activity_id") or args.get("plan_id") or ""))
+            return self.runtime_activity_status(
+                str(args.get("compiled_activity_id") or args.get("plan_id") or "")
+            )
         if tool_name == "soridormi.activity.cancel":
             return await self.cancel_runtime_activity(
                 str(args.get("compiled_activity_id") or args.get("plan_id") or ""),
@@ -297,11 +297,8 @@ class SoridormiRuntimeToolService:
                 "safe_idle": self._body_safe_idle(),
             }
         if tool_name == "soridormi.safety.emergency_stop":
-            return await self.emergency_stop_motion(
-                reason=str(args.get("reason", "unspecified"))
-            )
+            return await self.emergency_stop_motion(reason=str(args.get("reason", "unspecified")))
         raise KeyError(f"unknown Soridormi runtime tool: {tool_name}")
-
 
     def _runtime_skill_ids(self) -> tuple[str, ...]:
         supported: list[str] = []
@@ -312,15 +309,15 @@ class SoridormiRuntimeToolService:
             elif execution == "scripted_keyframe" and skill_id in SUPPORTED_SCRIPTED_SKILLS:
                 supported.append(skill_id)
             elif (
-                execution == "visual_expression"
-                and skill_id in SUPPORTED_VISUAL_EXPRESSION_SKILLS
+                execution == "visual_expression" and skill_id in SUPPORTED_VISUAL_EXPRESSION_SKILLS
             ):
                 supported.append(skill_id)
             elif (
                 execution == "composite"
                 and (self.skill_registry.skills[skill_id].get("metadata") or {}).get(
                     "simulation_mock"
-                ) == "resource_acquisition_delivery"
+                )
+                == "resource_acquisition_delivery"
                 and self.mode == "sim"
             ):
                 supported.append(skill_id)
@@ -350,13 +347,9 @@ class SoridormiRuntimeToolService:
                     "available": True,
                     "description": str(skill.get("description") or ""),
                     "parameters_schema": self._parameters_schema(skill),
-                    "interruptible": bool(
-                        (skill.get("safety") or {}).get("interruptible", True)
-                    ),
+                    "interruptible": bool((skill.get("safety") or {}).get("interruptible", True)),
                     "effects": list(skill.get("effects") or default_effects),
-                    "safety_class": str(
-                        skill.get("safety_class") or default_safety_class
-                    ),
+                    "safety_class": str(skill.get("safety_class") or default_safety_class),
                     "requires_confirmation": bool(
                         skill.get("requires_confirmation", self.mode != "sim")
                     ),
@@ -396,10 +389,7 @@ class SoridormiRuntimeToolService:
         self.active_task = {
             "kind": "concurrent_body_activity",
             "coordination_id": next(iter(coordination_ids)) if len(coordination_ids) == 1 else None,
-            "lanes": {
-                lane: dict(metadata)
-                for lane, metadata in sorted(self.active_lanes.items())
-            },
+            "lanes": {lane: dict(metadata) for lane, metadata in sorted(self.active_lanes.items())},
         }
 
     def _body_safe_idle(self) -> bool:
@@ -439,7 +429,11 @@ class SoridormiRuntimeToolService:
             return payload
         record.cancel_requested = True
         record.cancel_reason = reason
-        if record.primary_member is not None or record.head_overlay_member is not None or record.standalone_members:
+        if (
+            record.primary_member is not None
+            or record.head_overlay_member is not None
+            or record.standalone_members
+        ):
             self._motion_stop_requested = True
             await self._apply_safe_hold()
         payload = record.to_dict(
@@ -476,9 +470,7 @@ class SoridormiRuntimeToolService:
                 )
                 remaining -= duration_s
         if not commands:
-            raise ValueError(
-                f"runtime skill {plan.skill_id!r} produced no velocity commands"
-            )
+            raise ValueError(f"runtime skill {plan.skill_id!r} produced no velocity commands")
         return commands
 
     def create_runtime_skill_plan(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -487,9 +479,7 @@ class SoridormiRuntimeToolService:
         if not skill_id:
             raise ValueError("skill_id is required")
         if skill_id not in self._runtime_skill_ids():
-            raise ValueError(
-                f"skill {skill_id!r} is not supported by the runtime adapter"
-            )
+            raise ValueError(f"skill {skill_id!r} is not supported by the runtime adapter")
 
         plan = self.skill_registry.create_plan(
             skill_id,
@@ -509,9 +499,8 @@ class SoridormiRuntimeToolService:
             plan_id = f"soridormi-skill-plan-{uuid.uuid4().hex[:12]}"
         elif (
             plan.execution == "composite"
-            and (self.skill_registry.skills[skill_id].get("metadata") or {}).get(
-                "simulation_mock"
-            ) == "resource_acquisition_delivery"
+            and (self.skill_registry.skills[skill_id].get("metadata") or {}).get("simulation_mock")
+            == "resource_acquisition_delivery"
             and self.mode == "sim"
         ):
             motion_result = self.create_motion_plan(
@@ -519,9 +508,7 @@ class SoridormiRuntimeToolService:
             )
             plan_id = str(motion_result["plan_id"])
         else:  # pragma: no cover - guarded by _runtime_skill_ids
-            raise ValueError(
-                f"skill {skill_id!r} execution {plan.execution!r} is unsupported"
-            )
+            raise ValueError(f"skill {skill_id!r} execution {plan.execution!r} is unsupported")
 
         self.skill_plans[plan_id] = NamedSkillPlan(
             plan_id=plan_id,
@@ -557,9 +544,10 @@ class SoridormiRuntimeToolService:
             result = await self.execute_visual_expression_skill(plan_id)
         elif (
             stored.plan.execution == "composite"
-            and (
-                self.skill_registry.skills[stored.plan.skill_id].get("metadata") or {}
-            ).get("simulation_mock") == "resource_acquisition_delivery"
+            and (self.skill_registry.skills[stored.plan.skill_id].get("metadata") or {}).get(
+                "simulation_mock"
+            )
+            == "resource_acquisition_delivery"
             and self.mode == "sim"
         ):
             if self.emergency_stop:
@@ -572,7 +560,10 @@ class SoridormiRuntimeToolService:
                 if isinstance(resource, dict)
                 else ""
             )
-            if stored.plan.skill_id == "acquire_resource" and self._simulated_carried_resource is not None:
+            if (
+                stored.plan.skill_id == "acquire_resource"
+                and self._simulated_carried_resource is not None
+            ):
                 raise RuntimeError("simulation mock is already carrying a resource")
             if (
                 stored.plan.skill_id == "deliver_resource"
@@ -582,21 +573,37 @@ class SoridormiRuntimeToolService:
                     "deliver_resource requires the matching simulated acquired resource"
                 )
 
+            final_visual_arm_pose = "hold" if stored.plan.skill_id == "acquire_resource" else "rest"
+            fallback_visual_arm_pose = (
+                "hold" if stored.plan.skill_id == "deliver_resource" else "rest"
+            )
+            if stored.plan.skill_id == "deliver_resource":
+                await self._try_apply_visual_arm_pose("hold")
+
             async def resource_segment_handler(
                 command: dict[str, Any],
             ) -> bool | None:
-                if str(command.get("label") or "") != SIMULATED_RESOURCE_PICKUP_LABEL:
-                    return None
-                self.controller.command = PolicyCommand()
-                return await self._execute_simulated_resource_pickup_pose(
-                    float(command["duration_s"])
-                )
+                label = str(command.get("label") or "")
+                if label == SIMULATED_RESOURCE_PICKUP_LABEL:
+                    await self._try_apply_visual_arm_pose("reach")
+                    self.controller.command = PolicyCommand()
+                    completed = await self._execute_simulated_resource_pickup_pose(
+                        float(command["duration_s"])
+                    )
+                    await self._try_apply_visual_arm_pose(
+                        "hold" if completed else fallback_visual_arm_pose
+                    )
+                    return completed
+                if label == SIMULATED_RESOURCE_HANDOVER_LABEL:
+                    await self._try_apply_visual_arm_pose("place")
+                return None
 
             motion_result = await self.execute_motion_plan(
                 plan_id,
                 segment_handler=resource_segment_handler,
             )
             if motion_result.get("completed") is not True:
+                await self._try_apply_visual_arm_pose(fallback_visual_arm_pose)
                 result = {**motion_result, "no_motion": False}
             else:
                 if stored.plan.skill_id == "acquire_resource":
@@ -610,17 +617,21 @@ class SoridormiRuntimeToolService:
                         "Soridormi simulation mock completed its scripted physical "
                         "resource acquisition and handover sequence."
                     )
+                visual_arm_pose_applied = await self._try_apply_visual_arm_pose(
+                    final_visual_arm_pose
+                )
                 result = {
                     **motion_result,
                     "completed": True,
                     "summary": summary,
                     "no_motion": False,
                     "resource_outcome": simulated_resource_outcome(stored.plan),
+                    "visual_arm_pose": (final_visual_arm_pose if visual_arm_pose_applied else None),
+                    "visual_arm_mocked_simulation": visual_arm_pose_applied,
                 }
         else:  # pragma: no cover - plans are validated at creation
             raise ValueError(
-                f"skill {stored.plan.skill_id!r} execution "
-                f"{stored.plan.execution!r} is unsupported"
+                f"skill {stored.plan.skill_id!r} execution {stored.plan.execution!r} is unsupported"
             )
         return {
             **result,
@@ -651,18 +662,12 @@ class SoridormiRuntimeToolService:
 
         tasks: list[asyncio.Task[dict[str, Any]]] = []
         has_physical = bool(
-            record.primary_member
-            or record.head_overlay_member
-            or record.standalone_members
+            record.primary_member or record.head_overlay_member or record.standalone_members
         )
         if has_physical:
             tasks.append(asyncio.create_task(self._execute_physical_activity(record)))
         for member in record.independent_members:
-            tasks.append(
-                asyncio.create_task(
-                    self._execute_activity_member(record, member)
-                )
-            )
+            tasks.append(asyncio.create_task(self._execute_activity_member(record, member)))
         if not tasks:
             record.status = "failed"
             record.failure_reason = "body activity contains no executable members"
@@ -697,11 +702,7 @@ class SoridormiRuntimeToolService:
                     for result in record.member_results.values()
                     if result.get("status") == "failed" and result.get("optional") is True
                 ]
-                record.status = (
-                    "completed_with_degradation"
-                    if optional_failures
-                    else "completed"
-                )
+                record.status = "completed_with_degradation" if optional_failures else "completed"
             record.completed_at = time.time()
 
         payload = record.to_dict(
@@ -711,7 +712,8 @@ class SoridormiRuntimeToolService:
         )
         payload.update(
             {
-                "completed": record.status in {
+                "completed": record.status
+                in {
                     "completed",
                     "completed_with_degradation",
                 },
@@ -931,8 +933,7 @@ class SoridormiRuntimeToolService:
                 await asyncio.sleep(
                     max(
                         0.0,
-                        period_s
-                        - (asyncio.get_running_loop().time() - started_at),
+                        period_s - (asyncio.get_running_loop().time() - started_at),
                     )
                 )
             if primary is not None:
@@ -979,9 +980,7 @@ class SoridormiRuntimeToolService:
             plan,
             initial_positions,
         )
-        requested_duration_s = sum(
-            float(keyframe.duration_s) for keyframe in plan.keyframes
-        )
+        requested_duration_s = sum(float(keyframe.duration_s) for keyframe in plan.keyframes)
         envelope_velocity = member.concurrency_envelope.get("max_head_velocity_radps")
         max_velocity = (
             float(envelope_velocity)
@@ -993,9 +992,7 @@ class SoridormiRuntimeToolService:
             targets=resolved_targets,
             max_head_velocity_radps=max_velocity,
             auto_stretch_duration=True,
-            keyframe_durations=[
-                float(keyframe.duration_s) for keyframe in plan.keyframes
-            ],
+            keyframe_durations=[float(keyframe.duration_s) for keyframe in plan.keyframes],
         )
         keyframe_durations = scaled_keyframe_durations(
             plan,
@@ -1058,7 +1055,6 @@ class SoridormiRuntimeToolService:
         head_target: dict[str, float],
     ) -> MotorCommand:
         index_by_name = {name: index for index, name in enumerate(command.names)}
-        supported = [name for name in HEAD_JOINT_NAMES if name in index_by_name]
         requested = [name for name in HEAD_JOINT_NAMES if name in head_target]
         missing = [name for name in requested if name not in index_by_name]
         if missing:
@@ -1101,6 +1097,24 @@ class SoridormiRuntimeToolService:
         async with self._robot_lock:
             return await self._call_robot(applier, command)
 
+    async def _try_apply_visual_arm_pose(self, pose: str) -> bool:
+        """Apply optional simulator decoration without gaining completion authority."""
+
+        applier = getattr(self.robot, "set_visual_arm_pose", None)
+        if not callable(applier):
+            print(
+                "Soridormi visual-arm overlay unavailable: robot backend does not "
+                f"support pose {pose!r}"
+            )
+            return False
+        try:
+            async with self._robot_lock:
+                await self._call_robot(applier, VisualArmPoseCommand(pose=pose))
+        except Exception as exc:  # noqa: BLE001 - optional arm decoration must fail soft.
+            print(f"Soridormi visual-arm overlay failed soft: pose={pose!r} error={exc!r}")
+            return False
+        return True
+
     async def execute_scripted_head_skill(self, plan_id: str) -> dict[str, Any]:
         if self.emergency_stop:
             raise RuntimeError("cannot execute skill while emergency_stop is active")
@@ -1134,17 +1148,13 @@ class SoridormiRuntimeToolService:
                 plan,
                 initial_positions,
             )
-            requested_duration_s = sum(
-                float(keyframe.duration_s) for keyframe in plan.keyframes
-            )
+            requested_duration_s = sum(float(keyframe.duration_s) for keyframe in plan.keyframes)
             effective_duration_s = effective_duration_for_trajectory(
                 requested_duration_s=requested_duration_s,
                 targets=resolved_targets,
                 max_head_velocity_radps=DEFAULT_MAX_HEAD_VELOCITY_RADPS,
                 auto_stretch_duration=True,
-                keyframe_durations=[
-                    float(keyframe.duration_s) for keyframe in plan.keyframes
-                ],
+                keyframe_durations=[float(keyframe.duration_s) for keyframe in plan.keyframes],
             )
             keyframe_durations = scaled_keyframe_durations(
                 plan,
@@ -1324,10 +1334,7 @@ class SoridormiRuntimeToolService:
             )
 
         start_pose = {name: start_controls[name] for name in offsets}
-        pickup_pose = {
-            name: start_pose[name] + offset
-            for name, offset in offsets.items()
-        }
+        pickup_pose = {name: start_pose[name] + offset for name, offset in offsets.items()}
         move_duration_s = duration_s * 0.40
         hold_duration_s = duration_s * 0.20
 
@@ -1345,10 +1352,7 @@ class SoridormiRuntimeToolService:
                     return False
                 alpha = float(step + 1) / float(steps)
                 eased = alpha * alpha * (3.0 - 2.0 * alpha)
-                pose = {
-                    name: start[name] + (target[name] - start[name]) * eased
-                    for name in start
-                }
+                pose = {name: start[name] + (target[name] - start[name]) * eased for name in start}
                 started_at = loop.time()
                 state = await self._step_head_target(state, pose)
                 await asyncio.sleep(max(0.0, period_s - (loop.time() - started_at)))
@@ -1394,8 +1398,7 @@ class SoridormiRuntimeToolService:
             "emergency_stop": self.emergency_stop,
             "active_task": dict(self.active_task) if self.active_task is not None else None,
             "active_lanes": {
-                lane: dict(metadata)
-                for lane, metadata in sorted(self.active_lanes.items())
+                lane: dict(metadata) for lane, metadata in sorted(self.active_lanes.items())
             },
             "activity_idle": not self.active_lanes,
             "safe_idle": self._body_safe_idle(),
@@ -1409,9 +1412,7 @@ class SoridormiRuntimeToolService:
         self,
         plan_id: str,
         *,
-        segment_handler: Callable[
-            [dict[str, Any]], Awaitable[bool | None]
-        ] | None = None,
+        segment_handler: Callable[[dict[str, Any]], Awaitable[bool | None]] | None = None,
     ) -> dict[str, Any]:
         if self.emergency_stop:
             raise RuntimeError("cannot execute motion while emergency_stop is active")
@@ -1439,11 +1440,15 @@ class SoridormiRuntimeToolService:
                     self.active_lanes[lane]["command_index"] = index
                     self._refresh_active_task()
                     if (
-                        str(command.get("label") or "") == SIMULATED_RESOURCE_PICKUP_LABEL
+                        str(command.get("label") or "")
+                        in {
+                            SIMULATED_RESOURCE_PICKUP_LABEL,
+                            SIMULATED_RESOURCE_HANDOVER_LABEL,
+                        }
                         and segment_handler is None
                     ):
                         raise RuntimeError(
-                            "simulation resource pickup markers require provider skill execution"
+                            "simulation resource markers require provider skill execution"
                         )
                     if segment_handler is not None:
                         handled = await segment_handler(command)

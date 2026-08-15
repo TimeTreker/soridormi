@@ -7,15 +7,27 @@ from pathlib import Path
 
 import numpy as np
 
-from soridormi_api import IMUState, JointState, MotorCommand, RobotState, VisualExpressionCommand
+from soridormi_api import (
+    IMUState,
+    JointState,
+    MotorCommand,
+    RobotState,
+    VisualArmPoseCommand,
+    VisualExpressionCommand,
+)
+
+from .mujoco_viewer import MujocoViewerHandle, env_flag, env_float
+from .robot_config import RobotConfig, load_robot_config
 from .social_eye_scene import (
     LEFT_EYE_CLOSED_NAME,
     LEFT_EYE_NAME,
     RIGHT_EYE_CLOSED_NAME,
     RIGHT_EYE_NAME,
+    VISUAL_ARM_COMPONENTS,
+    VISUAL_ARM_POSES,
+    VISUAL_ARM_SIDES,
+    visual_arm_geom_name,
 )
-from .mujoco_viewer import MujocoViewerHandle, env_flag, env_float
-from .robot_config import RobotConfig, load_robot_config
 
 
 @dataclass
@@ -33,6 +45,7 @@ class FakeMujocoBackend:
     torques: list[float] = field(init=False)
     last_command: MotorCommand | None = None
     last_visual_expression: VisualExpressionCommand | None = None
+    last_visual_arm_pose: VisualArmPoseCommand | None = None
 
     def __post_init__(self) -> None:
         n = len(self.joint_names)
@@ -51,7 +64,8 @@ class FakeMujocoBackend:
 
         alpha = 0.05
         command_by_name = {
-            name: target for name, target in zip(self.last_command.names, self.last_command.positions)
+            name: target
+            for name, target in zip(self.last_command.names, self.last_command.positions)
         }
 
         for i, name in enumerate(self.joint_names):
@@ -83,6 +97,9 @@ class FakeMujocoBackend:
     def apply_visual_expression(self, command: VisualExpressionCommand) -> None:
         self.last_visual_expression = command
 
+    def apply_visual_arm_pose(self, command: VisualArmPoseCommand) -> None:
+        self.last_visual_arm_pose = command
+
     def reset(self) -> None:
         self.start_time = time.monotonic()
         n = len(self.joint_names)
@@ -91,6 +108,7 @@ class FakeMujocoBackend:
         self.torques = [0.0] * n
         self.last_command = None
         self.last_visual_expression = None
+        self.last_visual_arm_pose = None
 
 
 class MujocoBackend:
@@ -538,6 +556,29 @@ class MujocoBackend:
         self.mujoco.mj_forward(self.model, self.data)
         self.viewer.sync()
 
+    def apply_visual_arm_pose(self, command: VisualArmPoseCommand) -> None:
+        missing: list[str] = []
+        for side in VISUAL_ARM_SIDES:
+            for pose in VISUAL_ARM_POSES:
+                alpha = 1.0 if pose == command.pose else 0.0
+                for component in VISUAL_ARM_COMPONENTS:
+                    name = visual_arm_geom_name(side, pose, component)
+                    geom_id = self._geom_id(name)
+                    if geom_id < 0:
+                        missing.append(name)
+                        continue
+                    rgba = np.array(self.model.geom_rgba[geom_id], dtype=float)
+                    rgba[3] = alpha
+                    self.model.geom_rgba[geom_id] = rgba
+        if missing:
+            raise ValueError(
+                "MuJoCo model does not contain Soridormi visual-arm geoms. "
+                "Start the sim with visual arms enabled or regenerate the overlay. "
+                f"missing={missing}"
+            )
+        self.mujoco.mj_forward(self.model, self.data)
+        self.viewer.sync()
+
     def _set_social_eye_visuals(self, *, open_alpha: float, closed_alpha: float) -> None:
         missing: list[str] = []
         for name, alpha in (
@@ -565,11 +606,13 @@ class MujocoBackend:
 
         if self.config.control.mode == "torque":
             command_values = {
-                name: value for name, value in zip(self.last_command.names, self.last_command.torques)
+                name: value
+                for name, value in zip(self.last_command.names, self.last_command.torques)
             }
         else:
             command_values = {
-                name: value for name, value in zip(self.last_command.names, self.last_command.positions)
+                name: value
+                for name, value in zip(self.last_command.names, self.last_command.positions)
             }
 
         for actuator_index, actuator_name in enumerate(self.actuator_names):
@@ -660,8 +703,7 @@ class MujocoBackend:
         dim = int(self.model.sensor_dim[sensor_id])
         if dim < expected_size:
             raise RuntimeError(
-                f"MuJoCo sensor {sensor_name!r} has dim={dim}, "
-                f"expected at least {expected_size}"
+                f"MuJoCo sensor {sensor_name!r} has dim={dim}, expected at least {expected_size}"
             )
 
         values = self.data.sensordata[addr : addr + expected_size]

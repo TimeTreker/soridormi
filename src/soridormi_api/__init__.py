@@ -1,14 +1,22 @@
 from __future__ import annotations
 
-from .types import IMUState, JointState, MotorCommand, RobotState, VisualExpressionCommand
+from .types import (
+    IMUState,
+    JointState,
+    MotorCommand,
+    RobotState,
+    VisualArmPoseCommand,
+    VisualExpressionCommand,
+)
 
 __all__ = [
     "IMUState",
     "JointState",
     "MotorCommand",
-    "RobotState",
-    "VisualExpressionCommand",
     "RobotApiClient",
+    "RobotState",
+    "VisualArmPoseCommand",
+    "VisualExpressionCommand",
 ]
 
 

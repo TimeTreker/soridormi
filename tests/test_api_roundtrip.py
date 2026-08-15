@@ -5,7 +5,14 @@ import time
 
 from soridormi_api.client import RobotApiClient
 from soridormi_api.server import RobotApiServer
-from soridormi_api.types import IMUState, JointState, MotorCommand, RobotState, VisualExpressionCommand
+from soridormi_api.types import (
+    IMUState,
+    JointState,
+    MotorCommand,
+    RobotState,
+    VisualArmPoseCommand,
+    VisualExpressionCommand,
+)
 
 
 class FakeBackend:
@@ -13,6 +20,7 @@ class FakeBackend:
         self.step_count = 0
         self.last_command: MotorCommand | None = None
         self.last_visual_expression: VisualExpressionCommand | None = None
+        self.last_visual_arm_pose: VisualArmPoseCommand | None = None
 
     def step(self) -> None:
         self.step_count += 1
@@ -38,6 +46,9 @@ class FakeBackend:
 
     def apply_visual_expression(self, command: VisualExpressionCommand) -> None:
         self.last_visual_expression = command
+
+    def apply_visual_arm_pose(self, command: VisualArmPoseCommand) -> None:
+        self.last_visual_arm_pose = command
 
 
 def test_api_roundtrip_read_state_and_send_command() -> None:
@@ -83,6 +94,12 @@ def test_api_roundtrip_read_state_and_send_command() -> None:
         assert backend.last_visual_expression is not None
         assert backend.last_visual_expression.expression == "eyes_closed"
         assert backend.last_visual_expression.intensity == 0.75
+
+        arm_message = client.set_visual_arm_pose(VisualArmPoseCommand(pose="reach"))
+
+        assert arm_message == "visual arm pose applied: reach"
+        assert backend.last_visual_arm_pose is not None
+        assert backend.last_visual_arm_pose.pose == "reach"
 
     finally:
         client.close()

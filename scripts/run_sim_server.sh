@@ -32,6 +32,8 @@ Options:
   --no-social-eyes      Disable the generated visual eyes.
   --social-eye-frame    Show an RGB debug frame at the generated eye anchor.
   --no-social-eye-frame Hide the generated eye debug frame. default
+  --visual-arms         Generate non-colliding visual-only arms. default
+  --no-visual-arms      Disable the generated visual-only arms.
   --rough-ground        Generate a temporary MuJoCo scene with small stone boxes.
   --no-rough-ground     Use the normal flat MuJoCo scene. default
   --rough-stone-height M
@@ -67,6 +69,7 @@ CAMERA_ELEVATION="${SORIDORMI_MUJOCO_CAMERA_ELEVATION:--20}"
 SIM_POLICY_PROFILE="${SORIDORMI_SIM_POLICY_PROFILE:-}"
 SOCIAL_EYES="${SORIDORMI_MUJOCO_SOCIAL_EYES:-1}"
 SOCIAL_EYE_FRAME="${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME:-0}"
+VISUAL_ARMS="${SORIDORMI_MUJOCO_VISUAL_ARMS:-1}"
 ROUGH_GROUND="${SORIDORMI_MUJOCO_ROUGH_GROUND:-0}"
 ROUGH_STONE_HEIGHT="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT:-0.008}"
 ROUGH_STONE_COUNT="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT:-8}"
@@ -124,6 +127,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-social-eye-frame)
       SOCIAL_EYE_FRAME="0"
+      shift
+      ;;
+    --visual-arms)
+      VISUAL_ARMS="1"
+      shift
+      ;;
+    --no-visual-arms)
+      VISUAL_ARMS="0"
       shift
       ;;
     --rough-ground)
@@ -186,6 +197,7 @@ export SORIDORMI_MUJOCO_CAMERA_ELEVATION="${CAMERA_ELEVATION}"
 export SORIDORMI_SIM_POLICY_PROFILE="${SIM_POLICY_PROFILE}"
 export SORIDORMI_MUJOCO_SOCIAL_EYES="${SOCIAL_EYES}"
 export SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME="${SOCIAL_EYE_FRAME}"
+export SORIDORMI_MUJOCO_VISUAL_ARMS="${VISUAL_ARMS}"
 export SORIDORMI_MUJOCO_ROUGH_GROUND="${ROUGH_GROUND}"
 export SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT="${ROUGH_STONE_HEIGHT}"
 export SORIDORMI_MUJOCO_ROUGH_STONE_COUNT="${ROUGH_STONE_COUNT}"
@@ -198,6 +210,7 @@ echo "MuJoCo viewer: ${SORIDORMI_MUJOCO_VIEWER}"
 echo "MuJoCo follow camera: ${SORIDORMI_MUJOCO_FOLLOW_CAMERA}"
 echo "MuJoCo social eyes: ${SORIDORMI_MUJOCO_SOCIAL_EYES}"
 echo "MuJoCo social eye frame: ${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}"
+echo "MuJoCo visual arms: ${SORIDORMI_MUJOCO_VISUAL_ARMS}"
 echo "MuJoCo rough ground: ${SORIDORMI_MUJOCO_ROUGH_GROUND}"
 if [ "${SORIDORMI_MUJOCO_FOLLOW_CAMERA}" = "1" ]; then
   echo "MuJoCo follow camera params: distance=${SORIDORMI_MUJOCO_CAMERA_DISTANCE} azimuth=${SORIDORMI_MUJOCO_CAMERA_AZIMUTH} elevation=${SORIDORMI_MUJOCO_CAMERA_ELEVATION}"
@@ -219,6 +232,7 @@ docker compose -f compose.sim.yaml run --rm \
   -e SORIDORMI_MUJOCO_CAMERA_ELEVATION_OVERRIDE="${SORIDORMI_MUJOCO_CAMERA_ELEVATION}" \
   -e SORIDORMI_MUJOCO_SOCIAL_EYES_OVERRIDE="${SORIDORMI_MUJOCO_SOCIAL_EYES}" \
   -e SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME_OVERRIDE="${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}" \
+  -e SORIDORMI_MUJOCO_VISUAL_ARMS_OVERRIDE="${SORIDORMI_MUJOCO_VISUAL_ARMS}" \
   -e SORIDORMI_MUJOCO_ROUGH_GROUND_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_GROUND}" \
   -e SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT}" \
   -e SORIDORMI_MUJOCO_ROUGH_STONE_COUNT_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT}" \
@@ -243,12 +257,13 @@ docker compose -f compose.sim.yaml run --rm \
     export SORIDORMI_MUJOCO_CAMERA_ELEVATION="${SORIDORMI_MUJOCO_CAMERA_ELEVATION_OVERRIDE:--20}"
     export SORIDORMI_MUJOCO_SOCIAL_EYES="${SORIDORMI_MUJOCO_SOCIAL_EYES_OVERRIDE:-1}"
     export SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME="${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME_OVERRIDE:-0}"
+    export SORIDORMI_MUJOCO_VISUAL_ARMS="${SORIDORMI_MUJOCO_VISUAL_ARMS_OVERRIDE:-1}"
     export SORIDORMI_MUJOCO_ROUGH_GROUND="${SORIDORMI_MUJOCO_ROUGH_GROUND_OVERRIDE:-0}"
     export SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT_OVERRIDE:-0.008}"
     export SORIDORMI_MUJOCO_ROUGH_STONE_COUNT="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT_OVERRIDE:-8}"
     export SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS="${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS_OVERRIDE:-0.018}"
 
-    if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && [ "${SORIDORMI_MUJOCO_SOCIAL_EYES}" = "1" ]; then
+    if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && { [ "${SORIDORMI_MUJOCO_SOCIAL_EYES}" = "1" ] || [ "${SORIDORMI_MUJOCO_VISUAL_ARMS}" = "1" ]; }; then
       BASE_MODEL="${MUJOCO_MODEL_PATH:-}"
       if [ -z "${BASE_MODEL}" ]; then
         BASE_MODEL="$(python - <<'PYMODEL'
@@ -264,7 +279,14 @@ PYMODEL
       if [ "${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}" = "1" ]; then
         SOCIAL_EYE_FRAME_ARGS+=(--debug-frame)
       fi
-      python -m soridormi_sim.social_eye_scene         --base "${BASE_MODEL}"         --output "${SOCIAL_EYES_MODEL}"         "${SOCIAL_EYE_FRAME_ARGS[@]}"
+      VISUAL_OVERLAY_ARGS=("${SOCIAL_EYE_FRAME_ARGS[@]}")
+      if [ "${SORIDORMI_MUJOCO_SOCIAL_EYES}" != "1" ]; then
+        VISUAL_OVERLAY_ARGS+=(--no-eyes)
+      fi
+      if [ "${SORIDORMI_MUJOCO_VISUAL_ARMS}" = "1" ]; then
+        VISUAL_OVERLAY_ARGS+=(--visual-arms)
+      fi
+      python -m soridormi_sim.social_eye_scene         --base "${BASE_MODEL}"         --output "${SOCIAL_EYES_MODEL}"         "${VISUAL_OVERLAY_ARGS[@]}"
       export MUJOCO_MODEL_PATH="${SOCIAL_EYES_MODEL}"
     fi
 
@@ -291,6 +313,7 @@ PYMODEL
     echo "Effective MuJoCo follow camera: ${SORIDORMI_MUJOCO_FOLLOW_CAMERA}"
     echo "Effective MuJoCo social eyes: ${SORIDORMI_MUJOCO_SOCIAL_EYES}"
     echo "Effective MuJoCo social eye frame: ${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}"
+    echo "Effective MuJoCo visual arms: ${SORIDORMI_MUJOCO_VISUAL_ARMS}"
     echo "Effective MuJoCo rough ground: ${SORIDORMI_MUJOCO_ROUGH_GROUND}"
     if [ "${SORIDORMI_MUJOCO_FOLLOW_CAMERA}" = "1" ]; then
       echo "Effective MuJoCo camera params: distance=${SORIDORMI_MUJOCO_CAMERA_DISTANCE} azimuth=${SORIDORMI_MUJOCO_CAMERA_AZIMUTH} elevation=${SORIDORMI_MUJOCO_CAMERA_ELEVATION}"

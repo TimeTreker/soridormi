@@ -101,6 +101,13 @@ The mock is not hardware qualification. It must remain unavailable outside the
 simulation runtime and must never be advertised as proof that current hardware can
 physically grasp or hand over an object.
 
+When the generated visual-body overlay is loaded, the mock also drives fixed
+jointless arm display poses (`reach`, `hold`, `place`, and `rest`). This is
+fail-soft visualization only. The arm geoms have no collision, mass, joints,
+actuators, sensors, or completion authority, and an absent overlay cannot promote
+or demote resource evidence. The official Open Duck model and 14-actuator policy
+contract remain unchanged.
+
 A successful simulated execution returns bounded evidence such as:
 
 ```json

@@ -10,12 +10,13 @@ from soridormi_api import (
     JointState,
     MotorCommand,
     RobotState,
+    VisualArmPoseCommand,
     VisualExpressionCommand,
 )
 from soridormi_runtime.mcp.runtime_tools import SoridormiRuntimeToolService
+from soridormi_runtime.policy_command import PolicyCommand
 from soridormi_runtime.scripted_head_skill import HEAD_JOINT_NAMES
 from soridormi_runtime.skill_execution import MIN_FORWARD_WALK_SPEED_MPS
-from soridormi_runtime.policy_command import PolicyCommand
 
 
 class FakeRobot:
@@ -23,6 +24,7 @@ class FakeRobot:
         self.time = 0.0
         self.commands: list[MotorCommand] = []
         self.visual_expressions: list[VisualExpressionCommand] = []
+        self.visual_arm_poses: list[VisualArmPoseCommand] = []
 
     def read_state(self) -> RobotState:
         return RobotState(
@@ -45,7 +47,10 @@ class FakeRobot:
         self.time += 0.001
         return f"visual expression applied: {command.expression}"
 
-
+    def set_visual_arm_pose(self, command: VisualArmPoseCommand) -> str:
+        self.visual_arm_poses.append(command)
+        self.time += 0.001
+        return f"visual arm pose applied: {command.pose}"
 
 
 class ThreadAffineRobot(FakeRobot):
@@ -144,6 +149,7 @@ class ResourceFakeRobot:
     def __init__(self) -> None:
         self.time = 0.0
         self.commands: list[MotorCommand] = []
+        self.visual_arm_poses: list[VisualArmPoseCommand] = []
         self.names = [
             "left_ankle",
             "left_hip_pitch",
@@ -177,6 +183,10 @@ class ResourceFakeRobot:
     def step_motor_command(self, command: MotorCommand) -> RobotState:
         self.send_motor_command(command)
         return self.read_state()
+
+    def set_visual_arm_pose(self, command: VisualArmPoseCommand) -> str:
+        self.visual_arm_poses.append(command)
+        return f"visual arm pose applied: {command.pose}"
 
 
 class FakeController:
@@ -396,10 +406,7 @@ def test_runtime_task_get_capabilities_reports_readiness() -> None:
         service = _service()
 
         payload = await service.call_tool("soridormi.task.get_capabilities", {})
-        by_type = {
-            task["task_type"]: task
-            for task in payload["task_types"]
-        }
+        by_type = {task["task_type"]: task for task in payload["task_types"]}
 
         assert payload["schema_version"] == "soridormi.task_capabilities.v1"
         assert payload["mode"] == "sim"
@@ -455,8 +462,6 @@ def test_runtime_service_rejects_hardware_until_backend_exists() -> None:
             robot_factory=FakeRobot,
             controller_factory=FakeController,
         )
-
-
 
 
 def test_runtime_from_env_keeps_robot_on_one_worker_thread() -> None:
@@ -578,9 +583,7 @@ def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> Non
         resource_skill = skills["acquire_and_deliver_resource"]
         assert resource_skill["execution"] == "composite"
         assert resource_skill["parameters_schema"]["properties"]["resource"]["type"] == "object"
-        assert resource_skill["metadata"]["semantic_scope"]["resource_kinds"] == [
-            "physical_object"
-        ]
+        assert resource_skill["metadata"]["semantic_scope"]["resource_kinds"] == ["physical_object"]
         assert resource_skill["metadata"]["semantic_scope"]["delivery_modes"] == [
             "physical_handover"
         ]
@@ -601,8 +604,6 @@ def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> Non
         ]
 
     asyncio.run(exercise())
-
-
 
 
 def test_runtime_acquire_resource_uses_pickup_pose_and_restores_body() -> None:
@@ -637,6 +638,12 @@ def test_runtime_acquire_resource_uses_pickup_pose_and_restores_body() -> None:
         right_knee = robot.names.index("right_knee")
         assert result["completed"] is True
         assert result["resource_outcome"]["resource_acquired"] is True
+        assert result["visual_arm_pose"] == "hold"
+        assert [pose.pose for pose in robot.visual_arm_poses] == [
+            "reach",
+            "hold",
+            "hold",
+        ]
         assert max(command.positions[left_knee] for command in robot.commands) > 0.70
         assert min(command.positions[right_knee] for command in robot.commands) < -0.70
         assert robot.positions == pytest.approx(robot.initial_positions)
@@ -647,6 +654,8 @@ def test_runtime_acquire_resource_uses_pickup_pose_and_restores_body() -> None:
 def test_runtime_service_executes_simulated_resource_acquisition_delivery() -> None:
     async def exercise() -> None:
         service = _resource_service()
+        robot = service.robot
+        assert isinstance(robot, ResourceFakeRobot)
         plan = await service.call_tool(
             "soridormi.skill.create_plan",
             {
@@ -684,8 +693,48 @@ def test_runtime_service_executes_simulated_resource_acquisition_delivery() -> N
         assert result["resource_outcome"]["resource_delivered"] is True
         assert result["resource_outcome"]["resource_description"] == "a cup of water"
         assert result["resource_outcome"]["mocked_simulation"] is True
+        assert result["visual_arm_pose"] == "rest"
+        assert [pose.pose for pose in robot.visual_arm_poses] == [
+            "reach",
+            "hold",
+            "place",
+            "rest",
+        ]
 
     asyncio.run(exercise())
+
+
+def test_resource_mock_completion_does_not_depend_on_visual_arm_overlay() -> None:
+    async def exercise() -> None:
+        service = _resource_service()
+        robot = service.robot
+        assert isinstance(robot, ResourceFakeRobot)
+        robot.set_visual_arm_pose = None  # type: ignore[method-assign]
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {
+                "skill_id": "acquire_resource",
+                "parameters": {
+                    "resource": {
+                        "kind": "physical_object",
+                        "description": "a cup of water",
+                    },
+                    "source": {"status": "unknown"},
+                },
+            },
+        )
+
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
+        )
+
+        assert result["completed"] is True
+        assert result["resource_outcome"]["resource_acquired"] is True
+        assert result["visual_arm_pose"] is None
+        assert result["visual_arm_mocked_simulation"] is False
+
+    asyncio.run(exercise())
+
 
 def test_runtime_service_executes_granular_resource_chain() -> None:
     async def exercise() -> None:
@@ -703,6 +752,7 @@ def test_runtime_service_executes_granular_resource_chain() -> None:
         )
         assert acquired["resource_outcome"]["resource_acquired"] is True
         assert acquired["resource_outcome"]["resource_delivered"] is False
+        assert acquired["visual_arm_pose"] == "hold"
 
         deliver_plan = await service.call_tool(
             "soridormi.skill.create_plan",
@@ -718,6 +768,7 @@ def test_runtime_service_executes_granular_resource_chain() -> None:
             "soridormi.skill.execute_plan", {"plan_id": deliver_plan["plan_id"]}
         )
         assert delivered["resource_outcome"]["resource_delivered"] is True
+        assert delivered["visual_arm_pose"] == "rest"
 
     asyncio.run(exercise())
 
@@ -747,10 +798,7 @@ def test_runtime_service_executes_named_velocity_skill() -> None:
         assert result["completed"] is True
         assert result["skill_id"] == "walk_velocity"
         assert result["no_motion"] is False
-        assert any(
-            command.x_velocity == 0.15
-            for command in service.controller.seen_commands
-        )
+        assert any(command.x_velocity == 0.15 for command in service.controller.seen_commands)
 
     asyncio.run(exercise())
 
@@ -785,7 +833,9 @@ def test_runtime_service_executes_semantic_walk_forward_skill() -> None:
     asyncio.run(exercise())
 
 
-def test_runtime_service_executes_named_scripted_head_skill(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runtime_service_executes_named_scripted_head_skill(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def no_sleep(_delay: float) -> None:
         return None
 
@@ -818,9 +868,7 @@ def test_runtime_service_executes_named_scripted_head_skill(monkeypatch: pytest.
         )
 
         head_pitch_index = robot.names.index("head_pitch")
-        commanded_pitch = [
-            command.positions[head_pitch_index] for command in robot.commands
-        ]
+        commanded_pitch = [command.positions[head_pitch_index] for command in robot.commands]
         assert result["completed"] is True
         assert result["skill_id"] == "nod_yes"
         assert result["no_motion"] is False
@@ -866,10 +914,7 @@ def test_runtime_service_executes_named_visual_expression_skill(
         assert result["skill_id"] == "blink_eyes"
         assert result["no_motion"] is True
         assert result["visual_expression_steps"] == 3
-        assert [
-            command.expression
-            for command in service.robot.visual_expressions
-        ] == [
+        assert [command.expression for command in service.robot.visual_expressions] == [
             "eyes_open",
             "eyes_closed",
             "eyes_open",

@@ -14,6 +14,20 @@ HELPER = (ROOT / "scripts/x11_access.sh").read_text(encoding="utf-8")
 
 
 class X11LauncherContractTests(unittest.TestCase):
+    def test_start_launcher_enables_visual_arms_by_default_and_forwards_override(
+        self,
+    ) -> None:
+        self.assertIn(
+            'VISUAL_ARMS="${SORIDORMI_MUJOCO_VISUAL_ARMS:-1}"',
+            START,
+        )
+        self.assertIn("--visual-arms", START)
+        self.assertIn("--no-visual-arms", START)
+        self.assertIn(
+            'if [ "$VISUAL_ARMS" = "1" ]; then sim_args+=(--visual-arms); else sim_args+=(--no-visual-arms); fi',
+            START,
+        )
+
     def test_shell_scripts_parse(self) -> None:
         subprocess.run(
             [

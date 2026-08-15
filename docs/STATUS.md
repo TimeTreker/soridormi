@@ -44,6 +44,11 @@ hosting boundary requires a separate evidence-backed architecture decision.
   returns explicit `resource_outcome` acquisition/delivery evidence so paired
   Chromie/Soridormi architecture can be exercised end to end without claiming a
   real manipulator or hardware grasp capability.
+- The generated MuJoCo visual-body overlay now adds non-colliding, jointless arms
+  without editing the official Open Duck XML/URDF or the 14-actuator robot
+  configuration. Fixed `rest`, `reach`, `hold`, and `place` display poses decorate
+  the simulation-only resource mock but have no dynamics, collision, sensor, or
+  completion-evidence authority.
 - Exact concurrent body activities are validated and executable through
   `soridormi.activity.*`: one primary locomotion member may run with compatible
   bounded head overlays and independent visual expressions.
@@ -62,9 +67,9 @@ hosting boundary requires a separate evidence-backed architecture decision.
   standing safe idle. This is MuJoCo diagnostic evidence, not literal
   100-metre travel, physical water handling, or hardware qualification.
 - The paired working tree passes repository governance and compile checks. A
-  dependency-complete, full-checkout runtime container passes 742 tests with
-  one target-dependent skip; focused body concurrency passes 126 tests and the
-  task-agent contract passes 131. The current host Python lacks the declared
+  dependency-complete, full-checkout runtime container passes 748 tests with
+  two target-dependent skips; focused body concurrency passes 128 tests and the
+  task-agent contract passes 133. The current host Python lacks the declared
   `pyzmq` dependency, so the required host pytest/body gates stop during import
   collection and are not reported as passed.
 - The MCP service exposes robot state, safety tools, bounded motion plans, named

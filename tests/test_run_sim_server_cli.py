@@ -28,12 +28,20 @@ def test_run_sim_server_help_documents_backend_profile_and_viewer_flags() -> Non
     assert "--no-social-eyes" in proc.stdout
     assert "--social-eye-frame" in proc.stdout
     assert "--no-social-eye-frame" in proc.stdout
+    assert "--visual-arms" in proc.stdout
+    assert "--no-visual-arms" in proc.stdout
     assert "--rough-ground" in proc.stdout
     assert "--rough-stone-height M" in proc.stdout
     assert "--rough-stone-count N" in proc.stdout
     assert "--rough-stone-radius M" in proc.stdout
-    assert "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer" in proc.stdout
-    assert "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera" in proc.stdout
+    assert (
+        "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer"
+        in proc.stdout
+    )
+    assert (
+        "./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera"
+        in proc.stdout
+    )
     assert "--follow-camera --social-eyes" in proc.stdout
     assert "--follow-camera --social-eye-frame" in proc.stdout
     assert "--follow-camera --rough-ground" in proc.stdout
@@ -51,6 +59,7 @@ def test_run_sim_server_script_defaults_to_mujoco_without_viewer() -> None:
     assert 'SIM_POLICY_PROFILE="${SORIDORMI_SIM_POLICY_PROFILE:-}"' in text
     assert 'SOCIAL_EYES="${SORIDORMI_MUJOCO_SOCIAL_EYES:-1}"' in text
     assert 'SOCIAL_EYE_FRAME="${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME:-0}"' in text
+    assert 'VISUAL_ARMS="${SORIDORMI_MUJOCO_VISUAL_ARMS:-1}"' in text
     assert 'ROUGH_GROUND="${SORIDORMI_MUJOCO_ROUGH_GROUND:-0}"' in text
     assert 'ROUGH_STONE_HEIGHT="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT:-0.008}"' in text
     assert 'export SORIDORMI_SIM_BACKEND="${SIM_BACKEND}"' in text
@@ -62,33 +71,45 @@ def test_run_sim_server_script_defaults_to_mujoco_without_viewer() -> None:
     assert 'export SORIDORMI_SIM_POLICY_PROFILE="${SIM_POLICY_PROFILE}"' in text
     assert 'export SORIDORMI_MUJOCO_SOCIAL_EYES="${SOCIAL_EYES}"' in text
     assert 'export SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME="${SOCIAL_EYE_FRAME}"' in text
+    assert 'export SORIDORMI_MUJOCO_VISUAL_ARMS="${VISUAL_ARMS}"' in text
     assert 'export SORIDORMI_MUJOCO_ROUGH_GROUND="${ROUGH_GROUND}"' in text
-    assert 'SORIDORMI_SIM_BACKEND_OVERRIDE' in text
-    assert 'SORIDORMI_MUJOCO_VIEWER_OVERRIDE' in text
-    assert 'SORIDORMI_MUJOCO_FOLLOW_CAMERA_OVERRIDE' in text
-    assert 'SORIDORMI_MUJOCO_CAMERA_DISTANCE_OVERRIDE' in text
-    assert 'SORIDORMI_MUJOCO_SOCIAL_EYES_OVERRIDE' in text
-    assert 'SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME_OVERRIDE' in text
-    assert 'SORIDORMI_MUJOCO_ROUGH_GROUND_OVERRIDE' in text
+    assert "SORIDORMI_SIM_BACKEND_OVERRIDE" in text
+    assert "SORIDORMI_MUJOCO_VIEWER_OVERRIDE" in text
+    assert "SORIDORMI_MUJOCO_FOLLOW_CAMERA_OVERRIDE" in text
+    assert "SORIDORMI_MUJOCO_CAMERA_DISTANCE_OVERRIDE" in text
+    assert "SORIDORMI_MUJOCO_SOCIAL_EYES_OVERRIDE" in text
+    assert "SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME_OVERRIDE" in text
+    assert "SORIDORMI_MUJOCO_VISUAL_ARMS_OVERRIDE" in text
+    assert "SORIDORMI_MUJOCO_ROUGH_GROUND_OVERRIDE" in text
     assert 'SOCIAL_EYES_MODEL="$(dirname "${BASE_MODEL}")/soridormi_social_eyes_scene.xml"' in text
-    assert 'if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && [ "${SORIDORMI_MUJOCO_SOCIAL_EYES}" = "1" ]; then' in text
+    assert '[ "${SORIDORMI_MUJOCO_VISUAL_ARMS}" = "1" ]' in text
     assert "python -m soridormi_sim.social_eye_scene" in text
     assert "SOCIAL_EYE_FRAME_ARGS" in text
     assert "--debug-frame" in text
+    assert "--visual-arms" in text
     assert 'ROUGH_MODEL="$(dirname "${BASE_MODEL}")/soridormi_rough_ground_scene.xml"' in text
-    assert 'if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && [ "${SORIDORMI_MUJOCO_ROUGH_GROUND}" = "1" ]; then' in text
-    assert 'MuJoCo\n      # resolves mesh and texture paths relative to the top-level XML/compiler' in text
-    assert 'python -m soridormi_sim.rough_ground_scene' in text
+    assert (
+        'if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && [ "${SORIDORMI_MUJOCO_ROUGH_GROUND}" = "1" ]; then'
+        in text
+    )
+    assert (
+        "MuJoCo\n      # resolves mesh and texture paths relative to the top-level XML/compiler"
+        in text
+    )
+    assert "python -m soridormi_sim.rough_ground_scene" in text
 
 
 def test_run_sim_server_resolves_profile_inside_sim_container_before_server_start() -> None:
     text = open("scripts/run_sim_server.sh", encoding="utf-8").read()
 
-    assert 'python -m soridormi_runtime.policy_profiles "${SORIDORMI_SIM_POLICY_PROFILE}" --shell' in text
-    assert 'SORIDORMI_MUJOCO_USE_HOME_KEYFRAME' in text
-    assert 'SORIDORMI_MUJOCO_OFFICIAL_RESET_SEQUENCE' in text
-    assert 'SORIDORMI_MUJOCO_OFFICIAL_SENSOR_MODE' in text
-    assert 'SORIDORMI_MUJOCO_OFFICIAL_CONTACT_MODE' in text
+    assert (
+        'python -m soridormi_runtime.policy_profiles "${SORIDORMI_SIM_POLICY_PROFILE}" --shell'
+        in text
+    )
+    assert "SORIDORMI_MUJOCO_USE_HOME_KEYFRAME" in text
+    assert "SORIDORMI_MUJOCO_OFFICIAL_RESET_SEQUENCE" in text
+    assert "SORIDORMI_MUJOCO_OFFICIAL_SENSOR_MODE" in text
+    assert "SORIDORMI_MUJOCO_OFFICIAL_CONTACT_MODE" in text
 
 
 def test_policy_smoke_help_tells_user_to_start_profiled_mujoco_server() -> None:
@@ -144,7 +165,14 @@ def test_compose_runtime_passes_logging_override_envs() -> None:
 
     text = compose_path.read_text(encoding="utf-8")
 
-    assert "SORIDORMI_RUNTIME_LOG_FORMAT_OVERRIDE: ${SORIDORMI_RUNTIME_LOG_FORMAT_OVERRIDE:-}" in text
-    assert "SORIDORMI_RUNTIME_LOG_PREFIX_OVERRIDE: ${SORIDORMI_RUNTIME_LOG_PREFIX_OVERRIDE:-}" in text
+    assert (
+        "SORIDORMI_RUNTIME_LOG_FORMAT_OVERRIDE: ${SORIDORMI_RUNTIME_LOG_FORMAT_OVERRIDE:-}" in text
+    )
+    assert (
+        "SORIDORMI_RUNTIME_LOG_PREFIX_OVERRIDE: ${SORIDORMI_RUNTIME_LOG_PREFIX_OVERRIDE:-}" in text
+    )
     assert "SORIDORMI_RUNTIME_LOG_DIR_OVERRIDE: ${SORIDORMI_RUNTIME_LOG_DIR_OVERRIDE:-}" in text
-    assert "SORIDORMI_RUNTIME_LOG_EVERY_N_OVERRIDE: ${SORIDORMI_RUNTIME_LOG_EVERY_N_OVERRIDE:-}" in text
+    assert (
+        "SORIDORMI_RUNTIME_LOG_EVERY_N_OVERRIDE: ${SORIDORMI_RUNTIME_LOG_EVERY_N_OVERRIDE:-}"
+        in text
+    )

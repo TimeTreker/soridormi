@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
 
-
 LEFT_EYE_NAME = "soridormi_left_eye_visual"
 RIGHT_EYE_NAME = "soridormi_right_eye_visual"
 LEFT_EYE_CLOSED_NAME = "soridormi_left_eye_closed_visual"
@@ -25,7 +24,28 @@ SOCIAL_EYE_GEOM_NAMES = (
     RIGHT_EYE_CLOSED_NAME,
 )
 SOCIAL_EYE_COMMENT = "                <!-- Soridormi generated social eye visuals. -->\n"
+VISUAL_ARM_COMMENT = "        <!-- Soridormi generated visual-only arms. -->\n"
 DEFAULT_ROBOT_PREFIX = "soridormi_social_eyes_"
+
+VISUAL_ARM_POSES = ("rest", "reach", "hold", "place")
+VISUAL_ARM_SIDES = ("left", "right")
+VISUAL_ARM_COMPONENTS = ("upper", "elbow", "forearm", "hand")
+
+
+def visual_arm_geom_name(side: str, pose: str, component: str) -> str:
+    return f"soridormi_{side}_arm_{pose}_{component}_visual"
+
+
+VISUAL_ARM_SHOULDER_NAMES = tuple(
+    f"soridormi_{side}_arm_shoulder_visual" for side in VISUAL_ARM_SIDES
+)
+VISUAL_ARM_POSE_GEOM_NAMES = tuple(
+    visual_arm_geom_name(side, pose, component)
+    for side in VISUAL_ARM_SIDES
+    for pose in VISUAL_ARM_POSES
+    for component in VISUAL_ARM_COMPONENTS
+)
+VISUAL_ARM_GEOM_NAMES = VISUAL_ARM_SHOULDER_NAMES + VISUAL_ARM_POSE_GEOM_NAMES
 
 
 @dataclass(frozen=True)
@@ -45,6 +65,21 @@ class SocialEyeConfig:
 
 
 @dataclass(frozen=True)
+class VisualArmConfig:
+    shoulder_x_m: float = -0.02
+    shoulder_y_offset_m: float = 0.09
+    shoulder_z_m: float = 0.105
+    segment_radius_m: float = 0.012
+    joint_radius_m: float = 0.014
+    hand_size_xyz_m: tuple[float, float, float] = (0.018, 0.014, 0.02)
+    arm_rgba: str = "0.980392 0.713726 0.00392157 1"
+    joint_rgba: str = "0.909804 0.572549 0.164706 1"
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class SocialEyeResult:
     output_path: str
     base_path: str
@@ -52,6 +87,8 @@ class SocialEyeResult:
     robot_base_path: str
     eye_count: int
     config: dict[str, Any]
+    arm_geom_count: int = 0
+    arm_config: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -59,6 +96,81 @@ class SocialEyeResult:
 
 def _format_float(value: float) -> str:
     return f"{float(value):.6f}".rstrip("0").rstrip(".")
+
+
+def _format_xyz(values: tuple[float, float, float]) -> str:
+    return " ".join(_format_float(value) for value in values)
+
+
+def _arm_pose_points(
+    side: str,
+    pose: str,
+    config: VisualArmConfig,
+) -> tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]:
+    sign = 1.0 if side == "left" else -1.0
+    shoulder = (
+        config.shoulder_x_m,
+        sign * config.shoulder_y_offset_m,
+        config.shoulder_z_m,
+    )
+    points = {
+        "rest": (
+            (-0.028, sign * 0.15, 0.045),
+            (-0.005, sign * 0.18, 0.0),
+        ),
+        "reach": (
+            (0.04, sign * 0.125, 0.08),
+            (0.11, sign * 0.105, 0.06),
+        ),
+        "hold": (
+            (0.035, sign * 0.12, 0.08),
+            (0.09, sign * 0.038, 0.07),
+        ),
+        "place": (
+            (0.035, sign * 0.135, 0.075),
+            (0.12, sign * 0.08, 0.055),
+        ),
+    }
+    elbow, hand = points[pose]
+    return shoulder, elbow, hand
+
+
+def _visual_arm_pose_xml(side: str, pose: str, config: VisualArmConfig) -> str:
+    shoulder, elbow, hand = _arm_pose_points(side, pose, config)
+    alpha = "1" if pose == "rest" else "0"
+    arm_rgba = " ".join(config.arm_rgba.split()[:3] + [alpha])
+    joint_rgba = " ".join(config.joint_rgba.split()[:3] + [alpha])
+    upper = visual_arm_geom_name(side, pose, "upper")
+    elbow_name = visual_arm_geom_name(side, pose, "elbow")
+    forearm = visual_arm_geom_name(side, pose, "forearm")
+    hand_name = visual_arm_geom_name(side, pose, "hand")
+    return (
+        f'        <geom name="{upper}" type="capsule" class="visual" contype="0" conaffinity="0" '
+        f'fromto="{_format_xyz(shoulder)} {_format_xyz(elbow)}" '
+        f'size="{_format_float(config.segment_radius_m)}" rgba="{arm_rgba}"/>\n'
+        f'        <geom name="{elbow_name}" type="sphere" class="visual" contype="0" conaffinity="0" '
+        f'pos="{_format_xyz(elbow)}" size="{_format_float(config.joint_radius_m)}" rgba="{joint_rgba}"/>\n'
+        f'        <geom name="{forearm}" type="capsule" class="visual" contype="0" conaffinity="0" '
+        f'fromto="{_format_xyz(elbow)} {_format_xyz(hand)}" '
+        f'size="{_format_float(config.segment_radius_m)}" rgba="{arm_rgba}"/>\n'
+        f'        <geom name="{hand_name}" type="ellipsoid" class="visual" contype="0" conaffinity="0" '
+        f'pos="{_format_xyz(hand)}" size="{_format_xyz(config.hand_size_xyz_m)}" rgba="{joint_rgba}"/>\n'
+    )
+
+
+def build_visual_arm_geoms(config: VisualArmConfig | None = None) -> str:
+    cfg = config or VisualArmConfig()
+    chunks = [VISUAL_ARM_COMMENT]
+    for side, shoulder_name in zip(VISUAL_ARM_SIDES, VISUAL_ARM_SHOULDER_NAMES):
+        shoulder, _elbow, _hand = _arm_pose_points(side, "rest", cfg)
+        chunks.append(
+            f'        <geom name="{shoulder_name}" type="sphere" class="visual" '
+            f'contype="0" conaffinity="0" pos="{_format_xyz(shoulder)}" '
+            f'size="{_format_float(cfg.joint_radius_m)}" rgba="{cfg.joint_rgba}"/>\n'
+        )
+        for pose in VISUAL_ARM_POSES:
+            chunks.append(_visual_arm_pose_xml(side, pose, cfg))
+    return "".join(chunks)
 
 
 def _eye_geom_xml(name: str, *, y: float, config: SocialEyeConfig) -> str:
@@ -139,7 +251,9 @@ def build_social_eye_geoms(
     if LEFT_EYE_CLOSED_NAME in names:
         chunks.append(_closed_eye_geom_xml(LEFT_EYE_CLOSED_NAME, y=cfg.eye_y_offset_m, config=cfg))
     if RIGHT_EYE_CLOSED_NAME in names:
-        chunks.append(_closed_eye_geom_xml(RIGHT_EYE_CLOSED_NAME, y=-cfg.eye_y_offset_m, config=cfg))
+        chunks.append(
+            _closed_eye_geom_xml(RIGHT_EYE_CLOSED_NAME, y=-cfg.eye_y_offset_m, config=cfg)
+        )
     if cfg.debug_frame:
         chunks.append(_social_eye_frame_xml(cfg))
     return "".join(chunks)
@@ -154,7 +268,24 @@ def _remove_existing_social_eye_geoms(robot_xml: str) -> str:
         flags=re.MULTILINE | re.DOTALL,
     )
     for name in SOCIAL_EYE_GEOM_NAMES:
-        xml = re.sub(rf"^[ \t]*<geom\b[^>]*\bname=\"{re.escape(name)}\"[^>]*/>\n?", "", xml, flags=re.MULTILINE)
+        xml = re.sub(
+            rf"^[ \t]*<geom\b[^>]*\bname=\"{re.escape(name)}\"[^>]*/>\n?",
+            "",
+            xml,
+            flags=re.MULTILINE,
+        )
+    return xml
+
+
+def _remove_existing_visual_arm_geoms(robot_xml: str) -> str:
+    xml = robot_xml.replace(VISUAL_ARM_COMMENT, "")
+    for name in VISUAL_ARM_GEOM_NAMES:
+        xml = re.sub(
+            rf"^[ \t]*<geom\b[^>]*\bname=\"{re.escape(name)}\"[^>]*/>\n?",
+            "",
+            xml,
+            flags=re.MULTILINE,
+        )
     return xml
 
 
@@ -175,6 +306,20 @@ def build_social_eye_robot_xml(robot_xml: str, config: SocialEyeConfig | None = 
         raise ValueError("robot MuJoCo XML does not contain a head eye insertion marker")
 
     xml = robot_xml[:insert_at] + insertion + robot_xml[insert_at:]
+    ElementTree.fromstring(xml)
+    return xml
+
+
+def build_visual_arm_robot_xml(
+    robot_xml: str,
+    config: VisualArmConfig | None = None,
+) -> str:
+    robot_xml = _remove_existing_visual_arm_geoms(robot_xml)
+    marker = "        <!-- Frame trunk -->\n"
+    insert_at = robot_xml.find(marker)
+    if insert_at < 0:
+        raise ValueError("robot MuJoCo XML does not contain a trunk visual insertion marker")
+    xml = robot_xml[:insert_at] + build_visual_arm_geoms(config) + robot_xml[insert_at:]
     ElementTree.fromstring(xml)
     return xml
 
@@ -221,6 +366,8 @@ def generate_social_eye_scene(
     *,
     robot_output_path: str | Path | None = None,
     config: SocialEyeConfig | None = None,
+    arm_config: VisualArmConfig | None = None,
+    include_eyes: bool = True,
 ) -> SocialEyeResult:
     cfg = config or SocialEyeConfig()
     base = Path(base_path)
@@ -241,11 +388,19 @@ def generate_social_eye_scene(
     else:
         robot_output = robot_base.with_name(f"{DEFAULT_ROBOT_PREFIX}{robot_base.name}")
     robot_xml = robot_base.read_text(encoding="utf-8")
-    generated_robot_xml = build_social_eye_robot_xml(robot_xml, cfg)
+    generated_robot_xml = (
+        build_social_eye_robot_xml(robot_xml, cfg)
+        if include_eyes
+        else _remove_existing_social_eye_geoms(robot_xml)
+    )
+    if arm_config is not None:
+        generated_robot_xml = build_visual_arm_robot_xml(generated_robot_xml, arm_config)
     robot_output.parent.mkdir(parents=True, exist_ok=True)
     robot_output.write_text(generated_robot_xml, encoding="utf-8")
 
-    generated_scene_xml = build_social_eye_scene_xml(scene_xml, scene_path=output, robot_output_path=robot_output)
+    generated_scene_xml = build_social_eye_scene_xml(
+        scene_xml, scene_path=output, robot_output_path=robot_output
+    )
     ElementTree.fromstring(generated_scene_xml)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(generated_scene_xml, encoding="utf-8")
@@ -254,16 +409,24 @@ def generate_social_eye_scene(
         base_path=str(base),
         robot_output_path=str(robot_output),
         robot_base_path=str(robot_base),
-        eye_count=2,
+        eye_count=2 if include_eyes else 0,
         config=cfg.as_dict(),
+        arm_geom_count=len(VISUAL_ARM_GEOM_NAMES) if arm_config is not None else 0,
+        arm_config=arm_config.as_dict() if arm_config is not None else None,
     )
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate a MuJoCo scene with visual-only Soridormi social eyes.")
+    parser = argparse.ArgumentParser(
+        description="Generate a MuJoCo scene with visual-only Soridormi social eyes and optional arms."
+    )
     parser.add_argument("--base", type=Path, required=True, help="Base MuJoCo scene XML path")
-    parser.add_argument("--output", type=Path, required=True, help="Generated MuJoCo scene XML output path")
-    parser.add_argument("--robot-output", type=Path, default=None, help="Generated robot XML output path")
+    parser.add_argument(
+        "--output", type=Path, required=True, help="Generated MuJoCo scene XML output path"
+    )
+    parser.add_argument(
+        "--robot-output", type=Path, default=None, help="Generated robot XML output path"
+    )
     parser.add_argument("--eye-x", type=float, default=SocialEyeConfig.eye_x_m)
     parser.add_argument("--eye-y-offset", type=float, default=SocialEyeConfig.eye_y_offset_m)
     parser.add_argument("--eye-z", type=float, default=SocialEyeConfig.eye_z_m)
@@ -271,7 +434,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--eye-depth", type=float, default=SocialEyeConfig.eye_depth_m)
     parser.add_argument("--eye-quat", default=SocialEyeConfig.eye_quat)
     parser.add_argument("--eye-rgba", default=SocialEyeConfig.eye_rgba)
-    parser.add_argument("--debug-frame", action="store_true", help="Add RGB axes at the generated eye anchor")
+    parser.add_argument(
+        "--no-eyes",
+        action="store_true",
+        help="Do not add social-eye geoms while generating another visual overlay.",
+    )
+    parser.add_argument(
+        "--debug-frame", action="store_true", help="Add RGB axes at the generated eye anchor"
+    )
+    parser.add_argument(
+        "--visual-arms",
+        action="store_true",
+        help="Add non-colliding, jointless visual arms with fixed display poses.",
+    )
     parser.add_argument("--json", action="store_true", help="Print JSON result")
     return parser
 
@@ -292,6 +467,8 @@ def main(argv: list[str] | None = None) -> int:
             debug_frame=args.debug_frame,
             eye_rgba=args.eye_rgba,
         ),
+        arm_config=VisualArmConfig() if args.visual_arms else None,
+        include_eyes=not args.no_eyes,
     )
     if args.json:
         print(json.dumps(result.to_dict(), indent=2, sort_keys=True))

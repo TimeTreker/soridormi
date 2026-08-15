@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from xml.etree import ElementTree
 
+import pytest
+
 from soridormi_sim.social_eye_scene import (
     LEFT_EYE_CLOSED_NAME,
     LEFT_EYE_NAME,
@@ -13,9 +15,15 @@ from soridormi_sim.social_eye_scene import (
     SOCIAL_EYE_FRAME_X_AXIS_NAME,
     SOCIAL_EYE_FRAME_Y_AXIS_NAME,
     SOCIAL_EYE_FRAME_Z_AXIS_NAME,
+    VISUAL_ARM_GEOM_NAMES,
+    VISUAL_ARM_POSES,
+    VISUAL_ARM_SIDES,
     SocialEyeConfig,
+    VisualArmConfig,
     build_social_eye_robot_xml,
+    build_visual_arm_robot_xml,
     generate_social_eye_scene,
+    visual_arm_geom_name,
 )
 
 
@@ -30,7 +38,12 @@ def test_build_social_eye_robot_xml_inserts_visual_only_eye_geoms() -> None:
 
     root = ElementTree.fromstring(xml)
     geoms = {geom.attrib["name"]: geom.attrib for geom in root.findall(".//geom")}
-    assert set(geoms) == {LEFT_EYE_NAME, RIGHT_EYE_NAME, LEFT_EYE_CLOSED_NAME, RIGHT_EYE_CLOSED_NAME}
+    assert set(geoms) == {
+        LEFT_EYE_NAME,
+        RIGHT_EYE_NAME,
+        LEFT_EYE_CLOSED_NAME,
+        RIGHT_EYE_CLOSED_NAME,
+    }
     assert geoms[LEFT_EYE_NAME]["class"] == "visual"
     assert geoms[RIGHT_EYE_NAME]["class"] == "visual"
     assert geoms[LEFT_EYE_CLOSED_NAME]["class"] == "visual"
@@ -148,6 +161,149 @@ def test_build_social_eye_robot_xml_removes_debug_eye_frame_when_disabled() -> N
     assert without_frame.count(RIGHT_EYE_NAME) == 1
 
 
+def test_build_visual_arm_robot_xml_adds_only_non_contact_geoms() -> None:
+    robot = (
+        "<mujoco><worldbody><body name='trunk_assembly'>\n"
+        "        <!-- Frame trunk -->\n"
+        "<site name='trunk'/></body></worldbody><actuator>"
+        "<position name='leg' joint='leg'/></actuator></mujoco>"
+    )
+
+    xml = build_visual_arm_robot_xml(robot, VisualArmConfig())
+
+    root = ElementTree.fromstring(xml)
+    geoms = {geom.attrib["name"]: geom.attrib for geom in root.findall(".//geom")}
+    assert set(geoms) == set(VISUAL_ARM_GEOM_NAMES)
+    assert root.findall(".//joint") == []
+    assert len(root.findall(".//actuator/position")) == 1
+    assert root.findall(".//inertial") == []
+    for geom in geoms.values():
+        assert geom["class"] == "visual"
+        assert geom["contype"] == "0"
+        assert geom["conaffinity"] == "0"
+
+    for side in VISUAL_ARM_SIDES:
+        for pose in VISUAL_ARM_POSES:
+            expected_alpha = "1" if pose == "rest" else "0"
+            for component in ("upper", "elbow", "forearm", "hand"):
+                rgba = geoms[visual_arm_geom_name(side, pose, component)]["rgba"]
+                assert rgba.split()[-1] == expected_alpha
+
+
+def test_build_visual_arm_robot_xml_is_idempotent() -> None:
+    robot = (
+        "<mujoco><worldbody><body name='trunk_assembly'>\n"
+        "        <!-- Frame trunk -->\n"
+        "<site name='trunk'/></body></worldbody></mujoco>"
+    )
+
+    once = build_visual_arm_robot_xml(robot)
+    twice = build_visual_arm_robot_xml(once)
+
+    assert twice == once
+    for name in VISUAL_ARM_GEOM_NAMES:
+        assert twice.count(name) == 1
+
+
+def test_visual_arm_overlay_preserves_official_dynamic_contract() -> None:
+    robot_path = Path(
+        "workspace/Open_Duck_Playground/playground/open_duck_mini_v2/xmls/open_duck_mini_v2.xml"
+    )
+    original = robot_path.read_text(encoding="utf-8")
+    overlaid = build_visual_arm_robot_xml(original)
+    original_root = ElementTree.fromstring(original)
+    overlaid_root = ElementTree.fromstring(overlaid)
+
+    def dynamics_snapshot(root: ElementTree.Element) -> list[tuple[str, dict[str, str]]]:
+        return [
+            (element.tag, dict(element.attrib))
+            for tag in ("joint", "inertial", "actuator", "position")
+            for element in root.findall(f".//{tag}")
+        ]
+
+    assert dynamics_snapshot(overlaid_root) == dynamics_snapshot(original_root)
+    original_geoms = {geom.attrib.get("name") for geom in original_root.findall(".//geom")}
+    added_geoms = [
+        geom
+        for geom in overlaid_root.findall(".//geom")
+        if geom.attrib.get("name") not in original_geoms
+    ]
+    assert {geom.attrib["name"] for geom in added_geoms} == set(VISUAL_ARM_GEOM_NAMES)
+    assert all(geom.attrib["contype"] == "0" for geom in added_geoms)
+    assert all(geom.attrib["conaffinity"] == "0" for geom in added_geoms)
+
+
+def test_visual_arm_poses_clear_official_leg_geometry_at_home(tmp_path: Path) -> None:
+    mujoco = pytest.importorskip("mujoco")
+    xml_dir = Path("workspace/Open_Duck_Playground/playground/open_duck_mini_v2/xmls").resolve()
+    robot_name = "open_duck_mini_v2.xml"
+    (tmp_path / "assets").symlink_to(xml_dir / "assets", target_is_directory=True)
+    (tmp_path / robot_name).write_text(
+        build_visual_arm_robot_xml((xml_dir / robot_name).read_text(encoding="utf-8")),
+        encoding="utf-8",
+    )
+    scene_path = tmp_path / "scene_flat_terrain.xml"
+    scene_path.write_text(
+        (xml_dir / "scene_flat_terrain.xml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    model = mujoco.MjModel.from_xml_path(str(scene_path))
+    data = mujoco.MjData(model)
+    mujoco.mj_resetDataKeyframe(model, data, 0)
+    mujoco.mj_forward(model, data)
+    leg_bodies = {
+        "left": {
+            "hip_roll_assembly",
+            "left_roll_to_pitch_assembly",
+            "knee_and_ankle_assembly",
+            "knee_and_ankle_assembly_2",
+            "foot_assembly",
+        },
+        "right": {
+            "hip_roll_assembly_2",
+            "right_roll_to_pitch_assembly",
+            "knee_and_ankle_assembly_3",
+            "knee_and_ankle_assembly_4",
+            "foot_assembly_2",
+        },
+    }
+    minimum_clearance_m = float("inf")
+    for side, body_names in leg_bodies.items():
+        leg_geom_ids = [
+            geom_id
+            for geom_id in range(model.ngeom)
+            if mujoco.mj_id2name(
+                model,
+                mujoco.mjtObj.mjOBJ_BODY,
+                int(model.geom_bodyid[geom_id]),
+            )
+            in body_names
+        ]
+        assert leg_geom_ids
+        for pose in VISUAL_ARM_POSES:
+            for component in ("upper", "elbow", "forearm", "hand"):
+                arm_geom_id = mujoco.mj_name2id(
+                    model,
+                    mujoco.mjtObj.mjOBJ_GEOM,
+                    visual_arm_geom_name(side, pose, component),
+                )
+                for leg_geom_id in leg_geom_ids:
+                    minimum_clearance_m = min(
+                        minimum_clearance_m,
+                        mujoco.mj_geomDistance(
+                            model,
+                            data,
+                            arm_geom_id,
+                            leg_geom_id,
+                            1.0,
+                            None,
+                        ),
+                    )
+
+    assert minimum_clearance_m >= 0.015
+
+
 def test_generate_social_eye_scene_writes_scene_and_robot_overlay(tmp_path: Path) -> None:
     base_scene = tmp_path / "scene_flat_terrain.xml"
     base_robot = tmp_path / "open_duck_mini_v2.xml"
@@ -157,20 +313,28 @@ def test_generate_social_eye_scene_writes_scene_and_robot_overlay(tmp_path: Path
         encoding="utf-8",
     )
     base_robot.write_text(
-        "<mujoco><worldbody><body name='head_assembly'>\n"
+        "<mujoco><worldbody><body name='trunk_assembly'>\n"
+        "        <!-- Frame trunk -->\n"
+        "<body name='head_assembly'>\n"
         "                <!-- Frame head -->\n"
-        "<site name='head'/></body></worldbody></mujoco>",
+        "<site name='head'/></body><site name='trunk'/></body></worldbody></mujoco>",
         encoding="utf-8",
     )
 
-    result = generate_social_eye_scene(base_scene, out_scene)
+    result = generate_social_eye_scene(
+        base_scene,
+        out_scene,
+        arm_config=VisualArmConfig(),
+    )
 
     generated_robot = tmp_path / "soridormi_social_eyes_open_duck_mini_v2.xml"
     assert out_scene.exists()
     assert generated_robot.exists()
     assert result.eye_count == 2
+    assert result.arm_geom_count == len(VISUAL_ARM_GEOM_NAMES)
     assert f'file="{generated_robot.name}"' in out_scene.read_text(encoding="utf-8")
     assert LEFT_EYE_NAME in generated_robot.read_text(encoding="utf-8")
+    assert VISUAL_ARM_GEOM_NAMES[0] in generated_robot.read_text(encoding="utf-8")
 
 
 def test_generate_social_eye_scene_reuses_existing_generated_robot_overlay(tmp_path: Path) -> None:
@@ -193,5 +357,7 @@ def test_generate_social_eye_scene_reuses_existing_generated_robot_overlay(tmp_p
     result = generate_social_eye_scene(base_scene, out_scene)
 
     assert result.robot_output_path == str(generated_robot)
-    assert not (tmp_path / "soridormi_social_eyes_soridormi_social_eyes_open_duck_mini_v2.xml").exists()
+    assert not (
+        tmp_path / "soridormi_social_eyes_soridormi_social_eyes_open_duck_mini_v2.xml"
+    ).exists()
     assert generated_robot.read_text(encoding="utf-8").count(LEFT_EYE_NAME) == 1

@@ -9,6 +9,7 @@ MCP_PATH="${SORIDORMI_MCP_PATH:-/mcp}"
 VIEWER=1
 FOLLOW_CAMERA=1
 SOCIAL_EYE_FRAME=0
+VISUAL_ARMS="${SORIDORMI_MUJOCO_VISUAL_ARMS:-1}"
 BUILD_IMAGES=0
 KEEP_RUNNING=0
 REUSE_EXISTING_SIM=0
@@ -38,6 +39,8 @@ Options:
   --social-eye-frame   Show an RGB debug frame at the generated eye anchor
   --no-social-eye-frame
                        Hide the generated eye debug frame; default
+  --visual-arms        Show generated visual-only arms; default
+  --no-visual-arms     Hide generated visual-only arms
   --keep-running       Leave services running after launcher exits
   --reuse-existing-sim Reuse a simulator already listening on SIM_PORT
   --restart-existing-sim
@@ -56,6 +59,8 @@ while [ "$#" -gt 0 ]; do
     --no-follow-camera) FOLLOW_CAMERA=0; shift ;;
     --social-eye-frame) SOCIAL_EYE_FRAME=1; shift ;;
     --no-social-eye-frame) SOCIAL_EYE_FRAME=0; shift ;;
+    --visual-arms) VISUAL_ARMS=1; shift ;;
+    --no-visual-arms) VISUAL_ARMS=0; shift ;;
     --keep-running) KEEP_RUNNING=1; shift ;;
     --reuse-existing-sim) REUSE_EXISTING_SIM=1; shift ;;
     --restart-existing-sim) REUSE_EXISTING_SIM=0; shift ;;
@@ -299,7 +304,7 @@ fi
 if python_tcp_check 127.0.0.1 "$SIM_PORT"; then
   if [ "$REUSE_EXISTING_SIM" = "1" ]; then
     echo "[soridormi] Reusing existing simulator at 127.0.0.1:$SIM_PORT."
-    echo "[soridormi][warn] Viewer, profile, follow-camera, and eye-frame options are not reapplied to reused simulators." >&2
+    echo "[soridormi][warn] Viewer, profile, follow-camera, eye-frame, and visual-arm options are not reapplied to reused simulators." >&2
   else
     echo "[soridormi] Existing simulator detected at 127.0.0.1:$SIM_PORT; restarting so viewer/profile options are applied."
     stop_existing_sim_containers
@@ -319,6 +324,7 @@ if ! python_tcp_check 127.0.0.1 "$SIM_PORT"; then
   if [ "$VIEWER" = "1" ]; then sim_args+=(--viewer); else sim_args+=(--no-viewer); fi
   if [ "$FOLLOW_CAMERA" = "1" ]; then sim_args+=(--follow-camera); else sim_args+=(--no-follow-camera); fi
   if [ "$SOCIAL_EYE_FRAME" = "1" ]; then sim_args+=(--social-eye-frame); else sim_args+=(--no-social-eye-frame); fi
+  if [ "$VISUAL_ARMS" = "1" ]; then sim_args+=(--visual-arms); else sim_args+=(--no-visual-arms); fi
 
   if command -v setsid >/dev/null 2>&1; then
     setsid ./scripts/run_sim_server.sh "${sim_args[@]}" >>"$SIM_LOG" 2>&1 </dev/null &

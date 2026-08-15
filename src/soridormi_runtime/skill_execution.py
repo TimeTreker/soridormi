@@ -45,7 +45,9 @@ def _configured_min_forward_walk_speed_mps() -> float:
     except ValueError as exc:
         raise SkillExecutionError(f"{MIN_FORWARD_WALK_SPEED_ENV} must be a number") from exc
     if not math.isfinite(value) or value < 0.0:
-        raise SkillExecutionError(f"{MIN_FORWARD_WALK_SPEED_ENV} must be a finite non-negative number")
+        raise SkillExecutionError(
+            f"{MIN_FORWARD_WALK_SPEED_ENV} must be a finite non-negative number"
+        )
     return value
 
 
@@ -89,7 +91,9 @@ class JointKeyframeSegment:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "positions_by_name": {name: float(value) for name, value in self.positions_by_name.items()},
+            "positions_by_name": {
+                name: float(value) for name, value in self.positions_by_name.items()
+            },
             "duration_s": self.duration_s,
             "label": self.label,
         }
@@ -149,10 +153,10 @@ class SkillPlan:
 
     @property
     def total_duration_s(self) -> float:
-        return sum(command.duration_s for command in self.commands) + sum(
-            keyframe.duration_s for keyframe in self.keyframes
-        ) + sum(
-            expression.duration_s for expression in self.visual_expressions
+        return (
+            sum(command.duration_s for command in self.commands)
+            + sum(keyframe.duration_s for keyframe in self.keyframes)
+            + sum(expression.duration_s for expression in self.visual_expressions)
         )
 
 
@@ -175,7 +179,9 @@ def _skill_parameter_max(skill: Mapping[str, Any], parameter_name: str) -> float
     return value
 
 
-def apply_min_forward_walk_speed(vx_mps: float, *, max_vx_mps: float | None = None) -> tuple[float, bool]:
+def apply_min_forward_walk_speed(
+    vx_mps: float, *, max_vx_mps: float | None = None
+) -> tuple[float, bool]:
     """Raise tiny forward walk requests to the lowest useful sim walk speed."""
 
     vx = float(vx_mps)
@@ -220,7 +226,9 @@ def _coerce_number(name: str, value: Any) -> float:
         raise SkillExecutionError(f"parameter {name} must be numeric") from exc
 
 
-def _resolve_parameters(skill: dict[str, Any], provided: Mapping[str, Any] | None) -> dict[str, Any]:
+def _resolve_parameters(
+    skill: dict[str, Any], provided: Mapping[str, Any] | None
+) -> dict[str, Any]:
     provided = dict(provided or {})
     spec = skill.get("parameters", {})
     if not isinstance(spec, dict):
@@ -260,7 +268,11 @@ def _resolve_parameters(skill: dict[str, Any], provided: Mapping[str, Any] | Non
         elif param_type == "string":
             text = str(value)
             allowed = rule.get("enum")
-            if isinstance(allowed, list) and allowed and text not in {str(item) for item in allowed}:
+            if (
+                isinstance(allowed, list)
+                and allowed
+                and text not in {str(item) for item in allowed}
+            ):
                 raise SkillExecutionError(
                     f"skill {skill.get('id')}: parameter {name}={text!r} not in enum {allowed!r}"
                 )
@@ -268,7 +280,9 @@ def _resolve_parameters(skill: dict[str, Any], provided: Mapping[str, Any] | Non
         elif param_type is None:
             resolved[name] = value
         else:
-            raise SkillExecutionError(f"skill {skill.get('id')}: unsupported parameter type {param_type!r}")
+            raise SkillExecutionError(
+                f"skill {skill.get('id')}: unsupported parameter type {param_type!r}"
+            )
     return resolved
 
 
@@ -295,7 +309,9 @@ def _velocity_skill_plan(
     duration: float = 1.0,
 ) -> SkillPlan:
     skill_id = str(skill["id"])
-    command = VelocitySegment(vx_mps=vx, vy_mps=vy, yaw_radps=yaw, duration_s=duration, label=skill_id)
+    command = VelocitySegment(
+        vx_mps=vx, vy_mps=vy, yaw_radps=yaw, duration_s=duration, label=skill_id
+    )
     summary = (
         f"Dry-run {skill_id}: vx={vx:.3f} m/s, vy={vy:.3f} m/s, "
         f"yaw={yaw:.3f} rad/s for {duration:.2f}s using profile {profile}."
@@ -314,7 +330,9 @@ def _velocity_skill_plan(
     )
 
 
-def _plan_stand_idle(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+def _plan_stand_idle(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
     duration = float(parameters.get("duration_s", 2.0))
     return _velocity_skill_plan(skill, parameters, profile, duration=duration)
 
@@ -324,9 +342,13 @@ def _plan_stop(skill: dict[str, Any], parameters: Mapping[str, Any], profile: st
     return _velocity_skill_plan(skill, parameters, profile, duration=duration)
 
 
-def _plan_walk_velocity(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+def _plan_walk_velocity(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
     requested_vx = float(parameters.get("vx_mps", 0.0))
-    vx, _ = apply_min_forward_walk_speed(requested_vx, max_vx_mps=_skill_parameter_max(skill, "vx_mps"))
+    vx, _ = apply_min_forward_walk_speed(
+        requested_vx, max_vx_mps=_skill_parameter_max(skill, "vx_mps")
+    )
     planned_parameters = _with_forward_walk_speed_metadata(parameters, requested_vx, vx)
     return _velocity_skill_plan(
         skill,
@@ -339,9 +361,13 @@ def _plan_walk_velocity(skill: dict[str, Any], parameters: Mapping[str, Any], pr
     )
 
 
-def _plan_walk_forward(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+def _plan_walk_forward(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
     speed, requested_vx = _forward_walk_speed_preset(parameters.get("speed", "normal"))
-    vx, _ = apply_min_forward_walk_speed(requested_vx, max_vx_mps=_skill_parameter_max(skill, "vx_mps"))
+    vx, _ = apply_min_forward_walk_speed(
+        requested_vx, max_vx_mps=_skill_parameter_max(skill, "vx_mps")
+    )
     planned_parameters = dict(parameters)
     planned_parameters.update(
         {
@@ -366,7 +392,9 @@ def _plan_walk_forward(skill: dict[str, Any], parameters: Mapping[str, Any], pro
     )
 
 
-def _plan_turn_in_place(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+def _plan_turn_in_place(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
     return _velocity_skill_plan(
         skill,
         parameters,
@@ -376,9 +404,13 @@ def _plan_turn_in_place(skill: dict[str, Any], parameters: Mapping[str, Any], pr
     )
 
 
-def _plan_curve_walk(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+def _plan_curve_walk(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
     requested_vx = float(parameters.get("vx_mps", 0.0))
-    vx, _ = apply_min_forward_walk_speed(requested_vx, max_vx_mps=_skill_parameter_max(skill, "vx_mps"))
+    vx, _ = apply_min_forward_walk_speed(
+        requested_vx, max_vx_mps=_skill_parameter_max(skill, "vx_mps")
+    )
     planned_parameters = _with_forward_walk_speed_metadata(parameters, requested_vx, vx)
     return _velocity_skill_plan(
         skill,
@@ -444,7 +476,9 @@ def _visual_expression_plan(
     )
 
 
-def _head_keyframe(*, head_pitch: float = 0.0, head_yaw: float = 0.0, duration_s: float, label: str) -> JointKeyframeSegment:
+def _head_keyframe(
+    *, head_pitch: float = 0.0, head_yaw: float = 0.0, duration_s: float, label: str
+) -> JointKeyframeSegment:
     return JointKeyframeSegment(
         positions_by_name={
             "neck_pitch": 0.0,
@@ -478,7 +512,9 @@ def _count_cycles(value: Any, *, minimum: int = 1, maximum: int = 8) -> int:
     return result
 
 
-def _plan_neutral_head(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+def _plan_neutral_head(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
     skill_id = str(skill["id"])
     duration = float(parameters.get("duration_s", 3.0))
     keyframe = _head_keyframe(duration_s=duration, label=skill_id)
@@ -486,36 +522,46 @@ def _plan_neutral_head(skill: dict[str, Any], parameters: Mapping[str, Any], pro
         f"Plan {skill_id}: return head/neck joints to neutral straight-ahead pose "
         f"over {duration:.2f}s using a scripted head trajectory."
     )
-    return _scripted_keyframe_plan(skill, parameters, profile, keyframes=(keyframe,), summary=summary)
+    return _scripted_keyframe_plan(
+        skill, parameters, profile, keyframes=(keyframe,), summary=summary
+    )
 
 
-def _plan_look_direction(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+def _plan_look_direction(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
     skill_id = str(skill["id"])
     head_yaw = float(parameters.get("head_yaw_rad", 0.0))
     head_pitch = float(parameters.get("head_pitch_rad", 0.0))
     duration = float(parameters.get("duration_s", 1.0))
-    keyframe = _head_keyframe(head_pitch=head_pitch, head_yaw=head_yaw, duration_s=duration, label=skill_id)
+    keyframe = _head_keyframe(
+        head_pitch=head_pitch, head_yaw=head_yaw, duration_s=duration, label=skill_id
+    )
     summary = (
         f"Plan {skill_id}: head_yaw={head_yaw:.3f} rad, "
         f"head_pitch={head_pitch:.3f} rad over {duration:.2f}s using scripted head keyframes."
     )
-    return _scripted_keyframe_plan(skill, parameters, profile, keyframes=(keyframe,), summary=summary)
+    return _scripted_keyframe_plan(
+        skill, parameters, profile, keyframes=(keyframe,), summary=summary
+    )
 
 
-def _plan_look_at_person(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+def _plan_look_at_person(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
     skill_id = str(skill["id"])
     target_yaw = float(parameters.get("target_yaw_rad", 0.0))
     target_pitch = float(parameters.get("target_pitch_rad", 0.0))
     target_ref = str(parameters.get("target_ref") or "").strip()
     if not target_ref:
-        raise SkillExecutionError(
-            "look_at_person requires a non-empty structured target_ref"
-        )
+        raise SkillExecutionError("look_at_person requires a non-empty structured target_ref")
     duration = float(parameters.get("duration_s", 4.0))
     hold_fraction = float(parameters.get("hold_fraction", 0.50))
     end_mode = str(parameters.get("end_mode", "hold_target") or "hold_target")
     if end_mode not in {"hold_target", "return_neutral"}:
-        raise SkillExecutionError("look_at_person end_mode must be 'hold_target' or 'return_neutral'")
+        raise SkillExecutionError(
+            "look_at_person end_mode must be 'hold_target' or 'return_neutral'"
+        )
     if not 0.0 <= hold_fraction <= 0.8:
         raise SkillExecutionError("look_at_person hold_fraction must be between 0.0 and 0.8")
     settle_duration = duration * 0.15
@@ -523,7 +569,9 @@ def _plan_look_at_person(skill: dict[str, Any], parameters: Mapping[str, Any], p
     remaining_duration = duration - settle_duration - hold_duration
     move_duration = remaining_duration / 2.0 if end_mode == "return_neutral" else remaining_duration
     if move_duration <= 0.0:
-        raise SkillExecutionError("look_at_person duration_s is too short for the requested hold_fraction")
+        raise SkillExecutionError(
+            "look_at_person duration_s is too short for the requested hold_fraction"
+        )
     keyframes: list[JointKeyframeSegment] = [
         _head_keyframe(duration_s=settle_duration, label=f"{skill_id}_neutral_start"),
         _head_keyframe(
@@ -547,13 +595,17 @@ def _plan_look_at_person(skill: dict[str, Any], parameters: Mapping[str, Any], p
         f"over {duration:.2f}s using a scripted head trajectory; "
         f"end_mode={end_mode}; no perception is run."
     )
-    return _scripted_keyframe_plan(skill, parameters, profile, keyframes=tuple(keyframes), summary=summary)
+    return _scripted_keyframe_plan(
+        skill, parameters, profile, keyframes=tuple(keyframes), summary=summary
+    )
 
 
 def _plan_nod_yes(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
     skill_id = str(skill["id"])
     count = _count_cycles(parameters.get("count", 2), minimum=2, maximum=8)
-    down_amplitude = _amplitude_radians(parameters.get("amplitude", "small"), small=0.18, medium=0.26)
+    down_amplitude = _amplitude_radians(
+        parameters.get("amplitude", "small"), small=0.18, medium=0.26
+    )
     up_amplitude = _amplitude_radians(parameters.get("amplitude", "small"), small=0.12, medium=0.18)
     duration = float(parameters.get("duration_s", 4.0))
     segment_duration = duration / float(max(1, count * 2 + 2))
@@ -561,8 +613,20 @@ def _plan_nod_yes(skill: dict[str, Any], parameters: Mapping[str, Any], profile:
         _head_keyframe(duration_s=segment_duration, label=f"{skill_id}_neutral_start")
     ]
     for index in range(count):
-        keyframes.append(_head_keyframe(head_pitch=-down_amplitude, duration_s=segment_duration, label=f"{skill_id}_down_{index + 1}"))
-        keyframes.append(_head_keyframe(head_pitch=up_amplitude, duration_s=segment_duration, label=f"{skill_id}_up_{index + 1}"))
+        keyframes.append(
+            _head_keyframe(
+                head_pitch=-down_amplitude,
+                duration_s=segment_duration,
+                label=f"{skill_id}_down_{index + 1}",
+            )
+        )
+        keyframes.append(
+            _head_keyframe(
+                head_pitch=up_amplitude,
+                duration_s=segment_duration,
+                label=f"{skill_id}_up_{index + 1}",
+            )
+        )
     keyframes.append(_head_keyframe(duration_s=segment_duration, label=f"{skill_id}_neutral_end"))
     summary = (
         f"Plan {skill_id}: {count} visible nod cycle(s), amplitude={parameters.get('amplitude', 'small')} "
@@ -582,8 +646,20 @@ def _plan_shake_no(skill: dict[str, Any], parameters: Mapping[str, Any], profile
         _head_keyframe(duration_s=segment_duration, label=f"{skill_id}_neutral_start")
     ]
     for index in range(count):
-        keyframes.append(_head_keyframe(head_yaw=amplitude, duration_s=segment_duration, label=f"{skill_id}_right_{index + 1}"))
-        keyframes.append(_head_keyframe(head_yaw=-amplitude, duration_s=segment_duration, label=f"{skill_id}_left_{index + 1}"))
+        keyframes.append(
+            _head_keyframe(
+                head_yaw=amplitude,
+                duration_s=segment_duration,
+                label=f"{skill_id}_right_{index + 1}",
+            )
+        )
+        keyframes.append(
+            _head_keyframe(
+                head_yaw=-amplitude,
+                duration_s=segment_duration,
+                label=f"{skill_id}_left_{index + 1}",
+            )
+        )
     keyframes.append(_head_keyframe(duration_s=segment_duration, label=f"{skill_id}_neutral_end"))
     summary = (
         f"Plan {skill_id}: {count} visible shake cycle(s), amplitude={parameters.get('amplitude', 'small')} "
@@ -650,7 +726,9 @@ def _plan_bow(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
     return _scripted_keyframe_plan(skill, parameters, profile, keyframes=keyframes, summary=summary)
 
 
-def _plan_express_attention(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+def _plan_express_attention(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
     skill_id = str(skill["id"])
     style = str(parameters.get("style", "neutral") or "neutral")
     if style == "neutral":
@@ -669,7 +747,9 @@ def _plan_express_attention(skill: dict[str, Any], parameters: Mapping[str, Any]
     hold_duration = duration * hold_fraction
     move_duration = (duration - settle_duration - hold_duration) / 2.0
     if move_duration <= 0.0:
-        raise SkillExecutionError("express_attention duration_s is too short for the requested hold_fraction")
+        raise SkillExecutionError(
+            "express_attention duration_s is too short for the requested hold_fraction"
+        )
     keyframes = (
         _head_keyframe(duration_s=settle_duration, label=f"{skill_id}_neutral_start"),
         _head_keyframe(
@@ -694,14 +774,21 @@ def _plan_express_attention(skill: dict[str, Any], parameters: Mapping[str, Any]
     return _scripted_keyframe_plan(skill, parameters, profile, keyframes=keyframes, summary=summary)
 
 
-def _plan_blink_eyes(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
+def _plan_blink_eyes(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
     skill_id = str(skill["id"])
     count = _count_cycles(parameters.get("count", 2), minimum=1, maximum=6)
     closed_duration = float(parameters.get("closed_duration_s", 0.12))
     open_duration = float(parameters.get("open_duration_s", 0.18))
     intensity = float(parameters.get("intensity", 1.0))
     expressions: list[VisualExpressionSegment] = [
-        VisualExpressionSegment(expression="eyes_open", duration_s=open_duration, intensity=intensity, label=f"{skill_id}_open_start")
+        VisualExpressionSegment(
+            expression="eyes_open",
+            duration_s=open_duration,
+            intensity=intensity,
+            label=f"{skill_id}_open_start",
+        )
     ]
     for index in range(count):
         expressions.append(
@@ -725,7 +812,9 @@ def _plan_blink_eyes(skill: dict[str, Any], parameters: Mapping[str, Any], profi
         f"closed={closed_duration:.2f}s open={open_duration:.2f}s, "
         "using simulator visual expression geoms only."
     )
-    return _visual_expression_plan(skill, parameters, profile, visual_expressions=expressions, summary=summary)
+    return _visual_expression_plan(
+        skill, parameters, profile, visual_expressions=expressions, summary=summary
+    )
 
 
 def _resource_parts(
@@ -752,18 +841,14 @@ def _resource_parts(
             raise SkillExecutionError("source must be an object")
         source_status = str(source.get("status") or "").strip()
         if source_status not in {"known", "unknown", "provider_resolved"}:
-            raise SkillExecutionError(
-                "source.status must be known, unknown, or provider_resolved"
-            )
+            raise SkillExecutionError("source.status must be known, unknown, or provider_resolved")
 
     recipient_description = ""
     recipient = parameters.get("recipient")
     if require_recipient:
         if not isinstance(recipient, Mapping):
             raise SkillExecutionError("recipient must be an object")
-        recipient_description = " ".join(
-            str(recipient.get("description") or "").strip().split()
-        )
+        recipient_description = " ".join(str(recipient.get("description") or "").strip().split())
         if not recipient_description:
             raise SkillExecutionError("recipient.description is required")
     return description, source_status, recipient_description
@@ -793,6 +878,7 @@ def _resource_plan(
 
 SIMULATED_RESOURCE_PICKUP_LABEL = "resource_mock_pickup_pose"
 SIMULATED_RESOURCE_PICKUP_DURATION_S = 1.10
+SIMULATED_RESOURCE_HANDOVER_LABEL = "resource_mock_handover"
 
 
 def _plan_acquire_resource(
@@ -815,8 +901,7 @@ def _plan_acquire_resource(
         profile,
         commands=commands,
         summary=(
-            "Plan acquire_resource: simulation-only provider-local acquisition of "
-            f"{description!r}."
+            f"Plan acquire_resource: simulation-only provider-local acquisition of {description!r}."
         ),
     )
 
@@ -831,7 +916,7 @@ def _plan_deliver_resource(
     )
     commands = (
         VelocitySegment(vx_mps=-0.12, duration_s=0.60, label="resource_mock_return"),
-        VelocitySegment(duration_s=0.25, label="resource_mock_handover"),
+        VelocitySegment(duration_s=0.25, label=SIMULATED_RESOURCE_HANDOVER_LABEL),
     )
     return _resource_plan(
         skill,
@@ -864,7 +949,7 @@ def _plan_acquire_and_deliver_resource(
             label=SIMULATED_RESOURCE_PICKUP_LABEL,
         ),
         VelocitySegment(vx_mps=-0.12, duration_s=0.60, label="resource_mock_return"),
-        VelocitySegment(duration_s=0.25, label="resource_mock_handover"),
+        VelocitySegment(duration_s=0.25, label=SIMULATED_RESOURCE_HANDOVER_LABEL),
     )
     return _resource_plan(
         skill,
@@ -896,7 +981,9 @@ def simulated_resource_outcome(plan: SkillPlan) -> dict[str, Any]:
     if plan.skill_id == "acquire_resource":
         evidence_summary = "The simulation resource was acquired by the scripted provider mock."
     elif plan.skill_id == "deliver_resource":
-        evidence_summary = "The carried simulation resource was handed over by the scripted provider mock."
+        evidence_summary = (
+            "The carried simulation resource was handed over by the scripted provider mock."
+        )
     else:
         evidence_summary = (
             "The simulation resource was acquired, carried, and handed over "
@@ -1000,8 +1087,6 @@ def _load_json_args(raw: str | None) -> dict[str, Any]:
     return value
 
 
-
-
 def plan_shell_exports(plan: SkillPlan) -> str:
     """Return shell exports that bind a one-segment skill plan to runtime command overrides.
 
@@ -1028,13 +1113,20 @@ def plan_shell_exports(plan: SkillPlan) -> str:
     }
     return "\n".join(f"export {key}={shlex.quote(value)}" for key, value in sorted(exports.items()))
 
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Dry-run a Soridormi skill into a safe high-level command plan."
     )
     parser.add_argument("skill", nargs="?", help="Skill id to dry-run, e.g. walk_velocity.")
-    parser.add_argument("--manifest", default=str(DEFAULT_SKILL_MANIFEST), help="Path to skill manifest JSON.")
-    parser.add_argument("--profile", default=DEFAULT_SKILL_PROFILE, help="Policy profile hint for locomotion skills.")
+    parser.add_argument(
+        "--manifest", default=str(DEFAULT_SKILL_MANIFEST), help="Path to skill manifest JSON."
+    )
+    parser.add_argument(
+        "--profile",
+        default=DEFAULT_SKILL_PROFILE,
+        help="Policy profile hint for locomotion skills.",
+    )
     parser.add_argument("--args", default="{}", help="Skill parameter JSON object.")
     parser.add_argument("--list", action="store_true", help="List executable dry-run skill ids.")
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
@@ -1049,7 +1141,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
-    registry = SkillExecutionRegistry.from_manifest_path(args.manifest, default_profile=args.profile)
+    registry = SkillExecutionRegistry.from_manifest_path(
+        args.manifest, default_profile=args.profile
+    )
 
     if args.list:
         payload = {"executable_skills": list(registry.executable_skill_ids())}
@@ -1101,7 +1195,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("Keyframes:")
             for keyframe in plan.keyframes:
                 targets = ", ".join(
-                    f"{name}={value:.3f}" for name, value in sorted(keyframe.positions_by_name.items())
+                    f"{name}={value:.3f}"
+                    for name, value in sorted(keyframe.positions_by_name.items())
                 )
                 print(f"- {keyframe.label}: {targets} duration={keyframe.duration_s:.2f}s")
         if plan.visual_expressions:

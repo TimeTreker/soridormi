@@ -61,6 +61,7 @@ Soridormi-owned. Speech and singing remain Chromie-owned peer execution.
 
 ## Skill and interaction contracts
 
+- `docs/SORIDORMI_SOCIAL_EYES.md` — generated visual-only eyes and arm overlay
 - `docs/SORIDORMI_SKILL_TAXONOMY.md`
 - `docs/SORIDORMI_SKILL_EXECUTION.md`
 - `docs/SORIDORMI_SCRIPTED_SOCIAL_SKILLS.md`

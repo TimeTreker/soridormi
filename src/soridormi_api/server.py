@@ -6,7 +6,7 @@ from typing import Protocol
 
 import zmq
 
-from .types import ApiRequest, ApiResponse, MotorCommand, RobotState, VisualExpressionCommand
+from .types import ApiRequest, ApiResponse, MotorCommand, RobotState
 
 
 class RobotBackend(Protocol):
@@ -58,12 +58,28 @@ class RobotApiServer:
             return ApiResponse(ok=True, state=self.backend.get_state())
         if request.kind == "set_visual_expression":
             if request.visual_expression is None:
-                return ApiResponse(ok=False, message="set_visual_expression requires visual_expression")
+                return ApiResponse(
+                    ok=False, message="set_visual_expression requires visual_expression"
+                )
             applier = getattr(self.backend, "apply_visual_expression", None)
             if not callable(applier):
                 return ApiResponse(ok=False, message="backend does not support visual expressions")
             applier(request.visual_expression)
-            return ApiResponse(ok=True, message=f"visual expression applied: {request.visual_expression.expression}")
+            return ApiResponse(
+                ok=True,
+                message=f"visual expression applied: {request.visual_expression.expression}",
+            )
+        if request.kind == "set_visual_arm_pose":
+            if request.visual_arm_pose is None:
+                return ApiResponse(ok=False, message="set_visual_arm_pose requires visual_arm_pose")
+            applier = getattr(self.backend, "apply_visual_arm_pose", None)
+            if not callable(applier):
+                return ApiResponse(ok=False, message="backend does not support visual arm poses")
+            applier(request.visual_arm_pose)
+            return ApiResponse(
+                ok=True,
+                message=f"visual arm pose applied: {request.visual_arm_pose.pose}",
+            )
         if request.kind == "reset":
             resetter = getattr(self.backend, "reset", None)
             if not callable(resetter):
