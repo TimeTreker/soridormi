@@ -105,8 +105,10 @@ When the generated visual-body overlay is loaded, the mock also drives fixed
 jointless arm display poses (`reach`, `hold`, `place`, and `rest`). This is
 fail-soft visualization only. The arm geoms have no collision, mass, joints,
 actuators, sensors, or completion authority, and an absent overlay cannot promote
-or demote resource evidence. The official Open Duck model and 14-actuator policy
-contract remain unchanged.
+or demote resource evidence. The fixed five-digit hand geoms switch visibility
+with the arm poses but do not articulate, sense contact, or establish grasp
+evidence. The official Open Duck model and 14-actuator policy contract remain
+unchanged.
 
 A successful simulated execution returns bounded evidence such as:
 

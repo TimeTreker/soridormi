@@ -44,11 +44,13 @@ hosting boundary requires a separate evidence-backed architecture decision.
   returns explicit `resource_outcome` acquisition/delivery evidence so paired
   Chromie/Soridormi architecture can be exercised end to end without claiming a
   real manipulator or hardware grasp capability.
-- The generated MuJoCo visual-body overlay now adds non-colliding, jointless arms
-  without editing the official Open Duck XML/URDF or the 14-actuator robot
-  configuration. Fixed `rest`, `reach`, `hold`, and `place` display poses decorate
-  the simulation-only resource mock but have no dynamics, collision, sensor, or
-  completion-evidence authority.
+- The generated MuJoCo visual-body overlay adds non-colliding, jointless arms
+  with torso-overlapping shoulder mounts and proportions/material colors aligned
+  to the official body, without editing the Open Duck XML/URDF or 14-actuator
+  robot configuration. Gold five-digit hand geoms—four fingers and an opposing
+  thumb—follow the fixed `rest`, `reach`, `hold`, and `place` display poses. The
+  complete overlay decorates the simulation-only resource mock but has no
+  dynamics, collision, sensor, grasp, or completion-evidence authority.
 - Exact concurrent body activities are validated and executable through
   `soridormi.activity.*`: one primary locomotion member may run with compatible
   bounded head overlays and independent visual expressions.

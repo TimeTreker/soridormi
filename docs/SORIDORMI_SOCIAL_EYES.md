@@ -12,12 +12,18 @@ round `0.02m` radius face discs at the hand-tuned anchor
 (`quat="0.707107 0 0.707107 0"`) so they sit on the forward face plane instead
 of looking like balls mounted on top of the head.
 
-The arms are primitive shoulder, upper-arm, elbow, forearm, and hand geoms
-attached to `trunk_assembly`. They add no joints, actuators, inertials, sensors,
-or contacts. Every arm geom explicitly declares `contype=0` and
-`conaffinity=0`. Four fixed display poses are generated: `rest`, `reach`,
+The arms use body-overlapping shoulder mounts plus shoulder, upper-arm, elbow,
+forearm, and hand geoms under `trunk_assembly`. The mounts bridge each shoulder
+into the tapered torso instead of leaving a visible air gap. Chunkier white
+limb shells, graphite joints, and gold five-digit hands reuse the official
+robot's visual language. Each hand has four unequal rounded fingers aligned with
+the forearm plus a shorter opposing thumb, with every digit embedded into the
+palm for a continuous silhouette. They add no joints, actuators, inertials,
+sensors, or contacts. Every arm and finger geom explicitly declares `contype=0`
+and `conaffinity=0`. Four fixed display poses are generated: `rest`, `reach`,
 `hold`, and `place`. Pose changes only switch the alpha channel of those geom
-sets; they do not write MuJoCo `qpos`, `qvel`, controls, or policy state.
+sets; they do not write MuJoCo `qpos`, `qvel`, controls, or policy state, and
+finger visibility is not grasp evidence.
 The fixed coordinates keep the visible arm geometry outside the official leg
 geometry in the home pose. A compiled-model regression requires at least
 `0.015m` separation there; bounded leg-motion sampling is retained as visual

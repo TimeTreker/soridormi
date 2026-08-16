@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from math import dist, sqrt
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -15,8 +16,13 @@ from soridormi_sim.social_eye_scene import (
     SOCIAL_EYE_FRAME_X_AXIS_NAME,
     SOCIAL_EYE_FRAME_Y_AXIS_NAME,
     SOCIAL_EYE_FRAME_Z_AXIS_NAME,
+    VISUAL_ARM_COMPONENTS,
+    VISUAL_ARM_FINGER_COMPONENTS,
     VISUAL_ARM_GEOM_NAMES,
+    VISUAL_ARM_MAIN_FINGER_COMPONENTS,
     VISUAL_ARM_POSES,
+    VISUAL_ARM_SHOULDER_MOUNT_NAMES,
+    VISUAL_ARM_SHOULDER_NAMES,
     VISUAL_ARM_SIDES,
     SocialEyeConfig,
     VisualArmConfig,
@@ -182,12 +188,79 @@ def test_build_visual_arm_robot_xml_adds_only_non_contact_geoms() -> None:
         assert geom["contype"] == "0"
         assert geom["conaffinity"] == "0"
 
+    config = VisualArmConfig()
+    for side, mount_name, shoulder_name in zip(
+        VISUAL_ARM_SIDES,
+        VISUAL_ARM_SHOULDER_MOUNT_NAMES,
+        VISUAL_ARM_SHOULDER_NAMES,
+    ):
+        sign = 1.0 if side == "left" else -1.0
+        mount = geoms[mount_name]
+        assert mount["type"] == "capsule"
+        assert mount["rgba"] == config.arm_rgba
+        assert [float(value) for value in mount["fromto"].split()] == pytest.approx(
+            [
+                config.shoulder_x_m,
+                sign * config.shoulder_mount_y_offset_m,
+                config.shoulder_z_m,
+                config.shoulder_x_m,
+                sign * config.shoulder_y_offset_m,
+                config.shoulder_z_m,
+            ]
+        )
+        assert geoms[shoulder_name]["rgba"] == config.joint_rgba
+
     for side in VISUAL_ARM_SIDES:
         for pose in VISUAL_ARM_POSES:
             expected_alpha = "1" if pose == "rest" else "0"
-            for component in ("upper", "elbow", "forearm", "hand"):
+            for component in VISUAL_ARM_COMPONENTS:
                 rgba = geoms[visual_arm_geom_name(side, pose, component)]["rgba"]
                 assert rgba.split()[-1] == expected_alpha
+            hand_rgba = geoms[visual_arm_geom_name(side, pose, "hand")]["rgba"]
+            assert hand_rgba.split()[:3] == config.hand_rgba.split()[:3]
+            hand_position = tuple(
+                float(value)
+                for value in geoms[visual_arm_geom_name(side, pose, "hand")]["pos"].split()
+            )
+            finger_vectors: dict[str, tuple[float, float, float]] = {}
+            for component in VISUAL_ARM_FINGER_COMPONENTS:
+                finger = geoms[visual_arm_geom_name(side, pose, component)]
+                fromto = [float(value) for value in finger["fromto"].split()]
+                finger_root = tuple(fromto[:3])
+                finger_tip = tuple(fromto[3:])
+                assert finger["type"] == "capsule"
+                assert float(finger["size"]) == pytest.approx(config.finger_radius_m)
+                assert finger["rgba"].split()[:3] == config.hand_rgba.split()[:3]
+                assert dist(hand_position, finger_root) < min(config.hand_size_xyz_m)
+                finger_vectors[component] = tuple(
+                    tip_value - root_value for root_value, tip_value in zip(finger_root, finger_tip)
+                )
+
+            for component, tip_offset in zip(
+                VISUAL_ARM_MAIN_FINGER_COMPONENTS,
+                config.finger_tip_offsets_m,
+            ):
+                assert sqrt(sum(value * value for value in finger_vectors[component])) == (
+                    pytest.approx(tip_offset - config.finger_start_offset_m, abs=2e-6)
+                )
+            thumb_length = sqrt(
+                (config.thumb_tip_forward_offset_m - config.thumb_root_forward_offset_m) ** 2
+                + (config.thumb_tip_side_offset_m - config.thumb_root_side_offset_m) ** 2
+            )
+            assert sqrt(sum(value * value for value in finger_vectors["thumb"])) == pytest.approx(
+                thumb_length,
+                abs=2e-6,
+            )
+            thumb_vector = finger_vectors["thumb"]
+            middle_vector = finger_vectors["middle_finger"]
+            alignment = sum(
+                thumb_value * middle_value
+                for thumb_value, middle_value in zip(thumb_vector, middle_vector)
+            ) / (
+                sqrt(sum(value * value for value in thumb_vector))
+                * sqrt(sum(value * value for value in middle_vector))
+            )
+            assert alignment < 0.9
 
 
 def test_build_visual_arm_robot_xml_is_idempotent() -> None:
@@ -252,6 +325,28 @@ def test_visual_arm_poses_clear_official_leg_geometry_at_home(tmp_path: Path) ->
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, 0)
     mujoco.mj_forward(model, data)
+    trunk_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "trunk_assembly")
+    official_trunk_geom_ids = [
+        geom_id
+        for geom_id in range(model.ngeom)
+        if int(model.geom_bodyid[geom_id]) == trunk_id
+        and mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id) not in VISUAL_ARM_GEOM_NAMES
+    ]
+    assert official_trunk_geom_ids
+    for mount_name in VISUAL_ARM_SHOULDER_MOUNT_NAMES:
+        mount_geom_id = mujoco.mj_name2id(
+            model,
+            mujoco.mjtObj.mjOBJ_GEOM,
+            mount_name,
+        )
+        assert (
+            min(
+                mujoco.mj_geomDistance(model, data, mount_geom_id, trunk_geom_id, 1.0, None)
+                for trunk_geom_id in official_trunk_geom_ids
+            )
+            <= 0.0
+        )
+
     leg_bodies = {
         "left": {
             "hip_roll_assembly",
@@ -282,7 +377,7 @@ def test_visual_arm_poses_clear_official_leg_geometry_at_home(tmp_path: Path) ->
         ]
         assert leg_geom_ids
         for pose in VISUAL_ARM_POSES:
-            for component in ("upper", "elbow", "forearm", "hand"):
+            for component in VISUAL_ARM_COMPONENTS:
                 arm_geom_id = mujoco.mj_name2id(
                     model,
                     mujoco.mjtObj.mjOBJ_GEOM,

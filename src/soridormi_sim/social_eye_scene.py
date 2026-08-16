@@ -4,6 +4,7 @@ import argparse
 import json
 import re
 from dataclasses import asdict, dataclass
+from math import sqrt
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
@@ -29,7 +30,19 @@ DEFAULT_ROBOT_PREFIX = "soridormi_social_eyes_"
 
 VISUAL_ARM_POSES = ("rest", "reach", "hold", "place")
 VISUAL_ARM_SIDES = ("left", "right")
-VISUAL_ARM_COMPONENTS = ("upper", "elbow", "forearm", "hand")
+VISUAL_ARM_MAIN_FINGER_COMPONENTS = (
+    "index_finger",
+    "middle_finger",
+    "ring_finger",
+    "pinky_finger",
+)
+VISUAL_ARM_FINGER_COMPONENTS = VISUAL_ARM_MAIN_FINGER_COMPONENTS + ("thumb",)
+VISUAL_ARM_COMPONENTS = (
+    "upper",
+    "elbow",
+    "forearm",
+    "hand",
+) + VISUAL_ARM_FINGER_COMPONENTS
 
 
 def visual_arm_geom_name(side: str, pose: str, component: str) -> str:
@@ -39,13 +52,18 @@ def visual_arm_geom_name(side: str, pose: str, component: str) -> str:
 VISUAL_ARM_SHOULDER_NAMES = tuple(
     f"soridormi_{side}_arm_shoulder_visual" for side in VISUAL_ARM_SIDES
 )
+VISUAL_ARM_SHOULDER_MOUNT_NAMES = tuple(
+    f"soridormi_{side}_arm_shoulder_mount_visual" for side in VISUAL_ARM_SIDES
+)
 VISUAL_ARM_POSE_GEOM_NAMES = tuple(
     visual_arm_geom_name(side, pose, component)
     for side in VISUAL_ARM_SIDES
     for pose in VISUAL_ARM_POSES
     for component in VISUAL_ARM_COMPONENTS
 )
-VISUAL_ARM_GEOM_NAMES = VISUAL_ARM_SHOULDER_NAMES + VISUAL_ARM_POSE_GEOM_NAMES
+VISUAL_ARM_GEOM_NAMES = (
+    VISUAL_ARM_SHOULDER_MOUNT_NAMES + VISUAL_ARM_SHOULDER_NAMES + VISUAL_ARM_POSE_GEOM_NAMES
+)
 
 
 @dataclass(frozen=True)
@@ -69,11 +87,22 @@ class VisualArmConfig:
     shoulder_x_m: float = -0.02
     shoulder_y_offset_m: float = 0.09
     shoulder_z_m: float = 0.105
-    segment_radius_m: float = 0.012
-    joint_radius_m: float = 0.014
-    hand_size_xyz_m: tuple[float, float, float] = (0.018, 0.014, 0.02)
-    arm_rgba: str = "0.980392 0.713726 0.00392157 1"
-    joint_rgba: str = "0.909804 0.572549 0.164706 1"
+    shoulder_mount_y_offset_m: float = 0.055
+    shoulder_mount_radius_m: float = 0.019
+    segment_radius_m: float = 0.017
+    joint_radius_m: float = 0.021
+    hand_size_xyz_m: tuple[float, float, float] = (0.022, 0.019, 0.024)
+    finger_radius_m: float = 0.0042
+    finger_spread_m: float = 0.0065
+    finger_start_offset_m: float = 0.008
+    finger_tip_offsets_m: tuple[float, float, float, float] = (0.04, 0.044, 0.041, 0.034)
+    thumb_root_forward_offset_m: float = 0.004
+    thumb_root_side_offset_m: float = 0.01
+    thumb_tip_forward_offset_m: float = 0.024
+    thumb_tip_side_offset_m: float = 0.028
+    arm_rgba: str = "0.917647 0.917647 0.917647 1"
+    joint_rgba: str = "0.223529 0.219608 0.219608 1"
+    hand_rgba: str = "0.980392 0.713725 0.00392157 1"
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -102,6 +131,85 @@ def _format_xyz(values: tuple[float, float, float]) -> str:
     return " ".join(_format_float(value) for value in values)
 
 
+def _normalized_xyz(
+    values: tuple[float, float, float],
+) -> tuple[float, float, float]:
+    norm = sqrt(sum(value * value for value in values))
+    if norm <= 1e-9:
+        raise ValueError("visual-arm direction must have non-zero length")
+    return tuple(value / norm for value in values)
+
+
+def _offset_xyz(
+    origin: tuple[float, float, float],
+    direction: tuple[float, float, float],
+    distance: float,
+) -> tuple[float, float, float]:
+    return tuple(value + distance * delta for value, delta in zip(origin, direction))
+
+
+def _dot_xyz(
+    left: tuple[float, float, float],
+    right: tuple[float, float, float],
+) -> float:
+    return sum(left_value * right_value for left_value, right_value in zip(left, right))
+
+
+def _visual_arm_finger_points(
+    side: str,
+    elbow: tuple[float, float, float],
+    hand: tuple[float, float, float],
+    config: VisualArmConfig,
+) -> tuple[
+    tuple[tuple[float, float, float], tuple[float, float, float]],
+    ...,
+]:
+    finger_direction = _normalized_xyz(tuple(end - start for start, end in zip(elbow, hand)))
+    sign = 1.0 if side == "left" else -1.0
+    inner_hint = (0.0, -sign, 0.0)
+    inner_projection = _dot_xyz(inner_hint, finger_direction)
+    inner_direction = _normalized_xyz(
+        tuple(
+            hint - inner_projection * direction
+            for hint, direction in zip(inner_hint, finger_direction)
+        )
+    )
+    spread_candidate = (0.0, -finger_direction[2], finger_direction[1])
+    if sqrt(sum(value * value for value in spread_candidate)) <= 1e-9:
+        spread_direction = inner_direction
+    else:
+        spread_direction = _normalized_xyz(spread_candidate)
+    if _dot_xyz(spread_direction, inner_direction) < 0.0:
+        spread_direction = tuple(-value for value in spread_direction)
+
+    fingers = []
+    for spread_multiplier, tip_offset in zip(
+        (1.5, 0.5, -0.5, -1.5),
+        config.finger_tip_offsets_m,
+    ):
+        spread = spread_multiplier * config.finger_spread_m
+        root = _offset_xyz(hand, spread_direction, spread)
+        fingers.append(
+            (
+                _offset_xyz(root, finger_direction, config.finger_start_offset_m),
+                _offset_xyz(root, finger_direction, tip_offset),
+            )
+        )
+
+    thumb_root = _offset_xyz(
+        _offset_xyz(hand, finger_direction, config.thumb_root_forward_offset_m),
+        inner_direction,
+        config.thumb_root_side_offset_m,
+    )
+    thumb_tip = _offset_xyz(
+        _offset_xyz(hand, finger_direction, config.thumb_tip_forward_offset_m),
+        inner_direction,
+        config.thumb_tip_side_offset_m,
+    )
+    fingers.append((thumb_root, thumb_tip))
+    return tuple(fingers)
+
+
 def _arm_pose_points(
     side: str,
     pose: str,
@@ -115,8 +223,8 @@ def _arm_pose_points(
     )
     points = {
         "rest": (
-            (-0.028, sign * 0.15, 0.045),
-            (-0.005, sign * 0.18, 0.0),
+            (-0.028, sign * 0.156, 0.045),
+            (-0.005, sign * 0.186, 0.0),
         ),
         "reach": (
             (0.04, sign * 0.125, 0.08),
@@ -140,29 +248,69 @@ def _visual_arm_pose_xml(side: str, pose: str, config: VisualArmConfig) -> str:
     alpha = "1" if pose == "rest" else "0"
     arm_rgba = " ".join(config.arm_rgba.split()[:3] + [alpha])
     joint_rgba = " ".join(config.joint_rgba.split()[:3] + [alpha])
+    hand_rgba = " ".join(config.hand_rgba.split()[:3] + [alpha])
     upper = visual_arm_geom_name(side, pose, "upper")
     elbow_name = visual_arm_geom_name(side, pose, "elbow")
     forearm = visual_arm_geom_name(side, pose, "forearm")
     hand_name = visual_arm_geom_name(side, pose, "hand")
-    return (
-        f'        <geom name="{upper}" type="capsule" class="visual" contype="0" conaffinity="0" '
-        f'fromto="{_format_xyz(shoulder)} {_format_xyz(elbow)}" '
-        f'size="{_format_float(config.segment_radius_m)}" rgba="{arm_rgba}"/>\n'
-        f'        <geom name="{elbow_name}" type="sphere" class="visual" contype="0" conaffinity="0" '
-        f'pos="{_format_xyz(elbow)}" size="{_format_float(config.joint_radius_m)}" rgba="{joint_rgba}"/>\n'
-        f'        <geom name="{forearm}" type="capsule" class="visual" contype="0" conaffinity="0" '
-        f'fromto="{_format_xyz(elbow)} {_format_xyz(hand)}" '
-        f'size="{_format_float(config.segment_radius_m)}" rgba="{arm_rgba}"/>\n'
-        f'        <geom name="{hand_name}" type="ellipsoid" class="visual" contype="0" conaffinity="0" '
-        f'pos="{_format_xyz(hand)}" size="{_format_xyz(config.hand_size_xyz_m)}" rgba="{joint_rgba}"/>\n'
-    )
+    chunks = [
+        (
+            f'        <geom name="{upper}" type="capsule" class="visual" '
+            f'contype="0" conaffinity="0" '
+            f'fromto="{_format_xyz(shoulder)} {_format_xyz(elbow)}" '
+            f'size="{_format_float(config.segment_radius_m)}" rgba="{arm_rgba}"/>\n'
+        ),
+        (
+            f'        <geom name="{elbow_name}" type="sphere" class="visual" '
+            f'contype="0" conaffinity="0" pos="{_format_xyz(elbow)}" '
+            f'size="{_format_float(config.joint_radius_m)}" rgba="{joint_rgba}"/>\n'
+        ),
+        (
+            f'        <geom name="{forearm}" type="capsule" class="visual" '
+            f'contype="0" conaffinity="0" '
+            f'fromto="{_format_xyz(elbow)} {_format_xyz(hand)}" '
+            f'size="{_format_float(config.segment_radius_m)}" rgba="{arm_rgba}"/>\n'
+        ),
+        (
+            f'        <geom name="{hand_name}" type="ellipsoid" class="visual" '
+            f'contype="0" conaffinity="0" pos="{_format_xyz(hand)}" '
+            f'size="{_format_xyz(config.hand_size_xyz_m)}" rgba="{hand_rgba}"/>\n'
+        ),
+    ]
+    for component, (finger_root, finger_tip) in zip(
+        VISUAL_ARM_FINGER_COMPONENTS,
+        _visual_arm_finger_points(side, elbow, hand, config),
+    ):
+        finger_name = visual_arm_geom_name(side, pose, component)
+        chunks.append(
+            f'        <geom name="{finger_name}" type="capsule" class="visual" '
+            f'contype="0" conaffinity="0" '
+            f'fromto="{_format_xyz(finger_root)} {_format_xyz(finger_tip)}" '
+            f'size="{_format_float(config.finger_radius_m)}" rgba="{hand_rgba}"/>\n'
+        )
+    return "".join(chunks)
 
 
 def build_visual_arm_geoms(config: VisualArmConfig | None = None) -> str:
     cfg = config or VisualArmConfig()
     chunks = [VISUAL_ARM_COMMENT]
-    for side, shoulder_name in zip(VISUAL_ARM_SIDES, VISUAL_ARM_SHOULDER_NAMES):
+    for side, mount_name, shoulder_name in zip(
+        VISUAL_ARM_SIDES,
+        VISUAL_ARM_SHOULDER_MOUNT_NAMES,
+        VISUAL_ARM_SHOULDER_NAMES,
+    ):
+        sign = 1.0 if side == "left" else -1.0
         shoulder, _elbow, _hand = _arm_pose_points(side, "rest", cfg)
+        mount = (
+            cfg.shoulder_x_m,
+            sign * cfg.shoulder_mount_y_offset_m,
+            cfg.shoulder_z_m,
+        )
+        chunks.append(
+            f'        <geom name="{mount_name}" type="capsule" class="visual" '
+            f'contype="0" conaffinity="0" fromto="{_format_xyz(mount)} {_format_xyz(shoulder)}" '
+            f'size="{_format_float(cfg.shoulder_mount_radius_m)}" rgba="{cfg.arm_rgba}"/>\n'
+        )
         chunks.append(
             f'        <geom name="{shoulder_name}" type="sphere" class="visual" '
             f'contype="0" conaffinity="0" pos="{_format_xyz(shoulder)}" '
