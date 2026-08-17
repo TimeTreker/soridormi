@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from math import dist
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -18,12 +19,15 @@ from soridormi_sim.social_eye_scene import (
     VISUAL_ARM_COMPONENTS,
     VISUAL_ARM_GEOM_NAMES,
     VISUAL_ARM_POSES,
+    VISUAL_ARM_SHOULDER_AXLE_NAMES,
     VISUAL_ARM_SHOULDER_MOUNT_NAMES,
+    VISUAL_ARM_SHOULDER_NAMES,
     VISUAL_ARM_SIDES,
     VISUAL_LEG_GEOM_NAMES,
     SocialEyeConfig,
     VisualArmConfig,
     VisualLegConfig,
+    _arm_pose_points,
     build_social_eye_robot_xml,
     build_visual_arm_robot_xml,
     build_visual_leg_shell_robot_xml,
@@ -200,6 +204,8 @@ def test_build_visual_arm_robot_xml_adds_only_non_contact_geoms() -> None:
         for component in VISUAL_ARM_COMPONENTS
     }
     assert left_rest["palm"]["type"] == "ellipsoid"
+    assert left_rest["elbow"]["type"] == "cylinder"
+    assert left_rest["elbow_axle"]["type"] == "cylinder"
     assert left_rest["cuff"]["type"] == "cylinder"
     assert left_rest["wrist"]["type"] == "cylinder"
     for finger in ("index", "middle", "ring", "little"):
@@ -213,11 +219,32 @@ def test_build_visual_arm_robot_xml_adds_only_non_contact_geoms() -> None:
         assert left_rest[f"thumb_{joint}"]["type"] == "sphere"
     assert left_rest["upper"]["rgba"].startswith("0.917647 0.917647 0.917647")
     assert left_rest["elbow"]["rgba"].startswith("0.909804 0.572549 0.164706")
+    assert left_rest["elbow_axle"]["rgba"].startswith("0.223529 0.219608 0.219608")
     assert left_rest["index_mcp"]["rgba"].startswith("0.93 0.66 0.28")
     assert left_rest["index_pip"]["rgba"].startswith("0.82 0.82 0.80")
     left_mount = geoms[VISUAL_ARM_SHOULDER_MOUNT_NAMES[0]]
     assert left_mount["type"] == "capsule"
-    assert left_mount["fromto"] == "-0.02 0.055 0.105 -0.02 0.09 0.105"
+    assert left_mount["fromto"] == "-0.02 0.055 0.105 -0.02 0.07765 0.105"
+    left_shoulder = geoms[VISUAL_ARM_SHOULDER_NAMES[0]]
+    assert left_shoulder["type"] == "cylinder"
+    assert left_shoulder["fromto"] == "-0.029 0.09 0.105 -0.011 0.09 0.105"
+    left_shoulder_axle = geoms[VISUAL_ARM_SHOULDER_AXLE_NAMES[0]]
+    assert left_shoulder_axle["type"] == "cylinder"
+    assert left_shoulder_axle["rgba"] == "0.223529 0.219608 0.219608 1"
+
+
+def test_visual_arm_poses_keep_plausible_segment_proportions() -> None:
+    config = VisualArmConfig()
+
+    for side in VISUAL_ARM_SIDES:
+        for pose in VISUAL_ARM_POSES:
+            shoulder, elbow, wrist = _arm_pose_points(side, pose, config)
+            upper_length = dist(shoulder, elbow)
+            forearm_length = dist(elbow, wrist)
+
+            assert upper_length == pytest.approx(config.upper_arm_length_m)
+            assert forearm_length == pytest.approx(config.forearm_length_m)
+            assert forearm_length / upper_length == pytest.approx(0.07 / 0.082)
 
 
 def test_visual_arm_hands_use_pose_specific_wrist_directions() -> None:

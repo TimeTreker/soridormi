@@ -60,6 +60,7 @@ VISUAL_ARM_COMPONENTS = (
     (
         "upper",
         "elbow",
+        "elbow_axle",
         "forearm",
         "cuff",
         "wrist",
@@ -93,6 +94,9 @@ VISUAL_ARM_SHOULDER_NAMES = tuple(
 VISUAL_ARM_SHOULDER_MOUNT_NAMES = tuple(
     f"soridormi_{side}_arm_shoulder_mount_visual" for side in VISUAL_ARM_SIDES
 )
+VISUAL_ARM_SHOULDER_AXLE_NAMES = tuple(
+    f"soridormi_{side}_arm_shoulder_axle_visual" for side in VISUAL_ARM_SIDES
+)
 VISUAL_ARM_POSE_GEOM_NAMES = tuple(
     visual_arm_geom_name(side, pose, component)
     for side in VISUAL_ARM_SIDES
@@ -100,7 +104,10 @@ VISUAL_ARM_POSE_GEOM_NAMES = tuple(
     for component in VISUAL_ARM_COMPONENTS
 )
 VISUAL_ARM_GEOM_NAMES = (
-    VISUAL_ARM_SHOULDER_MOUNT_NAMES + VISUAL_ARM_SHOULDER_NAMES + VISUAL_ARM_POSE_GEOM_NAMES
+    VISUAL_ARM_SHOULDER_MOUNT_NAMES
+    + VISUAL_ARM_SHOULDER_NAMES
+    + VISUAL_ARM_SHOULDER_AXLE_NAMES
+    + VISUAL_ARM_POSE_GEOM_NAMES
 )
 
 VISUAL_LEG_BODY_NAMES = {
@@ -144,10 +151,16 @@ class VisualArmConfig:
     shoulder_y_offset_m: float = 0.09
     shoulder_z_m: float = 0.105
     shoulder_mount_y_offset_m: float = 0.055
-    shoulder_mount_radius_m: float = 0.019
-    upper_arm_radius_m: float = 0.017
-    forearm_radius_m: float = 0.014
-    joint_radius_m: float = 0.0185
+    shoulder_mount_radius_m: float = 0.0165
+    upper_arm_length_m: float = 0.082
+    forearm_length_m: float = 0.07
+    upper_arm_radius_m: float = 0.0165
+    forearm_radius_m: float = 0.0135
+    shoulder_joint_radius_m: float = 0.019
+    shoulder_joint_half_depth_m: float = 0.009
+    elbow_joint_radius_m: float = 0.0175
+    elbow_joint_half_depth_m: float = 0.0075
+    joint_axle_radius_m: float = 0.0065
     cuff_radius_m: float = 0.0125
     wrist_radius_m: float = 0.008
     palm_thickness_m: float = 0.0065
@@ -158,6 +171,7 @@ class VisualArmConfig:
     arm_rgba: str = "0.917647 0.917647 0.917647 1"
     hand_rgba: str = "0.917647 0.917647 0.917647 1"
     joint_rgba: str = "0.909804 0.572549 0.164706 1"
+    joint_axle_rgba: str = "0.223529 0.219608 0.219608 1"
     finger_joint_rgba: str = "0.82 0.82 0.80 1"
     finger_root_joint_rgba: str = "0.93 0.66 0.28 1"
 
@@ -215,7 +229,7 @@ def _arm_pose_points(
     )
     points = {
         "rest": (
-            (-0.028, sign * 0.157, 0.045),
+            (-0.025, sign * 0.155, 0.055),
             (-0.005, sign * 0.184, 0.0),
         ),
         "reach": (
@@ -223,8 +237,8 @@ def _arm_pose_points(
             (0.11, sign * 0.105, 0.06),
         ),
         "hold": (
-            (0.035, sign * 0.12, 0.08),
-            (0.09, sign * 0.038, 0.07),
+            (0.035, sign * 0.105, 0.08),
+            (0.09, sign * 0.01, 0.07),
         ),
         "place": (
             (0.035, sign * 0.135, 0.075),
@@ -247,12 +261,22 @@ def _arm_pose_points(
             (0.1, sign * 0.175, 0.112),
         ),
         "welcome_close": (
-            (0.04, sign * 0.12, 0.1),
-            (0.105, sign * 0.035, 0.1),
+            (0.04, sign * 0.106, 0.1),
+            (0.105, sign * 0.02, 0.1),
         ),
     }
-    elbow, hand = points[pose]
-    return shoulder, elbow, hand
+    elbow_hint, wrist_hint = points[pose]
+    upper_direction = _unit_vector(_vector_subtract(elbow_hint, shoulder))
+    forearm_direction = _unit_vector(_vector_subtract(wrist_hint, elbow_hint))
+    elbow = _vector_add(
+        shoulder,
+        _vector_scale(upper_direction, config.upper_arm_length_m),
+    )
+    wrist = _vector_add(
+        elbow,
+        _vector_scale(forearm_direction, config.forearm_length_m),
+    )
+    return shoulder, elbow, wrist
 
 
 def _vector_add(
@@ -355,6 +379,17 @@ def _perpendicular_unit(
         return _unit_vector(_vector_subtract(fallback, _vector_scale(axis, fallback_projection)))
 
 
+def _arm_hinge_axis(
+    upper_direction: tuple[float, float, float],
+    forearm_direction: tuple[float, float, float],
+) -> tuple[float, float, float]:
+    """Return the mechanical elbow axis perpendicular to both arm segments."""
+    try:
+        return _unit_vector(_vector_cross(upper_direction, forearm_direction))
+    except ValueError:
+        return _perpendicular_unit((1.0, 0.0, 0.0), upper_direction)
+
+
 def _arm_hand_direction(
     pose: str,
     elbow: tuple[float, float, float],
@@ -392,8 +427,10 @@ def _visual_arm_pose_xml(side: str, pose: str, config: VisualArmConfig) -> str:
     arm_rgba = " ".join(config.arm_rgba.split()[:3] + [alpha])
     hand_rgba = " ".join(config.hand_rgba.split()[:3] + [alpha])
     joint_rgba = " ".join(config.joint_rgba.split()[:3] + [alpha])
+    joint_axle_rgba = " ".join(config.joint_axle_rgba.split()[:3] + [alpha])
     upper = visual_arm_geom_name(side, pose, "upper")
     elbow_name = visual_arm_geom_name(side, pose, "elbow")
+    elbow_axle_name = visual_arm_geom_name(side, pose, "elbow_axle")
     forearm = visual_arm_geom_name(side, pose, "forearm")
     cuff = visual_arm_geom_name(side, pose, "cuff")
     wrist_name = visual_arm_geom_name(side, pose, "wrist")
@@ -406,6 +443,18 @@ def _visual_arm_pose_xml(side: str, pose: str, config: VisualArmConfig) -> str:
     palm_quat = _quat_from_axes(palm_normal, medial, hand_forward)
     curl_direction = _unit_vector(_vector_scale(_vector_cross(medial, hand_forward), sign))
     forearm_direction = _unit_vector(_vector_subtract(wrist, elbow))
+    upper_direction = _unit_vector(_vector_subtract(elbow, shoulder))
+    elbow_axis = _arm_hinge_axis(upper_direction, forearm_direction)
+    elbow_start = _vector_subtract(
+        elbow, _vector_scale(elbow_axis, config.elbow_joint_half_depth_m)
+    )
+    elbow_end = _vector_add(elbow, _vector_scale(elbow_axis, config.elbow_joint_half_depth_m))
+    elbow_axle_start = _vector_subtract(
+        elbow, _vector_scale(elbow_axis, config.elbow_joint_half_depth_m * 1.3)
+    )
+    elbow_axle_end = _vector_add(
+        elbow, _vector_scale(elbow_axis, config.elbow_joint_half_depth_m * 1.3)
+    )
     cuff_start = _vector_subtract(wrist, _vector_scale(forearm_direction, 0.02))
     cuff_end = _vector_subtract(wrist, _vector_scale(forearm_direction, 0.008))
     wrist_start = _vector_subtract(wrist, _vector_scale(forearm_direction, 0.004))
@@ -420,8 +469,12 @@ def _visual_arm_pose_xml(side: str, pose: str, config: VisualArmConfig) -> str:
         f'        <geom name="{upper}" type="capsule" class="visual" contype="0" conaffinity="0" '
         f'fromto="{_format_xyz(shoulder)} {_format_xyz(elbow)}" '
         f'size="{_format_float(config.upper_arm_radius_m)}" rgba="{arm_rgba}"/>\n'
-        f'        <geom name="{elbow_name}" type="sphere" class="visual" contype="0" conaffinity="0" '
-        f'pos="{_format_xyz(elbow)}" size="{_format_float(config.joint_radius_m)}" rgba="{joint_rgba}"/>\n'
+        f'        <geom name="{elbow_name}" type="cylinder" class="visual" contype="0" conaffinity="0" '
+        f'fromto="{_format_xyz(elbow_start)} {_format_xyz(elbow_end)}" '
+        f'size="{_format_float(config.elbow_joint_radius_m)}" rgba="{joint_rgba}"/>\n'
+        f'        <geom name="{elbow_axle_name}" type="cylinder" class="visual" contype="0" conaffinity="0" '
+        f'fromto="{_format_xyz(elbow_axle_start)} {_format_xyz(elbow_axle_end)}" '
+        f'size="{_format_float(config.joint_axle_radius_m)}" rgba="{joint_axle_rgba}"/>\n'
         f'        <geom name="{forearm}" type="capsule" class="visual" contype="0" conaffinity="0" '
         f'fromto="{_format_xyz(elbow)} {_format_xyz(cuff_start)}" '
         f'size="{_format_float(config.forearm_radius_m)}" rgba="{arm_rgba}"/>\n'
@@ -564,10 +617,11 @@ def _visual_arm_pose_xml(side: str, pose: str, config: VisualArmConfig) -> str:
 def build_visual_arm_geoms(config: VisualArmConfig | None = None) -> str:
     cfg = config or VisualArmConfig()
     chunks = [VISUAL_ARM_COMMENT]
-    for side, mount_name, shoulder_name in zip(
+    for side, mount_name, shoulder_name, shoulder_axle_name in zip(
         VISUAL_ARM_SIDES,
         VISUAL_ARM_SHOULDER_MOUNT_NAMES,
         VISUAL_ARM_SHOULDER_NAMES,
+        VISUAL_ARM_SHOULDER_AXLE_NAMES,
     ):
         sign = 1.0 if side == "left" else -1.0
         shoulder, _elbow, _hand = _arm_pose_points(side, "rest", cfg)
@@ -576,17 +630,48 @@ def build_visual_arm_geoms(config: VisualArmConfig | None = None) -> str:
             sign * cfg.shoulder_mount_y_offset_m,
             cfg.shoulder_z_m,
         )
+        mount_end = (
+            cfg.shoulder_x_m,
+            shoulder[1] - sign * cfg.shoulder_joint_radius_m * 0.65,
+            cfg.shoulder_z_m,
+        )
+        shoulder_axis = (1.0, 0.0, 0.0)
+        shoulder_start = _vector_subtract(
+            shoulder,
+            _vector_scale(shoulder_axis, cfg.shoulder_joint_half_depth_m),
+        )
+        shoulder_end = _vector_add(
+            shoulder,
+            _vector_scale(shoulder_axis, cfg.shoulder_joint_half_depth_m),
+        )
+        shoulder_axle_start = _vector_subtract(
+            shoulder,
+            _vector_scale(shoulder_axis, cfg.shoulder_joint_half_depth_m * 1.3),
+        )
+        shoulder_axle_end = _vector_add(
+            shoulder,
+            _vector_scale(shoulder_axis, cfg.shoulder_joint_half_depth_m * 1.3),
+        )
         chunks.append(
             f'        <geom name="{mount_name}" type="capsule" class="visual" '
             f'contype="0" conaffinity="0" '
-            f'fromto="{_format_xyz(mount)} {_format_xyz(shoulder)}" '
+            f'fromto="{_format_xyz(mount)} {_format_xyz(mount_end)}" '
             f'size="{_format_float(cfg.shoulder_mount_radius_m)}" '
             f'rgba="{cfg.arm_rgba}"/>\n'
         )
         chunks.append(
-            f'        <geom name="{shoulder_name}" type="sphere" class="visual" '
-            f'contype="0" conaffinity="0" pos="{_format_xyz(shoulder)}" '
-            f'size="{_format_float(cfg.joint_radius_m)}" rgba="{cfg.joint_rgba}"/>\n'
+            f'        <geom name="{shoulder_name}" type="cylinder" class="visual" '
+            f'contype="0" conaffinity="0" '
+            f'fromto="{_format_xyz(shoulder_start)} {_format_xyz(shoulder_end)}" '
+            f'size="{_format_float(cfg.shoulder_joint_radius_m)}" '
+            f'rgba="{cfg.joint_rgba}"/>\n'
+        )
+        chunks.append(
+            f'        <geom name="{shoulder_axle_name}" type="cylinder" class="visual" '
+            f'contype="0" conaffinity="0" '
+            f'fromto="{_format_xyz(shoulder_axle_start)} {_format_xyz(shoulder_axle_end)}" '
+            f'size="{_format_float(cfg.joint_axle_radius_m)}" '
+            f'rgba="{cfg.joint_axle_rgba}"/>\n'
         )
         for pose in VISUAL_ARM_POSES:
             chunks.append(_visual_arm_pose_xml(side, pose, cfg))

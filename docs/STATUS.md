@@ -48,10 +48,13 @@ hosting boundary requires a separate evidence-backed architecture decision.
   with torso-overlapping shoulder mounts and rounded cosmetic lower-leg shells
   without editing the official Open Duck
   XML/URDF or the 14-actuator robot configuration. The stylized model uses the
-  Open Duck white-shell/orange-joint palette. Each hand has a distinct cuff and
+  Open Duck white-shell/orange-joint palette. Fixed `0.082m` upper arms and
+  `0.070m` forearms keep all nine display poses at a consistent proportion;
+  compact orange hinge housings with graphite axle pins replace the previous
+  ball-like shoulder and elbow treatment. Each hand has a distinct cuff and
   narrow wrist, a flattened palm, tapered three-segment fingers, and an opposed
-  three-segment thumb. Nine fixed display poses and the moving-body leg shells
-  have no dynamics, collision, sensor, or completion-evidence authority.
+  three-segment thumb. The fixed display poses and moving-body leg shells have
+  no dynamics, collision, sensor, or completion-evidence authority.
 - `wave_hand`, `celebrate`, and `hug_gesture` are exported as simulation-only
   visual arm expressions. They sequence overlay poses through the independent
   `visual.arms` activity resource, restore `rest`, send no motor command, and do
