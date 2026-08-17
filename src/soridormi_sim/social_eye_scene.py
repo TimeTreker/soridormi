@@ -151,11 +151,11 @@ class VisualArmConfig:
     shoulder_y_offset_m: float = 0.09
     shoulder_z_m: float = 0.105
     shoulder_mount_y_offset_m: float = 0.055
-    shoulder_mount_radius_m: float = 0.0165
+    shoulder_mount_radius_m: float = 0.0175
     upper_arm_length_m: float = 0.082
     forearm_length_m: float = 0.07
-    upper_arm_radius_m: float = 0.0165
-    forearm_radius_m: float = 0.0135
+    upper_arm_radius_m: float = 0.018
+    forearm_radius_m: float = 0.015
     shoulder_joint_radius_m: float = 0.019
     shoulder_joint_half_depth_m: float = 0.009
     elbow_joint_radius_m: float = 0.0175

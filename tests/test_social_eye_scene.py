@@ -218,6 +218,8 @@ def test_build_visual_arm_robot_xml_adds_only_non_contact_geoms() -> None:
     for joint in ("cmc", "mcp", "ip"):
         assert left_rest[f"thumb_{joint}"]["type"] == "sphere"
     assert left_rest["upper"]["rgba"].startswith("0.917647 0.917647 0.917647")
+    assert left_rest["upper"]["size"] == "0.018"
+    assert left_rest["forearm"]["size"] == "0.015"
     assert left_rest["elbow"]["rgba"].startswith("0.909804 0.572549 0.164706")
     assert left_rest["elbow_axle"]["rgba"].startswith("0.223529 0.219608 0.219608")
     assert left_rest["index_mcp"]["rgba"].startswith("0.93 0.66 0.28")
