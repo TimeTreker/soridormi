@@ -13,9 +13,14 @@ round `0.02m` radius face discs at the hand-tuned anchor
 of looking like balls mounted on top of the head.
 
 The arms use body-overlapping shoulder mounts plus shoulder, upper-arm, elbow,
-forearm, cuff, wrist, palm, and finger geoms attached to `trunk_assembly`. The
-mounts bridge each shoulder into the tapered torso instead of leaving an air
-gap. They add no joints, actuators,
+forearm, cuff, wrist, palm, and finger geoms attached to `trunk_assembly`. Every
+display pose now preserves an `0.082m` upper arm and `0.070m` forearm, giving a
+consistent forearm-to-upper-arm ratio of about `0.85` instead of stretching the
+segments to arbitrary pose coordinates. The mounts bridge each shoulder into
+the tapered torso instead of leaving an air gap. Short orange cylindrical
+housings and graphite axle pins give the shoulders and elbows the compact hinge
+language used by Open Duck rather than a ball-joint appearance. They add no
+joints, actuators,
 inertials, sensors, or contacts. Every arm geom explicitly declares `contype=0`
 and `conaffinity=0`. A short white cuff now ends before a narrow orange wrist;
 the wrist connects to a flattened, lengthened palm instead of being hidden in a
