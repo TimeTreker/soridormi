@@ -107,8 +107,9 @@ one primary locomotion / whole-body member
 ```
 
 The current runtime composes a bounded head/gaze target into each locomotion
-controller command before sending one final `MotorCommand`. Eye blinking uses
-an independent visual output and does not write motor commands. Standalone
+controller command before sending one final `MotorCommand`. Eye blinking and
+the explicitly mocked `wave_hand`, `celebrate`, and `hug_gesture` arm displays
+use independent visual outputs and do not write motor commands. Standalone
 head/whole-body gestures remain incompatible with locomotion unless explicitly
 qualified.
 
@@ -129,6 +130,8 @@ Validate this path with:
 - Hardware remains disabled in the skill manifest.
 - Parameters are range-checked against the manifest.
 - Unsupported or future skills are rejected rather than silently executed.
+- Visual arm gestures are simulation-only display traces, not physical arm or
+  task-completion evidence.
 - Social speech/TTS remains outside Soridormi and belongs to Chromie.
 - Chromie must call structured skills/context, not raw joint targets or
   low-level `action_14d` policy outputs.

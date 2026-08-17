@@ -39,8 +39,8 @@ Options:
   --social-eye-frame   Show an RGB debug frame at the generated eye anchor
   --no-social-eye-frame
                        Hide the generated eye debug frame; default
-  --visual-arms        Show generated visual-only arms; default
-  --no-visual-arms     Hide generated visual-only arms
+  --visual-arms        Show generated visual arms and leg shells; default
+  --no-visual-arms     Hide the generated cosmetic limb overlay
   --keep-running       Leave services running after launcher exits
   --reuse-existing-sim Reuse a simulator already listening on SIM_PORT
   --restart-existing-sim

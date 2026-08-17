@@ -27,9 +27,11 @@ def test_registry_lists_manifest_backed_executable_skill_ids() -> None:
         "acquire_resource",
         "blink_eyes",
         "bow",
+        "celebrate",
         "curve_walk",
         "deliver_resource",
         "express_attention",
+        "hug_gesture",
         "look_at_person",
         "look_direction",
         "neutral_head",
@@ -41,6 +43,7 @@ def test_registry_lists_manifest_backed_executable_skill_ids() -> None:
         "turn_in_place",
         "walk_forward",
         "walk_velocity",
+        "wave_hand",
     )
 
 
@@ -231,6 +234,40 @@ def test_blink_eyes_dry_run_uses_visual_expression_segments() -> None:
     assert plan.total_duration_s == pytest.approx(0.80)
 
 
+def test_visual_arm_gesture_plans_are_display_only_and_restore_rest() -> None:
+    wave = _registry().create_plan(
+        "wave_hand",
+        {"side": "left", "count": 2, "duration_s": 2.4},
+    )
+    assert wave.commands == ()
+    assert wave.keyframes == ()
+    assert wave.visual_expressions == ()
+    assert [segment.pose for segment in wave.visual_arm_poses] == [
+        "rest",
+        "wave_up",
+        "wave_out",
+        "wave_up",
+        "wave_out",
+        "rest",
+    ]
+    assert {segment.side for segment in wave.visual_arm_poses[1:-1]} == {"left"}
+    assert wave.total_duration_s == pytest.approx(2.4)
+
+    celebrate = _registry().create_plan("celebrate", {"duration_s": 2.0})
+    hug = _registry().create_plan("hug_gesture", {"duration_s": 2.4})
+    assert [segment.pose for segment in celebrate.visual_arm_poses] == [
+        "rest",
+        "celebrate",
+        "rest",
+    ]
+    assert [segment.pose for segment in hug.visual_arm_poses] == [
+        "rest",
+        "welcome_open",
+        "welcome_close",
+        "rest",
+    ]
+
+
 def test_rejects_out_of_range_and_unknown_parameters() -> None:
     registry = _registry()
     with pytest.raises(SkillExecutionError, match="above max"):
@@ -246,7 +283,7 @@ def test_rejects_future_and_unsupported_skills() -> None:
     with pytest.raises(SkillExecutionError, match="not executable yet"):
         registry.create_plan("step_over_obstacle", {})
     with pytest.raises(SkillExecutionError, match="not executable yet"):
-        registry.create_plan("wave_hand", {})
+        registry.create_plan("point_direction", {})
 
 
 def test_skill_dry_run_cli_json() -> None:

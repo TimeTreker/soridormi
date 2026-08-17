@@ -9,6 +9,7 @@ from soridormi_api import (
     JointState,
     MotorCommand,
     RobotState,
+    VisualArmPoseCommand,
     VisualExpressionCommand,
 )
 from soridormi_runtime.mcp.body_activity import (
@@ -30,6 +31,7 @@ class ConcurrentRobot:
         self.positions = [0.0] * len(self.names)
         self.commands: list[MotorCommand] = []
         self.visual_expressions: list[VisualExpressionCommand] = []
+        self.visual_arm_poses: list[VisualArmPoseCommand] = []
 
     def read_state(self) -> RobotState:
         return RobotState(
@@ -58,6 +60,11 @@ class ConcurrentRobot:
         self.visual_expressions.append(command)
         self.time += 0.001
         return command.expression
+
+    def set_visual_arm_pose(self, command: VisualArmPoseCommand) -> str:
+        self.visual_arm_poses.append(command)
+        self.time += 0.001
+        return command.pose
 
 
 class ConcurrentController:
@@ -154,6 +161,35 @@ def test_activity_plan_accepts_walk_gaze_and_blink() -> None:
         for member in record.members
         for resource in member.write_resources
     } == {"body.primary_motion", "body.head_pose", "visual.eyes"}
+
+
+def test_activity_plan_accepts_independent_eye_and_arm_expressions() -> None:
+    record = compile_body_activity(
+        _registry(),
+        {
+            "members": [
+                {
+                    "member_id": "blink",
+                    "skill_id": "blink_eyes",
+                    "parameters": {"count": 1},
+                },
+                {
+                    "member_id": "wave",
+                    "skill_id": "wave_hand",
+                    "parameters": {"side": "right", "count": 1, "duration_s": 1.2},
+                },
+            ]
+        },
+    )
+
+    assert [member.skill_id for member in record.independent_members] == [
+        "blink_eyes",
+        "wave_hand",
+    ]
+    assert {resource for member in record.members for resource in member.write_resources} == {
+        "visual.eyes",
+        "visual.arms",
+    }
 
 
 def test_activity_plan_rejects_two_primary_locomotion_members() -> None:
@@ -283,6 +319,55 @@ def test_runtime_executes_walk_gaze_and_blink_concurrently() -> None:
         final_status = await service.call_tool("soridormi.robot.get_status", {})
         assert final_status["safe_idle"] is True
         assert final_status["activity_idle"] is True
+
+    asyncio.run(exercise())
+
+
+def test_runtime_executes_visual_arm_activity_and_restores_pose(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def no_sleep(_delay: float) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "soridormi_runtime.mcp.runtime_tools.asyncio.sleep",
+        no_sleep,
+    )
+
+    async def exercise() -> None:
+        robot = ConcurrentRobot()
+        service = SoridormiRuntimeToolService(
+            robot=robot,
+            controller=ConcurrentController(),
+            control_hz=100.0,
+        )
+        plan = await service.call_tool(
+            "soridormi.activity.compile",
+            {
+                "members": [
+                    {
+                        "member_id": "celebrate",
+                        "skill_id": "celebrate",
+                        "parameters": {"duration_s": 1.0},
+                    }
+                ]
+            },
+        )
+        result = await service.call_tool(
+            "soridormi.activity.execute",
+            {"compiled_activity_id": plan["compiled_activity_id"]},
+        )
+
+        assert result["completed"] is True
+        assert result["motor_commands_sent"] is False
+        assert result["member_results"]["celebrate"]["visual_arm_pose_steps"] == 3
+        assert [pose.pose for pose in robot.visual_arm_poses] == [
+            "rest",
+            "celebrate",
+            "rest",
+            "rest",
+        ]
+        assert service.active_lanes == {}
 
     asyncio.run(exercise())
 

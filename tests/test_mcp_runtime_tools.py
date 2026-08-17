@@ -602,6 +602,10 @@ def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> Non
             "social_attention",
             "facial_expression",
         ]
+        assert {"wave_hand", "celebrate", "hug_gesture"} <= set(skills)
+        assert skills["wave_hand"]["execution"] == "visual_arm_gesture"
+        assert skills["wave_hand"]["effects"] == ["visual_expression"]
+        assert skills["wave_hand"]["resource_claims"] == ["visual.arms"]
 
     asyncio.run(exercise())
 
@@ -924,13 +928,88 @@ def test_runtime_service_executes_named_visual_expression_skill(
     asyncio.run(exercise())
 
 
+def test_runtime_service_executes_named_visual_arm_gesture_skill(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def no_sleep(_delay: float) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "soridormi_runtime.mcp.runtime_tools.asyncio.sleep",
+        no_sleep,
+    )
+
+    async def exercise() -> None:
+        service = _service()
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {
+                "skill_id": "wave_hand",
+                "parameters": {"side": "left", "count": 1, "duration_s": 1.2},
+            },
+        )
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan",
+            {"plan_id": plan["plan_id"]},
+        )
+
+        assert plan["no_motion"] is True
+        assert result["completed"] is True
+        assert result["no_motion"] is True
+        assert result["visual_arm_pose_steps"] == 4
+        assert [(command.pose, command.side) for command in service.robot.visual_arm_poses] == [
+            ("rest", "both"),
+            ("wave_up", "left"),
+            ("wave_out", "left"),
+            ("rest", "both"),
+            ("rest", "both"),
+        ]
+
+    asyncio.run(exercise())
+
+
+def test_runtime_visual_arm_gesture_restores_pose_after_execution_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fail_sleep(_delay: float) -> None:
+        raise RuntimeError("simulated scheduler failure")
+
+    monkeypatch.setattr(
+        "soridormi_runtime.mcp.runtime_tools.asyncio.sleep",
+        fail_sleep,
+    )
+
+    async def exercise() -> None:
+        service = _service()
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {
+                "skill_id": "celebrate",
+                "parameters": {"duration_s": 1.0},
+            },
+        )
+
+        with pytest.raises(RuntimeError, match="simulated scheduler failure"):
+            await service.call_tool(
+                "soridormi.skill.execute_plan",
+                {"plan_id": plan["plan_id"]},
+            )
+
+        assert service.robot.visual_arm_poses[-1] == VisualArmPoseCommand(
+            pose="rest", side="both"
+        )
+        assert service.active_lanes == {}
+
+    asyncio.run(exercise())
+
+
 def test_runtime_service_rejects_unsupported_named_skill() -> None:
     async def exercise() -> None:
         service = _service()
         with pytest.raises(ValueError, match="not supported by the runtime adapter"):
             await service.call_tool(
                 "soridormi.skill.create_plan",
-                {"skill_id": "wave_hand", "parameters": {}},
+                {"skill_id": "point_direction", "parameters": {}},
             )
 
     asyncio.run(exercise())

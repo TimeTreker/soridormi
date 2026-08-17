@@ -404,7 +404,7 @@ class SoridormiLocalToolService:
             ):
                 continue
             execution = str(skill.get("execution") or "")
-            if execution == "visual_expression":
+            if execution in {"visual_expression", "visual_arm_gesture"}:
                 default_effects = ["visual_expression"]
                 default_safety_class = "low_risk_action"
             else:

@@ -114,7 +114,10 @@ Recovery and social behaviors should be staged after baseline locomotion is stab
 - `recovery_after_push_v1`
 - `look_direction_stationary_v1`
 
-Safe social skills should use head, neck, or body-safe motions only. Arm and hand skills remain unsupported until there is a current actuator contract.
+Safe physical social skills should use head, neck, or body-safe motions only.
+Physical arm and hand skills remain unsupported until there is a current
+actuator contract. Jointless `visual.arms` expressions may be tested as display
+scenarios, but they provide no motion or hardware qualification evidence.
 
 ## Required metadata
 
