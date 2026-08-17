@@ -47,6 +47,8 @@ REQUIRED_SKILLS = {
     "greeting",
     "express_attention",
     "wave_hand",
+    "celebrate",
+    "hug_gesture",
     "point_direction",
     "high_five",
 }
@@ -150,7 +152,7 @@ def test_first_available_subset_is_small_and_supported() -> None:
         for skill in skills.values()
         if skill["status"] in {"available_sim", "available_sim_experimental"}
     ]
-    assert 6 <= len(available) <= 18
+    assert 6 <= len(available) <= 24
 
     for skill in available:
         required = set(skill["required_actuator_groups"])
@@ -199,9 +201,19 @@ def test_resource_capabilities_publish_dynamic_plan_coverage() -> None:
         "delivery_modes"
     ] == ["physical_handover"]
 
-def test_arm_and_hand_social_skills_are_declared_but_unsupported() -> None:
+def test_visual_arm_social_skills_are_sim_only_while_contact_skills_stay_unsupported() -> None:
     skills = _skills_by_id()
-    for skill_id in ["wave_hand", "point_direction", "high_five"]:
+    for skill_id in ["wave_hand", "celebrate", "hug_gesture"]:
+        skill = skills[skill_id]
+        assert skill["category"] == "social"
+        assert skill["status"] == "available_sim_experimental"
+        assert skill["execution"] == "visual_arm_gesture"
+        assert skill["required_actuator_groups"] == []
+        assert skill["safety"]["hardware_enabled"] is False
+        assert skill["concurrency"]["write_resources"] == ["visual.arms"]
+        assert skill["concurrency"]["control_coupling"] == "independent_output"
+
+    for skill_id in ["point_direction", "high_five"]:
         skill = skills[skill_id]
         assert skill["category"] == "hardware_extension"
         assert skill["status"] == "unsupported_current_robot"

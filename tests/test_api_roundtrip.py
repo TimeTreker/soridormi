@@ -95,11 +95,14 @@ def test_api_roundtrip_read_state_and_send_command() -> None:
         assert backend.last_visual_expression.expression == "eyes_closed"
         assert backend.last_visual_expression.intensity == 0.75
 
-        arm_message = client.set_visual_arm_pose(VisualArmPoseCommand(pose="reach"))
+        arm_message = client.set_visual_arm_pose(
+            VisualArmPoseCommand(pose="wave_up", side="left")
+        )
 
-        assert arm_message == "visual arm pose applied: reach"
+        assert arm_message == "visual arm pose applied: wave_up"
         assert backend.last_visual_arm_pose is not None
-        assert backend.last_visual_arm_pose.pose == "reach"
+        assert backend.last_visual_arm_pose.pose == "wave_up"
+        assert backend.last_visual_arm_pose.side == "left"
 
     finally:
         client.close()

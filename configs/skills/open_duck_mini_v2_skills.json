@@ -29,6 +29,7 @@
     "scripted_keyframe",
     "scripted_tracking",
     "visual_expression",
+    "visual_arm_gesture",
     "pose_transition",
     "trajectory_policy",
     "residual_policy",
@@ -89,6 +90,10 @@
     {
       "id": "head_social",
       "goal": "Implement head/neck social gestures in MuJoCo."
+    },
+    {
+      "id": "visual_arm_social",
+      "goal": "Implement explicitly mocked, display-only arm expressions without changing the actuator contract."
     },
     {
       "id": "posture_transitions",
@@ -2300,33 +2305,196 @@
     },
     {
       "id": "wave_hand",
-      "category": "hardware_extension",
+      "category": "social",
+      "metadata": {
+        "behavior_domains": [
+          "social_attention",
+          "greeting"
+        ],
+        "simulation_mock": "visual_arm_display"
+      },
       "display_name": "Wave Hand",
-      "description": "Arm/hand wave greeting. Current Open Duck Mini v2 actuator map has no arm/hand actuators, so this is a future hardware-extension skill.",
-      "status": "unsupported_current_robot",
-      "execution": "future_hardware_extension",
-      "capability_group": "future_hardware_extensions",
-      "parameters": {},
+      "description": "Wave one generated visual hand in MuJoCo. This is a display-only social expression and does not claim arm motors or hardware movement.",
+      "status": "available_sim_experimental",
+      "execution": "visual_arm_gesture",
+      "capability_group": "visual_arm_social",
+      "parameters": {
+        "side": {
+          "type": "string",
+          "enum": [
+            "left",
+            "right"
+          ],
+          "default": "right"
+        },
+        "count": {
+          "min": 1,
+          "max": 4,
+          "default": 2
+        },
+        "duration_s": {
+          "min": 1.0,
+          "max": 6.0,
+          "default": 2.4
+        }
+      },
       "preconditions": [
-        "future_arm_actuators_available"
+        "soridormi_visual_arm_overlay_loaded",
+        "sim_or_dry_run"
       ],
-      "required_actuator_groups": [
-        "arms_hands"
-      ],
+      "required_actuator_groups": [],
       "safety": {
-        "requires_standing": true,
-        "requires_stable_balance": true,
-        "requires_not_walking": true,
-        "requires_flat_ground": true,
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
         "interruptible": true,
-        "fallback": "arms_neutral",
+        "fallback": "visual_arms_rest",
         "sim_first": true,
         "hardware_enabled": false
       },
       "evaluation": [
-        "not_applicable_until_hardware_exists"
+        "visual_arm_pose_trace",
+        "restored_visual_arm_pose"
       ],
-      "notes": "Declared so higher-level planners know the desired behavior exists conceptually, but Soridormi must reject it on the current robot."
+      "effects": [
+        "visual_expression"
+      ],
+      "safety_class": "low_risk_action",
+      "notes": "The generated arms are non-colliding, jointless display geometry. The skill changes geom visibility only; it sends no action_14d, joint, contact, or hardware command.",
+      "concurrency": {
+        "ability_class": "subtle_expression",
+        "control_coupling": "independent_output",
+        "write_resources": [
+          "visual.arms"
+        ],
+        "parallel_safe_with": [
+          "locomotion_whole_body",
+          "body_command_overlay",
+          "independent_output"
+        ],
+        "safety_preemption": "restore_neutral_output"
+      }
+    },
+    {
+      "id": "celebrate",
+      "category": "social",
+      "metadata": {
+        "behavior_domains": [
+          "social_attention",
+          "positive_affect"
+        ],
+        "simulation_mock": "visual_arm_display"
+      },
+      "display_name": "Celebrate",
+      "description": "Raise both generated visual hands in a brief MuJoCo celebration without changing robot dynamics or actuator state.",
+      "status": "available_sim_experimental",
+      "execution": "visual_arm_gesture",
+      "capability_group": "visual_arm_social",
+      "parameters": {
+        "duration_s": {
+          "min": 1.0,
+          "max": 6.0,
+          "default": 2.0
+        }
+      },
+      "preconditions": [
+        "soridormi_visual_arm_overlay_loaded",
+        "sim_or_dry_run"
+      ],
+      "required_actuator_groups": [],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "visual_arms_rest",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "visual_arm_pose_trace",
+        "restored_visual_arm_pose"
+      ],
+      "effects": [
+        "visual_expression"
+      ],
+      "safety_class": "low_risk_action",
+      "notes": "This skill is visual-only. It does not establish that the current robot can raise physical arms or complete a real-world activity.",
+      "concurrency": {
+        "ability_class": "subtle_expression",
+        "control_coupling": "independent_output",
+        "write_resources": [
+          "visual.arms"
+        ],
+        "parallel_safe_with": [
+          "locomotion_whole_body",
+          "body_command_overlay",
+          "independent_output"
+        ],
+        "safety_preemption": "restore_neutral_output"
+      }
+    },
+    {
+      "id": "hug_gesture",
+      "category": "social",
+      "metadata": {
+        "behavior_domains": [
+          "social_attention",
+          "affiliative_expression"
+        ],
+        "simulation_mock": "visual_arm_display"
+      },
+      "display_name": "Hug Gesture",
+      "description": "Show a generated open-and-close arm expression in MuJoCo. It is not an interactive or contact-capable physical hug.",
+      "status": "available_sim_experimental",
+      "execution": "visual_arm_gesture",
+      "capability_group": "visual_arm_social",
+      "parameters": {
+        "duration_s": {
+          "min": 1.2,
+          "max": 6.0,
+          "default": 2.4
+        }
+      },
+      "preconditions": [
+        "soridormi_visual_arm_overlay_loaded",
+        "sim_or_dry_run"
+      ],
+      "required_actuator_groups": [],
+      "safety": {
+        "requires_standing": false,
+        "requires_stable_balance": false,
+        "requires_not_walking": false,
+        "requires_flat_ground": false,
+        "interruptible": true,
+        "fallback": "visual_arms_rest",
+        "sim_first": true,
+        "hardware_enabled": false
+      },
+      "evaluation": [
+        "visual_arm_pose_trace",
+        "restored_visual_arm_pose"
+      ],
+      "effects": [
+        "visual_expression"
+      ],
+      "safety_class": "low_risk_action",
+      "notes": "The gesture changes only generated visual-arm geom visibility. It does not detect a person, make contact, or provide completion evidence for a physical hug.",
+      "concurrency": {
+        "ability_class": "subtle_expression",
+        "control_coupling": "independent_output",
+        "write_resources": [
+          "visual.arms"
+        ],
+        "parallel_safe_with": [
+          "locomotion_whole_body",
+          "body_command_overlay",
+          "independent_output"
+        ],
+        "safety_preemption": "restore_neutral_output"
+      }
     },
     {
       "id": "point_direction",
@@ -2410,6 +2578,10 @@
     },
     "visual.eyes": {
       "description": "Independent visual eye-expression output that does not write motor commands.",
+      "kind": "independent_output"
+    },
+    "visual.arms": {
+      "description": "Independent simulation-only visual arm-expression output that does not write motor commands or establish physical manipulation.",
       "kind": "independent_output"
     },
     "world.carried_object": {

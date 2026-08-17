@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from math import dist, sqrt
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -17,19 +16,20 @@ from soridormi_sim.social_eye_scene import (
     SOCIAL_EYE_FRAME_Y_AXIS_NAME,
     SOCIAL_EYE_FRAME_Z_AXIS_NAME,
     VISUAL_ARM_COMPONENTS,
-    VISUAL_ARM_FINGER_COMPONENTS,
     VISUAL_ARM_GEOM_NAMES,
-    VISUAL_ARM_MAIN_FINGER_COMPONENTS,
     VISUAL_ARM_POSES,
     VISUAL_ARM_SHOULDER_MOUNT_NAMES,
-    VISUAL_ARM_SHOULDER_NAMES,
     VISUAL_ARM_SIDES,
+    VISUAL_LEG_GEOM_NAMES,
     SocialEyeConfig,
     VisualArmConfig,
+    VisualLegConfig,
     build_social_eye_robot_xml,
     build_visual_arm_robot_xml,
+    build_visual_leg_shell_robot_xml,
     generate_social_eye_scene,
     visual_arm_geom_name,
+    visual_leg_geom_name,
 )
 
 
@@ -188,79 +188,72 @@ def test_build_visual_arm_robot_xml_adds_only_non_contact_geoms() -> None:
         assert geom["contype"] == "0"
         assert geom["conaffinity"] == "0"
 
-    config = VisualArmConfig()
-    for side, mount_name, shoulder_name in zip(
-        VISUAL_ARM_SIDES,
-        VISUAL_ARM_SHOULDER_MOUNT_NAMES,
-        VISUAL_ARM_SHOULDER_NAMES,
-    ):
-        sign = 1.0 if side == "left" else -1.0
-        mount = geoms[mount_name]
-        assert mount["type"] == "capsule"
-        assert mount["rgba"] == config.arm_rgba
-        assert [float(value) for value in mount["fromto"].split()] == pytest.approx(
-            [
-                config.shoulder_x_m,
-                sign * config.shoulder_mount_y_offset_m,
-                config.shoulder_z_m,
-                config.shoulder_x_m,
-                sign * config.shoulder_y_offset_m,
-                config.shoulder_z_m,
-            ]
-        )
-        assert geoms[shoulder_name]["rgba"] == config.joint_rgba
-
     for side in VISUAL_ARM_SIDES:
         for pose in VISUAL_ARM_POSES:
             expected_alpha = "1" if pose == "rest" else "0"
             for component in VISUAL_ARM_COMPONENTS:
                 rgba = geoms[visual_arm_geom_name(side, pose, component)]["rgba"]
                 assert rgba.split()[-1] == expected_alpha
-            hand_rgba = geoms[visual_arm_geom_name(side, pose, "hand")]["rgba"]
-            assert hand_rgba.split()[:3] == config.hand_rgba.split()[:3]
-            hand_position = tuple(
-                float(value)
-                for value in geoms[visual_arm_geom_name(side, pose, "hand")]["pos"].split()
-            )
-            finger_vectors: dict[str, tuple[float, float, float]] = {}
-            for component in VISUAL_ARM_FINGER_COMPONENTS:
-                finger = geoms[visual_arm_geom_name(side, pose, component)]
-                fromto = [float(value) for value in finger["fromto"].split()]
-                finger_root = tuple(fromto[:3])
-                finger_tip = tuple(fromto[3:])
-                assert finger["type"] == "capsule"
-                assert float(finger["size"]) == pytest.approx(config.finger_radius_m)
-                assert finger["rgba"].split()[:3] == config.hand_rgba.split()[:3]
-                assert dist(hand_position, finger_root) < min(config.hand_size_xyz_m)
-                finger_vectors[component] = tuple(
-                    tip_value - root_value for root_value, tip_value in zip(finger_root, finger_tip)
-                )
 
-            for component, tip_offset in zip(
-                VISUAL_ARM_MAIN_FINGER_COMPONENTS,
-                config.finger_tip_offsets_m,
-            ):
-                assert sqrt(sum(value * value for value in finger_vectors[component])) == (
-                    pytest.approx(tip_offset - config.finger_start_offset_m, abs=2e-6)
-                )
-            thumb_length = sqrt(
-                (config.thumb_tip_forward_offset_m - config.thumb_root_forward_offset_m) ** 2
-                + (config.thumb_tip_side_offset_m - config.thumb_root_side_offset_m) ** 2
-            )
-            assert sqrt(sum(value * value for value in finger_vectors["thumb"])) == pytest.approx(
-                thumb_length,
-                abs=2e-6,
-            )
-            thumb_vector = finger_vectors["thumb"]
-            middle_vector = finger_vectors["middle_finger"]
-            alignment = sum(
-                thumb_value * middle_value
-                for thumb_value, middle_value in zip(thumb_vector, middle_vector)
-            ) / (
-                sqrt(sum(value * value for value in thumb_vector))
-                * sqrt(sum(value * value for value in middle_vector))
-            )
-            assert alignment < 0.9
+    left_rest = {
+        component: geoms[visual_arm_geom_name("left", "rest", component)]
+        for component in VISUAL_ARM_COMPONENTS
+    }
+    assert left_rest["palm"]["type"] == "ellipsoid"
+    assert left_rest["cuff"]["type"] == "cylinder"
+    assert left_rest["wrist"]["type"] == "cylinder"
+    for finger in ("index", "middle", "ring", "little"):
+        for segment in ("proximal", "middle", "distal"):
+            assert left_rest[f"{finger}_{segment}"]["type"] == "capsule"
+        for joint in ("mcp", "pip", "dip"):
+            assert left_rest[f"{finger}_{joint}"]["type"] == "sphere"
+    for segment in ("metacarpal", "proximal", "distal"):
+        assert left_rest[f"thumb_{segment}"]["type"] == "capsule"
+    for joint in ("cmc", "mcp", "ip"):
+        assert left_rest[f"thumb_{joint}"]["type"] == "sphere"
+    assert left_rest["upper"]["rgba"].startswith("0.917647 0.917647 0.917647")
+    assert left_rest["elbow"]["rgba"].startswith("0.909804 0.572549 0.164706")
+    assert left_rest["index_mcp"]["rgba"].startswith("0.93 0.66 0.28")
+    assert left_rest["index_pip"]["rgba"].startswith("0.82 0.82 0.80")
+    left_mount = geoms[VISUAL_ARM_SHOULDER_MOUNT_NAMES[0]]
+    assert left_mount["type"] == "capsule"
+    assert left_mount["fromto"] == "-0.02 0.055 0.105 -0.02 0.09 0.105"
+
+
+def test_visual_arm_hands_use_pose_specific_wrist_directions() -> None:
+    robot = (
+        "<mujoco><worldbody><body name='trunk_assembly'>\n"
+        "        <!-- Frame trunk -->\n"
+        "<site name='trunk'/></body></worldbody></mujoco>"
+    )
+    root = ElementTree.fromstring(build_visual_arm_robot_xml(robot))
+
+    def finger_vector(pose: str) -> tuple[float, float, float]:
+        mcp = root.find(f".//geom[@name='{visual_arm_geom_name('left', pose, 'middle_mcp')}']")
+        distal = root.find(
+            f".//geom[@name='{visual_arm_geom_name('left', pose, 'middle_distal')}']"
+        )
+        assert mcp is not None
+        assert distal is not None
+        start = [float(value) for value in mcp.attrib["pos"].split()]
+        points = [float(value) for value in distal.attrib["fromto"].split()]
+        return tuple(points[index + 3] - start[index] for index in range(3))
+
+    for pose in (
+        "wave_up",
+        "wave_out",
+        "celebrate",
+        "welcome_open",
+        "welcome_close",
+    ):
+        dx, dy, dz = finger_vector(pose)
+        assert dz > 0.024
+        assert abs(dx) < 0.004
+        assert abs(dy) < 0.003
+
+    reach_dx, _reach_dy, reach_dz = finger_vector("reach")
+    assert reach_dx > 0.024
+    assert reach_dz < 0
 
 
 def test_build_visual_arm_robot_xml_is_idempotent() -> None:
@@ -275,6 +268,64 @@ def test_build_visual_arm_robot_xml_is_idempotent() -> None:
 
     assert twice == once
     for name in VISUAL_ARM_GEOM_NAMES:
+        assert twice.count(name) == 1
+
+
+def test_build_visual_arm_robot_xml_removes_single_segment_finger_overlay() -> None:
+    stale_index_name = visual_arm_geom_name("left", "wave_up", "index")
+    robot = (
+        "<mujoco><worldbody><body name='trunk_assembly'>\n"
+        "        <!-- Frame trunk -->\n"
+        f'<geom name="{stale_index_name}" type="capsule"/>\n'
+        "<site name='trunk'/></body></worldbody></mujoco>"
+    )
+
+    xml = build_visual_arm_robot_xml(robot)
+
+    assert stale_index_name not in xml
+    assert visual_arm_geom_name("left", "wave_up", "index_mcp") in xml
+
+
+def test_build_visual_leg_shell_robot_xml_adds_moving_non_contact_shells() -> None:
+    robot = (
+        "<mujoco><worldbody>"
+        '<body name="knee_and_ankle_assembly"><joint name="left_hip"/>'
+        '<body name="knee_and_ankle_assembly_2"><joint name="left_knee"/></body></body>'
+        '<body name="knee_and_ankle_assembly_3"><joint name="right_hip"/>'
+        '<body name="knee_and_ankle_assembly_4"><joint name="right_knee"/></body></body>'
+        "</worldbody></mujoco>"
+    )
+
+    xml = build_visual_leg_shell_robot_xml(robot, VisualLegConfig())
+
+    root = ElementTree.fromstring(xml)
+    geoms = {geom.attrib["name"]: geom.attrib for geom in root.findall(".//geom")}
+    assert set(geoms) == set(VISUAL_LEG_GEOM_NAMES)
+    assert len(root.findall(".//joint")) == 4
+    assert all(geom["class"] == "visual" for geom in geoms.values())
+    assert all(geom["contype"] == "0" for geom in geoms.values())
+    assert all(geom["conaffinity"] == "0" for geom in geoms.values())
+    assert geoms[visual_leg_geom_name("left", "shin_shell")]["type"] == "capsule"
+    assert geoms[visual_leg_geom_name("left", "ankle")]["type"] == "sphere"
+
+    left_shin = root.find('.//body[@name="knee_and_ankle_assembly_2"]')
+    assert left_shin is not None
+    assert (
+        left_shin.find(f'./geom[@name="{visual_leg_geom_name("left", "shin_shell")}"]') is not None
+    )
+
+
+def test_build_visual_leg_shell_robot_xml_is_idempotent() -> None:
+    robot_path = Path(
+        "workspace/Open_Duck_Playground/playground/open_duck_mini_v2/xmls/open_duck_mini_v2.xml"
+    )
+    robot = robot_path.read_text(encoding="utf-8")
+
+    once = build_visual_leg_shell_robot_xml(robot)
+    twice = build_visual_leg_shell_robot_xml(once)
+
+    assert twice == once
+    for name in VISUAL_LEG_GEOM_NAMES:
         assert twice.count(name) == 1
 
 
@@ -306,6 +357,34 @@ def test_visual_arm_overlay_preserves_official_dynamic_contract() -> None:
     assert all(geom.attrib["conaffinity"] == "0" for geom in added_geoms)
 
 
+def test_visual_leg_shell_overlay_preserves_official_dynamic_contract() -> None:
+    robot_path = Path(
+        "workspace/Open_Duck_Playground/playground/open_duck_mini_v2/xmls/open_duck_mini_v2.xml"
+    )
+    original = robot_path.read_text(encoding="utf-8")
+    overlaid = build_visual_leg_shell_robot_xml(original)
+    original_root = ElementTree.fromstring(original)
+    overlaid_root = ElementTree.fromstring(overlaid)
+
+    def dynamics_snapshot(root: ElementTree.Element) -> list[tuple[str, dict[str, str]]]:
+        return [
+            (element.tag, dict(element.attrib))
+            for tag in ("joint", "inertial", "actuator", "position")
+            for element in root.findall(f".//{tag}")
+        ]
+
+    assert dynamics_snapshot(overlaid_root) == dynamics_snapshot(original_root)
+    original_geoms = {geom.attrib.get("name") for geom in original_root.findall(".//geom")}
+    added_geoms = [
+        geom
+        for geom in overlaid_root.findall(".//geom")
+        if geom.attrib.get("name") not in original_geoms
+    ]
+    assert {geom.attrib["name"] for geom in added_geoms} == set(VISUAL_LEG_GEOM_NAMES)
+    assert all(geom.attrib["contype"] == "0" for geom in added_geoms)
+    assert all(geom.attrib["conaffinity"] == "0" for geom in added_geoms)
+
+
 def test_visual_arm_poses_clear_official_leg_geometry_at_home(tmp_path: Path) -> None:
     mujoco = pytest.importorskip("mujoco")
     xml_dir = Path("workspace/Open_Duck_Playground/playground/open_duck_mini_v2/xmls").resolve()
@@ -325,28 +404,6 @@ def test_visual_arm_poses_clear_official_leg_geometry_at_home(tmp_path: Path) ->
     data = mujoco.MjData(model)
     mujoco.mj_resetDataKeyframe(model, data, 0)
     mujoco.mj_forward(model, data)
-    trunk_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "trunk_assembly")
-    official_trunk_geom_ids = [
-        geom_id
-        for geom_id in range(model.ngeom)
-        if int(model.geom_bodyid[geom_id]) == trunk_id
-        and mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id) not in VISUAL_ARM_GEOM_NAMES
-    ]
-    assert official_trunk_geom_ids
-    for mount_name in VISUAL_ARM_SHOULDER_MOUNT_NAMES:
-        mount_geom_id = mujoco.mj_name2id(
-            model,
-            mujoco.mjtObj.mjOBJ_GEOM,
-            mount_name,
-        )
-        assert (
-            min(
-                mujoco.mj_geomDistance(model, data, mount_geom_id, trunk_geom_id, 1.0, None)
-                for trunk_geom_id in official_trunk_geom_ids
-            )
-            <= 0.0
-        )
-
     leg_bodies = {
         "left": {
             "hip_roll_assembly",

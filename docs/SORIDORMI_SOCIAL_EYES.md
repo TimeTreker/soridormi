@@ -13,23 +13,38 @@ round `0.02m` radius face discs at the hand-tuned anchor
 of looking like balls mounted on top of the head.
 
 The arms use body-overlapping shoulder mounts plus shoulder, upper-arm, elbow,
-forearm, and hand geoms under `trunk_assembly`. The mounts bridge each shoulder
-into the tapered torso instead of leaving a visible air gap. Chunkier white
-limb shells, graphite joints, and gold five-digit hands reuse the official
-robot's visual language. Each hand has four unequal rounded fingers aligned with
-the forearm plus a shorter opposing thumb, with every digit embedded into the
-palm for a continuous silhouette. They add no joints, actuators, inertials,
-sensors, or contacts. Every arm and finger geom explicitly declares `contype=0`
-and `conaffinity=0`. Four fixed display poses are generated: `rest`, `reach`,
-`hold`, and `place`. Pose changes only switch the alpha channel of those geom
-sets; they do not write MuJoCo `qpos`, `qvel`, controls, or policy state, and
-finger visibility is not grasp evidence.
+forearm, cuff, wrist, palm, and finger geoms attached to `trunk_assembly`. The
+mounts bridge each shoulder into the tapered torso instead of leaving an air
+gap. They add no joints, actuators,
+inertials, sensors, or contacts. Every arm geom explicitly declares `contype=0`
+and `conaffinity=0`. A short white cuff now ends before a narrow orange wrist;
+the wrist connects to a flattened, lengthened palm instead of being hidden in a
+large spherical hand. The four fingers follow the human MCP/PIP/DIP layout with
+three tapered phalange segments, while the opposing thumb uses a separate
+CMC/MCP/IP chain. Only the root knuckles retain a muted warm accent; smaller
+PIP/DIP knuckles use a quiet warm gray. Each fixed hand pose applies a modest,
+anatomically ordered finger curl. These knuckles remain non-contact visual
+geoms, not MuJoCo kinematic `joint` elements or a claim of physical finger
+actuation. Raised and forward gestures use explicit wrist directions instead
+of simply continuing every hand along the forearm.
+
+The same generated cosmetic profile adds rounded off-white shin shells plus
+compact orange ankle accents to the existing moving lower-leg bodies. The
+official thigh panels remain unobscured. The shells follow the knee and ankle
+hierarchy but do not replace its joints, collision geometry, inertials, or
+controls. This keeps the friendly silhouette entirely visual while preserving
+the official locomotion model.
+
+Nine fixed display poses are generated: `rest`, `reach`, `hold`, `place`,
+`wave_up`, `wave_out`, `celebrate`, `welcome_open`, and `welcome_close`. Pose
+changes only switch the alpha channel of those geom sets; they do not write
+MuJoCo `qpos`, `qvel`, controls, or policy state.
 The fixed coordinates keep the visible arm geometry outside the official leg
 geometry in the home pose. A compiled-model regression requires at least
 `0.015m` separation there; bounded leg-motion sampling is retained as visual
 inspection evidence rather than a physical collision or hardware claim.
 
-The eyes and visual arms are enabled by default when starting the Soridormi
+The eyes and cosmetic limbs are enabled by default when starting the Soridormi
 MuJoCo server:
 
 ```bash
@@ -60,6 +75,19 @@ displays `place` then `rest`. The arm display never establishes acquisition or
 delivery. Only the existing validated `resource_outcome` evidence can complete
 that provider capability, and it remains marked `mocked_simulation=true`.
 
+Three display-only social skills use the same overlay through the independent
+`visual.arms` body-activity resource:
+
+- `wave_hand` alternates `wave_up` and `wave_out` for one selected side;
+- `celebrate` briefly shows both arms raised;
+- `hug_gesture` shows an open-and-close arm expression without claiming person
+  contact or a physical hug.
+
+These skills are safe to compose with locomotion only because they are visual
+outputs with no dynamics. `point_direction` and `high_five` remain rejected:
+the current robot has neither target-aligned arm control nor contact-safe arm
+hardware.
+
 Blinking is exposed as the high-level `blink_eyes` ability. It uses a
 simulator-only visual-expression API to toggle the generated open-eye geoms off
 and closed-eye geoms on briefly. Keep testing it through the normal Chromie and
@@ -85,6 +113,16 @@ the Python module directly:
 ```bash
 python -m soridormi_runtime.visual_expression_skill blink_eyes \
   --args '{"count":2}' \
+  --backend mujoco \
+  --dry-run \
+  --json | python -m json.tool
+```
+
+Visual arm gestures have an equivalent dry-run entry point:
+
+```bash
+python -m soridormi_runtime.visual_arm_gesture_skill wave_hand \
+  --args '{"side":"right","count":2,"duration_s":2.4}' \
   --backend mujoco \
   --dry-run \
   --json | python -m json.tool

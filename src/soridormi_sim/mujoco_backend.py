@@ -559,8 +559,9 @@ class MujocoBackend:
     def apply_visual_arm_pose(self, command: VisualArmPoseCommand) -> None:
         missing: list[str] = []
         for side in VISUAL_ARM_SIDES:
+            visible_pose = command.pose if command.side in {side, "both"} else "rest"
             for pose in VISUAL_ARM_POSES:
-                alpha = 1.0 if pose == command.pose else 0.0
+                alpha = 1.0 if pose == visible_pose else 0.0
                 for component in VISUAL_ARM_COMPONENTS:
                     name = visual_arm_geom_name(side, pose, component)
                     geom_id = self._geom_id(name)

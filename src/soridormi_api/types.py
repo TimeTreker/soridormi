@@ -114,7 +114,18 @@ class VisualExpressionCommand(BaseModel):
 
 
 class VisualArmPoseCommand(BaseModel):
-    pose: Literal["rest", "reach", "hold", "place"]
+    pose: Literal[
+        "rest",
+        "reach",
+        "hold",
+        "place",
+        "wave_up",
+        "wave_out",
+        "celebrate",
+        "welcome_open",
+        "welcome_close",
+    ]
+    side: Literal["left", "right", "both"] = "both"
 
 
 class ApiRequest(BaseModel):

@@ -32,8 +32,8 @@ Options:
   --no-social-eyes      Disable the generated visual eyes.
   --social-eye-frame    Show an RGB debug frame at the generated eye anchor.
   --no-social-eye-frame Hide the generated eye debug frame. default
-  --visual-arms         Generate non-colliding visual-only arms. default
-  --no-visual-arms      Disable the generated visual-only arms.
+  --visual-arms         Generate non-colliding visual arms and leg shells. default
+  --no-visual-arms      Disable the generated cosmetic limb overlay.
   --rough-ground        Generate a temporary MuJoCo scene with small stone boxes.
   --no-rough-ground     Use the normal flat MuJoCo scene. default
   --rough-stone-height M

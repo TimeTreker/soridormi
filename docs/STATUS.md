@@ -45,17 +45,22 @@ hosting boundary requires a separate evidence-backed architecture decision.
   Chromie/Soridormi architecture can be exercised end to end without claiming a
   real manipulator or hardware grasp capability.
 - The generated MuJoCo visual-body overlay adds non-colliding, jointless arms
-  with torso-overlapping shoulder mounts and proportions/material colors aligned
-  to the official body, without editing the Open Duck XML/URDF or 14-actuator
-  robot configuration. Gold five-digit hand geoms—four fingers and an opposing
-  thumb—follow the fixed `rest`, `reach`, `hold`, and `place` display poses. The
-  complete overlay decorates the simulation-only resource mock but has no
-  dynamics, collision, sensor, grasp, or completion-evidence authority.
+  with torso-overlapping shoulder mounts and rounded cosmetic lower-leg shells
+  without editing the official Open Duck
+  XML/URDF or the 14-actuator robot configuration. The stylized model uses the
+  Open Duck white-shell/orange-joint palette. Each hand has a distinct cuff and
+  narrow wrist, a flattened palm, tapered three-segment fingers, and an opposed
+  three-segment thumb. Nine fixed display poses and the moving-body leg shells
+  have no dynamics, collision, sensor, or completion-evidence authority.
+- `wave_hand`, `celebrate`, and `hug_gesture` are exported as simulation-only
+  visual arm expressions. They sequence overlay poses through the independent
+  `visual.arms` activity resource, restore `rest`, send no motor command, and do
+  not claim physical arm movement, contact, manipulation, or hardware support.
 - Exact concurrent body activities are validated and executable through
   `soridormi.activity.*`: one primary locomotion member may run with compatible
   bounded head overlays and independent visual expressions.
 - The runtime composes locomotion and head overlays into one final motor command;
-  `blink_eyes` remains an independent non-motor visual output.
+  eye and arm expressions remain independent non-motor visual outputs.
 - Every currently executable social named skill exports explicit
   `behavior_domains` metadata. This lets Chromie's trusted Activity runtime
   validate an accepted Social Attention decoration against the same live

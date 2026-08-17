@@ -21,7 +21,8 @@ by control coupling:
 - `standalone_body_motion`: small-looking gestures that still require exclusive
   body control.
 
-The visual `blink_eyes` skill is independent. `look_direction` and
+The visual `blink_eyes`, `wave_hand`, `celebrate`, and `hug_gesture` skills are
+independent. The arm skills write display geometry only. `look_direction` and
 `look_at_person` are bounded head overlays. Nodding, shaking, bowing,
 `neutral_head`, and `express_attention` remain standalone body motions until
 separately qualified during locomotion.
@@ -49,6 +50,7 @@ Current resources are:
 body.primary_motion  primary locomotion or standalone body control
 body.head_pose       bounded head/neck command overlay
 visual.eyes          independent visual eye output
+visual.arms          independent simulation-only visual arm output
 ```
 
 Only one member may write a resource. Resource compatibility, not the skill
@@ -62,6 +64,8 @@ Supported in the runtime-backed simulation adapter:
 - locomotion plus bounded `look_direction`;
 - locomotion plus bounded `look_at_person`;
 - locomotion plus one bounded gaze overlay plus eye blinking;
+- locomotion plus a visual arm expression;
+- simultaneous eye and arm visual expressions through distinct resources;
 - standalone head/body gesture plus eye blinking;
 - visual-only body activities.
 
@@ -137,8 +141,8 @@ locomotion policy MotorCommand
 = one final MotorCommand sent to the robot API
 ```
 
-Independent visual expressions use the separate visual-expression API and
-never write motor commands.
+Independent visual expressions use the separate visual output APIs and never
+write motor commands.
 
 A future WBC implementation may replace the composer internals, but it must
 preserve the same resource, safety, cancellation, and evidence contracts.
@@ -156,7 +160,7 @@ Current implementation provides:
 - activity-specific cancellation;
 - global motion stop and emergency stop;
 - per-member status and aggregate reconciliation;
-- neutral eye restoration after completion, cancellation, or failure.
+- neutral eye and visual-arm restoration after completion or cancellation.
 
 Not yet claimed:
 

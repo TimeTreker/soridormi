@@ -45,6 +45,10 @@ from soridormi_runtime.skill_manifest import (
     parameters_schema_for_skill,
 )
 from soridormi_runtime.sync_preroll import preroll_sync_simulator
+from soridormi_runtime.visual_arm_gesture_skill import (
+    SUPPORTED_VISUAL_ARM_GESTURE_SKILLS,
+    validate_visual_arm_gesture_plan,
+)
 from soridormi_runtime.visual_expression_skill import (
     SUPPORTED_VISUAL_EXPRESSION_SKILLS,
     validate_visual_expression_plan,
@@ -313,6 +317,11 @@ class SoridormiRuntimeToolService:
             ):
                 supported.append(skill_id)
             elif (
+                execution == "visual_arm_gesture"
+                and skill_id in SUPPORTED_VISUAL_ARM_GESTURE_SKILLS
+            ):
+                supported.append(skill_id)
+            elif (
                 execution == "composite"
                 and (self.skill_registry.skills[skill_id].get("metadata") or {}).get(
                     "simulation_mock"
@@ -332,7 +341,7 @@ class SoridormiRuntimeToolService:
         for skill_id in self._runtime_skill_ids():
             skill = self.skill_registry.skills[skill_id]
             execution = str(skill.get("execution") or "")
-            if execution == "visual_expression":
+            if execution in {"visual_expression", "visual_arm_gesture"}:
                 default_effects = ["visual_expression"]
                 default_safety_class = "low_risk_action"
             else:
@@ -497,6 +506,9 @@ class SoridormiRuntimeToolService:
         elif plan.execution == "visual_expression":
             validate_visual_expression_plan(plan.skill_id, plan.execution)
             plan_id = f"soridormi-skill-plan-{uuid.uuid4().hex[:12]}"
+        elif plan.execution == "visual_arm_gesture":
+            validate_visual_arm_gesture_plan(plan.skill_id, plan.execution)
+            plan_id = f"soridormi-skill-plan-{uuid.uuid4().hex[:12]}"
         elif (
             plan.execution == "composite"
             and (self.skill_registry.skills[skill_id].get("metadata") or {}).get("simulation_mock")
@@ -527,7 +539,7 @@ class SoridormiRuntimeToolService:
                 )
             ),
             "interruptible": bool((plan.safety or {}).get("interruptible", True)),
-            "no_motion": plan.execution == "visual_expression",
+            "no_motion": plan.execution in {"visual_expression", "visual_arm_gesture"},
         }
 
     async def execute_runtime_skill_plan(self, plan_id: str) -> dict[str, Any]:
@@ -542,6 +554,8 @@ class SoridormiRuntimeToolService:
             result = await self.execute_scripted_head_skill(plan_id)
         elif stored.plan.execution == "visual_expression":
             result = await self.execute_visual_expression_skill(plan_id)
+        elif stored.plan.execution == "visual_arm_gesture":
+            result = await self.execute_visual_arm_gesture_skill(plan_id)
         elif (
             stored.plan.execution == "composite"
             and (self.skill_registry.skills[stored.plan.skill_id].get("metadata") or {}).get(
@@ -640,7 +654,7 @@ class SoridormiRuntimeToolService:
             "no_motion": bool(
                 result.get(
                     "no_motion",
-                    stored.plan.execution == "visual_expression",
+                    stored.plan.execution in {"visual_expression", "visual_arm_gesture"},
                 )
             ),
             "recommendation_only": False,
@@ -770,6 +784,8 @@ class SoridormiRuntimeToolService:
         member: BodyActivityMemberPlan,
     ) -> dict[str, Any]:
         plan = member.plan
+        if plan.execution == "visual_arm_gesture":
+            return await self._execute_visual_arm_activity_member(record, member)
         validate_visual_expression_plan(plan.skill_id, plan.execution)
         applier = getattr(self.robot, "set_visual_expression", None)
         if not callable(applier):
@@ -830,6 +846,85 @@ class SoridormiRuntimeToolService:
                     "optional": member.optional,
                     "visual_expression_steps": len(plan.visual_expressions),
                 }
+            finally:
+                self._clear_active_lane(lane)
+
+    async def _execute_visual_arm_activity_member(
+        self,
+        record: BodyActivityPlanRecord,
+        member: BodyActivityMemberPlan,
+    ) -> dict[str, Any]:
+        plan = member.plan
+        validate_visual_arm_gesture_plan(plan.skill_id, plan.execution)
+        applier = getattr(self.robot, "set_visual_arm_pose", None)
+        if not callable(applier):
+            raise RuntimeError("robot backend does not support visual arm gestures")
+        resource = member.write_resources[0]
+        lane = f"visual:{resource}"
+        async with self._independent_output_lock(resource):
+            self._set_active_lane(
+                lane,
+                {
+                    "plan_id": record.plan_id,
+                    "coordination_id": record.coordination_id,
+                    "member_id": member.member_id,
+                    "skill_id": member.skill_id,
+                    "ability_class": member.ability_class,
+                },
+            )
+            try:
+                for index, pose in enumerate(plan.visual_arm_poses):
+                    if self.emergency_stop or record.cancel_requested:
+                        await self._apply_visual_arm_pose_command(
+                            applier,
+                            VisualArmPoseCommand(pose="rest", side="both"),
+                        )
+                        return {
+                            "member_id": member.member_id,
+                            "skill_id": member.skill_id,
+                            "status": "cancelled",
+                            "completed": False,
+                            "optional": member.optional,
+                            "command_index": index,
+                        }
+                    self.active_lanes[lane]["command_index"] = index
+                    self._refresh_active_task()
+                    await self._apply_visual_arm_pose_command(
+                        applier,
+                        VisualArmPoseCommand(pose=pose.pose, side=pose.side),
+                    )
+                    await asyncio.sleep(max(0.0, float(pose.duration_s)))
+                await self._apply_visual_arm_pose_command(
+                    applier,
+                    VisualArmPoseCommand(pose="rest", side="both"),
+                )
+                return {
+                    "member_id": member.member_id,
+                    "skill_id": member.skill_id,
+                    "status": "completed",
+                    "completed": True,
+                    "optional": member.optional,
+                    "visual_arm_pose_steps": len(plan.visual_arm_poses),
+                }
+            except asyncio.CancelledError:
+                await asyncio.shield(
+                    self._apply_visual_arm_pose_command(
+                        applier,
+                        VisualArmPoseCommand(pose="rest", side="both"),
+                    )
+                )
+                raise
+            except Exception:
+                try:
+                    await asyncio.shield(
+                        self._apply_visual_arm_pose_command(
+                            applier,
+                            VisualArmPoseCommand(pose="rest", side="both"),
+                        )
+                    )
+                except Exception:  # noqa: BLE001 - preserve the original execution failure.
+                    pass
+                raise
             finally:
                 self._clear_active_lane(lane)
 
@@ -1097,6 +1192,14 @@ class SoridormiRuntimeToolService:
         async with self._robot_lock:
             return await self._call_robot(applier, command)
 
+    async def _apply_visual_arm_pose_command(
+        self,
+        applier: Callable[..., Any],
+        command: VisualArmPoseCommand,
+    ) -> Any:
+        async with self._robot_lock:
+            return await self._call_robot(applier, command)
+
     async def _try_apply_visual_arm_pose(self, pose: str) -> bool:
         """Apply optional simulator decoration without gaining completion authority."""
 
@@ -1108,8 +1211,9 @@ class SoridormiRuntimeToolService:
             )
             return False
         try:
-            async with self._robot_lock:
-                await self._call_robot(applier, VisualArmPoseCommand(pose=pose))
+            await self._apply_visual_arm_pose_command(
+                applier, VisualArmPoseCommand(pose=pose, side="both")
+            )
         except Exception as exc:  # noqa: BLE001 - optional arm decoration must fail soft.
             print(f"Soridormi visual-arm overlay failed soft: pose={pose!r} error={exc!r}")
             return False
@@ -1276,6 +1380,85 @@ class SoridormiRuntimeToolService:
                         VisualExpressionCommand(expression="eyes_open", intensity=1.0),
                     )
                 )
+                raise
+            finally:
+                self._clear_active_lane(lane)
+
+    async def execute_visual_arm_gesture_skill(self, plan_id: str) -> dict[str, Any]:
+        if self.emergency_stop:
+            raise RuntimeError("cannot execute skill while emergency_stop is active")
+        stored = self.skill_plans.get(plan_id)
+        if stored is None:
+            raise KeyError(f"skill plan not found: {plan_id}")
+        plan = stored.plan
+        validate_visual_arm_gesture_plan(plan.skill_id, plan.execution)
+        applier = getattr(self.robot, "set_visual_arm_pose", None)
+        if not callable(applier):
+            raise RuntimeError("robot backend does not support visual arm gestures")
+
+        lane = "visual:visual.arms"
+        async with self._independent_output_lock("visual.arms"):
+            if self.emergency_stop:
+                raise RuntimeError("cannot execute skill while emergency_stop is active")
+            self._set_active_lane(
+                lane,
+                {
+                    "plan_id": plan_id,
+                    "skill_id": plan.skill_id,
+                    "execution": plan.execution,
+                    "started_at": time.time(),
+                    "command_index": 0,
+                },
+            )
+            try:
+                for index, pose in enumerate(plan.visual_arm_poses):
+                    if self.emergency_stop:
+                        await self._apply_visual_arm_pose_command(
+                            applier,
+                            VisualArmPoseCommand(pose="rest", side="both"),
+                        )
+                        return {
+                            "completed": False,
+                            "stopped": True,
+                            "dry_run_only": False,
+                            "summary": f"Soridormi runtime stopped skill {plan.skill_id}.",
+                        }
+                    self.active_lanes[lane]["command_index"] = index
+                    self._refresh_active_task()
+                    await self._apply_visual_arm_pose_command(
+                        applier,
+                        VisualArmPoseCommand(pose=pose.pose, side=pose.side),
+                    )
+                    await asyncio.sleep(max(0.0, float(pose.duration_s)))
+                await self._apply_visual_arm_pose_command(
+                    applier,
+                    VisualArmPoseCommand(pose="rest", side="both"),
+                )
+                return {
+                    "completed": True,
+                    "dry_run_only": False,
+                    "summary": f"Soridormi runtime completed skill {plan.skill_id}.",
+                    "estimated_duration_s": plan.total_duration_s,
+                    "visual_arm_pose_steps": len(plan.visual_arm_poses),
+                }
+            except asyncio.CancelledError:
+                await asyncio.shield(
+                    self._apply_visual_arm_pose_command(
+                        applier,
+                        VisualArmPoseCommand(pose="rest", side="both"),
+                    )
+                )
+                raise
+            except Exception:
+                try:
+                    await asyncio.shield(
+                        self._apply_visual_arm_pose_command(
+                            applier,
+                            VisualArmPoseCommand(pose="rest", side="both"),
+                        )
+                    )
+                except Exception:  # noqa: BLE001 - preserve the original execution failure.
+                    pass
                 raise
             finally:
                 self._clear_active_lane(lane)

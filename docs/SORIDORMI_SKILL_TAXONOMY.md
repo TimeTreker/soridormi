@@ -31,7 +31,7 @@ implementation phase says when it should land
 controller/evaluation fills in over time
 ```
 
-This means a future skill such as `run`, `step_over_obstacle`, or `wave_hand` can exist in the manifest today without being executable. Higher-level systems can understand the desired body vocabulary while the local Soridormi validator rejects unavailable or unsupported skills.
+This means a future skill such as `run`, `step_over_obstacle`, or `high_five` can exist in the manifest today without being executable. Higher-level systems can understand the desired body vocabulary while the local Soridormi validator rejects unavailable or unsupported skills.
 
 ## Why skills instead of one walking controller?
 
@@ -62,7 +62,16 @@ head_neck:
   neck_pitch, head_pitch, head_yaw, head_roll
 ```
 
-It does **not** currently expose arm or hand actuators in Soridormi's 14-action policy contract. Therefore skills such as `wave_hand`, `point_direction`, or `high_five` are useful to declare conceptually, but they must be marked `unsupported_current_robot` until matching hardware and a controller exist.
+It does **not** currently expose arm or hand actuators in Soridormi's 14-action
+policy contract. Physical pointing, high-five/contact, grasping, and
+manipulation must remain `unsupported_current_robot` until matching hardware
+and a controller exist.
+
+Simulation may separately expose explicitly mocked visual expressions.
+`wave_hand`, `celebrate`, and `hug_gesture` only switch non-colliding,
+jointless arm-overlay geoms and write the `visual.arms` display resource. Their
+availability is not evidence for an arm actuator, physical contact, or hardware
+capability.
 
 For the current robot, first social skills should use head/neck/body-safe gestures:
 
@@ -195,15 +204,17 @@ Declare `run` as future. Do not expose it as executable until fast walking is pr
 
 ### future_hardware_extensions: future hardware extensions
 
-Declare arm/hand gestures but reject them on current Open Duck Mini v2:
+Keep physical arm/hand behaviors rejected on current Open Duck Mini v2:
 
 ```text
-wave_hand
 point_direction
 high_five
 ```
 
 These require hardware and controller support that the current actuator map does not provide.
+
+Display-only `wave_hand`, `celebrate`, and `hug_gesture` remain in the separate
+`visual_arm_social` capability group and never lower to the action policy.
 
 ## Skill categories
 

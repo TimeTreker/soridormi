@@ -118,6 +118,24 @@ class VisualExpressionSegment:
 
 
 @dataclass(frozen=True)
+class VisualArmPoseSegment:
+    """Simulator-only visual arm pose emitted by a social display skill."""
+
+    pose: str
+    duration_s: float = 0.2
+    side: str = "both"
+    label: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "pose": self.pose,
+            "duration_s": float(self.duration_s),
+            "side": self.side,
+            "label": self.label,
+        }
+
+
+@dataclass(frozen=True)
 class SkillPlan:
     """Dry-run plan produced from a manifest-declared skill."""
 
@@ -131,6 +149,7 @@ class SkillPlan:
     commands: tuple[VelocitySegment, ...] = ()
     keyframes: tuple[JointKeyframeSegment, ...] = ()
     visual_expressions: tuple[VisualExpressionSegment, ...] = ()
+    visual_arm_poses: tuple[VisualArmPoseSegment, ...] = ()
     safety: Mapping[str, Any] | None = None
     parameters: Mapping[str, Any] | None = None
 
@@ -146,6 +165,7 @@ class SkillPlan:
             "commands": [command.to_dict() for command in self.commands],
             "keyframes": [keyframe.to_dict() for keyframe in self.keyframes],
             "visual_expressions": [expression.to_dict() for expression in self.visual_expressions],
+            "visual_arm_poses": [pose.to_dict() for pose in self.visual_arm_poses],
             "safety": dict(self.safety or {}),
             "parameters": dict(self.parameters or {}),
             "total_duration_s": self.total_duration_s,
@@ -157,6 +177,7 @@ class SkillPlan:
             sum(command.duration_s for command in self.commands)
             + sum(keyframe.duration_s for keyframe in self.keyframes)
             + sum(expression.duration_s for expression in self.visual_expressions)
+            + sum(pose.duration_s for pose in self.visual_arm_poses)
         )
 
 
@@ -471,6 +492,28 @@ def _visual_expression_plan(
         dry_run=True,
         summary=summary,
         visual_expressions=tuple(visual_expressions),
+        safety=skill.get("safety", {}),
+        parameters=parameters,
+    )
+
+
+def _visual_arm_gesture_plan(
+    skill: dict[str, Any],
+    parameters: Mapping[str, Any],
+    profile: str,
+    *,
+    visual_arm_poses: Sequence[VisualArmPoseSegment],
+    summary: str,
+) -> SkillPlan:
+    return SkillPlan(
+        skill_id=str(skill["id"]),
+        status=str(skill.get("status")),
+        category=str(skill.get("category")),
+        execution=str(skill.get("execution")),
+        profile=profile,
+        dry_run=True,
+        summary=summary,
+        visual_arm_poses=tuple(visual_arm_poses),
         safety=skill.get("safety", {}),
         parameters=parameters,
     )
@@ -817,6 +860,125 @@ def _plan_blink_eyes(
     )
 
 
+def _plan_wave_hand(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
+    skill_id = str(skill["id"])
+    side = str(parameters.get("side", "right") or "right")
+    if side not in {"left", "right"}:
+        raise SkillExecutionError("wave_hand side must be 'left' or 'right'")
+    count = _count_cycles(parameters.get("count", 2), minimum=1, maximum=4)
+    duration = float(parameters.get("duration_s", 2.4))
+    segment_duration = duration / float(count * 2 + 2)
+    poses: list[VisualArmPoseSegment] = [
+        VisualArmPoseSegment(
+            pose="rest",
+            side="both",
+            duration_s=segment_duration,
+            label=f"{skill_id}_rest_start",
+        )
+    ]
+    for index in range(count):
+        poses.extend(
+            (
+                VisualArmPoseSegment(
+                    pose="wave_up",
+                    side=side,
+                    duration_s=segment_duration,
+                    label=f"{skill_id}_up_{index + 1}",
+                ),
+                VisualArmPoseSegment(
+                    pose="wave_out",
+                    side=side,
+                    duration_s=segment_duration,
+                    label=f"{skill_id}_out_{index + 1}",
+                ),
+            )
+        )
+    poses.append(
+        VisualArmPoseSegment(
+            pose="rest",
+            side="both",
+            duration_s=segment_duration,
+            label=f"{skill_id}_rest_end",
+        )
+    )
+    summary = (
+        f"Plan {skill_id}: {count} simulator-only {side}-hand wave cycle(s) "
+        f"over {duration:.2f}s; no arm actuator or contact capability is claimed."
+    )
+    return _visual_arm_gesture_plan(
+        skill, parameters, profile, visual_arm_poses=poses, summary=summary
+    )
+
+
+def _plan_celebrate(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
+    skill_id = str(skill["id"])
+    duration = float(parameters.get("duration_s", 2.0))
+    poses = (
+        VisualArmPoseSegment(
+            pose="rest",
+            duration_s=duration * 0.2,
+            label=f"{skill_id}_rest_start",
+        ),
+        VisualArmPoseSegment(
+            pose="celebrate",
+            duration_s=duration * 0.6,
+            label=f"{skill_id}_hands_up",
+        ),
+        VisualArmPoseSegment(
+            pose="rest",
+            duration_s=duration * 0.2,
+            label=f"{skill_id}_rest_end",
+        ),
+    )
+    summary = (
+        f"Plan {skill_id}: show a simulator-only raised-hands celebration over "
+        f"{duration:.2f}s; no arm actuator or physical completion is claimed."
+    )
+    return _visual_arm_gesture_plan(
+        skill, parameters, profile, visual_arm_poses=poses, summary=summary
+    )
+
+
+def _plan_hug_gesture(
+    skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
+) -> SkillPlan:
+    skill_id = str(skill["id"])
+    duration = float(parameters.get("duration_s", 2.4))
+    poses = (
+        VisualArmPoseSegment(
+            pose="rest",
+            duration_s=duration * 0.15,
+            label=f"{skill_id}_rest_start",
+        ),
+        VisualArmPoseSegment(
+            pose="welcome_open",
+            duration_s=duration * 0.35,
+            label=f"{skill_id}_open",
+        ),
+        VisualArmPoseSegment(
+            pose="welcome_close",
+            duration_s=duration * 0.35,
+            label=f"{skill_id}_close",
+        ),
+        VisualArmPoseSegment(
+            pose="rest",
+            duration_s=duration * 0.15,
+            label=f"{skill_id}_rest_end",
+        ),
+    )
+    summary = (
+        f"Plan {skill_id}: show a simulator-only open-and-close arm expression over "
+        f"{duration:.2f}s; it does not establish person contact or a physical hug."
+    )
+    return _visual_arm_gesture_plan(
+        skill, parameters, profile, visual_arm_poses=poses, summary=summary
+    )
+
+
 def _resource_parts(
     parameters: Mapping[str, Any],
     *,
@@ -1020,6 +1182,9 @@ BUILTIN_SKILL_PLANNERS: dict[str, SkillPlanner] = {
     "bow": _plan_bow,
     "express_attention": _plan_express_attention,
     "blink_eyes": _plan_blink_eyes,
+    "wave_hand": _plan_wave_hand,
+    "celebrate": _plan_celebrate,
+    "hug_gesture": _plan_hug_gesture,
 }
 
 
@@ -1205,6 +1370,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(
                     f"- {expression.label}: {expression.expression} "
                     f"intensity={expression.intensity:.2f} duration={expression.duration_s:.2f}s"
+                )
+        if plan.visual_arm_poses:
+            print("Visual arm poses:")
+            for pose in plan.visual_arm_poses:
+                print(
+                    f"- {pose.label}: {pose.pose} side={pose.side} "
+                    f"duration={pose.duration_s:.2f}s"
                 )
         print("No robot, simulator, or hardware command was executed.")
     return 0
