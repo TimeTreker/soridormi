@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from soridormi_runtime.skill_manifest import parameters_schema_for_skill
+
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "configs" / "skills" / "open_duck_mini_v2_skills.json"
@@ -197,6 +199,21 @@ def test_resource_capabilities_publish_dynamic_plan_coverage() -> None:
     assert skills["deliver_resource"]["metadata"]["semantic_scope"]["delivery_modes"] == [
         "physical_handover"
     ]
+
+
+def test_compact_manifest_parameters_without_defaults_are_required() -> None:
+    skills = _skills_by_id()
+
+    look_schema = parameters_schema_for_skill(skills["look_at_person"])
+    assert look_schema["required"] == ["target_ref"]
+
+    resource_schema = parameters_schema_for_skill(
+        skills["acquire_and_deliver_resource"]
+    )
+    assert resource_schema["required"] == ["resource", "source", "recipient"]
+
+    blink_schema = parameters_schema_for_skill(skills["blink_eyes"])
+    assert "count" not in blink_schema.get("required", [])
     assert skills["acquire_and_deliver_resource"]["metadata"]["semantic_scope"][
         "delivery_modes"
     ] == ["physical_handover"]

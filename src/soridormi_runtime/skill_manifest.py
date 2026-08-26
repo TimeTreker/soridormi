@@ -308,6 +308,7 @@ def parameters_schema_for_skill(skill: Mapping[str, Any]) -> dict[str, Any]:
         return copy.deepcopy(explicit)
 
     properties: dict[str, Any] = {}
+    required: list[str] = []
     for name, rule in (skill.get("parameters") or {}).items():
         if not isinstance(rule, dict):
             continue
@@ -324,12 +325,17 @@ def parameters_schema_for_skill(skill: Mapping[str, Any]) -> dict[str, Any]:
                 schema["maximum"] = rule["max"]
         if "default" in rule:
             schema["default"] = rule["default"]
+        else:
+            required.append(str(name))
         properties[name] = schema
-    return {
+    result = {
         "type": "object",
         "properties": properties,
         "additionalProperties": False,
     }
+    if required:
+        result["required"] = required
+    return result
 
 
 def iter_skills(manifest: dict[str, Any], query: SkillQuery | None = None) -> list[dict[str, Any]]:
