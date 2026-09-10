@@ -13,7 +13,7 @@ import json
 import math
 import os
 import shlex
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -275,8 +275,10 @@ def _resolve_parameters(
         # only. Treat those as number parameters to keep the manifest compact.
         if param_type is None and any(key in rule for key in ("min", "max")):
             param_type = "number"
-        if param_type == "number":
+        if param_type in {"number", "integer"}:
             number = _coerce_number(name, value)
+            if param_type == "integer" and (not math.isfinite(number) or not number.is_integer()):
+                raise SkillExecutionError(f"parameter {name} must be a finite integer")
             if "min" in rule and number < float(rule["min"]):
                 raise SkillExecutionError(
                     f"skill {skill.get('id')}: parameter {name}={number} below min {rule['min']}"
@@ -285,7 +287,7 @@ def _resolve_parameters(
                 raise SkillExecutionError(
                     f"skill {skill.get('id')}: parameter {name}={number} above max {rule['max']}"
                 )
-            resolved[name] = number
+            resolved[name] = int(number) if param_type == "integer" else number
         elif param_type == "string":
             text = str(value)
             allowed = rule.get("enum")
@@ -416,12 +418,21 @@ def _plan_walk_forward(
 def _plan_turn_in_place(
     skill: dict[str, Any], parameters: Mapping[str, Any], profile: str
 ) -> SkillPlan:
-    return _velocity_skill_plan(
-        skill,
-        parameters,
-        profile,
-        yaw=float(parameters.get("yaw_radps", 0.0)),
-        duration=float(parameters.get("duration_s", 2.0)),
+    count = int(parameters.get("count", 1))
+    duration = float(parameters.get("duration_s", 2.0))
+    if not math.isfinite(duration) or count * duration > 20.0:
+        raise SkillExecutionError("turn repetitions must fit the existing 20 second motion-plan limit")
+    plan = _velocity_skill_plan(
+        skill, parameters, profile,
+        yaw=float(parameters.get("yaw_radps", 0.0)), duration=duration,
+    )
+    if count == 1:
+        return plan
+    return replace(
+        plan,
+        commands=tuple(replace(plan.commands[0], label=f"turn_in_place_{index + 1}")
+                       for index in range(count)),
+        summary=f"Dry-run turn_in_place: {count} sequential repetitions of {duration:.2f}s each using profile {profile}.",
     )
 
 

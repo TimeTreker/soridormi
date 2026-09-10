@@ -74,6 +74,18 @@ Future skills such as `step_over_obstacle`, `sit_down`, `bow`, and `run` remain
 manifest-declared but are rejected by the dry-run registry until their controller
 and safety validation are added.
 
+## Bounded turn repetition
+
+The owner-authorized `turn_in_place` contract accepts integer `count` from 1 to 8,
+default 1. `duration_s` applies to each repetition; `count * duration_s` must not
+exceed the existing 20-second motion-plan limit. Positive `yaw_radps` turns left;
+negative turns right. Repetitions keep the requested yaw and duration, with no
+implied pause, heading reset, or full revolution. The Planner supplies count in
+its primary decision; the host must not infer it from unrelated argument values.
+Soridormi validates and expands count into sequential segments under the existing
+locomotion lock, cancellation, stop and safe-hold lifecycle. Counts above one use
+the runtime MCP route; the single-segment shell exporter rejects them explicitly.
+
 ## Policy input boundary
 
 Skill execution should not pass natural-language task descriptions to the low-level controller. A planner or skill router should translate user intent into bounded structured context first:
@@ -85,7 +97,7 @@ task mode / gait style / clearance intent
 environment labels such as terrain or obstacle metadata
 ```
 
-The current skill execution contract/skill simulation execution implementation only lowers single-segment locomotion skills to velocity command overrides. Future skill execution should preserve the same boundary: validate manifest parameters, build policy context, then call the runtime policy that outputs the 14D action.
+The runtime MCP adapter lowers bounded locomotion segments to velocity commands. The shell export route remains single-segment and rejects multi-segment plans. Future skill execution should preserve the same boundary: validate manifest parameters, build policy context, then call the runtime policy that outputs the 14D action.
 
 `walk_forward`, `walk_velocity`, and `curve_walk` also apply the shared minimum
 useful forward walk speed of `0.12 m/s`. The resolved plan keeps

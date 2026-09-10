@@ -111,3 +111,20 @@ def test_look_at_target_preserves_explicit_target_and_direction() -> None:
     assert result["status"] == "completed"
     assert result["skill_id"] == "look_at_person"
     assert result["no_motion"] is True
+
+
+def test_turn_task_preserves_repetition_in_provider_plan() -> None:
+    service = SoridormiLocalToolService()
+    result = service.call_tool("soridormi.task.preview", {
+        "task_type": "turn_to_heading", "summary": "two bounded right turns",
+        "parameters": {"count": 2, "duration_s": 0.5, "direction": "right"},
+    })
+    assert result["accepted"] is True
+    assert result["skill_id"] == "turn_in_place"
+    assert result["estimated_duration_s"] == 1.0
+    rejected = service.call_tool("soridormi.task.preview", {
+        "task_type": "turn_to_heading", "summary": "invalid repetition",
+        "parameters": {"count": 1.5, "duration_s": 0.5, "direction": "right"},
+    })
+    assert rejected["accepted"] is False
+    assert rejected["reason_code"] == "skill_planning_failed"

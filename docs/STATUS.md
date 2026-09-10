@@ -27,6 +27,23 @@ peer Activity capability rather than a Soridormi body capability. Soridormi
 remains the embodied provider beneath Activity; changing the vocal or media
 hosting boundary requires a separate evidence-backed architecture decision.
 
+## Authorized turn-count repair
+
+`turn_in_place` now exposes bounded integer count (1-8, default 1). The body
+expands repetitions sequentially; duration is per repetition and the existing
+20-second total limit is retained. The catalog states positive yaw = left,
+negative = right. This closes the paired Chromie count-representation and yaw
+context gaps without transferring planning authority to the host. See
+[Soridormi Skill Execution](SORIDORMI_SKILL_EXECUTION.md). Validation: governance and compile checks pass; full suite 788 passed / 2 skipped,
+body-concurrency suite 155 passed. An isolated snapshot excluding unrelated local
+metadata edits passes 80 focused tests. Paired Chromie real-model requests for
+left twice, right once and right twice executed in MuJoCo with one-second segments,
+correct counts and safe idle. The initial observation-map failure is preserved;
+corrected adjudication passes all three motion results. Evidence lives in the
+paired Chromie checkout under `.chromie/acceptance/turn-count-evidence-20260910/`,
+with provider gates under `.chromie/acceptance/turn-count-20260910/`. These are
+simulation results; physical robot qualification remains open.
+
 ## Verified repository surface
 
 - Official Open Duck policy parity and replay/comparison tooling are retained as

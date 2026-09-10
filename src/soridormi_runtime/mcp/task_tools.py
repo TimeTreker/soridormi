@@ -399,7 +399,7 @@ def _skill_request_for_task(record: EmbodiedTaskRecord) -> tuple[str, dict[str, 
             ),
         )
     if record.task_type == "turn_to_heading":
-        skill_parameters = _copy_present(parameters, "yaw_radps", "duration_s")
+        skill_parameters = _copy_present(parameters, "yaw_radps", "duration_s", "count")
         if "yaw_radps" not in skill_parameters:
             direction = str(parameters.get("direction", "")).strip().lower()
             if direction == "left":

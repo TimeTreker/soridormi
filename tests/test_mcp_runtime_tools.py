@@ -1013,3 +1013,28 @@ def test_runtime_service_rejects_unsupported_named_skill() -> None:
             )
 
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("termination", ["complete", "cancel", "timeout"])
+def test_turn_repetition_uses_existing_ordered_execution_and_cancellation(termination):
+    async def exercise():
+        service = _service(control_hz=100.0)
+        created = await service.call_tool("soridormi.skill.create_plan", {
+            "skill_id": "turn_in_place", "parameters": {"count": 2, "duration_s": 0.5, "yaw_radps": -0.12},
+        })
+        execution = asyncio.create_task(service.call_tool("soridormi.skill.execute_plan", {"plan_id": created["plan_id"]}))
+        if termination == "cancel":
+            await asyncio.sleep(0.05)
+            execution.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await execution
+        elif termination == "timeout":
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.wait_for(execution, timeout=0.05)
+        else:
+            result = await execution
+            assert result["completed"] is True
+        assert service.active_task is None
+        assert service.controller.command == PolicyCommand()
+        assert any(command.yaw_velocity == -0.12 for command in service.controller.seen_commands)
+    asyncio.run(exercise())

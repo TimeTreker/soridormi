@@ -318,3 +318,28 @@ def test_run_skill_shell_wrapper_lists_skills() -> None:
     )
     assert "Soridormi executable dry-run skills" in proc.stdout
     assert "walk_velocity" in proc.stdout
+
+
+@pytest.mark.parametrize("count,duration", [(1, 2.0), (2, 1.0), (8, 2.5)])
+@pytest.mark.parametrize("yaw", [-0.12, 0.12])
+def test_turn_count_preserves_sequential_segments_and_duration(count, duration, yaw):
+    from soridormi_runtime.skill_manifest import parameters_schema_for_skill
+    registry = _registry()
+    schema = parameters_schema_for_skill(registry.skills["turn_in_place"])
+    assert schema["properties"]["count"] == {"type": "integer", "minimum": 1, "maximum": 8, "default": 1}
+    plan = registry.create_plan("turn_in_place", {"count": count, "duration_s": duration, "yaw_radps": yaw})
+    assert len(plan.commands) == count
+    assert all(segment.duration_s == duration and segment.yaw_radps == yaw for segment in plan.commands)
+    assert plan.total_duration_s == pytest.approx(count * duration)
+    assert plan.parameters["count"] == count
+
+
+@pytest.mark.parametrize("count", [0, 9, 1.5, True, float("nan"), float("inf")])
+def test_turn_count_rejects_invalid_repetition(count):
+    with pytest.raises(SkillExecutionError):
+        _registry().create_plan("turn_in_place", {"count": count})
+
+
+def test_turn_count_preserves_existing_total_motion_limit():
+    with pytest.raises(SkillExecutionError, match="20 second"):
+        _registry().create_plan("turn_in_place", {"count": 3, "duration_s": 10})

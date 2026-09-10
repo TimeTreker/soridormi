@@ -318,7 +318,7 @@ def parameters_schema_for_skill(skill: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(rule.get("enum"), list):
                 schema["enum"] = list(rule["enum"])
         else:
-            schema["type"] = "number"
+            schema["type"] = "integer" if rule.get("type") == "integer" else "number"
             if "min" in rule:
                 schema["minimum"] = rule["min"]
             if "max" in rule:

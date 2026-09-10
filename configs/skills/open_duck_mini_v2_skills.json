@@ -830,7 +830,7 @@
       "id": "turn_in_place",
       "category": "locomotion",
       "display_name": "Turn In Place",
-      "description": "Rotate left or right with near-zero forward velocity.",
+      "description": "Rotate left (positive yaw_radps) or right (negative yaw_radps) with near-zero forward velocity. count is 1-8 sequential repetitions; duration_s is per repetition. Total count * duration_s must not exceed 20 seconds; no pause or direction change is implied.",
       "status": "available_sim",
       "execution": "policy_velocity",
       "capability_group": "locomotion_wrappers",
@@ -844,6 +844,12 @@
           "min": 0.5,
           "max": 10.0,
           "default": 2.0
+        },
+        "count": {
+          "type": "integer",
+          "min": 1,
+          "max": 8,
+          "default": 1
         }
       },
       "preconditions": [
