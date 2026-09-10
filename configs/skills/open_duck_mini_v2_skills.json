@@ -1813,7 +1813,18 @@
         "behavior_domains": [
           "social_attention",
           "orientation"
-        ]
+        ],
+        "argument_realization": {
+          "gaze_duration": {
+            "source_entity_type": "duration",
+            "planner_owned": true,
+            "arguments": [
+              "duration_s"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Realize an explicitly bound gaze duration as duration_s in seconds. Supply this argument even when the schema has a default; use that default only when no duration was requested. Planner owns conversion of the bound duration and units; the Host must not infer or fill it."
+          }
+        }
       },
       "display_name": "Look At Person",
       "description": "Turn head toward a structured person target direction provided by an external planner/perception layer and, by default, hold gaze on that target. Soridormi does not run perception here; it only executes bounded yaw/pitch offsets.",

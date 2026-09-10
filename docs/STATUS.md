@@ -27,22 +27,27 @@ peer Activity capability rather than a Soridormi body capability. Soridormi
 remains the embodied provider beneath Activity; changing the vocal or media
 hosting boundary requires a separate evidence-backed architecture decision.
 
-## Authorized turn-count repair
+## Authorized explicit motion-parameter repairs
 
-`turn_in_place` now exposes bounded integer count (1-8, default 1). The body
-expands repetitions sequentially; duration is per repetition and the existing
-20-second total limit is retained. The catalog states positive yaw = left,
-negative = right. This closes the paired Chromie count-representation and yaw
-context gaps without transferring planning authority to the host. See
-[Soridormi Skill Execution](SORIDORMI_SKILL_EXECUTION.md). Validation: governance and compile checks pass; full suite 788 passed / 2 skipped,
-body-concurrency suite 155 passed. An isolated snapshot excluding unrelated local
-metadata edits passes 80 focused tests. Paired Chromie real-model requests for
-left twice, right once and right twice executed in MuJoCo with one-second segments,
-correct counts and safe idle. The initial observation-map failure is preserved;
-corrected adjudication passes all three motion results. Evidence lives in the
-paired Chromie checkout under `.chromie/acceptance/turn-count-evidence-20260910/`,
-with provider gates under `.chromie/acceptance/turn-count-20260910/`. These are
-simulation results; physical robot qualification remains open.
+`turn_in_place` exposes bounded integer count (1-8, default 1), expands repetitions
+sequentially and retains the 20-second total limit. Positive yaw is left, negative
+is right. `look_at_person` now declares human duration -> duration_s realization:
+Planner must supply an explicitly requested duration instead of relying on the
+four-second default. Chromie checks the provider's existing minimum-argument
+contract without interpreting or filling the human value. Target grounding,
+execution bounds and body lifecycle are unchanged. See
+[Soridormi Skill Execution](SORIDORMI_SKILL_EXECUTION.md).
+
+Latest validation: governance and compile pass; full suite 789 passed / 2 skipped,
+body-concurrency suite 156 passed. An own-only snapshot excluding unrelated local
+metadata edits passes 31 skill execution tests. Paired Chromie real-model gaze2
+then blink2 and gaze3 requests completed in MuJoCo with exact durations and safe
+idle; post-execution Fast results pass their original DTO contracts. The two-goal
+headless episode still fails required speech playback, so no physical speaker or
+robot qualification is claimed. Earlier bounded-turn simulation evidence remains
+in the paired Chromie handoff. Current evidence roots in that checkout are
+`.chromie/acceptance/argument-coverage-20260910/` and
+`.chromie/acceptance/fast-reentry-format-20260910/`; artifacts are private/local.
 
 ## Verified repository surface
 

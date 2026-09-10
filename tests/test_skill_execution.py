@@ -343,3 +343,16 @@ def test_turn_count_rejects_invalid_repetition(count):
 def test_turn_count_preserves_existing_total_motion_limit():
     with pytest.raises(SkillExecutionError, match="20 second"):
         _registry().create_plan("turn_in_place", {"count": 3, "duration_s": 10})
+
+
+def test_gaze_duration_realization_has_an_executable_explicit_argument() -> None:
+    manifest = load_skill_manifest(DEFAULT_SKILL_MANIFEST)
+    look = next(skill for skill in manifest["skills"] if skill["id"] == "look_at_person")
+    realization = look["metadata"]["argument_realization"]["gaze_duration"]
+    assert realization["source_entity_type"] == "duration"
+    assert realization["planner_owned"] is True
+    assert realization["minimum_arguments"] == 1
+    assert realization["arguments"] == ["duration_s"]
+    for duration in (0.5, 2.0, 3.0):
+        plan = SkillExecutionRegistry(manifest).create_plan("look_at_person", {"target_ref": "test-target", "duration_s": duration})
+        assert plan.parameters["duration_s"] == duration

@@ -261,3 +261,12 @@ Then run the same `run_scripted_social_skill_in_sim.sh` command without
 `--dry-run`. The executor preserves non-head joints at their current simulator
 positions and only targets `neck_pitch`, `head_pitch`, `head_yaw`, and
 `head_roll`. Hardware remains unavailable.
+
+### Explicit gaze duration
+
+`look_at_person` declares a Planner-owned `duration -> duration_s` argument
+realization. A bound human duration must be realized explicitly in seconds; its
+four-second schema default applies only when the human has not specified a
+duration. Chromie checks the declared argument presence before admission and never
+fills or interprets the omitted duration. Soridormi's existing duration bounds,
+trusted target requirement and execution lifecycle are unchanged.
