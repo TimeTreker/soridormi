@@ -231,6 +231,28 @@
           "default": 2.0
         }
       },
+      "metadata": {
+        "argument_realization": {
+          "forward_speed": {
+            "source_entity_type": "speed",
+            "planner_owned": true,
+            "arguments": [
+              "vx_mps"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Map an explicit human linear speed to vx_mps after selecting this capability. Preserve an explicit numeric speed in metres per second exactly instead of using the schema default; positive vx_mps is forward/ahead and negative vx_mps is backward."
+          },
+          "duration": {
+            "source_entity_type": "duration",
+            "planner_owned": true,
+            "arguments": [
+              "duration_s"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Map an explicit human duration to duration_s in seconds and preserve an explicit numeric duration exactly instead of using the schema default."
+          }
+        }
+      },
       "preconditions": [
         "standing",
         "not_fallen",
@@ -747,6 +769,71 @@
           "acquisition": "provider_owned",
           "source_resolution": "provider_owned"
         },
+        "argument_realization": {
+          "physical_resource_entity": {
+            "source_entity_type": "entity",
+            "planner_owned": true,
+            "arguments": [
+              "resource"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Place the exact human-semantic entity description inside resource.description without renaming, translating, shortening, or replacing it. Other resource fields may only express source-grounded qualifiers or schema-required type information."
+          },
+          "physical_resource_item": {
+            "source_entity_type": "item",
+            "planner_owned": true,
+            "arguments": [
+              "resource"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Place the exact human-semantic item description inside resource.description without renaming, translating, shortening, or replacing it. Other resource fields may only express source-grounded qualifiers or schema-required type information."
+          },
+          "physical_resource_quantity": {
+            "source_entity_type": "quantity",
+            "planner_owned": true,
+            "arguments": [
+              "resource"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Place the exact human-semantic quantity inside the structured resource argument without changing its value."
+          },
+          "physical_resource_location": {
+            "source_entity_type": "location",
+            "planner_owned": true,
+            "arguments": [
+              "source"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Place the exact human-semantic source location inside source.description or source.bindings without renaming, translating, shortening, or replacing it."
+          },
+          "physical_resource_distance": {
+            "source_entity_type": "distance",
+            "planner_owned": true,
+            "arguments": [
+              "source"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Place the exact human-semantic distance inside source.bindings without changing its numeric value or unit semantics."
+          },
+          "physical_resource_direction": {
+            "source_entity_type": "direction",
+            "planner_owned": true,
+            "arguments": [
+              "source"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Place the exact human-semantic direction inside source.description or source.bindings without replacing it with a provider default."
+          },
+          "physical_resource_recipient": {
+            "source_entity_type": "recipient",
+            "planner_owned": true,
+            "arguments": [
+              "recipient"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Place the exact human-semantic recipient inside recipient.description without renaming, translating, or replacing it."
+          }
+        },
         "resource_contract": {
           "result_field": "resource_outcome",
           "plan_requires": [],
@@ -883,6 +970,28 @@
           "body.primary_motion"
         ],
         "safety_preemption": "safe_hold"
+      },
+      "metadata": {
+        "argument_realization": {
+          "turn_direction": {
+            "source_entity_type": "direction",
+            "planner_owned": true,
+            "arguments": [
+              "yaw_radps"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Realize the supplied orientation with signed yaw_radps: positive rotates left, negative rotates right. The positive default cannot replace an explicitly supplied direction."
+          },
+          "turn_duration": {
+            "source_entity_type": "duration",
+            "planner_owned": true,
+            "arguments": [
+              "duration_s"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Realize the supplied duration in seconds per repetition. The default applies only when the human supplied no duration."
+          }
+        }
       }
     },
     {
@@ -1815,6 +1924,24 @@
           "orientation"
         ],
         "argument_realization": {
+          "person_entity_target": {
+            "source_entity_type": "entity",
+            "planner_owned": true,
+            "arguments": [
+              "target_ref"
+            ],
+            "minimum_arguments": 1,
+            "contract": "For a person-directed gaze Responsibility, copy target_ref only from matching current trusted target evidence supplied by perception or bounded conversation context. Never use an ungrounded pronoun surface, invent a person reference, or infer target yaw/pitch. Soridormi retains target-resolution and bounded motion authority."
+          },
+          "person_addressee_target": {
+            "source_entity_type": "addressee",
+            "planner_owned": true,
+            "arguments": [
+              "target_ref"
+            ],
+            "minimum_arguments": 1,
+            "contract": "For a person-directed gaze Responsibility whose semantic target is the addressee, copy target_ref only from matching current trusted target evidence supplied by perception or bounded conversation context. Never use an ungrounded pronoun surface, invent a person reference, or infer target yaw/pitch. Soridormi retains target-resolution and bounded motion authority."
+          },
           "gaze_duration": {
             "source_entity_type": "duration",
             "planner_owned": true,

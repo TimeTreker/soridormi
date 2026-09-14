@@ -80,7 +80,11 @@ The owner-authorized `turn_in_place` contract accepts integer `count` from 1 to 
 default 1. `duration_s` applies to each repetition; `count * duration_s` must not
 exceed the existing 20-second motion-plan limit. Positive `yaw_radps` turns left;
 negative turns right. Repetitions keep the requested yaw and duration, with no
-implied pause, heading reset, or full revolution. The Planner supplies count in
+implied pause, heading reset, or full revolution. There is no implicit replacement of a supplied direction or duration by defaults: provider
+`argument_realization` metadata requires Planner to supply `yaw_radps` for a bound
+direction and `duration_s` for a bound duration. The Host checks argument presence;
+Planner still owns the source meaning and signed-value realization. This is not
+an independent semantic correctness proof. The Planner supplies count in
 its primary decision; the host must not infer it from unrelated argument values.
 Soridormi validates and expands count into sequential segments under the existing
 locomotion lock, cancellation, stop and safe-hold lifecycle. Counts above one use

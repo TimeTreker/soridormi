@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 
-from soridormi_runtime.skill_manifest import parameters_schema_for_skill
+from soridormi_runtime.skill_manifest import (
+    parameters_schema_for_skill,
+    validate_skill_manifest,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -217,6 +221,73 @@ def test_compact_manifest_parameters_without_defaults_are_required() -> None:
     assert skills["acquire_and_deliver_resource"]["metadata"]["semantic_scope"][
         "delivery_modes"
     ] == ["physical_handover"]
+
+
+def test_walk_velocity_declares_human_semantic_argument_realization() -> None:
+    walk = _skills_by_id()["walk_velocity"]
+    realization = walk["metadata"]["argument_realization"]
+
+    assert realization["forward_speed"]["source_entity_type"] == "speed"
+    assert realization["forward_speed"]["arguments"] == ["vx_mps"]
+    assert realization["duration"]["source_entity_type"] == "duration"
+    assert realization["duration"]["arguments"] == ["duration_s"]
+
+
+def test_turn_declares_explicit_orientation_and_duration_realization() -> None:
+    turn = _skills_by_id()["turn_in_place"]
+    contracts = turn["metadata"]["argument_realization"]
+    schema = parameters_schema_for_skill(turn)
+    for name, source_type, argument in (
+        ("turn_direction", "direction", "yaw_radps"),
+        ("turn_duration", "duration", "duration_s"),
+    ):
+        contract = contracts[name]
+        assert contract["source_entity_type"] == source_type
+        assert contract["planner_owned"] is True
+        assert contract["arguments"] == [argument]
+        assert contract["minimum_arguments"] == 1
+        assert argument in schema["properties"]
+
+
+def test_look_at_person_declares_trusted_target_argument_realization() -> None:
+    look = _skills_by_id()["look_at_person"]
+    realizations = look["metadata"]["argument_realization"]
+    entity = realizations["person_entity_target"]
+    addressee = realizations["person_addressee_target"]
+
+    assert entity["source_entity_type"] == "entity"
+    assert addressee["source_entity_type"] == "addressee"
+    assert entity["planner_owned"] is True
+    assert addressee["arguments"] == ["target_ref"]
+    assert "trusted target evidence" in entity["contract"]
+
+
+def test_acquire_and_deliver_declares_structured_binding_realization() -> None:
+    resource = _skills_by_id()["acquire_and_deliver_resource"]
+    realizations = resource["metadata"]["argument_realization"]
+
+    assert realizations["physical_resource_entity"]["arguments"] == ["resource"]
+    assert realizations["physical_resource_location"]["arguments"] == ["source"]
+    assert realizations["physical_resource_distance"]["arguments"] == ["source"]
+    assert realizations["physical_resource_recipient"]["arguments"] == ["recipient"]
+    assert all(item["planner_owned"] is True for item in realizations.values())
+
+
+def test_skill_manifest_rejects_argument_realization_for_unknown_parameter() -> None:
+    manifest = deepcopy(_load_manifest())
+    walk = next(skill for skill in manifest["skills"] if skill["id"] == "walk_velocity")
+    walk["metadata"]["argument_realization"]["forward_speed"]["arguments"] = [
+        "undeclared_speed"
+    ]
+
+    result = validate_skill_manifest(manifest)
+
+    assert result.ok is False
+    assert any(
+        "argument_realization.forward_speed.arguments names unknown parameters"
+        in error
+        for error in result.errors
+    )
 
 def test_visual_arm_social_skills_are_sim_only_while_contact_skills_stay_unsupported() -> None:
     skills = _skills_by_id()

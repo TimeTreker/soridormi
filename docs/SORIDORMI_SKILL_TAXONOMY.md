@@ -330,6 +330,23 @@ skill_id + desired_command + task_context + environment_context -> policy input 
 
 Semantic aliases such as `slow`, `normal`, `fast`, `careful`, or `high_clearance` may be useful at the UI or planner layer, but they must resolve to bounded numeric/context fields before reaching the low-level policy. Soridormi should reject unsupported context combinations the same way it rejects unsupported skills.
 
+When a provider parameter name does not directly match a human semantic entity,
+the skill manifest owns a model-visible `metadata.argument_realization` contract.
+It names the source entity type, the exact provider arguments that may realize it,
+and the Planner-owned transformation rule. Consumers may project this declaration
+but must not invent provider-vocabulary mappings. For example, `walk_velocity`
+declares that human `speed` is realized through `vx_mps` and human `duration`
+through `duration_s`; an explicit numeric value must override the provider default.
+`look_at_person` likewise declares that a person-target `entity` may be realized
+through `target_ref`, but only by copying matching current trusted target evidence.
+A pronoun or entity surface alone does not satisfy that precondition, and neither
+Planner nor Host may infer yaw/pitch from it.
+`acquire_and_deliver_resource` declares the corresponding structured boundary:
+entity/item/quantity values may realize only into `resource`, spatial
+location/distance/direction values only into `source`, and recipient only into
+`recipient`. Each human-semantic value remains exact inside that declared object;
+the declaration authorizes representation, not reinterpretation.
+
 See `docs/SORIDORMI_POLICY_CONTEXT_CONTRACT.md` for the policy input contract.
 
 ## Relationship to BC, residual, and RL

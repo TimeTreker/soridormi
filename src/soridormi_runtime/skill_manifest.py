@@ -240,6 +240,75 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
         metadata = metadata if isinstance(metadata, dict) else {}
         semantic_scope = metadata.get("semantic_scope")
         resource_contract = metadata.get("resource_contract")
+        argument_realization = metadata.get("argument_realization")
+        if argument_realization is not None:
+            if not isinstance(argument_realization, dict) or not argument_realization:
+                errors.append(
+                    f"skill {skill_id}: metadata.argument_realization must be a non-empty object"
+                )
+            else:
+                if isinstance(explicit_schema, dict):
+                    declared_argument_names = set(
+                        (explicit_schema.get("properties") or {}).keys()
+                    )
+                else:
+                    declared_argument_names = set(parameters)
+                for realization_name, realization in argument_realization.items():
+                    if not str(realization_name).strip() or not isinstance(
+                        realization, dict
+                    ):
+                        errors.append(
+                            f"skill {skill_id}: each argument_realization entry must be a named object"
+                        )
+                        continue
+                    source_entity_type = realization.get("source_entity_type")
+                    if not isinstance(source_entity_type, str) or not source_entity_type.strip():
+                        errors.append(
+                            f"skill {skill_id}: argument_realization.{realization_name}.source_entity_type must be a non-empty string"
+                        )
+                    if realization.get("planner_owned") is not True:
+                        errors.append(
+                            f"skill {skill_id}: argument_realization.{realization_name}.planner_owned must be true"
+                        )
+                    arguments = realization.get("arguments")
+                    if not isinstance(arguments, list) or not arguments:
+                        errors.append(
+                            f"skill {skill_id}: argument_realization.{realization_name}.arguments must be a non-empty list"
+                        )
+                        normalized_arguments: list[str] = []
+                    else:
+                        normalized_arguments = [
+                            str(argument).strip() for argument in arguments
+                        ]
+                        if (
+                            any(not argument for argument in normalized_arguments)
+                            or len(normalized_arguments) != len(set(normalized_arguments))
+                        ):
+                            errors.append(
+                                f"skill {skill_id}: argument_realization.{realization_name}.arguments must contain unique non-empty strings"
+                            )
+                        unknown_arguments = (
+                            set(normalized_arguments) - declared_argument_names
+                        )
+                        if unknown_arguments:
+                            errors.append(
+                                f"skill {skill_id}: argument_realization.{realization_name}.arguments names unknown parameters {sorted(unknown_arguments)}"
+                            )
+                    minimum_arguments = realization.get("minimum_arguments")
+                    if (
+                        isinstance(minimum_arguments, bool)
+                        or not isinstance(minimum_arguments, int)
+                        or minimum_arguments < 1
+                        or minimum_arguments > len(normalized_arguments)
+                    ):
+                        errors.append(
+                            f"skill {skill_id}: argument_realization.{realization_name}.minimum_arguments must be an integer within its arguments list"
+                        )
+                    contract = realization.get("contract")
+                    if not isinstance(contract, str) or not contract.strip():
+                        errors.append(
+                            f"skill {skill_id}: argument_realization.{realization_name}.contract must be a non-empty string"
+                        )
         if (
             isinstance(semantic_scope, dict)
             and semantic_scope.get("responsibility_type") == "acquire_and_deliver_resource"

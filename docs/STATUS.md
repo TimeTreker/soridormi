@@ -29,6 +29,16 @@ hosting boundary requires a separate evidence-backed architecture decision.
 
 ## Authorized explicit motion-parameter repairs
 
+Owner-authorized delivery, 2026-09-14: Planner-owned motion, gaze and resource
+argument declarations, manifest validation and tests; base `284273b` on
+`codex/turn-count`. Resume at the latest commit containing this status; paired
+Chromie `main` delivers Runtime/SC repairs from `ec4a5c26`. The executable patch
+matches the tested snapshot; native semantic/signed-direction failures remain.
+Generated social-eyes XML stays local; no submodule revision changes. Resume by
+fast-forwarding this branch, initializing submodules and rebuilding the provider.
+
+`turn_in_place` declares direction → `yaw_radps` and duration → `duration_s`;
+Host checks explicit argument presence, while signed semantics remain unqualified.
 `turn_in_place` exposes bounded integer count (1-8, default 1), expands repetitions
 sequentially and retains the 20-second total limit. Positive yaw is left, negative
 is right. `look_at_person` now declares human duration -> duration_s realization:
@@ -38,16 +48,10 @@ contract without interpreting or filling the human value. Target grounding,
 execution bounds and body lifecycle are unchanged. See
 [Soridormi Skill Execution](SORIDORMI_SKILL_EXECUTION.md).
 
-Latest validation: governance and compile pass; full suite 789 passed / 2 skipped,
-body-concurrency suite 156 passed. An own-only snapshot excluding unrelated local
-metadata edits passes 31 skill execution tests. Paired Chromie real-model gaze2
-then blink2 and gaze3 requests completed in MuJoCo with exact durations and safe
-idle; post-execution Fast results pass their original DTO contracts. The two-goal
-headless episode still fails required speech playback, so no physical speaker or
-robot qualification is claimed. Earlier bounded-turn simulation evidence remains
-in the paired Chromie handoff. Current evidence roots in that checkout are
-`.chromie/acceptance/argument-coverage-20260910/` and
-`.chromie/acceptance/fast-reentry-format-20260910/`; artifacts are private/local.
+Governance/compile pass; full suite: 790 passed / 2 skipped; concurrency: 156 passed.
+Full-suite evidence: Chromie `.chromie/acceptance/failed-case-repair-20260914/`,
+`soridormi-final-canonical.log` (local, not Git). Earlier simulator evidence does not qualify
+physical speaker/robot behavior or resolve current Planner semantic failures.
 
 ## Verified repository surface
 
