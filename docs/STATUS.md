@@ -29,13 +29,13 @@ hosting boundary requires a separate evidence-backed architecture decision.
 
 ## Authorized explicit motion-parameter repairs
 
-Owner-authorized delivery, 2026-09-14: Planner-owned motion, gaze and resource
-argument declarations, manifest validation and tests; base `284273b` on
-`codex/turn-count`. Resume at the latest commit containing this status; paired
-Chromie `main` delivers Runtime/SC repairs from `ec4a5c26`. The executable patch
-matches the tested snapshot; native semantic/signed-direction failures remain.
-Generated social-eyes XML stays local; no submodule revision changes. Resume by
-fast-forwarding this branch, initializing submodules and rebuilding the provider.
+Integration delivery, 2026-09-15: base `0af3d09` on `codex/turn-count`;
+paired Chromie base `2e18f86a` retains SC communication and Work separation.
+Resource mappings retain upstream contracts and add route-to-source coverage.
+Validation passes: 798 tests / two skips, body 165, task 147, governance, compile
+and manifest checks. Native semantic/signed-direction failures remain unqualified. Resume by fetching
+upstream, preserving dirty work, initializing submodules and rebuilding providers.
+Generated social-eyes XML stays local; no third-party submodule revision changes.
 
 `turn_in_place` declares direction → `yaw_radps` and duration → `duration_s`;
 Host checks explicit argument presence, while signed semantics remain unqualified.

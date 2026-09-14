@@ -92,6 +92,15 @@ the runtime MCP route; the single-segment shell exporter rejects them explicitly
 
 ## Policy input boundary
 
+The simulation-only `acquire_and_deliver_resource` skill declares Planner-owned
+argument realization for entity, item and quantity into `resource`, recipient into
+`recipient`, and direction/location/distance/route into `source`. These are the
+existing structured input objects, not new parameters. Planner preserves exact
+bound values in their declared objects; Chromie validates the advertised mapping
+and value conservation instead of comparing a scalar recipient with the whole
+recipient object. Soridormi still owns local execution, bounds and safe idle.
+The declaration does not establish physical acquisition, travel or handover.
+
 Skill execution should not pass natural-language task descriptions to the low-level controller. A planner or skill router should translate user intent into bounded structured context first:
 
 ```text

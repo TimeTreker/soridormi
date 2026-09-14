@@ -832,6 +832,15 @@
             ],
             "minimum_arguments": 1,
             "contract": "Place the exact human-semantic recipient inside recipient.description without renaming, translating, or replacing it."
+          },
+          "physical_resource_route": {
+            "source_entity_type": "route",
+            "planner_owned": true,
+            "arguments": [
+              "source"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Preserve the exact supplied route value in source.bindings under its own binding name; retain other supplied source facts independently. Planner owns semantic realization; the Host must not infer or fill missing values."
           }
         },
         "resource_contract": {

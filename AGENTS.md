@@ -2,6 +2,14 @@
 
 Repository-local guidance for coding agents working on Soridormi.
 
+## Before development
+
+Before editing source, fetch the configured remote and verify the working branch
+contains the newest upstream revision. Preserve dirty work before integrating
+remote changes; reconcile against the latest design and rerun relevant validation.
+Do not start development from a stale checkout. Check upstream again before push;
+never force-push to overwrite others' work.
+
 ## Primary objective
 
 Build a reusable sim-to-real engineering runtime, not a one-off demo. Official

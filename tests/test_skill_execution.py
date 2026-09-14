@@ -77,6 +77,32 @@ def test_resource_acquisition_mock_plan_keeps_semantic_parameters() -> None:
     assert plan.parameters["resource"]["description"] == "a cup of water"
 
 
+@pytest.mark.parametrize("binding,argument", [
+    ("entity", "resource"), ("item", "resource"), ("quantity", "resource"), ("recipient", "recipient"),
+    ("direction", "source"), ("location", "source"), ("distance", "source"), ("route", "source"),
+])
+def test_composite_resource_realization_declares_existing_structured_argument(binding, argument):
+    from soridormi_runtime.skill_manifest import parameters_schema_for_skill
+
+    registry = _registry()
+    skill = registry.skills["acquire_and_deliver_resource"]
+    realization = skill["metadata"]["argument_realization"]["physical_resource_" + binding]
+    assert realization["source_entity_type"] == binding
+    assert realization["planner_owned"] is True
+    assert realization["minimum_arguments"] == 1
+    assert realization["arguments"] == [argument]
+    schema = parameters_schema_for_skill(skill)
+    assert argument in schema["properties"]
+    assert schema["properties"][argument]["type"] == "object"
+    args = {
+        "resource": {"kind": "physical_object", "description": "a cup of water", "quantity": "one", "attributes": {}},
+        "source": {"status": "known", "bindings": {"direction": "ahead", "distance": "fifty meters"}},
+        "recipient": {"description": "the requester"},
+    }
+    plan = registry.create_plan("acquire_and_deliver_resource", args)
+    assert plan.parameters[argument] == args[argument]
+
+
 def test_granular_resource_mock_plans_expose_public_phase_boundaries() -> None:
     registry = _registry()
     acquire = registry.create_plan(
