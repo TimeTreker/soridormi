@@ -73,6 +73,154 @@ def _as_set(value: Any) -> set[str]:
     return {str(item) for item in value}
 
 
+def _validate_semantic_facade(
+    *,
+    skill_id: str,
+    metadata: Mapping[str, Any],
+    provider_input_schema: Mapping[str, Any],
+    errors: list[str],
+) -> set[str] | None:
+    """Validate a provider-published Core-facing semantic argument facade.
+
+    Soridormi keeps its executable parameter schema provider-local. A semantic
+    facade is only a declaration that an upstream brain may plan with a safer,
+    provider-neutral vocabulary while its trusted adapter realizes the provider
+    encoding immediately before ``soridormi.skill.create_plan``.
+    """
+
+    facade = metadata.get("semantic_facade")
+    if facade is None:
+        return None
+    if not isinstance(facade, dict) or not facade:
+        errors.append(f"skill {skill_id}: metadata.semantic_facade must be a non-empty object")
+        return set()
+
+    semantic_schema = facade.get("input_schema")
+    if not isinstance(semantic_schema, dict):
+        errors.append(f"skill {skill_id}: semantic_facade.input_schema must be an object")
+        return set()
+    if semantic_schema.get("type") != "object":
+        errors.append(f"skill {skill_id}: semantic_facade.input_schema.type must be 'object'")
+    if semantic_schema.get("additionalProperties") is not False:
+        errors.append(
+            f"skill {skill_id}: semantic_facade.input_schema must set additionalProperties=false"
+        )
+    semantic_properties = semantic_schema.get("properties")
+    if not isinstance(semantic_properties, dict) or not semantic_properties:
+        errors.append(
+            f"skill {skill_id}: semantic_facade.input_schema.properties must be a non-empty object"
+        )
+        semantic_properties = {}
+    semantic_names = {str(name) for name in semantic_properties}
+    required = semantic_schema.get("required", [])
+    if not isinstance(required, list):
+        errors.append(f"skill {skill_id}: semantic_facade.input_schema.required must be a list")
+    else:
+        unknown_required = {str(name) for name in required} - semantic_names
+        if unknown_required:
+            errors.append(
+                f"skill {skill_id}: semantic_facade requires unknown semantic arguments "
+                f"{sorted(unknown_required)}"
+            )
+
+    provider_properties = provider_input_schema.get("properties")
+    if not isinstance(provider_properties, dict):
+        provider_properties = {}
+    realizations = facade.get("provider_realizations", {})
+    if not isinstance(realizations, dict):
+        errors.append(
+            f"skill {skill_id}: semantic_facade.provider_realizations must be an object"
+        )
+        return semantic_names
+
+    for raw_provider_arg, raw_contract in realizations.items():
+        provider_arg = str(raw_provider_arg).strip()
+        if not provider_arg or provider_arg not in provider_properties:
+            errors.append(
+                f"skill {skill_id}: semantic_facade names unknown provider argument "
+                f"{provider_arg!r}"
+            )
+            continue
+        if not isinstance(raw_contract, dict):
+            errors.append(
+                f"skill {skill_id}: semantic_facade realization for {provider_arg} must be an object"
+            )
+            continue
+        if raw_contract.get("kind") != "signed_magnitude":
+            errors.append(
+                f"skill {skill_id}: semantic_facade realization for {provider_arg} "
+                "must use supported kind signed_magnitude"
+            )
+            continue
+        direction_argument = str(raw_contract.get("direction_argument") or "").strip()
+        magnitude_argument = str(raw_contract.get("magnitude_argument") or "").strip()
+        if direction_argument not in semantic_names:
+            errors.append(
+                f"skill {skill_id}: semantic_facade realization for {provider_arg} "
+                "names unknown direction_argument"
+            )
+            continue
+        if magnitude_argument and magnitude_argument not in semantic_names:
+            errors.append(
+                f"skill {skill_id}: semantic_facade realization for {provider_arg} "
+                "names unknown magnitude_argument"
+            )
+        direction_schema = semantic_properties.get(direction_argument)
+        direction_enum = (
+            direction_schema.get("enum") if isinstance(direction_schema, dict) else None
+        )
+        positive_direction = str(raw_contract.get("positive_direction") or "").strip()
+        negative_direction = str(raw_contract.get("negative_direction") or "").strip()
+        if (
+            not isinstance(direction_enum, list)
+            or not positive_direction
+            or not negative_direction
+            or positive_direction == negative_direction
+            or positive_direction not in direction_enum
+            or negative_direction not in direction_enum
+        ):
+            errors.append(
+                f"skill {skill_id}: semantic_facade realization for {provider_arg} "
+                "requires distinct positive/negative directions from the semantic enum"
+            )
+        default_magnitude = raw_contract.get("default_magnitude")
+        if default_magnitude is not None and (
+            isinstance(default_magnitude, bool)
+            or not isinstance(default_magnitude, (int, float))
+            or float(default_magnitude) <= 0
+        ):
+            errors.append(
+                f"skill {skill_id}: semantic_facade realization for {provider_arg} "
+                "default_magnitude must be positive"
+            )
+        if not magnitude_argument and default_magnitude is None:
+            errors.append(
+                f"skill {skill_id}: semantic_facade realization for {provider_arg} "
+                "requires magnitude_argument or default_magnitude"
+            )
+
+        provider_rule = provider_properties.get(provider_arg)
+        if isinstance(provider_rule, dict):
+            if provider_rule.get("type") not in {"number", "integer"}:
+                errors.append(
+                    f"skill {skill_id}: signed semantic facade target {provider_arg} "
+                    "must be numeric"
+                )
+            minimum = provider_rule.get("minimum")
+            maximum = provider_rule.get("maximum")
+            if (
+                isinstance(minimum, (int, float))
+                and isinstance(maximum, (int, float))
+                and not (minimum < 0 < maximum)
+            ):
+                errors.append(
+                    f"skill {skill_id}: signed semantic facade target {provider_arg} "
+                    "must admit both negative and positive values"
+                )
+
+    return semantic_names
+
+
 def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
     errors: list[str] = []
     warnings: list[str] = []
@@ -240,6 +388,13 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
         metadata = metadata if isinstance(metadata, dict) else {}
         semantic_scope = metadata.get("semantic_scope")
         resource_contract = metadata.get("resource_contract")
+        provider_input_schema = parameters_schema_for_skill(skill)
+        semantic_argument_names = _validate_semantic_facade(
+            skill_id=skill_id,
+            metadata=metadata,
+            provider_input_schema=provider_input_schema,
+            errors=errors,
+        )
         argument_realization = metadata.get("argument_realization")
         if argument_realization is not None:
             if not isinstance(argument_realization, dict) or not argument_realization:
@@ -247,7 +402,9 @@ def validate_skill_manifest(manifest: dict[str, Any]) -> SkillValidationResult:
                     f"skill {skill_id}: metadata.argument_realization must be a non-empty object"
                 )
             else:
-                if isinstance(explicit_schema, dict):
+                if semantic_argument_names is not None:
+                    declared_argument_names = set(semantic_argument_names)
+                elif isinstance(explicit_schema, dict):
                     declared_argument_names = set(
                         (explicit_schema.get("properties") or {}).keys()
                     )

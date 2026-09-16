@@ -27,26 +27,26 @@ peer Activity capability rather than a Soridormi body capability. Soridormi
 remains the embodied provider beneath Activity; changing the vocal or media
 hosting boundary requires a separate evidence-backed architecture decision.
 
-## Authorized explicit motion-parameter repairs
+## Motion argument and semantic facade boundary
 
-Integration delivery, 2026-09-15: base `0af3d09` on `codex/turn-count`;
-paired Chromie base `2e18f86a` retains SC communication and Work separation.
+Current source amendment, 2026-09-16; prior integration evidence base `0af3d09`
+on `codex/turn-count`, paired Chromie base `2e18f86a`. SC communication and Work remain separate.
 Resource mappings retain upstream contracts and add route-to-source coverage.
 Validation passes: 798 tests / two skips, body 165, task 147, governance, compile
 and manifest checks. Native semantic/signed-direction failures remain unqualified. Resume by fetching
 upstream, preserving dirty work, initializing submodules and rebuilding providers.
 Generated social-eyes XML stays local; no third-party submodule revision changes.
 
-`turn_in_place` declares direction → `yaw_radps` and duration → `duration_s`;
-Host checks explicit argument presence, while signed semantics remain unqualified.
-`turn_in_place` exposes bounded integer count (1-8, default 1), expands repetitions
-sequentially and retains the 20-second total limit. Positive yaw is left, negative
-is right. `look_at_person` now declares human duration -> duration_s realization:
-Planner must supply an explicitly requested duration instead of relying on the
-four-second default. Chromie checks the provider's existing minimum-argument
-contract without interpreting or filling the human value. Target grounding,
-execution bounds and body lifecycle are unchanged. See
-[Soridormi Skill Execution](SORIDORMI_SKILL_EXECUTION.md).
+`turn_in_place`, `curve_walk`, and `sidestep` now publish semantic left/right
+facades; Planner owns direction and positive magnitude while the trusted provider
+adapter alone realizes signed `yaw_radps` / `vy_mps`. Provider execution schemas
+remain unchanged. `turn_in_place` count remains 1-8 with the existing 20-second
+total limit. General `walk_velocity` is not force-fit because its signed forward
+range is asymmetric; `look_at_person` still needs trusted target resolution rather
+than a sign transform, while its requested duration remains Planner-supplied.
+Manifest validation covers facade schemas, realization targets and semantic
+`argument_realization` names. Native paired direction qualification remains open.
+See [Soridormi Skill Execution](SORIDORMI_SKILL_EXECUTION.md).
 
 Governance/compile pass; full suite: 790 passed / 2 skipped; concurrency: 156 passed.
 Full-suite evidence: Chromie `.chromie/acceptance/failed-case-repair-20260914/`,

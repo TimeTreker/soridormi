@@ -233,20 +233,83 @@ def test_walk_velocity_declares_human_semantic_argument_realization() -> None:
     assert realization["duration"]["arguments"] == ["duration_s"]
 
 
-def test_turn_declares_explicit_orientation_and_duration_realization() -> None:
+def test_turn_declares_semantic_orientation_facade() -> None:
     turn = _skills_by_id()["turn_in_place"]
-    contracts = turn["metadata"]["argument_realization"]
-    schema = parameters_schema_for_skill(turn)
-    for name, source_type, argument in (
-        ("turn_direction", "direction", "yaw_radps"),
-        ("turn_duration", "duration", "duration_s"),
+    metadata = turn["metadata"]
+    facade = metadata["semantic_facade"]
+    semantic_schema = facade["input_schema"]
+    provider_schema = parameters_schema_for_skill(turn)
+
+    assert semantic_schema["required"] == ["direction"]
+    assert semantic_schema["properties"]["direction"]["enum"] == ["left", "right"]
+    assert "yaw_radps" not in semantic_schema["properties"]
+    assert "yaw_radps" in provider_schema["properties"]
+    yaw = facade["provider_realizations"]["yaw_radps"]
+    assert yaw == {
+        "kind": "signed_magnitude",
+        "direction_argument": "direction",
+        "magnitude_argument": "turn_rate_radps",
+        "positive_direction": "left",
+        "negative_direction": "right",
+        "default_magnitude": 0.12,
+    }
+
+    contracts = metadata["argument_realization"]
+    assert contracts["turn_direction"]["arguments"] == ["direction"]
+    assert contracts["turn_duration"]["arguments"] == ["duration_s"]
+    assert contracts["turn_count"]["arguments"] == ["count"]
+    assert all(
+        "yaw_radps" not in contract["arguments"] for contract in contracts.values()
+    )
+
+
+def test_other_signed_provider_axes_publish_semantic_facades() -> None:
+    skills = _skills_by_id()
+    for skill_id, provider_arg, magnitude_arg, default_magnitude in (
+        ("curve_walk", "yaw_radps", "turn_rate_radps", 0.1),
+        ("sidestep", "vy_mps", "lateral_speed_mps", 0.02),
     ):
-        contract = contracts[name]
-        assert contract["source_entity_type"] == source_type
-        assert contract["planner_owned"] is True
-        assert contract["arguments"] == [argument]
-        assert contract["minimum_arguments"] == 1
-        assert argument in schema["properties"]
+        skill = skills[skill_id]
+        facade = skill["metadata"]["semantic_facade"]
+        semantic_schema = facade["input_schema"]
+        provider_schema = parameters_schema_for_skill(skill)
+        assert semantic_schema["properties"]["direction"]["enum"] == ["left", "right"]
+        assert provider_arg not in semantic_schema["properties"]
+        assert provider_arg in provider_schema["properties"]
+        realization = facade["provider_realizations"][provider_arg]
+        assert realization["kind"] == "signed_magnitude"
+        assert realization["direction_argument"] == "direction"
+        assert realization["magnitude_argument"] == magnitude_arg
+        assert realization["positive_direction"] == "left"
+        assert realization["negative_direction"] == "right"
+        assert realization["default_magnitude"] == default_magnitude
+
+
+def test_manifest_rejects_semantic_facade_with_unknown_provider_target() -> None:
+    manifest = deepcopy(_load_manifest())
+    turn = next(skill for skill in manifest["skills"] if skill["id"] == "turn_in_place")
+    facade = turn["metadata"]["semantic_facade"]
+    facade["provider_realizations"]["unknown_axis"] = facade["provider_realizations"].pop(
+        "yaw_radps"
+    )
+
+    result = validate_skill_manifest(manifest)
+
+    assert not result.ok
+    assert any("unknown provider argument 'unknown_axis'" in error for error in result.errors)
+
+
+def test_argument_realization_is_validated_against_semantic_facade() -> None:
+    manifest = deepcopy(_load_manifest())
+    turn = next(skill for skill in manifest["skills"] if skill["id"] == "turn_in_place")
+    turn["metadata"]["argument_realization"]["turn_direction"]["arguments"] = [
+        "yaw_radps"
+    ]
+
+    result = validate_skill_manifest(manifest)
+
+    assert not result.ok
+    assert any("unknown parameters ['yaw_radps']" in error for error in result.errors)
 
 
 def test_look_at_person_declares_trusted_target_argument_realization() -> None:

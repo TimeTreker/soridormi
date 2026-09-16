@@ -81,6 +81,29 @@ readiness, manifest export, acceptance cases, `task_graph`, and docs checks:
 ./scripts/validate_task_agent_contract.sh
 ```
 
+## Semantic capability facades
+
+Named skills may publish `metadata.semantic_facade` when a model-facing human
+semantic argument should not expose Soridormi's provider-local encoding. The facade
+is declarative: `input_schema` is the closed Core-facing schema and
+`provider_realizations` describes the trusted lowering performed by Chromie's
+provider adapter immediately before calling `soridormi.skill.create_plan`. Soridormi
+continues to publish its original `parameters_schema` because that is the executable
+provider contract.
+
+The current signed-axis declarations are:
+
+- `turn_in_place`: `direction=left|right` + positive `turn_rate_radps` -> signed `yaw_radps`;
+- `curve_walk`: `direction=left|right` + positive `turn_rate_radps` -> signed `yaw_radps`;
+- `sidestep`: `direction=left|right` + positive `lateral_speed_mps` -> signed `vy_mps`.
+
+`argument_realization` for these skills refers to semantic facade arguments, not
+provider-local signed axes. This keeps source grounding in Chromie while keeping frame
+and sign conventions inside the provider boundary. A facade is never inferred from a
+skill name or user phrase. Skills whose correct lowering needs a different primitive
+(for example asymmetric general velocity or perception-backed target resolution) keep
+their existing contract until that primitive is explicitly designed and qualified.
+
 ## Safety boundary
 
 The manifest exposes named body skills, short velocity-plan tools,

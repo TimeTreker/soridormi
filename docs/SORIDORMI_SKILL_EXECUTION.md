@@ -78,17 +78,25 @@ and safety validation are added.
 
 The owner-authorized `turn_in_place` contract accepts integer `count` from 1 to 8,
 default 1. `duration_s` applies to each repetition; `count * duration_s` must not
-exceed the existing 20-second motion-plan limit. Positive `yaw_radps` turns left;
-negative turns right. Repetitions keep the requested yaw and duration, with no
-implied pause, heading reset, or full revolution. There is no implicit replacement of a supplied direction or duration by defaults: provider
-`argument_realization` metadata requires Planner to supply `yaw_radps` for a bound
-direction and `duration_s` for a bound duration. The Host checks argument presence;
-Planner still owns the source meaning and signed-value realization. This is not
-an independent semantic correctness proof. The Planner supplies count in
-its primary decision; the host must not infer it from unrelated argument values.
-Soridormi validates and expands count into sequential segments under the existing
-locomotion lock, cancellation, stop and safe-hold lifecycle. Counts above one use
-the runtime MCP route; the single-segment shell exporter rejects them explicitly.
+exceed the existing 20-second motion-plan limit. The public semantic facade exposes
+`direction=left|right` plus a positive `turn_rate_radps` magnitude. The executable
+Soridormi schema still uses signed `yaw_radps`, but that sign convention is provider
+realization state and is not part of Planner meaning. A trusted adapter lowers the
+semantic direction to the local signed yaw immediately before plan creation.
+Repetitions keep the realized yaw and requested duration, with no implied pause,
+heading reset, or full revolution. `argument_realization` therefore binds human
+direction to `direction`, duration to `duration_s`, and repetition count to `count`;
+it no longer tells Planner to author provider-local `yaw_radps`. Soridormi validates
+and expands count into sequential segments under the existing locomotion lock,
+cancellation, stop and safe-hold lifecycle. Counts above one use the runtime MCP
+route; the single-segment shell exporter rejects them explicitly.
+
+The same signed-axis facade is published by `curve_walk` for curve direction and by
+`sidestep` for lateral direction. Their provider schemas continue to use signed yaw
+and lateral velocity respectively; the facade keeps that frame convention below the
+provider boundary. `walk_velocity` is intentionally not force-fit to this primitive
+because its forward/backward range is asymmetric, and person-target gaze still
+requires trusted target resolution rather than a sign transform.
 
 ## Policy input boundary
 

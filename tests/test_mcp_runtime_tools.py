@@ -577,6 +577,14 @@ def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> Non
             "quick",
             "fast_limited",
         ]
+        turn = skills["turn_in_place"]
+        assert "yaw_radps" in turn["parameters_schema"]["properties"]
+        assert turn["metadata"]["semantic_facade"]["input_schema"]["properties"][
+            "direction"
+        ]["enum"] == ["left", "right"]
+        assert turn["metadata"]["semantic_facade"]["provider_realizations"][
+            "yaw_radps"
+        ]["positive_direction"] == "left"
         assert {"acquire_resource", "deliver_resource", "acquire_and_deliver_resource"} <= set(
             skills
         )

@@ -926,7 +926,7 @@
       "id": "turn_in_place",
       "category": "locomotion",
       "display_name": "Turn In Place",
-      "description": "Rotate left (positive yaw_radps) or right (negative yaw_radps) with near-zero forward velocity. count is 1-8 sequential repetitions; duration_s is per repetition. Total count * duration_s must not exceed 20 seconds; no pause or direction change is implied.",
+      "description": "Rotate left or right in place with near-zero forward velocity. The public semantic contract uses direction plus a positive turn-rate magnitude; Soridormi alone owns the provider-local signed yaw convention. count is 1-8 sequential repetitions; duration_s is per repetition. Total count * duration_s must not exceed 20 seconds; no pause or direction change is implied.",
       "status": "available_sim",
       "execution": "policy_velocity",
       "capability_group": "locomotion_wrappers",
@@ -986,10 +986,10 @@
             "source_entity_type": "direction",
             "planner_owned": true,
             "arguments": [
-              "yaw_radps"
+              "direction"
             ],
             "minimum_arguments": 1,
-            "contract": "Realize the supplied orientation with signed yaw_radps: positive rotates left, negative rotates right. The positive default cannot replace an explicitly supplied direction."
+            "contract": "Preserve an explicit human left/right orientation as semantic direction. Do not author yaw_radps or choose a provider sign; Soridormi owns that realization below the semantic facade."
           },
           "turn_duration": {
             "source_entity_type": "duration",
@@ -998,7 +998,62 @@
               "duration_s"
             ],
             "minimum_arguments": 1,
-            "contract": "Realize the supplied duration in seconds per repetition. The default applies only when the human supplied no duration."
+            "contract": "Realize an explicitly supplied duration as duration_s in seconds per repetition. The default applies only when the human supplied no duration."
+          },
+          "turn_count": {
+            "source_entity_type": "count",
+            "planner_owned": true,
+            "arguments": [
+              "count"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Preserve an explicitly supplied repetition count as count. The default applies only when no count was requested."
+          }
+        },
+        "semantic_facade": {
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              "turn_rate_radps": {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 0.2,
+                "default": 0.12
+              },
+              "duration_s": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 10.0,
+                "default": 2.0
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 8,
+                "default": 1
+              }
+            },
+            "required": [
+              "direction"
+            ],
+            "additionalProperties": false
+          },
+          "provider_realizations": {
+            "yaw_radps": {
+              "kind": "signed_magnitude",
+              "direction_argument": "direction",
+              "magnitude_argument": "turn_rate_radps",
+              "positive_direction": "left",
+              "negative_direction": "right",
+              "default_magnitude": 0.12
+            }
           }
         }
       }
@@ -1099,7 +1154,7 @@
       "id": "curve_walk",
       "category": "locomotion",
       "display_name": "Curve Walk",
-      "description": "Walk forward while tracking a yaw command.",
+      "description": "Walk forward while curving left or right. The public semantic contract keeps forward speed and duration explicit and represents curve orientation separately from Soridormi's provider-local signed yaw convention.",
       "status": "available_sim",
       "execution": "policy_velocity",
       "capability_group": "locomotion_wrappers",
@@ -1151,6 +1206,83 @@
           "body.primary_motion"
         ],
         "safety_preemption": "safe_hold"
+      },
+      "metadata": {
+        "semantic_facade": {
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              "turn_rate_radps": {
+                "type": "number",
+                "minimum": 0.01,
+                "maximum": 0.2,
+                "default": 0.1
+              },
+              "vx_mps": {
+                "type": "number",
+                "minimum": 0.03,
+                "maximum": 0.2,
+                "default": 0.12
+              },
+              "duration_s": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 20.0,
+                "default": 3.0
+              }
+            },
+            "required": [
+              "direction"
+            ],
+            "additionalProperties": false
+          },
+          "provider_realizations": {
+            "yaw_radps": {
+              "kind": "signed_magnitude",
+              "direction_argument": "direction",
+              "magnitude_argument": "turn_rate_radps",
+              "positive_direction": "left",
+              "negative_direction": "right",
+              "default_magnitude": 0.1
+            }
+          }
+        },
+        "argument_realization": {
+          "curve_direction": {
+            "source_entity_type": "direction",
+            "planner_owned": true,
+            "arguments": [
+              "direction"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Preserve an explicit human left/right curve orientation as semantic direction. Do not author yaw_radps or choose a provider sign."
+          },
+          "forward_speed": {
+            "source_entity_type": "speed",
+            "planner_owned": true,
+            "arguments": [
+              "vx_mps"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Preserve an explicit forward speed in metres per second as vx_mps. This capability only admits positive forward motion."
+          },
+          "curve_duration": {
+            "source_entity_type": "duration",
+            "planner_owned": true,
+            "arguments": [
+              "duration_s"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Realize an explicitly supplied curve duration as duration_s in seconds."
+          }
+        }
       }
     },
     {
@@ -1247,7 +1379,7 @@
       "id": "sidestep",
       "category": "locomotion",
       "display_name": "Sidestep",
-      "description": "Track a small lateral velocity command.",
+      "description": "Sidestep left or right at a bounded lateral speed. The public semantic contract uses direction plus a positive lateral-speed magnitude; Soridormi owns the provider-local signed lateral-velocity convention.",
       "status": "available_sim_experimental",
       "execution": "policy_velocity",
       "capability_group": "locomotion_wrappers",
@@ -1293,6 +1425,68 @@
           "body.primary_motion"
         ],
         "safety_preemption": "safe_hold"
+      },
+      "metadata": {
+        "semantic_facade": {
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "left",
+                  "right"
+                ]
+              },
+              "lateral_speed_mps": {
+                "type": "number",
+                "minimum": 0.005,
+                "maximum": 0.03,
+                "default": 0.02
+              },
+              "duration_s": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 8.0,
+                "default": 2.0
+              }
+            },
+            "required": [
+              "direction"
+            ],
+            "additionalProperties": false
+          },
+          "provider_realizations": {
+            "vy_mps": {
+              "kind": "signed_magnitude",
+              "direction_argument": "direction",
+              "magnitude_argument": "lateral_speed_mps",
+              "positive_direction": "left",
+              "negative_direction": "right",
+              "default_magnitude": 0.02
+            }
+          }
+        },
+        "argument_realization": {
+          "sidestep_direction": {
+            "source_entity_type": "direction",
+            "planner_owned": true,
+            "arguments": [
+              "direction"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Preserve an explicit left/right sidestep orientation as semantic direction. Do not author vy_mps or choose a provider sign."
+          },
+          "sidestep_duration": {
+            "source_entity_type": "duration",
+            "planner_owned": true,
+            "arguments": [
+              "duration_s"
+            ],
+            "minimum_arguments": 1,
+            "contract": "Realize an explicitly supplied sidestep duration as duration_s in seconds."
+          }
+        }
       }
     },
     {

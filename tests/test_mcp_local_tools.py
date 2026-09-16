@@ -89,6 +89,11 @@ def test_named_skill_provider_is_no_motion_in_all_safe_modes(
     assert "nod_yes" in skills
     assert skills["walk_forward"]["execution"] == "skill_wrapper"
     assert skills["walk_forward"]["semantic_speed_presets_mps"]["quick"] == pytest.approx(0.16)
+    turn = skills["turn_in_place"]
+    assert "yaw_radps" in turn["parameters_schema"]["properties"]
+    assert turn["metadata"]["semantic_facade"]["input_schema"]["properties"][
+        "direction"
+    ]["enum"] == ["left", "right"]
 
     planned = service.call_tool(
         "soridormi.skill.create_plan",
