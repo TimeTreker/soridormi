@@ -109,8 +109,10 @@ their existing contract until that primitive is explicitly designed and qualifie
 The manifest exposes named body skills, short velocity-plan tools,
 resource-aware body-activity tools, safety controls, task-level contract tools,
 and status checks. `soridormi.robot.get_status` includes `safe_idle`,
-`activity_idle`, and `active_lanes` so Chromie can monitor body execution
-without receiving low-level commands.
+`activity_idle`, and `active_lanes` so Chromie can inspect body execution
+without receiving low-level commands. It is an observational capability, not a
+mandatory Planner preflight for ordinary movement: Soridormi Runtime and safety
+gates own execution readiness and may reject or stop motion independently.
 
 `soridormi.activity.*` is the exact concurrent body-execution surface. Its
 members are already-selected named skills. Every member declares:

@@ -73,6 +73,9 @@ def test_status_schema_exposes_safe_idle_for_chromie() -> None:
 
     assert "active_task" in status.output_schema["properties"]
     assert "safe_idle" in status.output_schema["properties"]
+    hint = status.llm_hints["when_to_use"]
+    assert "Do not use as Planner preflight" in hint
+    assert "before planning or executing robot movement" not in hint
 
 
 def test_task_submit_is_contract_only_no_motion_surface() -> None:
@@ -244,6 +247,11 @@ def test_dag_contract_recommends_monitoring_motion_execution() -> None:
     sequence = "\n".join(bundle.dag_contract["default_short_motion_sequence"])
     assert "soridormi.safety.monitor_motion" in sequence
     assert "soridormi.motion.execute_plan" in sequence
+    assert "soridormi.robot.get_status" not in bundle.dag_contract["default_short_motion_sequence"]
+    assert any(
+        "not a mandatory movement preflight" in rule
+        for rule in bundle.dag_contract["rules"]
+    )
 
 
 def test_dag_contract_uses_semantic_status_language() -> None:

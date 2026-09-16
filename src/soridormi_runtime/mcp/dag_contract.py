@@ -57,7 +57,6 @@ def build_soridormi_dag_contract(*, mode: str = "sim") -> dict[str, Any]:
             "soridormi.safety.emergency_stop",
         ],
         "default_short_motion_sequence": [
-            "soridormi.robot.get_status",
             "soridormi.motion.create_plan",
             "chromie.ask_confirmation",
             "soridormi.safety.monitor_motion during soridormi.motion.execute_plan",
@@ -90,6 +89,7 @@ def build_soridormi_dag_contract(*, mode: str = "sim") -> dict[str, Any]:
             "Chromie must use chromie.ask_confirmation before physical-motion execution unless the action is stop/cancel/emergency_stop.",
             "Chromie must cover soridormi.motion.execute_plan with soridormi.safety.monitor_motion.",
             "Chromie must use soridormi.motion.create_plan before soridormi.motion.execute_plan.",
+            "soridormi.robot.get_status is observational and is not a mandatory movement preflight; Soridormi Runtime and safety checks own execution readiness.",
             "Chromie must cover soridormi.skill.execute_plan with soridormi.safety.monitor_motion.",
             "Chromie must use soridormi.skill.create_plan before soridormi.skill.execute_plan.",
             "Chromie must use soridormi.activity.compile before soridormi.activity.execute.",

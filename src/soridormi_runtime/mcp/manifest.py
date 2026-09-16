@@ -231,7 +231,15 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 availability=ToolAvailability(modes=[*safe_modes, "hardware"]),
                 execution=ExecutionPolicy(can_run_parallel=True, timeout_s=1.0, idempotent=True, side_effect_free=True),
                 default_failure_policy=FailurePolicy(strategy="abort_task"),
-                llm_hints={"when_to_use": "Use before planning or executing robot movement."},
+                llm_hints={
+                    "when_to_use": (
+                        "Use when the person asks for current robot status, mode, safety, "
+                        "active-task or idle-state information, or when trusted Runtime "
+                        "diagnostics need an explicit status observation. Do not use as "
+                        "Planner preflight for ordinary movement; Soridormi Runtime and "
+                        "safety gates own execution readiness."
+                    )
+                },
             ),
             ToolCapability(
                 name="soridormi.robot.get_mode",
