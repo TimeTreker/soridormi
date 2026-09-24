@@ -17,6 +17,7 @@ from soridormi_api import (
 )
 
 from .mujoco_viewer import MujocoViewerHandle, env_flag, env_float
+from .milk_bottle_scene import MILK_BOTTLE_GEOM, mock_milk_observation
 from .robot_config import RobotConfig, load_robot_config
 from .social_eye_scene import (
     LEFT_EYE_CLOSED_NAME,
@@ -89,6 +90,14 @@ class FakeMujocoBackend:
             feet_contacts=[0.0, 0.0],
             feet_position_xyz=None,
             actuator_ctrl=list(self.positions),
+        )
+
+    def observe_scene(self) -> dict[str, object]:
+        return mock_milk_observation(
+            bottle_xyz=None,
+            robot_xyz=(0.0, 0.0, 0.0),
+            robot_quat_wxyz=(1.0, 0.0, 0.0, 0.0),
+            robot_time_s=time.monotonic() - self.start_time,
         )
 
     def apply_command(self, command: MotorCommand) -> None:
@@ -251,6 +260,26 @@ class MujocoBackend:
         # reset pose rather than the previous fallen pose.
         if hasattr(self, "fixed_base_qpos_slices"):
             self.fixed_base_qpos_slices = self._capture_fixed_base_qpos_slices()
+
+    def observe_scene(self) -> dict[str, object]:
+        """Read the optional named bottle geom from current MuJoCo state."""
+
+        geom_id = self.mujoco.mj_name2id(
+            self.model, self.mujoco.mjtObj.mjOBJ_GEOM, MILK_BOTTLE_GEOM
+        )
+        bottle_xyz = (
+            tuple(float(value) for value in self.data.geom_xpos[geom_id])
+            if geom_id >= 0
+            else None
+        )
+        xyz = self._slice(self.data.qpos, self.config.base.qpos_xyz_slice)
+        quat = self._slice(self.data.qpos, self.config.base.qpos_quat_wxyz_slice)
+        return mock_milk_observation(
+            bottle_xyz=bottle_xyz,
+            robot_xyz=(float(xyz[0]), float(xyz[1]), float(xyz[2])),
+            robot_quat_wxyz=(float(quat[0]), float(quat[1]), float(quat[2]), float(quat[3])),
+            robot_time_s=float(self.data.time),
+        )
 
     def _apply_home_keyframe_if_enabled(self) -> None:
         """Apply MuJoCo keyframe("home") qpos and ctrl like official Open Duck.

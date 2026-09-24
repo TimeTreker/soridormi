@@ -70,17 +70,17 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
   returns explicit `resource_outcome` acquisition/delivery evidence so paired
   Chromie/Soridormi architecture can be exercised end to end without claiming a
   real manipulator or hardware grasp capability.
-- The generated MuJoCo visual-body overlay adds non-colliding, jointless arms
-  with torso-overlapping shoulder mounts and rounded cosmetic lower-leg shells
-  without editing the official Open Duck
-  XML/URDF or the 14-actuator robot configuration. The stylized model uses the
-  Open Duck white-shell/orange-joint palette. Fixed `0.082m` upper arms and
-  `0.070m` forearms keep all nine display poses at a consistent proportion;
-  compact orange hinge housings with graphite axle pins replace the previous
-  ball-like shoulder and elbow treatment. Each hand has a distinct cuff and
-  narrow wrist, a flattened palm, tapered three-segment fingers, and an opposed
-  three-segment thumb. The fixed display poses and moving-body leg shells have
-  no dynamics, collision, sensor, or completion-evidence authority.
+- An optional generated MuJoCo milk-bottle geom and read-only
+  `soridormi.robot.observe_scene` marker detector are source-implemented. The
+  detector reads current simulator geometry in the robot frame and returns
+  simulation-marked observations or an empty list; it is not a camera or
+  physical perception claim. Focused unit checks and generated-XML MuJoCo
+  compilation cover the source slice. Chromie does not yet poll this tool on
+  ordinary turns, and no live scene-to-speech qualification is claimed.
+- The generated MuJoCo visual-body overlay supplies proportioned jointless
+  arms, detailed fixed-pose hands, and cosmetic lower-leg shells in the Open
+  Duck palette. It does not change the official XML/URDF or 14-actuator policy;
+  its display geoms have no dynamics, collision, sensing, or completion authority.
 - `wave_hand`, `celebrate`, and `hug_gesture` are exported as simulation-only
   visual arm expressions. They sequence overlay poses through the independent
   `visual.arms` activity resource, restore `rest`, send no motor command, and do

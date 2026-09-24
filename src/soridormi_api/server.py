@@ -45,6 +45,11 @@ class RobotApiServer:
         if request.kind == "get_state":
             self.backend.step()
             return ApiResponse(ok=True, state=self.backend.get_state())
+        if request.kind == "observe_scene":
+            observer = getattr(self.backend, "observe_scene", None)
+            if not callable(observer):
+                return ApiResponse(ok=False, message="backend does not support scene observation")
+            return ApiResponse(ok=True, scene_observation=observer())
         if request.kind == "send_command":
             if request.command is None:
                 return ApiResponse(ok=False, message="send_command requires command")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -132,6 +132,7 @@ class ApiRequest(BaseModel):
     kind: Literal[
         "ping",
         "get_state",
+        "observe_scene",
         "send_command",
         "step_command",
         "set_visual_expression",
@@ -147,3 +148,4 @@ class ApiResponse(BaseModel):
     ok: bool
     message: str = ""
     state: RobotState | None = None
+    scene_observation: dict[str, Any] | None = None

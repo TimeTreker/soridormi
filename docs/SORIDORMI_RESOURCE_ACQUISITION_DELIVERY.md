@@ -89,6 +89,35 @@ capabilities, the complete capability, both, or neither according to qualificati
 
 ## Simulation-first mock implementation
 
+For scene-grounding experiments, run:
+
+```bash
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer --milk-bottle
+```
+
+This generates an optional,
+non-contact bottle geom 50 metres along the initial robot-forward axis. It is
+off by default and leaves the official robot XML and actuator contract intact.
+`soridormi.robot.observe_scene` reads that named geom's *current MuJoCo
+position* relative to the robot and returns a bounded forward-field mock
+observation with an exact observation ID, sequence, distance, and
+`mocked_simulation=true`. The detector is marker-based; it does not analyze
+camera pixels or establish physical-world perception. No bottle in the loaded
+scene, an out-of-range bottle, or a bottle outside the forward field yields an
+empty object list. User speech cannot populate this result.
+
+Chromie can project a validated result into Situation with the Soridormi
+observation as its source. The mock observation is separate from a user's
+report and cannot retrospectively turn that report into robot perception.
+The current text turn path does not automatically request scene observation;
+first-person visual claims require the observation to have been explicitly
+admitted before the response. A future camera provider can replace this
+simulation source without changing the user-report provenance rule.
+
+The `--milk-bottle` launcher option exists only for this simulation scenario;
+its default is off, it has no hardware or dry-run combination, and it can be
+removed when a qualified scene provider supplies equivalent test coverage.
+
 Open Duck Mini v2 does not currently expose a validated manipulator/gripper stack.
 To validate the cross-repository architecture now, Soridormi provides a
 **simulation-only scripted/mock implementation** of the complete resource contract.

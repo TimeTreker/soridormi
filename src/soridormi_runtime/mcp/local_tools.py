@@ -219,6 +219,18 @@ class SoridormiLocalToolService:
         with self._lock:
             if tool_name == "soridormi.robot.get_status":
                 return self.get_status()
+            if tool_name == "soridormi.robot.observe_scene":
+                if self.mode != "sim":
+                    raise RuntimeError("mock scene perception is available only in sim mode")
+                return {
+                    "observation_id": f"soridormi-local-scene-{uuid.uuid4().hex}",
+                    "observation_sequence": 1,
+                    "mode": self.mode,
+                    "source_kind": "local_no_scene",
+                    "mocked_simulation": True,
+                    "robot_time_s": 0.0,
+                    "objects": [],
+                }
             if tool_name == "soridormi.robot.get_mode":
                 return {"mode": self.mode}
             if tool_name == "soridormi.robot.get_battery":

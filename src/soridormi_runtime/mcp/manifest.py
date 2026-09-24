@@ -242,6 +242,61 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 },
             ),
             ToolCapability(
+                name="soridormi.robot.observe_scene",
+                agent_id="soridormi.robot",
+                display_name="Observe simulated scene",
+                description=(
+                    "Read the current MuJoCo scene-marker mock observation. "
+                    "It is simulation evidence, not camera or hardware perception."
+                ),
+                input_schema=_object_schema({}),
+                output_schema=_object_schema(
+                    {
+                        "observation_id": {"type": "string"},
+                        "observation_sequence": {"type": "integer", "minimum": 1},
+                        "mode": {"type": "string", "enum": ["sim"]},
+                        "source_kind": {"type": "string"},
+                        "mocked_simulation": {"type": "boolean", "const": True},
+                        "robot_time_s": {"type": "number"},
+                        "objects": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "object_ref": {"type": "string"},
+                                    "description": {"type": "string"},
+                                    "relative_direction": {"type": "string"},
+                                    "distance_m": {"type": "number"},
+                                },
+                                "required": [
+                                    "object_ref", "description", "relative_direction",
+                                    "distance_m",
+                                ],
+                                "additionalProperties": False,
+                            },
+                        },
+                        "source_revision": {"type": "string"},
+                    },
+                    required=[
+                        "observation_id", "observation_sequence", "mode", "source_kind", "mocked_simulation",
+                        "robot_time_s", "objects",
+                    ],
+                ),
+                effects=["read_only", "perception"],
+                safety_class="safe_read",
+                availability=ToolAvailability(modes=["sim"]),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True, timeout_s=2.0, idempotent=True,
+                    side_effect_free=True,
+                ),
+                llm_hints={
+                    "when_to_use": (
+                        "Use only for an explicit simulation scene observation. "
+                        "An empty objects list provides no visual grounding."
+                    )
+                },
+            ),
+            ToolCapability(
                 name="soridormi.robot.get_mode",
                 agent_id="soridormi.robot",
                 description="Read the current Soridormi runtime mode such as sim, hardware_dry_run, or hardware.",

@@ -129,6 +129,7 @@ class SoridormiRuntimeToolService:
     _robot_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
     _last_state: RobotState | None = field(default=None, init=False, repr=False)
     _simulated_carried_resource: str | None = field(default=None, init=False, repr=False)
+    _scene_observation_sequence: int = field(default=0, init=False, repr=False)
     _robot_executor: ThreadPoolExecutor | None = field(default=None, init=False, repr=False)
 
     @classmethod
@@ -202,6 +203,8 @@ class SoridormiRuntimeToolService:
         args = args or {}
         if tool_name == "soridormi.robot.get_status":
             return await self.get_status()
+        if tool_name == "soridormi.robot.observe_scene":
+            return await self.observe_scene()
         if tool_name == "soridormi.robot.get_mode":
             return {"mode": self.mode}
         if tool_name == "soridormi.robot.get_battery":
@@ -1590,6 +1593,27 @@ class SoridormiRuntimeToolService:
         if self.source_revision:
             status["source_revision"] = self.source_revision
         return status
+
+    async def observe_scene(self) -> dict[str, Any]:
+        """Expose only current simulation scene-marker observations."""
+
+        if self.mode != "sim":
+            raise RuntimeError("mock scene perception is available only in sim mode")
+        observer = getattr(self.robot, "observe_scene", None)
+        if not callable(observer):
+            raise RuntimeError("simulator does not expose scene observation")
+        async with self._robot_lock:
+            observed = await self._call_robot(observer)
+        if not isinstance(observed, dict) or observed.get("mocked_simulation") is not True:
+            raise RuntimeError("invalid mock scene observation")
+        result = dict(observed)
+        self._scene_observation_sequence += 1
+        result["observation_sequence"] = self._scene_observation_sequence
+        result["observation_id"] = f"soridormi-scene-{uuid.uuid4().hex}"
+        result["mode"] = self.mode
+        if self.source_revision:
+            result["source_revision"] = self.source_revision
+        return result
 
     async def execute_motion_plan(
         self,

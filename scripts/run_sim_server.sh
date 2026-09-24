@@ -36,6 +36,7 @@ Options:
   --no-visual-arms      Disable the generated cosmetic limb overlay.
   --rough-ground        Generate a temporary MuJoCo scene with small stone boxes.
   --no-rough-ground     Use the normal flat MuJoCo scene. default
+  --milk-bottle         Add a non-contact bottle of milk 50 m ahead for mock perception.
   --rough-stone-height M
                         Approximate stone height in meters. default: 0.008
   --rough-stone-count N
@@ -71,6 +72,7 @@ SOCIAL_EYES="${SORIDORMI_MUJOCO_SOCIAL_EYES:-1}"
 SOCIAL_EYE_FRAME="${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME:-0}"
 VISUAL_ARMS="${SORIDORMI_MUJOCO_VISUAL_ARMS:-1}"
 ROUGH_GROUND="${SORIDORMI_MUJOCO_ROUGH_GROUND:-0}"
+MILK_BOTTLE="0"
 ROUGH_STONE_HEIGHT="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT:-0.008}"
 ROUGH_STONE_COUNT="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT:-8}"
 ROUGH_STONE_RADIUS="${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS:-0.018}"
@@ -139,6 +141,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --rough-ground)
       ROUGH_GROUND="1"
+      shift
+      ;;
+    --milk-bottle)
+      MILK_BOTTLE="1"
       shift
       ;;
     --no-rough-ground)
@@ -212,6 +218,7 @@ echo "MuJoCo social eyes: ${SORIDORMI_MUJOCO_SOCIAL_EYES}"
 echo "MuJoCo social eye frame: ${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}"
 echo "MuJoCo visual arms: ${SORIDORMI_MUJOCO_VISUAL_ARMS}"
 echo "MuJoCo rough ground: ${SORIDORMI_MUJOCO_ROUGH_GROUND}"
+echo "MuJoCo milk bottle: ${MILK_BOTTLE}"
 if [ "${SORIDORMI_MUJOCO_FOLLOW_CAMERA}" = "1" ]; then
   echo "MuJoCo follow camera params: distance=${SORIDORMI_MUJOCO_CAMERA_DISTANCE} azimuth=${SORIDORMI_MUJOCO_CAMERA_AZIMUTH} elevation=${SORIDORMI_MUJOCO_CAMERA_ELEVATION}"
 fi
@@ -237,6 +244,7 @@ docker compose -f compose.sim.yaml run --rm \
   -e SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT}" \
   -e SORIDORMI_MUJOCO_ROUGH_STONE_COUNT_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT}" \
   -e SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS}" \
+  -e SORIDORMI_MUJOCO_MILK_BOTTLE_OVERRIDE="${MILK_BOTTLE}" \
   sim bash -lc '
     set -euo pipefail
     source /opt/venvs/sim/bin/activate
@@ -262,6 +270,7 @@ docker compose -f compose.sim.yaml run --rm \
     export SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT_OVERRIDE:-0.008}"
     export SORIDORMI_MUJOCO_ROUGH_STONE_COUNT="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT_OVERRIDE:-8}"
     export SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS="${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS_OVERRIDE:-0.018}"
+    MILK_BOTTLE="${SORIDORMI_MUJOCO_MILK_BOTTLE_OVERRIDE:-0}"
 
     if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && { [ "${SORIDORMI_MUJOCO_SOCIAL_EYES}" = "1" ] || [ "${SORIDORMI_MUJOCO_VISUAL_ARMS}" = "1" ]; }; then
       BASE_MODEL="${MUJOCO_MODEL_PATH:-}"
@@ -308,6 +317,20 @@ PYMODEL
       export MUJOCO_MODEL_PATH="${ROUGH_MODEL}"
     fi
 
+    if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && [ "${MILK_BOTTLE}" = "1" ]; then
+      BASE_MODEL="${MUJOCO_MODEL_PATH:-}"
+      if [ -z "${BASE_MODEL}" ]; then
+        BASE_MODEL="$(python - <<'PYMODEL'
+from soridormi_sim.robot_config import load_robot_config
+print(load_robot_config().model.path)
+PYMODEL
+)"
+      fi
+      MILK_MODEL="$(dirname "${BASE_MODEL}")/soridormi_milk_bottle_scene.xml"
+      python -m soridormi_sim.milk_bottle_scene --base "${BASE_MODEL}" --output "${MILK_MODEL}"
+      export MUJOCO_MODEL_PATH="${MILK_MODEL}"
+    fi
+
     echo "Effective sim backend: ${SORIDORMI_SIM_BACKEND}"
     echo "Effective MuJoCo viewer: ${SORIDORMI_MUJOCO_VIEWER}"
     echo "Effective MuJoCo follow camera: ${SORIDORMI_MUJOCO_FOLLOW_CAMERA}"
@@ -315,6 +338,7 @@ PYMODEL
     echo "Effective MuJoCo social eye frame: ${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}"
     echo "Effective MuJoCo visual arms: ${SORIDORMI_MUJOCO_VISUAL_ARMS}"
     echo "Effective MuJoCo rough ground: ${SORIDORMI_MUJOCO_ROUGH_GROUND}"
+    echo "Effective MuJoCo milk bottle: ${MILK_BOTTLE}"
     if [ "${SORIDORMI_MUJOCO_FOLLOW_CAMERA}" = "1" ]; then
       echo "Effective MuJoCo camera params: distance=${SORIDORMI_MUJOCO_CAMERA_DISTANCE} azimuth=${SORIDORMI_MUJOCO_CAMERA_AZIMUTH} elevation=${SORIDORMI_MUJOCO_CAMERA_ELEVATION}"
     fi

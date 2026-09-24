@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from typing import Any
 
 import zmq
 
@@ -40,6 +41,12 @@ class RobotApiClient:
         if response.state is None:
             raise RuntimeError("server returned no RobotState")
         return response.state
+
+    def observe_scene(self) -> dict[str, Any]:
+        response = self._request(ApiRequest(kind="observe_scene"))
+        if response.scene_observation is None:
+            raise RuntimeError("server returned no scene observation")
+        return response.scene_observation
 
     def send_motor_command(self, command: MotorCommand) -> None:
         response = self._request(ApiRequest(kind="send_command", command=command))

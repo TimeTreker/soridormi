@@ -7,6 +7,7 @@ and cross-agent DAG planning.
 Soridormi therefore exports only `soridormi.*` tools:
 
 - `soridormi.robot.get_status`
+- `soridormi.robot.observe_scene` (simulation-only marker observation)
 - `soridormi.robot.get_mode`
 - `soridormi.robot.get_battery`
 - `soridormi.motion.create_plan`
