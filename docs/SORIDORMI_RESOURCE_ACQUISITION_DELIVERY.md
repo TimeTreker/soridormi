@@ -101,7 +101,8 @@ bottle through `MjSpec`, compiles the model, then starts Soridormi as a separate
 child process. `--validate` compiles the scene without starting the server.
 For another scenario, pass `--scenario PATH`; its `world_map.base_xml` must be
 visible inside the simulator container. Assembly verifies the robot state and
-actuator dimensions and actuator order against the selected base world.
+actuator dimensions and actuator order against the selected base world. Pass
+`--profile open_duck_forward` when pairing the scenario with that policy runtime.
 The viewer opens with an overview of Chromie, both chairs, and the table.
 
 The default scenario places a non-contact bottle on the tabletop 10 metres
