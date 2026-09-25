@@ -97,19 +97,20 @@ For scene-grounding experiments, run:
 
 The scenario runner reads `configs/simulation_scenarios/default.json`, stages
 its MuJoCo world map, adds fixed table and chairs, creates the dynamic milk
-bottle through `MjSpec`, compiles the model, then starts Soridormi as a separate
+bottle and standing user through `MjSpec`, compiles the model, then starts Soridormi as a separate
 child process. `--validate` compiles the scene without starting the server.
 For another scenario, pass `--scenario PATH`; its `world_map.base_xml` must be
 visible inside the simulator container. Assembly verifies the robot state and
 actuator dimensions and actuator order against the selected base world. Pass
 `--profile open_duck_forward` when pairing the scenario with that policy runtime.
-The viewer opens with an overview of Chromie, both chairs, and the table.
+The viewer opens with Chromie, the user to her right, both chairs, and the table.
 
 The default scenario places a non-contact bottle on the tabletop 10 metres
 along the initial robot-forward axis. The tabletop is 0.74 m high; its four legs and the
 bottle are visual scene fixtures, not collision or grasp targets. Two fixed
 chairs sit to Chromie's initial left (+y), 1.5 m and 3 m ahead. They are also
-non-contact visual fixtures. The scenario file chooses the base world XML and
+non-contact visual fixtures. The standing user starts 1.5 m to Chromie's right
+(-y) and is also a non-contact scenario actor. The scenario file chooses the base world XML and
 static layout, declares dynamic bodies and their geoms, and optionally schedules
 `events` with `at_sim_time_s` and world poses. The runner applies due events as
 Soridormi's simulation clock advances; it does not issue robot motor commands.
@@ -118,13 +119,15 @@ Soridormi's simulation clock advances; it does not issue robot motor commands.
 option still builds a self-contained milk scene. Generated XML and relative
 assets are staged under ignored `/data/scenes`; the Open Duck submodule and
 official 14-actuator contract remain unchanged.
-`soridormi.robot.observe_scene` reads that named geom's *current MuJoCo
-position* relative to the robot and returns a bounded forward-field mock
+`soridormi.robot.observe_scene` reads the named bottle and user geoms' *current MuJoCo
+positions* relative to the robot. The bottle uses a bounded forward-field mock
 observation with an exact observation ID, sequence, distance, and
 `mocked_simulation=true`. The detector is marker-based; it does not analyze
 camera pixels or establish physical-world perception. No bottle in the loaded
 scene, an out-of-range bottle, or a bottle outside the forward field yields an
-empty object list. User speech cannot populate this result.
+empty bottle result. The named user actor remains scene-tracked around the robot
+so Soridormi can return after pickup; it is not camera perception. User speech
+cannot populate either marker result.
 
 Chromie can project a validated result into Situation with the Soridormi
 observation as its source. The mock observation is separate from a user's
@@ -138,8 +141,8 @@ The static world belongs to MuJoCo. The separate scenario runner uses a
 separate simulator-only ZeroMQ REQ/REP endpoint at `tcp://127.0.0.1:5556`
 (`SIM_PORT + 1`) to control dynamic bodies. A body is controllable when its
 MuJoCo XML declares `mocap="true"` and its name starts with `scenario_`.
-The default scenario declares `scenario_milk_bottle`; the table and chairs are
-fixed. `{"kind":"list_objects"}` lists dynamic bodies, poses, and simulation time.
+The default scenario declares `scenario_milk_bottle` and `scenario_user`; the table
+and chairs are fixed. `{"kind":"list_objects"}` lists dynamic bodies, poses, and simulation time.
 `{"kind":"set_object_pose","object_name":"scenario_milk_bottle","position_xyz":[6,0,0.86]}`
 updates its world pose; an optional unit `quat_wxyz` sets orientation. The
 simulator serializes these requests with robot stepping and perception reads.
@@ -150,11 +153,14 @@ bodies before starting the simulator and changes their poses during playback.
 
 Open Duck Mini v2 does not currently expose a validated manipulator/gripper stack.
 To validate the cross-repository architecture now, Soridormi provides a
-**simulation-only scripted/mock implementation** of the complete resource contract.
-The runtime mock uses a short scripted approach/return motion so the composite action
-is observable in simulation. Object acquisition, carrying, and handover remain
-idealized because the current body has no qualified manipulator/gripper stack. The
-provider must still return coherent completion evidence for the whole capability.
+**simulation-only implementation** of the complete resource contract. The runtime
+walks to a uniquely observed resource and back to a uniquely observed recipient,
+rechecking scene distance and bearing after bounded walking segments. A recipient
+behind Chromie is reached by a feedback-guided walking turn. Missing or ambiguous
+markers, stalled motion, reset, stop, and timeout prevent delivery evidence.
+Object acquisition, carrying, and handover remain idealized because the current
+body has no qualified manipulator/gripper stack. The provider returns completion
+evidence only after both walks finish.
 
 The mock is not hardware qualification. It must remain unavailable outside the
 simulation runtime and must never be advertised as proof that current hardware can

@@ -150,13 +150,14 @@ matching contract.
 
 The implementation remains simulation-only because the current Open Duck Mini v2
 has no qualified manipulator/gripper stack. Soridormi walks toward a uniquely
-observed scene object in bounded one-second segments, re-reading its simulator
-distance and bearing until it is within 0.9 m. The user-reported distance stays
-in `source` as context; simulator geometry controls travel. `speed` optionally
-selects an existing bounded walking pace and defaults to `slow`. Missing or
-ambiguous scene observations, lack of progress, timeout, stop, and simulator reset
-prevent completion evidence. Acquisition, carrying, return to recipient, and
-handover are still explicit simulation mocks in `resource_outcome`; the result
+observed scene object in bounded one-second segments, then returns to a uniquely
+observed recipient. It re-reads simulator distance and bearing until it is within
+0.9 m of each target. The user-reported distance stays in `source` as context;
+simulator geometry controls travel. `speed` optionally selects an existing
+bounded walking pace and defaults to `slow`. Missing or ambiguous scene
+observations, lack of progress, timeout, stop, and simulator reset prevent
+completion evidence. Acquisition, carrying, and handover remain explicit
+simulation mocks in `resource_outcome`; the result
 must not be interpreted as physical retrieval or delivery. Hardware execution
 remains unavailable until the embodied stack is qualified.
 

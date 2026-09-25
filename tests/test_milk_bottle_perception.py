@@ -13,8 +13,9 @@ from soridormi_runtime.mcp.manifest import build_soridormi_capability_bundle
 from soridormi_sim.milk_bottle_scene import (
     MILK_BOTTLE_GEOM,
     MILK_TABLE_GEOM,
+    USER_BODY_GEOM,
     build_milk_bottle_scene_xml,
-    mock_milk_observation,
+    mock_scene_observation,
 )
 from soridormi_sim.mujoco_backend import FakeMujocoBackend
 from soridormi_sim.robot_config import load_robot_config
@@ -76,7 +77,7 @@ def test_mock_observation_uses_scene_position_and_robot_heading() -> None:
         "robot_quat_wxyz": (1.0, 0.0, 0.0, 0.0),
         "robot_time_s": 2.0,
     }
-    detected = mock_milk_observation(bottle_xyz=(10.0, 0.0, 0.86), **base)
+    detected = mock_scene_observation(bottle_xyz=(10.0, 0.0, 0.86), **base)
     assert detected["mocked_simulation"] is True
     assert detected["objects"] == [{
         "object_ref": MILK_BOTTLE_GEOM,
@@ -85,10 +86,21 @@ def test_mock_observation_uses_scene_position_and_robot_heading() -> None:
         "distance_m": 10.0,
         "bearing_rad": 0.0,
     }]
-    assert mock_milk_observation(bottle_xyz=None, **base)["objects"] == []
-    assert mock_milk_observation(bottle_xyz=(70.0, 0.0, 0.86), **base)["objects"] == []
+    assert mock_scene_observation(bottle_xyz=None, **base)["objects"] == []
+    assert mock_scene_observation(bottle_xyz=(70.0, 0.0, 0.86), **base)["objects"] == []
     turned = {**base, "robot_quat_wxyz": (math.sqrt(0.5), 0.0, 0.0, math.sqrt(0.5))}
-    assert mock_milk_observation(bottle_xyz=(10.0, 0.0, 0.86), **turned)["objects"] == []
+    assert mock_scene_observation(bottle_xyz=(10.0, 0.0, 0.86), **turned)["objects"] == []
+    user = mock_scene_observation(
+        bottle_xyz=None, user_xyz=(0.0, -1.5, 1.0), **base
+    )["objects"]
+    assert len(user) == 1
+    assert user[0]["object_ref"] == USER_BODY_GEOM
+    assert user[0]["relative_direction"] == "to Chromie's right"
+    assert user[0]["distance_m"] == 1.5
+    assert user[0]["bearing_rad"] == pytest.approx(-math.pi / 2)
+    assert mock_scene_observation(
+        bottle_xyz=None, user_xyz=(0.0, -70.0, 1.0), **base
+    )["objects"] == []
 
 
 def test_fake_simulator_and_local_adapter_cannot_invent_a_bottle() -> None:
@@ -128,7 +140,7 @@ def test_simulator_api_and_runtime_tool_preserve_mock_provenance() -> None:
 
     class SceneRobot:
         def observe_scene(self):
-            return mock_milk_observation(
+            return mock_scene_observation(
                 bottle_xyz=(10.0, 0.0, 0.86),
                 robot_xyz=(0.0, 0.0, 0.0),
                 robot_quat_wxyz=(1.0, 0.0, 0.0, 0.0),

@@ -16,6 +16,7 @@ from .rough_ground_scene import rewrite_relative_includes
 MILK_BOTTLE_GEOM = "soridormi_mock_milk_bottle"
 MILK_TABLE_GEOM = "soridormi_mock_milk_table_top"
 SCENARIO_BOTTLE_BODY = "scenario_milk_bottle"
+USER_BODY_GEOM = "soridormi_mock_user_torso"
 
 
 def _left_chair_xml(index: int, x: float) -> str:
@@ -46,23 +47,28 @@ def _left_chair_xml(index: int, x: float) -> str:
     )
 
 
-def mock_milk_observation(
+def mock_scene_observation(
     *,
     bottle_xyz: tuple[float, float, float] | None,
+    user_xyz: tuple[float, float, float] | None = None,
     robot_xyz: tuple[float, float, float],
     robot_quat_wxyz: tuple[float, float, float, float],
     robot_time_s: float,
 ) -> dict[str, object]:
-    """Classify one named scene geom in the robot frame, without camera inference."""
+    """Classify named scene markers in the robot frame, without camera inference."""
 
     observations: list[dict[str, object]] = []
+    w, x, y, z = robot_quat_wxyz
+    yaw = math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+
+    def polar(target_xyz: tuple[float, float, float]) -> tuple[float, float]:
+        dx = target_xyz[0] - robot_xyz[0]
+        dy = target_xyz[1] - robot_xyz[1]
+        direction = math.atan2(dy, dx) - yaw
+        return math.hypot(dx, dy), math.atan2(math.sin(direction), math.cos(direction))
+
     if bottle_xyz is not None:
-        dx = bottle_xyz[0] - robot_xyz[0]
-        dy = bottle_xyz[1] - robot_xyz[1]
-        distance_m = math.hypot(dx, dy)
-        w, x, y, z = robot_quat_wxyz
-        yaw = math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
-        bearing = math.atan2(math.sin(math.atan2(dy, dx) - yaw), math.cos(math.atan2(dy, dx) - yaw))
+        distance_m, bearing = polar(bottle_xyz)
         # A deliberately simple marker detector: 60 m range and a 90-degree
         # forward field. The simulator geom, not the user's words, supplies pose.
         if distance_m <= 60.0 and abs(bearing) <= math.pi / 4:
@@ -74,6 +80,28 @@ def mock_milk_observation(
                     "distance_m": round(distance_m, 3),
                     # Provider-internal steering input. The MCP perception tool
                     # removes this backend-frame value before exposing the scene.
+                    "bearing_rad": bearing,
+                }
+            )
+    if user_xyz is not None:
+        distance_m, bearing = polar(user_xyz)
+        # A named scenario actor is tracked through the simulator scene API,
+        # including when behind the robot. This is not camera perception.
+        if distance_m <= 60.0:
+            if abs(bearing) <= math.pi / 4:
+                relative_direction = "in front of Chromie"
+            elif abs(bearing) >= 3 * math.pi / 4:
+                relative_direction = "behind Chromie"
+            elif bearing > 0:
+                relative_direction = "to Chromie's left"
+            else:
+                relative_direction = "to Chromie's right"
+            observations.append(
+                {
+                    "object_ref": USER_BODY_GEOM,
+                    "description": "user",
+                    "relative_direction": relative_direction,
+                    "distance_m": round(distance_m, 3),
                     "bearing_rad": bearing,
                 }
             )

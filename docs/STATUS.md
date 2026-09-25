@@ -65,16 +65,17 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
   provider may advertise granular acquisition/delivery capabilities, the complete
   composite, or both. Chromie owns composition across public leaves; Soridormi owns
   local planning inside each selected capability.
-- `acquire_and_deliver_resource` walks to uniquely observed scene resources at
-  bounded pace; grasp, carry, return, and handover remain simulation mocks.
+- `acquire_and_deliver_resource` walks to the observed resource and returns to
+  the observed recipient; pickup, carry, and handover remain simulation mocks.
   Missing observations, stalls, stops, and resets cannot complete.
-- Live default-scene MuJoCo/MCP, 2026-09-25, revision `06d5d4f`: bottle
-  10.008→0.881 m in 155.13 s; mock handover completed, no active task,
-  `safe_idle=true`. Simulator reset to initial scene after proof.
+- Direct full-scene MuJoCo proof, 2026-09-25, dirty successor of `06d5d4f`:
+  bottle 10.006→0.844 m in 156.08 s; user 9.412→0.892 m in 159.17 s;
+  mocked handover completed, standing/safe idle, no active task. The earlier
+  approach-only MCP proof on `06d5d4f` was 10.008→0.881 m in 155.13 s.
 - The separate scenario runner reads a world-map/dynamic-element file, builds
   bodies with MuJoCo `MjSpec`, starts Soridormi, and applies timed pose events.
-  The default scenario places a mock bottle on a fixed table 10 m ahead and
-  fixed chairs left of Chromie. `observe_scene` reads current simulation geometry;
+  The default scenario places a bottle on a fixed table 10 m ahead, a standing
+  user 1.5 m right, and fixed chairs left. `observe_scene` reads scene geometry;
   it is not camera or physical perception. Focused and live MuJoCo tests cover
   creation and movement. Chromie does not poll it on ordinary turns; no live
   scene-to-speech proof exists.
@@ -104,7 +105,7 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
   standing safe idle. This is MuJoCo diagnostic evidence, not literal
   100-metre travel, physical water handling, or hardware qualification.
 - Current checkout: governance and compile pass; full runtime-container suite
-  818 passed / 4 skipped; body concurrency 176 passed. Host Python lacks
+  819 passed / 4 skipped; body concurrency 177 passed. Host Python lacks
   `pyzmq`, so host pytest/body collection does not pass.
 - The MCP service exposes robot state, safety tools, bounded motion plans, named
   skills, concurrent body activities, and a task-level contract surface.

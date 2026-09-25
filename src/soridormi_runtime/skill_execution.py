@@ -1133,8 +1133,8 @@ def _plan_acquire_and_deliver_resource(
         commands=commands,
         summary=(
             "Plan acquire_and_deliver_resource: observe and walk to "
-            f"{description!r}, then mock acquisition and handover to "
-            f"{recipient_description!r} in simulation."
+            f"{description!r}, mock pickup, return to observed "
+            f"{recipient_description!r}, then mock handover in simulation."
         ),
     )
 

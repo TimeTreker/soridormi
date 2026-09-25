@@ -30,6 +30,54 @@
           "rgba": [0.18, 0.40, 0.82, 1.0]
         }
       ]
+    },
+    {
+      "name": "scenario_user",
+      "position_xyz": [0.0, -1.5, 0.0],
+      "geoms": [
+        {
+          "name": "soridormi_mock_user_torso",
+          "shape": "box",
+          "size": [0.15, 0.22, 0.34],
+          "local_position_xyz": [0.0, 0.0, 1.08],
+          "rgba": [0.87, 0.40, 0.18, 1.0]
+        },
+        {
+          "name": "soridormi_mock_user_head",
+          "shape": "sphere",
+          "size": [0.14, 0.0, 0.0],
+          "local_position_xyz": [0.0, 0.0, 1.59],
+          "rgba": [0.75, 0.52, 0.36, 1.0]
+        },
+        {
+          "name": "soridormi_mock_user_left_leg",
+          "shape": "box",
+          "size": [0.08, 0.08, 0.36],
+          "local_position_xyz": [0.0, 0.11, 0.36],
+          "rgba": [0.16, 0.22, 0.35, 1.0]
+        },
+        {
+          "name": "soridormi_mock_user_right_leg",
+          "shape": "box",
+          "size": [0.08, 0.08, 0.36],
+          "local_position_xyz": [0.0, -0.11, 0.36],
+          "rgba": [0.16, 0.22, 0.35, 1.0]
+        },
+        {
+          "name": "soridormi_mock_user_left_arm",
+          "shape": "box",
+          "size": [0.06, 0.06, 0.29],
+          "local_position_xyz": [0.0, 0.30, 1.03],
+          "rgba": [0.75, 0.52, 0.36, 1.0]
+        },
+        {
+          "name": "soridormi_mock_user_right_arm",
+          "shape": "box",
+          "size": [0.06, 0.06, 0.29],
+          "local_position_xyz": [0.0, -0.30, 1.03],
+          "rgba": [0.75, 0.52, 0.36, 1.0]
+        }
+      ]
     }
   ],
   "events": []

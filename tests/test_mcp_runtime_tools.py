@@ -212,20 +212,29 @@ class ResettingResourceFakeRobot(ResourceFakeRobot):
             "mocked_simulation": True,
             "objects": [{
                 "description": "bottle of milk", "distance_m": 2.0, "bearing_rad": 0.0,
+            }, {
+                "description": "user", "distance_m": 1.5, "bearing_rad": 0.0,
             }],
         }
 
 
 class ObservedResourceFakeRobot(ResourceFakeRobot):
-    def __init__(self, *, description: str = "bottle of milk") -> None:
+    def __init__(
+        self, *, description: str = "bottle of milk", user_description: str = "user"
+    ) -> None:
         super().__init__()
         self.description = description
+        self.user_description = user_description
         self.distance_m = 1.25
+        self.user_distance_m = 1.45
 
     def send_motor_command(self, command: MotorCommand) -> None:
         super().send_motor_command(command)
         if command.velocities and command.velocities[0] > 0:
-            self.distance_m -= 0.02
+            if self.distance_m > 0.9:
+                self.distance_m -= 0.02
+            else:
+                self.user_distance_m -= 0.02
 
     def observe_scene(self) -> dict[str, object]:
         return {
@@ -233,6 +242,10 @@ class ObservedResourceFakeRobot(ResourceFakeRobot):
             "objects": [{
                 "description": self.description,
                 "distance_m": self.distance_m,
+                "bearing_rad": 0.0,
+            }, {
+                "description": self.user_description,
+                "distance_m": self.user_distance_m,
                 "bearing_rad": 0.0,
             }],
         }
@@ -661,7 +674,7 @@ def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> Non
         )
         resource_skill = skills["acquire_and_deliver_resource"]
         assert resource_skill["execution"] == "composite"
-        assert resource_skill["timeout_s"] == 300.0
+        assert resource_skill["timeout_s"] == 660.0
         assert resource_skill["parameters_schema"]["properties"]["speed"]["default"] == "slow"
         assert resource_skill["parameters_schema"]["properties"]["resource"]["type"] == "object"
         assert resource_skill["metadata"]["semantic_scope"]["resource_kinds"] == ["physical_object"]
@@ -760,7 +773,7 @@ def test_runtime_service_executes_simulated_resource_acquisition_delivery() -> N
                         "bindings": {},
                     },
                     "recipient": {
-                        "description": "requester",
+                        "description": "user",
                         "referent_id": None,
                     },
                 },
@@ -823,12 +836,14 @@ def test_known_resource_walks_to_observed_scene_object_before_mock_handover(
         assert result["resource_outcome"]["mocked_simulation"] is True
         assert result["approach_outcome"]["observed_distance_start_m"] == 1.25
         assert result["approach_outcome"]["observed_distance_end_m"] <= 0.9
+        assert 0.9 < result["return_outcome"]["observed_distance_start_m"] <= 1.45
+        assert result["return_outcome"]["observed_distance_end_m"] <= 0.9
         assert any(
             command.x_velocity == pytest.approx(expected_mps)
             for command in service.controller.seen_commands
         )
         assert all(command.x_velocity >= 0 for command in service.controller.seen_commands)
-        assert "mocked acquisition and handover" in result["summary"]
+        assert "returned to the observed recipient" in result["summary"]
         public_observation = await service.call_tool("soridormi.robot.observe_scene", {})
         assert "bearing_rad" not in public_observation["objects"][0]
 
@@ -858,6 +873,33 @@ def test_known_resource_without_matching_observation_refuses_motion() -> None:
             command.velocities[0] == 0 for command in robot.commands
         )
         assert service.active_task is None
+
+    asyncio.run(exercise())
+
+
+def test_missing_recipient_prevents_mock_delivery_after_pickup() -> None:
+    async def exercise() -> None:
+        robot = ObservedResourceFakeRobot(user_description="unrelated person")
+        service = SoridormiRuntimeToolService(
+            robot=robot, controller=FakeController(), control_hz=20.0
+        )
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {
+                "skill_id": "acquire_and_deliver_resource",
+                "parameters": {
+                    "resource": {"kind": "physical_object", "description": "bottle of milk"},
+                    "source": {"status": "known"},
+                    "recipient": {"description": "user"},
+                },
+            },
+        )
+        with pytest.raises(RuntimeError, match="not uniquely observed"):
+            await service.call_tool("soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]})
+        assert any(command.x_velocity > 0 for command in service.controller.seen_commands)
+        assert [pose.pose for pose in robot.visual_arm_poses][-1] == "rest"
+        assert service.active_task is None
+        assert service.controller.command == PolicyCommand()
 
     asyncio.run(exercise())
 

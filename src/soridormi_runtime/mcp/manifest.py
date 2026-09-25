@@ -585,6 +585,10 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                             "type": "object",
                             "description": "Simulator observation distances before and after walking.",
                         },
+                        "return_outcome": {
+                            "type": "object",
+                            "description": "Simulator recipient distances before and after returning.",
+                        },
                     },
                     required=["completed", "skill_id", "no_motion"],
                 ),
@@ -594,7 +598,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 execution=ExecutionPolicy(
                     can_run_parallel=False,
                     exclusive_group="soridormi.robot_motion",
-                    timeout_s=300.0,
+                    timeout_s=660.0,
                     idempotent=False,
                     side_effect_free=False,
                 ),

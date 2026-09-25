@@ -14,6 +14,7 @@ from scenario_runner.scenario import Scenario, load_scenario
 from soridormi_sim.milk_bottle_scene import (
     MILK_BOTTLE_GEOM,
     MILK_TABLE_GEOM,
+    USER_BODY_GEOM,
     build_default_world_scene_xml,
 )
 
@@ -30,6 +31,11 @@ def test_default_scenario_owns_dynamic_bottle_separately_from_static_world() -> 
     assert MILK_BOTTLE_GEOM not in static_world
     assert scenario.dynamic_elements[0].name == "scenario_milk_bottle"
     assert {geom.name for geom in scenario.dynamic_elements[0].geoms} >= {MILK_BOTTLE_GEOM}
+    user = scenario.dynamic_elements[1]
+    assert user.name == "scenario_user"
+    assert user.position_xyz == (0.0, -1.5, 0.0)
+    assert USER_BODY_GEOM in {geom.name for geom in user.geoms}
+    assert all(not geom.collidable for geom in user.geoms)
 
 
 def test_scenario_rejects_events_for_undeclared_elements() -> None:
@@ -87,7 +93,9 @@ def test_runner_creates_bottle_and_applies_sim_time_event(tmp_path: Path) -> Non
                 if time.monotonic() >= deadline:
                     raise AssertionError("scenario runner did not start")
                 time.sleep(0.1)
-        assert {item["name"] for item in initial["objects"]} == {"scenario_milk_bottle", "scenario_actor"}
+        assert {item["name"] for item in initial["objects"]} == {
+            "scenario_milk_bottle", "scenario_user", "scenario_actor"
+        }
 
         import zmq
 
@@ -118,6 +126,7 @@ def test_runner_creates_bottle_and_applies_sim_time_event(tmp_path: Path) -> Non
             assert reset_state["reset_count"] == 1
             assert {item["name"]: item["position_xyz"][0] for item in reset_state["objects"]} == {
                 "scenario_milk_bottle": 10.0,
+                "scenario_user": 0.0,
                 "scenario_actor": 2.0,
             }
             for _ in range(4):
@@ -127,7 +136,10 @@ def test_runner_creates_bottle_and_applies_sim_time_event(tmp_path: Path) -> Non
             while True:
                 replayed = scene_request(port + 1, {"kind": "list_objects"})
                 positions = {item["name"]: item["position_xyz"][0] for item in replayed["objects"]}
-                if positions == {"scenario_milk_bottle": 8.0, "scenario_actor": 3.0}:
+                if positions == {
+                    "scenario_milk_bottle": 8.0, "scenario_user": 0.0,
+                    "scenario_actor": 3.0,
+                }:
                     break
                 if time.monotonic() >= deadline:
                     raise AssertionError("scenario events were not replayed after reset")
