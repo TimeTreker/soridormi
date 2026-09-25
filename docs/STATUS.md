@@ -68,8 +68,9 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
 - `acquire_and_deliver_resource` walks to uniquely observed scene resources at
   bounded pace; grasp, carry, return, and handover remain simulation mocks.
   Missing observations, stalls, stops, and resets cannot complete.
-- Isolated default-scene MuJoCo, 2026-09-25, uncommitted: bottle 10.006→0.899 m
-  in 155.08 s; mock handover completed, no active task, `safe_idle=true`.
+- Live default-scene MuJoCo/MCP, 2026-09-25, revision `06d5d4f`: bottle
+  10.008→0.881 m in 155.13 s; mock handover completed, no active task,
+  `safe_idle=true`. Simulator reset to initial scene after proof.
 - The separate scenario runner reads a world-map/dynamic-element file, builds
   bodies with MuJoCo `MjSpec`, starts Soridormi, and applies timed pose events.
   The default scenario places a mock bottle on a fixed table 10 m ahead and
