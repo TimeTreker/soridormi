@@ -68,10 +68,11 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
 - `acquire_and_deliver_resource` walks to the observed resource and returns to
   the observed recipient; pickup, carry, and handover remain simulation mocks.
   Missing observations, stalls, stops, and resets cannot complete.
-- Direct full-scene MuJoCo proof, 2026-09-25, dirty successor of `06d5d4f`:
-  bottle 10.006→0.844 m in 156.08 s; user 9.412→0.892 m in 159.17 s;
-  mocked handover completed, standing/safe idle, no active task. The earlier
-  approach-only MCP proof on `06d5d4f` was 10.008→0.881 m in 155.13 s.
+- Full-scene MuJoCo/MCP proof, 2026-09-25, source `5d235b8`: bottle
+  10.008→0.834 m in 155.26 s; user 9.425→0.883 m in 158.45 s; mock
+  handover completed, standing/safe idle, no active task. Scene was reset to
+  milk ~10 m ahead and user 1.5 m right; MCP again reported safe idle.
+  Direct dirty-source proof had independently completed both walking legs.
 - The separate scenario runner reads a world-map/dynamic-element file, builds
   bodies with MuJoCo `MjSpec`, starts Soridormi, and applies timed pose events.
   The default scenario places a bottle on a fixed table 10 m ahead, a standing
