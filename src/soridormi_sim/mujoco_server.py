@@ -6,6 +6,7 @@ from soridormi_api.server import RobotApiServer
 
 from .mujoco_backend import FakeMujocoBackend, MujocoBackend
 from .robot_config import load_robot_config
+from .scene_control import SceneControl
 
 
 def main() -> None:
@@ -20,7 +21,14 @@ def main() -> None:
     else:
         backend = FakeMujocoBackend(config=load_robot_config(config_path))
 
-    RobotApiServer(backend=backend, host=host, port=port).serve_forever()
+    scene_control = SceneControl(backend) if isinstance(backend, MujocoBackend) else None
+    RobotApiServer(
+        backend=backend,
+        host=host,
+        port=port,
+        sim_control_port=port + 1 if scene_control is not None else None,
+        sim_control_handler=scene_control.handle if scene_control is not None else None,
+    ).serve_forever()
 
 
 if __name__ == "__main__":

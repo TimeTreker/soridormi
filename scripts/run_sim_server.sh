@@ -36,7 +36,9 @@ Options:
   --no-visual-arms      Disable the generated cosmetic limb overlay.
   --rough-ground        Generate a temporary MuJoCo scene with small stone boxes.
   --no-rough-ground     Use the normal flat MuJoCo scene. default
-  --milk-bottle         Add a non-contact bottle of milk 50 m ahead for mock perception.
+  --scene NAME          Scene: default (table, milk bottle, chairs), flat, or an
+                        absolute MuJoCo XML path. default: default
+  --milk-bottle         Alias for --scene default.
   --rough-stone-height M
                         Approximate stone height in meters. default: 0.008
   --rough-stone-count N
@@ -47,6 +49,8 @@ Options:
 
 Examples:
   ./scripts/run_sim_server.sh --backend mujoco --no-viewer
+  ./scripts/run_sim_server.sh --backend mujoco --viewer --scene default
+  ./scripts/run_sim_server.sh --backend mujoco --no-viewer --scene flat
   ./scripts/run_sim_server.sh --backend mujoco --viewer
   ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
   ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer --follow-camera
@@ -72,7 +76,7 @@ SOCIAL_EYES="${SORIDORMI_MUJOCO_SOCIAL_EYES:-1}"
 SOCIAL_EYE_FRAME="${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME:-0}"
 VISUAL_ARMS="${SORIDORMI_MUJOCO_VISUAL_ARMS:-1}"
 ROUGH_GROUND="${SORIDORMI_MUJOCO_ROUGH_GROUND:-0}"
-MILK_BOTTLE="0"
+SCENE="default"
 ROUGH_STONE_HEIGHT="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT:-0.008}"
 ROUGH_STONE_COUNT="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT:-8}"
 ROUGH_STONE_RADIUS="${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS:-0.018}"
@@ -144,8 +148,12 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --milk-bottle)
-      MILK_BOTTLE="1"
+      SCENE="default"
       shift
+      ;;
+    --scene)
+      SCENE="${2:?--scene requires a value}"
+      shift 2
       ;;
     --no-rough-ground)
       ROUGH_GROUND="0"
@@ -175,16 +183,27 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+case "$SCENE" in
+  default|flat) ;;
+  /*) ;;
+  *) echo "--scene must be default, flat, or an absolute XML path" >&2; exit 2 ;;
+esac
+
 if [ ! -f .env ]; then
   ./scripts/setup_env.sh
 fi
 
 X11_CLEANED=0
+SCENE_WORK_DIR_HOST=""
+SCENE_WORK_DIR_CONTAINER=""
 cleanup_x11() {
   local rc=$?
   if [ "$X11_CLEANED" = "0" ]; then
     X11_CLEANED=1
-    soridormi_x11_cleanup "$rc"
+    if [ -n "$SCENE_WORK_DIR_HOST" ]; then
+      rm -rf -- "$SCENE_WORK_DIR_HOST"
+    fi
+    soridormi_x11_cleanup "$rc" || true
   fi
   return "$rc"
 }
@@ -193,6 +212,12 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 soridormi_x11_acquire "$VIEWER_ENABLED"
+
+if [ "$SIM_BACKEND" = "mujoco" ]; then
+  mkdir -p data/scenes
+  SCENE_WORK_DIR_HOST="$(mktemp -d "$PWD/data/scenes/run.XXXXXXXX")"
+  SCENE_WORK_DIR_CONTAINER="/data/scenes/$(basename "$SCENE_WORK_DIR_HOST")"
+fi
 
 export SORIDORMI_SIM_BACKEND="${SIM_BACKEND}"
 export SORIDORMI_MUJOCO_VIEWER="${VIEWER_ENABLED}"
@@ -218,7 +243,7 @@ echo "MuJoCo social eyes: ${SORIDORMI_MUJOCO_SOCIAL_EYES}"
 echo "MuJoCo social eye frame: ${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}"
 echo "MuJoCo visual arms: ${SORIDORMI_MUJOCO_VISUAL_ARMS}"
 echo "MuJoCo rough ground: ${SORIDORMI_MUJOCO_ROUGH_GROUND}"
-echo "MuJoCo milk bottle: ${MILK_BOTTLE}"
+echo "MuJoCo scene: ${SCENE}"
 if [ "${SORIDORMI_MUJOCO_FOLLOW_CAMERA}" = "1" ]; then
   echo "MuJoCo follow camera params: distance=${SORIDORMI_MUJOCO_CAMERA_DISTANCE} azimuth=${SORIDORMI_MUJOCO_CAMERA_AZIMUTH} elevation=${SORIDORMI_MUJOCO_CAMERA_ELEVATION}"
 fi
@@ -244,7 +269,8 @@ docker compose -f compose.sim.yaml run --rm \
   -e SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT}" \
   -e SORIDORMI_MUJOCO_ROUGH_STONE_COUNT_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT}" \
   -e SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS_OVERRIDE="${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS}" \
-  -e SORIDORMI_MUJOCO_MILK_BOTTLE_OVERRIDE="${MILK_BOTTLE}" \
+  -e SORIDORMI_MUJOCO_SCENE_OVERRIDE="${SCENE}" \
+  -e SORIDORMI_SCENE_WORK_DIR="${SCENE_WORK_DIR_CONTAINER}" \
   sim bash -lc '
     set -euo pipefail
     source /opt/venvs/sim/bin/activate
@@ -270,7 +296,31 @@ docker compose -f compose.sim.yaml run --rm \
     export SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT="${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT_OVERRIDE:-0.008}"
     export SORIDORMI_MUJOCO_ROUGH_STONE_COUNT="${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT_OVERRIDE:-8}"
     export SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS="${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS_OVERRIDE:-0.018}"
-    MILK_BOTTLE="${SORIDORMI_MUJOCO_MILK_BOTTLE_OVERRIDE:-0}"
+    SCENE="${SORIDORMI_MUJOCO_SCENE_OVERRIDE:-default}"
+
+    if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ]; then
+      if [[ "${SCENE}" = /* ]]; then
+        BASE_MODEL="${SCENE}"
+      else
+        BASE_MODEL="${MUJOCO_MODEL_PATH:-}"
+        if [ -z "${BASE_MODEL}" ]; then
+          BASE_MODEL="$(python - <<'PYMODEL'
+from soridormi_sim.robot_config import load_robot_config
+print(load_robot_config().model.path)
+PYMODEL
+)"
+        fi
+      fi
+      if [ ! -f "${BASE_MODEL}" ]; then
+        echo "MuJoCo scene XML not found: ${BASE_MODEL}" >&2
+        exit 2
+      fi
+      # Copy the XML and relative assets into ignored Soridormi data. Generated
+      # overlays no longer modify the Open Duck reference submodule.
+      SCENE_WORK_DIR="${SORIDORMI_SCENE_WORK_DIR}"
+      cp -a "$(dirname "${BASE_MODEL}")/." "${SCENE_WORK_DIR}/"
+      export MUJOCO_MODEL_PATH="${SCENE_WORK_DIR}/$(basename "${BASE_MODEL}")"
+    fi
 
     if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && { [ "${SORIDORMI_MUJOCO_SOCIAL_EYES}" = "1" ] || [ "${SORIDORMI_MUJOCO_VISUAL_ARMS}" = "1" ]; }; then
       BASE_MODEL="${MUJOCO_MODEL_PATH:-}"
@@ -281,8 +331,8 @@ print(load_robot_config().model.path)
 PYMODEL
 )"
       fi
-      # Keep generated scene/model overlays next to the Open Duck XMLs so MuJoCo
-      # still resolves mesh assets relative to the original compiler context.
+      # Keep generated overlays next to the staged XMLs so MuJoCo resolves
+      # relative includes and mesh assets inside this run directory.
       SOCIAL_EYES_MODEL="$(dirname "${BASE_MODEL}")/soridormi_social_eyes_scene.xml"
       SOCIAL_EYE_FRAME_ARGS=()
       if [ "${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}" = "1" ]; then
@@ -308,16 +358,13 @@ print(load_robot_config().model.path)
 PYMODEL
 )"
       fi
-      # Write the generated scene next to the original Open Duck XML. MuJoCo
-      # resolves mesh and texture paths relative to the top-level XML/compiler
-      # context, so writing the generated scene to /tmp can make included robot
-      # XML files look for meshes in the wrong directory.
+      # Write beside the staged XML so relative MuJoCo assets still resolve.
       ROUGH_MODEL="$(dirname "${BASE_MODEL}")/soridormi_rough_ground_scene.xml"
       python -m soridormi_sim.rough_ground_scene         --base "${BASE_MODEL}"         --output "${ROUGH_MODEL}"         --stone-count "${SORIDORMI_MUJOCO_ROUGH_STONE_COUNT}"         --stone-height "${SORIDORMI_MUJOCO_ROUGH_STONE_HEIGHT}"         --stone-radius "${SORIDORMI_MUJOCO_ROUGH_STONE_RADIUS}"
       export MUJOCO_MODEL_PATH="${ROUGH_MODEL}"
     fi
 
-    if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && [ "${MILK_BOTTLE}" = "1" ]; then
+    if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && [ "${SCENE}" = "default" ]; then
       BASE_MODEL="${MUJOCO_MODEL_PATH:-}"
       if [ -z "${BASE_MODEL}" ]; then
         BASE_MODEL="$(python - <<'PYMODEL'
@@ -338,7 +385,7 @@ PYMODEL
     echo "Effective MuJoCo social eye frame: ${SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME}"
     echo "Effective MuJoCo visual arms: ${SORIDORMI_MUJOCO_VISUAL_ARMS}"
     echo "Effective MuJoCo rough ground: ${SORIDORMI_MUJOCO_ROUGH_GROUND}"
-    echo "Effective MuJoCo milk bottle: ${MILK_BOTTLE}"
+    echo "Effective MuJoCo scene: ${SCENE}"
     if [ "${SORIDORMI_MUJOCO_FOLLOW_CAMERA}" = "1" ]; then
       echo "Effective MuJoCo camera params: distance=${SORIDORMI_MUJOCO_CAMERA_DISTANCE} azimuth=${SORIDORMI_MUJOCO_CAMERA_AZIMUTH} elevation=${SORIDORMI_MUJOCO_CAMERA_ELEVATION}"
     fi

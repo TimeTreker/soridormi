@@ -14,6 +14,36 @@ from xml.etree import ElementTree
 from .rough_ground_scene import rewrite_relative_includes
 
 MILK_BOTTLE_GEOM = "soridormi_mock_milk_bottle"
+MILK_TABLE_GEOM = "soridormi_mock_milk_table_top"
+SCENARIO_BOTTLE_BODY = "scenario_milk_bottle"
+
+
+def _left_chair_xml(index: int, x: float) -> str:
+    """Place a fixed visual chair beside the initial +x-facing robot."""
+
+    name = f"soridormi_mock_left_chair_{index}"
+    legs = "".join(
+        f'        <geom name="{name}_leg_{side}" type="box" '
+        f'size="0.035 0.035 0.205" pos="{leg_x} {leg_y} 0.205" '
+        'rgba="0.13 0.27 0.31 1" contype="0" conaffinity="0"/>\n'
+        for side, leg_x, leg_y in (
+            ("front_left", 0.19, 0.19),
+            ("front_right", 0.19, -0.19),
+            ("back_left", -0.19, 0.19),
+            ("back_right", -0.19, -0.19),
+        )
+    )
+    return (
+        f'    <body name="{name}" pos="{x:g} 2 0">\n'
+        f'        <geom name="{name}_seat" type="box" '
+        'size="0.25 0.25 0.035" pos="0 0 0.43" '
+        'rgba="0.16 0.43 0.49 1" contype="0" conaffinity="0"/>\n'
+        f'        <geom name="{name}_back" type="box" '
+        'size="0.035 0.25 0.21" pos="-0.215 0 0.64" '
+        'rgba="0.16 0.43 0.49 1" contype="0" conaffinity="0"/>\n'
+        f'{legs}'
+        '    </body>\n'
+    )
 
 
 def mock_milk_observation(
@@ -53,26 +83,47 @@ def mock_milk_observation(
 
 
 def build_milk_bottle_scene_xml(base_xml: str) -> str:
-    if MILK_BOTTLE_GEOM in base_xml:
-        raise ValueError("milk bottle already exists in MuJoCo scene")
+    if MILK_BOTTLE_GEOM in base_xml or MILK_TABLE_GEOM in base_xml:
+        raise ValueError("milk bottle scene already exists in MuJoCo scene")
     insert_at = base_xml.rfind("</worldbody>")
     if insert_at < 0:
         raise ValueError("base MuJoCo XML does not contain </worldbody>")
-    # The official robot starts facing +x. A visible, non-contact world geom
-    # keeps the mock test from changing the robot's dynamics or actuator model.
-    bottle = (
-        '    <!-- Simulation-only milk bottle for scene observation. -->\n'
-        f'    <geom name="{MILK_BOTTLE_GEOM}" type="cylinder" '
-        'size="0.045 0.12" pos="50 0 0.12" '
+    # The official robot starts facing +x, so +y is to its left. All fixture
+    # geoms are non-contact and leave body dynamics unchanged.
+    scene = (
+        '    <!-- Simulation-only table, milk bottle, and left-side chairs. -->\n'
+        '    <body name="soridormi_mock_milk_table" pos="10 0 0">\n'
+        f'      <geom name="{MILK_TABLE_GEOM}" type="box" '
+        'size="0.45 0.30 0.04" pos="0 0 0.70" '
+        'rgba="0.64 0.43 0.25 1" contype="0" conaffinity="0"/>\n'
+        '    <geom name="soridormi_mock_milk_table_leg_front_left" type="box" '
+        'size="0.035 0.035 0.33" pos="-0.35 -0.20 0.33" '
+        'rgba="0.48 0.30 0.17 1" contype="0" conaffinity="0"/>\n'
+        '    <geom name="soridormi_mock_milk_table_leg_front_right" type="box" '
+        'size="0.035 0.035 0.33" pos="-0.35 0.20 0.33" '
+        'rgba="0.48 0.30 0.17 1" contype="0" conaffinity="0"/>\n'
+        '    <geom name="soridormi_mock_milk_table_leg_back_left" type="box" '
+        'size="0.035 0.035 0.33" pos="0.35 -0.20 0.33" '
+        'rgba="0.48 0.30 0.17 1" contype="0" conaffinity="0"/>\n'
+        '    <geom name="soridormi_mock_milk_table_leg_back_right" type="box" '
+        'size="0.035 0.035 0.33" pos="0.35 0.20 0.33" '
+        'rgba="0.48 0.30 0.17 1" contype="0" conaffinity="0"/>\n'
+        '    </body>\n'
+        f'    <body name="{SCENARIO_BOTTLE_BODY}" mocap="true" pos="10 0 0.86">\n'
+        f'      <geom name="{MILK_BOTTLE_GEOM}" type="cylinder" '
+        'size="0.045 0.12" pos="0 0 0" '
         'rgba="0.96 0.96 0.91 1" contype="0" conaffinity="0"/>\n'
         '    <geom name="soridormi_mock_milk_bottle_neck" type="cylinder" '
-        'size="0.025 0.025" pos="50 0 0.265" '
+        'size="0.025 0.025" pos="0 0 0.145" '
         'rgba="0.96 0.96 0.91 1" contype="0" conaffinity="0"/>\n'
         '    <geom name="soridormi_mock_milk_bottle_cap" type="cylinder" '
-        'size="0.029 0.015" pos="50 0 0.305" '
+        'size="0.029 0.015" pos="0 0 0.185" '
         'rgba="0.18 0.40 0.82 1" contype="0" conaffinity="0"/>\n'
+        '    </body>\n'
+        f'{_left_chair_xml(1, 1.5)}'
+        f'{_left_chair_xml(2, 3.0)}'
     )
-    xml = base_xml[:insert_at] + bottle + base_xml[insert_at:]
+    xml = base_xml[:insert_at] + scene + base_xml[insert_at:]
     ElementTree.fromstring(xml)
     return xml
 
@@ -87,7 +138,7 @@ def generate_milk_bottle_scene(base_path: Path, output_path: Path) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Add an optional milk bottle to a MuJoCo scene")
+    parser = argparse.ArgumentParser(description="Add an optional table, milk bottle, and two chairs to a MuJoCo scene")
     parser.add_argument("--base", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()

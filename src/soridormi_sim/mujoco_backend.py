@@ -17,7 +17,7 @@ from soridormi_api import (
 )
 
 from .mujoco_viewer import MujocoViewerHandle, env_flag, env_float
-from .milk_bottle_scene import MILK_BOTTLE_GEOM, mock_milk_observation
+from .milk_bottle_scene import MILK_BOTTLE_GEOM, MILK_TABLE_GEOM, mock_milk_observation
 from .robot_config import RobotConfig, load_robot_config
 from .social_eye_scene import (
     LEFT_EYE_CLOSED_NAME,
@@ -226,6 +226,17 @@ class MujocoBackend:
             camera_azimuth=env_float("SORIDORMI_MUJOCO_CAMERA_AZIMUTH", 135.0),
             camera_elevation=env_float("SORIDORMI_MUJOCO_CAMERA_ELEVATION", -20.0),
         )
+        table_geom_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_GEOM, MILK_TABLE_GEOM
+        )
+        if table_geom_id >= 0 and self.viewer.is_enabled:
+            table_xyz = self.data.geom_xpos[table_geom_id]
+            self.viewer.frame_scene(
+                lookat=(float(table_xyz[0]) - 4.5, float(table_xyz[1]) + 0.8, 0.5),
+                distance=11.5,
+                azimuth=90.0,
+                elevation=-20.0,
+            )
 
         print(f"Loaded robot config: {self.config.robot_name}")
         print(f"Loaded MuJoCo model: {self.model_path}")

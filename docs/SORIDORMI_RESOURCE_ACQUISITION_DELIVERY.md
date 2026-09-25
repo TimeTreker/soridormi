@@ -92,12 +92,23 @@ capabilities, the complete capability, both, or neither according to qualificati
 For scene-grounding experiments, run:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer --milk-bottle
+./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
 ```
 
-This generates an optional,
-non-contact bottle geom 50 metres along the initial robot-forward axis. It is
-off by default and leaves the official robot XML and actuator contract intact.
+The default scene opens with a one-time overview of Chromie, both chairs, and
+the table; the camera remains manually adjustable afterward. `--follow-camera` keeps the existing
+robot-centered tracking view instead.
+
+This generates a non-contact table with a bottle of milk on its top,
+10 metres along the initial robot-forward axis. The tabletop is 0.74 m high; its four legs and the
+bottle are visual scene fixtures, not collision or grasp targets. Two fixed
+chairs sit to Chromie's initial left (+y), 1.5 m and 3 m ahead. They are also
+non-contact visual fixtures. Select `--scene flat` for the original empty flat
+world, or `--scene /absolute/path/to/scene.xml` for another MuJoCo scene path
+visible inside the simulator container. `--milk-bottle` remains an alias for
+`--scene default`. Generated XML and relative assets are staged under ignored
+`/data/scenes` for the run; the Open Duck submodule stays untouched. The
+official robot XML and actuator contract are unchanged.
 `soridormi.robot.observe_scene` reads that named geom's *current MuJoCo
 position* relative to the robot and returns a bounded forward-field mock
 observation with an exact observation ID, sequence, distance, and
@@ -114,9 +125,18 @@ first-person visual claims require the observation to have been explicitly
 admitted before the response. A future camera provider can replace this
 simulation source without changing the user-report provenance rule.
 
-The `--milk-bottle` launcher option exists only for this simulation scenario;
-its default is off, it has no hardware or dry-run combination, and it can be
-removed when a qualified scene provider supplies equivalent test coverage.
+The static world belongs to MuJoCo. An external scenario runner can use a
+separate simulator-only ZeroMQ REQ/REP endpoint at `tcp://127.0.0.1:5556`
+(`SIM_PORT + 1`) to control dynamic bodies. A body is controllable when its
+MuJoCo XML declares `mocap="true"` and its name starts with `scenario_`.
+The default scene declares `scenario_milk_bottle`; the table and chairs are
+fixed. `{"kind":"list_objects"}` lists current dynamic bodies and poses.
+`{"kind":"set_object_pose","object_name":"scenario_milk_bottle","position_xyz":[6,0,0.86]}`
+updates its world pose; an optional unit `quat_wxyz` sets orientation. The
+simulator serializes these requests with robot stepping and perception reads.
+This endpoint is local to the simulator process and absent from Soridormi's
+robot API, Chromie's tools, and hardware mode. The scenario runner itself is
+not implemented here.
 
 Open Duck Mini v2 does not currently expose a validated manipulator/gripper stack.
 To validate the cross-repository architecture now, Soridormi provides a

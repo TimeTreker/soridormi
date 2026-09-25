@@ -79,6 +79,22 @@ def test_follow_camera_is_noop_when_disabled() -> None:
     assert viewer.sync_count == 1
 
 
+def test_scene_opening_view_frames_fixture_once_without_overriding_manual_camera() -> None:
+    viewer = FakeViewer()
+    handle = MujocoViewerHandle(model=object(), data=FakeData(), enabled=False)
+    handle._viewer = viewer
+
+    handle.frame_scene(lookat=(5.5, 0.8, 0.5), distance=11.5, azimuth=90.0, elevation=-20.0)
+    assert viewer.cam.lookat == [5.5, 0.8, 0.5]
+    assert (viewer.cam.distance, viewer.cam.azimuth, viewer.cam.elevation) == (11.5, 90.0, -20.0)
+    assert viewer.lock_count == 1
+    assert viewer.sync_count == 1
+
+    viewer.cam.distance = 4.0
+    handle.sync()
+    assert viewer.cam.distance == 4.0
+
+
 def test_env_float_parses_values_and_reports_invalid_input(monkeypatch: pytest.MonkeyPatch) -> None:
     assert env_float("SORIDORMI_TEST_FLOAT", 1.25) == 1.25
 

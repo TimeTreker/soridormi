@@ -101,6 +101,32 @@ class MujocoViewerHandle:
         self._viewer.close()
         self._viewer = None
 
+    def frame_scene(
+        self,
+        *,
+        lookat: tuple[float, float, float],
+        distance: float,
+        azimuth: float,
+        elevation: float,
+    ) -> None:
+        """Set the opening free-camera view once, leaving later manual control intact."""
+
+        if self._viewer is None or self.follow_camera:
+            return
+        cam = getattr(self._viewer, "cam", None)
+        if cam is None:
+            return
+        lock_factory = getattr(self._viewer, "lock", None)
+        lock_context = lock_factory() if callable(lock_factory) else nullcontext()
+        with lock_context:
+            if getattr(cam, "lookat", None) is not None:
+                for index, value in enumerate(lookat):
+                    cam.lookat[index] = float(value)
+            cam.distance = float(distance)
+            cam.azimuth = float(azimuth)
+            cam.elevation = float(elevation)
+        self._viewer.sync()
+
     def _apply_follow_camera(self) -> None:
         """Keep the passive viewer camera centered on the floating base."""
 

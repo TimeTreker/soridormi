@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Callable, Protocol
 
 import zmq
 
@@ -22,22 +22,49 @@ class RobotApiServer:
     backend: RobotBackend
     host: str = "0.0.0.0"
     port: int = 5555
+    sim_control_port: int | None = None
+    sim_control_handler: Callable[[dict[str, object]], dict[str, object]] | None = None
 
     def serve_forever(self) -> None:
         context = zmq.Context.instance()
         socket = context.socket(zmq.REP)
         socket.bind(f"tcp://{self.host}:{self.port}")
         print(f"Soridormi API server listening on tcp://{self.host}:{self.port}")
+        control_socket = None
+        poller = zmq.Poller()
+        poller.register(socket, zmq.POLLIN)
+        if self.sim_control_port is not None:
+            if self.sim_control_handler is None:
+                raise ValueError("sim_control_port requires sim_control_handler")
+            control_socket = context.socket(zmq.REP)
+            control_socket.bind(f"tcp://127.0.0.1:{self.sim_control_port}")
+            poller.register(control_socket, zmq.POLLIN)
+            print(f"Simulator scene control listening on tcp://127.0.0.1:{self.sim_control_port}")
 
         while True:
-            raw = socket.recv()
-            try:
-                payload = json.loads(raw.decode("utf-8"))
-                request = ApiRequest.model_validate(payload)
-                response = self._handle(request)
-            except Exception as exc:  # keep server alive during controller development
-                response = ApiResponse(ok=False, message=repr(exc))
-            socket.send_json(response.model_dump(mode="json"))
+            ready = dict(poller.poll())
+            if socket in ready:
+                raw = socket.recv()
+                try:
+                    payload = json.loads(raw.decode("utf-8"))
+                    request = ApiRequest.model_validate(payload)
+                    response = self._handle(request)
+                except Exception as exc:  # keep server alive during controller development
+                    response = ApiResponse(ok=False, message=repr(exc))
+                socket.send_json(response.model_dump(mode="json"))
+            if control_socket is not None and control_socket in ready:
+                raw = control_socket.recv()
+                try:
+                    payload = json.loads(raw.decode("utf-8"))
+                    if not isinstance(payload, dict):
+                        raise ValueError("scene control request must be a JSON object")
+                    handler = self.sim_control_handler
+                    if handler is None:
+                        raise RuntimeError("scene control handler unavailable")
+                    result = handler(payload)
+                except Exception as exc:  # keep both sockets responsive on malformed requests
+                    result = {"ok": False, "message": str(exc)}
+                control_socket.send_json(result)
 
     def _handle(self, request: ApiRequest) -> ApiResponse:
         if request.kind == "ping":

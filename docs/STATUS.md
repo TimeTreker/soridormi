@@ -70,13 +70,13 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
   returns explicit `resource_outcome` acquisition/delivery evidence so paired
   Chromie/Soridormi architecture can be exercised end to end without claiming a
   real manipulator or hardware grasp capability.
-- An optional generated MuJoCo milk-bottle geom and read-only
-  `soridormi.robot.observe_scene` marker detector are source-implemented. The
-  detector reads current simulator geometry in the robot frame and returns
-  simulation-marked observations or an empty list; it is not a camera or
-  physical perception claim. Focused unit checks and generated-XML MuJoCo
-  compilation cover the source slice. Chromie does not yet poll this tool on
-  ordinary turns, and no live scene-to-speech qualification is claimed.
+- The default MuJoCo scene places a non-contact bottle on a fixed table 10 m
+  ahead and two fixed chairs to Chromie's left. `soridormi.robot.observe_scene`
+  reads current geometry and robot pose, returning simulation-marked observations
+  or an empty list; it is not camera or physical perception. Focused tests and
+  generated-XML MuJoCo compilation cover this slice. `--scene flat` selects the
+  original world; a local socket controls dynamic bodies for a future runner.
+  Chromie does not poll it on ordinary turns; no live scene-to-speech proof exists.
 - The generated MuJoCo visual-body overlay supplies proportioned jointless
   arms, detailed fixed-pose hands, and cosmetic lower-leg shells in the Open
   Duck palette. It does not change the official XML/URDF or 14-actuator policy;

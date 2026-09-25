@@ -31,6 +31,9 @@ def test_run_sim_server_help_documents_backend_profile_and_viewer_flags() -> Non
     assert "--visual-arms" in proc.stdout
     assert "--no-visual-arms" in proc.stdout
     assert "--rough-ground" in proc.stdout
+    assert "--scene NAME" in proc.stdout
+    assert "default: default" in proc.stdout
+    assert "--scene flat" in proc.stdout
     assert "--rough-stone-height M" in proc.stdout
     assert "--rough-stone-count N" in proc.stdout
     assert "--rough-stone-radius M" in proc.stdout
@@ -81,21 +84,16 @@ def test_run_sim_server_script_defaults_to_mujoco_without_viewer() -> None:
     assert "SORIDORMI_MUJOCO_SOCIAL_EYE_FRAME_OVERRIDE" in text
     assert "SORIDORMI_MUJOCO_VISUAL_ARMS_OVERRIDE" in text
     assert "SORIDORMI_MUJOCO_ROUGH_GROUND_OVERRIDE" in text
-    assert 'SOCIAL_EYES_MODEL="$(dirname "${BASE_MODEL}")/soridormi_social_eyes_scene.xml"' in text
     assert '[ "${SORIDORMI_MUJOCO_VISUAL_ARMS}" = "1" ]' in text
     assert "python -m soridormi_sim.social_eye_scene" in text
     assert "SOCIAL_EYE_FRAME_ARGS" in text
     assert "--debug-frame" in text
     assert "--visual-arms" in text
-    assert 'ROUGH_MODEL="$(dirname "${BASE_MODEL}")/soridormi_rough_ground_scene.xml"' in text
     assert (
         'if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && [ "${SORIDORMI_MUJOCO_ROUGH_GROUND}" = "1" ]; then'
         in text
     )
-    assert (
-        "MuJoCo\n      # resolves mesh and texture paths relative to the top-level XML/compiler"
-        in text
-    )
+    assert "SCENE_WORK_DIR" in text
     assert "python -m soridormi_sim.rough_ground_scene" in text
 
 
