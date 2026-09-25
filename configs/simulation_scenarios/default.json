@@ -1,0 +1,36 @@
+{
+  "name": "default_milk_table",
+  "world_map": {
+    "base_xml": "/workspaces/Open_Duck_Playground/playground/open_duck_mini_v2/xmls/scene_flat_terrain.xml",
+    "static_layout": "table_chairs"
+  },
+  "dynamic_elements": [
+    {
+      "name": "scenario_milk_bottle",
+      "position_xyz": [10.0, 0.0, 0.86],
+      "geoms": [
+        {
+          "name": "soridormi_mock_milk_bottle",
+          "shape": "cylinder",
+          "size": [0.045, 0.12, 0.0],
+          "rgba": [0.96, 0.96, 0.91, 1.0]
+        },
+        {
+          "name": "soridormi_mock_milk_bottle_neck",
+          "shape": "cylinder",
+          "size": [0.025, 0.025, 0.0],
+          "local_position_xyz": [0.0, 0.0, 0.145],
+          "rgba": [0.96, 0.96, 0.91, 1.0]
+        },
+        {
+          "name": "soridormi_mock_milk_bottle_cap",
+          "shape": "cylinder",
+          "size": [0.029, 0.015, 0.0],
+          "local_position_xyz": [0.0, 0.0, 0.185],
+          "rgba": [0.18, 0.40, 0.82, 1.0]
+        }
+      ]
+    }
+  ],
+  "events": []
+}

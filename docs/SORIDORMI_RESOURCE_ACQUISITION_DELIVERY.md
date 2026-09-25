@@ -92,23 +92,31 @@ capabilities, the complete capability, both, or neither according to qualificati
 For scene-grounding experiments, run:
 
 ```bash
-./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --viewer
+./scripts/run_scenario.sh --viewer
 ```
 
-The default scene opens with a one-time overview of Chromie, both chairs, and
-the table; the camera remains manually adjustable afterward. `--follow-camera` keeps the existing
-robot-centered tracking view instead.
+The scenario runner reads `configs/simulation_scenarios/default.json`, stages
+its MuJoCo world map, adds fixed table and chairs, creates the dynamic milk
+bottle through `MjSpec`, compiles the model, then starts Soridormi as a separate
+child process. `--validate` compiles the scene without starting the server.
+For another scenario, pass `--scenario PATH`; its `world_map.base_xml` must be
+visible inside the simulator container. Assembly verifies the robot state and
+actuator dimensions and actuator order against the selected base world.
+The viewer opens with an overview of Chromie, both chairs, and the table.
 
-This generates a non-contact table with a bottle of milk on its top,
-10 metres along the initial robot-forward axis. The tabletop is 0.74 m high; its four legs and the
+The default scenario places a non-contact bottle on the tabletop 10 metres
+along the initial robot-forward axis. The tabletop is 0.74 m high; its four legs and the
 bottle are visual scene fixtures, not collision or grasp targets. Two fixed
 chairs sit to Chromie's initial left (+y), 1.5 m and 3 m ahead. They are also
-non-contact visual fixtures. Select `--scene flat` for the original empty flat
-world, or `--scene /absolute/path/to/scene.xml` for another MuJoCo scene path
-visible inside the simulator container. `--milk-bottle` remains an alias for
-`--scene default`. Generated XML and relative assets are staged under ignored
-`/data/scenes` for the run; the Open Duck submodule stays untouched. The
-official robot XML and actuator contract are unchanged.
+non-contact visual fixtures. The scenario file chooses the base world XML and
+static layout, declares dynamic bodies and their geoms, and optionally schedules
+`events` with `at_sim_time_s` and world poses. The runner applies due events as
+Soridormi's simulation clock advances; it does not issue robot motor commands.
+`run_sim_server.sh --scene default` loads only the fixed furniture;
+`--scene flat` loads the original world. The explicit legacy `--milk-bottle`
+option still builds a self-contained milk scene. Generated XML and relative
+assets are staged under ignored `/data/scenes`; the Open Duck submodule and
+official 14-actuator contract remain unchanged.
 `soridormi.robot.observe_scene` reads that named geom's *current MuJoCo
 position* relative to the robot and returns a bounded forward-field mock
 observation with an exact observation ID, sequence, distance, and
@@ -125,18 +133,19 @@ first-person visual claims require the observation to have been explicitly
 admitted before the response. A future camera provider can replace this
 simulation source without changing the user-report provenance rule.
 
-The static world belongs to MuJoCo. An external scenario runner can use a
+The static world belongs to MuJoCo. The separate scenario runner uses a
 separate simulator-only ZeroMQ REQ/REP endpoint at `tcp://127.0.0.1:5556`
 (`SIM_PORT + 1`) to control dynamic bodies. A body is controllable when its
 MuJoCo XML declares `mocap="true"` and its name starts with `scenario_`.
-The default scene declares `scenario_milk_bottle`; the table and chairs are
-fixed. `{"kind":"list_objects"}` lists current dynamic bodies and poses.
+The default scenario declares `scenario_milk_bottle`; the table and chairs are
+fixed. `{"kind":"list_objects"}` lists dynamic bodies, poses, and simulation time.
 `{"kind":"set_object_pose","object_name":"scenario_milk_bottle","position_xyz":[6,0,0.86]}`
 updates its world pose; an optional unit `quat_wxyz` sets orientation. The
 simulator serializes these requests with robot stepping and perception reads.
 This endpoint is local to the simulator process and absent from Soridormi's
-robot API, Chromie's tools, and hardware mode. The scenario runner itself is
-not implemented here.
+robot API, Chromie's tools, and hardware mode. Adding or removing bodies after
+startup is outside this runner's current contract; it compiles declared dynamic
+bodies before starting the simulator and changes their poses during playback.
 
 Open Duck Mini v2 does not currently expose a validated manipulator/gripper stack.
 To validate the cross-repository architecture now, Soridormi provides a

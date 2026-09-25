@@ -36,9 +36,10 @@ Options:
   --no-visual-arms      Disable the generated cosmetic limb overlay.
   --rough-ground        Generate a temporary MuJoCo scene with small stone boxes.
   --no-rough-ground     Use the normal flat MuJoCo scene. default
-  --scene NAME          Scene: default (table, milk bottle, chairs), flat, or an
+  --scene NAME          Scene: default (fixed table and chairs), flat, or an
                         absolute MuJoCo XML path. default: default
-  --milk-bottle         Alias for --scene default.
+  --milk-bottle         Legacy self-contained milk scene; use run_scenario.sh
+                        for scenario-owned dynamic objects.
   --rough-stone-height M
                         Approximate stone height in meters. default: 0.008
   --rough-stone-count N
@@ -148,7 +149,7 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --milk-bottle)
-      SCENE="default"
+      SCENE="milk-bottle"
       shift
       ;;
     --scene)
@@ -184,7 +185,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$SCENE" in
-  default|flat) ;;
+  default|flat|milk-bottle) ;;
   /*) ;;
   *) echo "--scene must be default, flat, or an absolute XML path" >&2; exit 2 ;;
 esac
@@ -364,7 +365,7 @@ PYMODEL
       export MUJOCO_MODEL_PATH="${ROUGH_MODEL}"
     fi
 
-    if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && [ "${SCENE}" = "default" ]; then
+    if [ "${SORIDORMI_SIM_BACKEND}" = "mujoco" ] && { [ "${SCENE}" = "default" ] || [ "${SCENE}" = "milk-bottle" ]; }; then
       BASE_MODEL="${MUJOCO_MODEL_PATH:-}"
       if [ -z "${BASE_MODEL}" ]; then
         BASE_MODEL="$(python - <<'PYMODEL'
@@ -373,9 +374,15 @@ print(load_robot_config().model.path)
 PYMODEL
 )"
       fi
-      MILK_MODEL="$(dirname "${BASE_MODEL}")/soridormi_milk_bottle_scene.xml"
-      python -m soridormi_sim.milk_bottle_scene --base "${BASE_MODEL}" --output "${MILK_MODEL}"
-      export MUJOCO_MODEL_PATH="${MILK_MODEL}"
+      SCENE_ARGS=()
+      if [ "${SCENE}" = "default" ]; then
+        SCENE_MODEL="$(dirname "${BASE_MODEL}")/soridormi_default_world_scene.xml"
+        SCENE_ARGS+=(--static-only)
+      else
+        SCENE_MODEL="$(dirname "${BASE_MODEL}")/soridormi_milk_bottle_scene.xml"
+      fi
+      python -m soridormi_sim.milk_bottle_scene --base "${BASE_MODEL}" --output "${SCENE_MODEL}" "${SCENE_ARGS[@]}"
+      export MUJOCO_MODEL_PATH="${SCENE_MODEL}"
     fi
 
     echo "Effective sim backend: ${SORIDORMI_SIM_BACKEND}"

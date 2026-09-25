@@ -82,16 +82,18 @@ def mock_milk_observation(
     }
 
 
-def build_milk_bottle_scene_xml(base_xml: str) -> str:
-    if MILK_BOTTLE_GEOM in base_xml or MILK_TABLE_GEOM in base_xml:
-        raise ValueError("milk bottle scene already exists in MuJoCo scene")
+def build_default_world_scene_xml(base_xml: str) -> str:
+    """Add only the fixed furniture; scenario-owned objects are added later."""
+
+    if MILK_TABLE_GEOM in base_xml:
+        raise ValueError("default world already exists in MuJoCo scene")
     insert_at = base_xml.rfind("</worldbody>")
     if insert_at < 0:
         raise ValueError("base MuJoCo XML does not contain </worldbody>")
     # The official robot starts facing +x, so +y is to its left. All fixture
     # geoms are non-contact and leave body dynamics unchanged.
     scene = (
-        '    <!-- Simulation-only table, milk bottle, and left-side chairs. -->\n'
+        '    <!-- Simulation-only fixed table and left-side chairs. -->\n'
         '    <body name="soridormi_mock_milk_table" pos="10 0 0">\n'
         f'      <geom name="{MILK_TABLE_GEOM}" type="box" '
         'size="0.45 0.30 0.04" pos="0 0 0.70" '
@@ -109,6 +111,22 @@ def build_milk_bottle_scene_xml(base_xml: str) -> str:
         'size="0.035 0.035 0.33" pos="0.35 0.20 0.33" '
         'rgba="0.48 0.30 0.17 1" contype="0" conaffinity="0"/>\n'
         '    </body>\n'
+        f'{_left_chair_xml(1, 1.5)}'
+        f'{_left_chair_xml(2, 3.0)}'
+    )
+    xml = base_xml[:insert_at] + scene + base_xml[insert_at:]
+    ElementTree.fromstring(xml)
+    return xml
+
+
+def build_milk_bottle_scene_xml(base_xml: str) -> str:
+    """Legacy self-contained scene used by explicit --milk-bottle launches."""
+
+    if MILK_BOTTLE_GEOM in base_xml:
+        raise ValueError("milk bottle scene already exists in MuJoCo scene")
+    static_xml = build_default_world_scene_xml(base_xml)
+    insert_at = static_xml.rfind("</worldbody>")
+    scene = (
         f'    <body name="{SCENARIO_BOTTLE_BODY}" mocap="true" pos="10 0 0.86">\n'
         f'      <geom name="{MILK_BOTTLE_GEOM}" type="cylinder" '
         'size="0.045 0.12" pos="0 0 0" '
@@ -120,10 +138,8 @@ def build_milk_bottle_scene_xml(base_xml: str) -> str:
         'size="0.029 0.015" pos="0 0 0.185" '
         'rgba="0.18 0.40 0.82 1" contype="0" conaffinity="0"/>\n'
         '    </body>\n'
-        f'{_left_chair_xml(1, 1.5)}'
-        f'{_left_chair_xml(2, 3.0)}'
     )
-    xml = base_xml[:insert_at] + scene + base_xml[insert_at:]
+    xml = static_xml[:insert_at] + scene + static_xml[insert_at:]
     ElementTree.fromstring(xml)
     return xml
 
@@ -137,12 +153,23 @@ def generate_milk_bottle_scene(base_path: Path, output_path: Path) -> Path:
     return output_path
 
 
+def generate_default_world_scene(base_path: Path, output_path: Path) -> Path:
+    source = base_path.read_text(encoding="utf-8")
+    if output_path.parent.resolve() != base_path.parent.resolve():
+        source = rewrite_relative_includes(source, base_path.parent)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(build_default_world_scene_xml(source), encoding="utf-8")
+    return output_path
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Add an optional table, milk bottle, and two chairs to a MuJoCo scene")
     parser.add_argument("--base", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--static-only", action="store_true")
     args = parser.parse_args()
-    print(generate_milk_bottle_scene(args.base, args.output))
+    generator = generate_default_world_scene if args.static_only else generate_milk_bottle_scene
+    print(generator(args.base, args.output))
 
 
 if __name__ == "__main__":  # pragma: no cover

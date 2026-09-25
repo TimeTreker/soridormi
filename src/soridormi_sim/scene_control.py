@@ -45,7 +45,12 @@ class SceneControl:
             objects: list[dict[str, object]] = []
             for name, mocap_id in self._dynamic_objects():
                 objects.append(self._object_state(name, mocap_id))
-            return {"ok": True, "objects": objects, "robot_time_s": float(backend.data.time)}
+            return {
+                "ok": True,
+                "objects": objects,
+                "robot_time_s": float(backend.data.time),
+                "reset_count": int(backend.reset_count),
+            }
 
         name = request.object_name
         position = request.position_xyz

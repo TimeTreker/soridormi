@@ -121,6 +121,7 @@ soridormi/
 │   ├── enter_runtime_dev.sh
 │   ├── enter_sim.sh
 │   ├── run_sim_server.sh
+│   ├── run_scenario.sh
 │   └── run_runtime_loop.sh
 ├── src/
 │   ├── soridormi_api/
@@ -260,6 +261,18 @@ For locomotion validation, start the real MuJoCo backend explicitly. The default
 ```bash
 ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
 ```
+
+For the default world with a scenario-owned milk bottle and timed dynamic
+elements, start the separate scenario runner:
+
+```bash
+./scripts/run_scenario.sh --viewer
+```
+
+The runner reads `configs/simulation_scenarios/default.json`; use
+`--scenario PATH` for another scenario or `--validate` to compile without
+starting the simulator. The standalone simulator's `--scene default` contains
+the fixed table and chairs only.
 
 To watch MuJoCo visually, enable the passive viewer explicitly:
 
