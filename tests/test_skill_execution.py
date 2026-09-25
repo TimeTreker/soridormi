@@ -71,8 +71,8 @@ def test_resource_acquisition_mock_plan_keeps_semantic_parameters() -> None:
         "resource_mock_return",
         "resource_mock_handover",
     ]
-    assert plan.commands[0].vx_mps > 0.0
-    assert plan.commands[2].vx_mps < 0.0
+    assert plan.commands[0].vx_mps == 0.0
+    assert plan.commands[2].vx_mps == 0.0
     assert plan.parameters is not None
     assert plan.parameters["resource"]["description"] == "a cup of water"
 

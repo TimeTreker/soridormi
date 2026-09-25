@@ -16,6 +16,9 @@ class SimRobot:
     def read_state(self) -> RobotState:
         return self.client.read_state()
 
+    def observe_scene(self) -> dict[str, object]:
+        return self.client.observe_scene()
+
     def send_motor_command(self, command: MotorCommand) -> None:
         self.client.send_motor_command(command)
 

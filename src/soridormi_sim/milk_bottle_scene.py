@@ -72,6 +72,9 @@ def mock_milk_observation(
                     "description": "bottle of milk",
                     "relative_direction": "in front of Chromie",
                     "distance_m": round(distance_m, 3),
+                    # Provider-internal steering input. The MCP perception tool
+                    # removes this backend-frame value before exposing the scene.
+                    "bearing_rad": bearing,
                 }
             )
     return {

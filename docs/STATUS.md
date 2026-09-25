@@ -65,11 +65,11 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
   provider may advertise granular acquisition/delivery capabilities, the complete
   composite, or both. Chromie owns composition across public leaves; Soridormi owns
   local planning inside each selected capability.
-- `acquire_and_deliver_resource` is exported as a simulation-only scripted/mock
-  skill. It reports mock resource evidence but does not navigate or grasp.
-  Motion crossing a MuJoCo reset now fails without completion evidence; see
-  [skill taxonomy](SORIDORMI_SKILL_TAXONOMY.md#resource_acquisition_delivery-provider-local-physical-resource-fulfillment).
-- Live 2026-09-25: direct walk +0.096 m; milk mock reset 1→2 and failed.
+- `acquire_and_deliver_resource` walks to uniquely observed scene resources at
+  bounded pace; grasp, carry, return, and handover remain simulation mocks.
+  Missing observations, stalls, stops, and resets cannot complete.
+- Isolated default-scene MuJoCo, 2026-09-25, uncommitted: bottle 10.006→0.899 m
+  in 155.08 s; mock handover completed, no active task, `safe_idle=true`.
 - The separate scenario runner reads a world-map/dynamic-element file, builds
   bodies with MuJoCo `MjSpec`, starts Soridormi, and applies timed pose events.
   The default scenario places a mock bottle on a fixed table 10 m ahead and
@@ -102,12 +102,9 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
   `no_motion=false`, explicit mocked acquisition/delivery evidence, and final
   standing safe idle. This is MuJoCo diagnostic evidence, not literal
   100-metre travel, physical water handling, or hardware qualification.
-- The paired working tree passes repository governance and compile checks. A
-  dependency-complete, full-checkout runtime container passes 748 tests with
-  two target-dependent skips; focused body concurrency passes 128 tests and the
-  task-agent contract passes 133. The current host Python lacks the declared
-  `pyzmq` dependency, so the required host pytest/body gates stop during import
-  collection and are not reported as passed.
+- Current checkout: governance and compile pass; full runtime-container suite
+  818 passed / 4 skipped; body concurrency 176 passed. Host Python lacks
+  `pyzmq`, so host pytest/body collection does not pass.
 - The MCP service exposes robot state, safety tools, bounded motion plans, named
   skills, concurrent body activities, and a task-level contract surface.
 - Task capabilities, preview, submit, status, events, and cancel are implemented

@@ -637,14 +637,19 @@
       "id": "acquire_and_deliver_resource",
       "category": "resource",
       "display_name": "Acquire and Deliver Resource",
-      "description": "Acquire a described physical object and deliver it to the intended recipient. The current implementation is a simulation-only scripted/mock provider-local pipeline.",
+      "description": "Walk to a uniquely observed physical object, then mock acquisition and handover in simulation. Soridormi reads the scene distance while walking; speed is an optional bounded pace.",
       "status": "available_sim_experimental",
       "execution": "composite",
       "capability_group": "resource_acquisition_delivery",
       "parameters": {
         "resource": {},
         "source": {},
-        "recipient": {}
+        "recipient": {},
+        "speed": {
+          "type": "string",
+          "default": "slow",
+          "enum": ["slow", "normal", "medium", "quick", "fast_limited"]
+        }
       },
       "parameters_schema": {
         "type": "object",
@@ -716,6 +721,12 @@
               "description"
             ],
             "additionalProperties": false
+          },
+          "speed": {
+            "type": "string",
+            "enum": ["slow", "normal", "medium", "quick", "fast_limited"],
+            "default": "slow",
+            "description": "Bounded walking pace; Soridormi uses scene observations for travel distance."
           }
         },
         "required": [
@@ -755,7 +766,7 @@
         "resource_outcome_contract",
         "safe_idle_after_delivery"
       ],
-      "notes": "Simulation-only architecture mock. Provider-local navigation, acquisition, carrying, and handover are idealized; no real manipulator/gripper capability is claimed.",
+      "notes": "Simulation-only capability. Soridormi walks toward a uniquely observed scene object at a bounded pace; acquisition, carrying, and handover are mocked. No real manipulator/gripper capability is claimed.",
       "metadata": {
         "simulation_mock": "resource_acquisition_delivery",
         "semantic_scope": {

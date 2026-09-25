@@ -148,17 +148,17 @@ advertises `resource_kinds=[physical_object]` and
 `delivery_modes=[physical_handover]`; those fields, not the skill name, are the
 matching contract.
 
-The first implementation is simulation-only and scripted/mock because the current
-Open Duck Mini v2 has no qualified manipulator/gripper stack. It may idealize source
-resolution, acquisition, carry, and handover while returning explicit
-`resource_outcome` evidence. This mock validates the Goal → capability → provider →
-evidence architecture and must remain unavailable for hardware execution until the
-real embodied stack is qualified.
-
-The current scripted composite issues only a short local approach, pickup pose,
-return, and handover. It does not route to the scene bottle or scale travel to a
-source distance; the mock outcome must not be interpreted as physical retrieval.
-Any simulator reset during the sequence prevents completion evidence.
+The implementation remains simulation-only because the current Open Duck Mini v2
+has no qualified manipulator/gripper stack. Soridormi walks toward a uniquely
+observed scene object in bounded one-second segments, re-reading its simulator
+distance and bearing until it is within 0.9 m. The user-reported distance stays
+in `source` as context; simulator geometry controls travel. `speed` optionally
+selects an existing bounded walking pace and defaults to `slow`. Missing or
+ambiguous scene observations, lack of progress, timeout, stop, and simulator reset
+prevent completion evidence. Acquisition, carrying, return to recipient, and
+handover are still explicit simulation mocks in `resource_outcome`; the result
+must not be interpreted as physical retrieval or delivery. Hardware execution
+remains unavailable until the embodied stack is qualified.
 
 ### head_social: head/neck social skills
 

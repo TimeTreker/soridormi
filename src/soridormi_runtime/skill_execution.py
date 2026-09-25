@@ -1116,12 +1116,14 @@ def _plan_acquire_and_deliver_resource(
     # expose separately. Chromie sees one capability leaf only when it selects
     # this stronger advertised contract.
     commands = (
-        VelocitySegment(vx_mps=0.12, duration_s=0.60, label="resource_mock_approach"),
+        # Runtime resolves this marker from live scene observations. A static
+        # duration here would be mistaken for a route to the resource.
+        VelocitySegment(duration_s=0.05, label="resource_mock_approach"),
         VelocitySegment(
             duration_s=SIMULATED_RESOURCE_PICKUP_DURATION_S,
             label=SIMULATED_RESOURCE_PICKUP_LABEL,
         ),
-        VelocitySegment(vx_mps=-0.12, duration_s=0.60, label="resource_mock_return"),
+        VelocitySegment(duration_s=0.05, label="resource_mock_return"),
         VelocitySegment(duration_s=0.25, label=SIMULATED_RESOURCE_HANDOVER_LABEL),
     )
     return _resource_plan(
@@ -1130,8 +1132,9 @@ def _plan_acquire_and_deliver_resource(
         profile,
         commands=commands,
         summary=(
-            "Plan acquire_and_deliver_resource: simulation-only provider-local "
-            f"acquisition and handover of {description!r} to {recipient_description!r}."
+            "Plan acquire_and_deliver_resource: observe and walk to "
+            f"{description!r}, then mock acquisition and handover to "
+            f"{recipient_description!r} in simulation."
         ),
     )
 

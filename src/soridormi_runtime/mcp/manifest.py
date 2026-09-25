@@ -581,6 +581,10 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                                 "skills; omitted for unrelated named skills."
                             ),
                         },
+                        "approach_outcome": {
+                            "type": "object",
+                            "description": "Simulator observation distances before and after walking.",
+                        },
                     },
                     required=["completed", "skill_id", "no_motion"],
                 ),
@@ -590,7 +594,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 execution=ExecutionPolicy(
                     can_run_parallel=False,
                     exclusive_group="soridormi.robot_motion",
-                    timeout_s=30.0,
+                    timeout_s=300.0,
                     idempotent=False,
                     side_effect_free=False,
                 ),

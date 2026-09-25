@@ -35,6 +35,7 @@ from soridormi_runtime.scripted_head_skill import (
     validate_scripted_head_plan,
 )
 from soridormi_runtime.skill_execution import (
+    FORWARD_WALK_SPEED_PRESETS_MPS,
     SIMULATED_RESOURCE_HANDOVER_LABEL,
     SIMULATED_RESOURCE_PICKUP_LABEL,
     SkillExecutionRegistry,
@@ -70,6 +71,12 @@ from .local_tools import (
 )
 from .source_identity import current_source_revision
 from .task_tools import EmbodiedTaskStore, task_capabilities_payload
+
+RESOURCE_APPROACH_LABEL = "resource_mock_approach"
+RESOURCE_RETURN_LABEL = "resource_mock_return"
+RESOURCE_APPROACH_STOP_DISTANCE_M = 0.9
+RESOURCE_APPROACH_MAX_DURATION_S = 240.0
+RESOURCE_APPROACH_SEGMENT_S = 1.0
 
 
 class RuntimeRobot(Protocol):
@@ -368,6 +375,11 @@ class SoridormiRuntimeToolService:
                     "when_to_use": str(skill.get("description") or ""),
                     "execution": execution,
                     "notes": str(skill.get("notes") or ""),
+                    **(
+                        {"timeout_s": 300.0}
+                        if skill_id == "acquire_and_deliver_resource"
+                        else {}
+                    ),
                     "semantic_speed_presets_mps": dict(
                         skill.get("semantic_speed_presets_mps") or {}
                     ),
@@ -535,7 +547,9 @@ class SoridormiRuntimeToolService:
             "skill_id": skill_id,
             "mode": self.mode,
             "summary": plan.summary.replace("Dry-run", "Runtime"),
-            "estimated_duration_s": plan.total_duration_s,
+            "estimated_duration_s": (
+                None if skill_id == "acquire_and_deliver_resource" else plan.total_duration_s
+            ),
             "requires_confirmation": bool(
                 self.skill_registry.skills[skill_id].get(
                     "requires_confirmation", self.mode != "sim"
@@ -596,21 +610,39 @@ class SoridormiRuntimeToolService:
             )
             if stored.plan.skill_id == "deliver_resource":
                 await self._try_apply_visual_arm_pose("hold")
+            observed_approach = stored.plan.skill_id == "acquire_and_deliver_resource"
+            approach_outcome: dict[str, Any] | None = None
 
             async def resource_segment_handler(
                 command: dict[str, Any],
             ) -> bool | None:
+                nonlocal approach_outcome
                 label = str(command.get("label") or "")
+                if observed_approach and label == RESOURCE_APPROACH_LABEL:
+                    speed = str((stored.plan.parameters or {}).get("speed") or "slow")
+                    approach_outcome = await self._navigate_to_observed_resource(
+                        description, speed_mps=FORWARD_WALK_SPEED_PRESETS_MPS[speed]
+                    )
+                    return bool(approach_outcome)
                 if label == SIMULATED_RESOURCE_PICKUP_LABEL:
                     await self._try_apply_visual_arm_pose("reach")
                     self.controller.command = PolicyCommand()
-                    completed = await self._execute_simulated_resource_pickup_pose(
-                        float(command["duration_s"])
-                    )
+                    if observed_approach:
+                        await asyncio.sleep(float(command["duration_s"]))
+                        completed = not self.emergency_stop and not self._motion_stop_requested
+                    else:
+                        completed = await self._execute_simulated_resource_pickup_pose(
+                            float(command["duration_s"])
+                        )
                     await self._try_apply_visual_arm_pose(
                         "hold" if completed else fallback_visual_arm_pose
                     )
                     return completed
+                if observed_approach and label == RESOURCE_RETURN_LABEL:
+                    # The handover is still a simulation mock. Do not command a
+                    # token reverse step and imply travel back to the recipient.
+                    self.controller.command = PolicyCommand()
+                    return True
                 if label == SIMULATED_RESOURCE_HANDOVER_LABEL:
                     await self._try_apply_visual_arm_pose("place")
                 return None
@@ -631,8 +663,8 @@ class SoridormiRuntimeToolService:
                     summary = "Soridormi simulation mock delivered the carried resource."
                 else:
                     summary = (
-                        "Soridormi simulation mock completed its scripted physical "
-                        "resource acquisition and handover sequence."
+                        "Soridormi walked to the observed simulation resource and "
+                        "mocked acquisition and handover."
                     )
                 visual_arm_pose_applied = await self._try_apply_visual_arm_pose(
                     final_visual_arm_pose
@@ -642,9 +674,11 @@ class SoridormiRuntimeToolService:
                     "completed": True,
                     "summary": summary,
                     "no_motion": False,
+                    **({"estimated_duration_s": None} if observed_approach else {}),
                     "resource_outcome": simulated_resource_outcome(stored.plan),
                     "visual_arm_pose": (final_visual_arm_pose if visual_arm_pose_applied else None),
                     "visual_arm_mocked_simulation": visual_arm_pose_applied,
+                    **({"approach_outcome": approach_outcome} if approach_outcome else {}),
                 }
         else:  # pragma: no cover - plans are validated at creation
             raise ValueError(
@@ -1607,6 +1641,11 @@ class SoridormiRuntimeToolService:
         if not isinstance(observed, dict) or observed.get("mocked_simulation") is not True:
             raise RuntimeError("invalid mock scene observation")
         result = dict(observed)
+        result["objects"] = [
+            {key: value for key, value in item.items() if key != "bearing_rad"}
+            for item in observed.get("objects", [])
+            if isinstance(item, dict)
+        ]
         self._scene_observation_sequence += 1
         result["observation_sequence"] = self._scene_observation_sequence
         result["observation_id"] = f"soridormi-scene-{uuid.uuid4().hex}"
@@ -1614,6 +1653,86 @@ class SoridormiRuntimeToolService:
         if self.source_revision:
             result["source_revision"] = self.source_revision
         return result
+
+    async def _navigate_to_observed_resource(
+        self, description: str, *, speed_mps: float
+    ) -> dict[str, Any]:
+        """Walk toward a matching simulator marker using provider-only bearing feedback."""
+
+        observer = getattr(self.robot, "observe_scene", None)
+        if not callable(observer):
+            raise RuntimeError("simulator cannot observe the requested resource")
+
+        def normalized(value: str) -> str:
+            return " ".join(
+                word for word in value.casefold().split() if word not in {"a", "an", "the"}
+            )
+
+        async def target() -> tuple[float, float]:
+            async with self._robot_lock:
+                observed = await self._call_robot(observer)
+            if not isinstance(observed, dict) or observed.get("mocked_simulation") is not True:
+                raise RuntimeError("simulator resource observation is unavailable")
+            matches = [
+                item
+                for item in observed.get("objects", [])
+                if isinstance(item, dict)
+                and normalized(str(item.get("description") or "")) == normalized(description)
+            ]
+            if len(matches) != 1:
+                raise RuntimeError("requested resource is not uniquely observed in the simulator")
+            distance = float(matches[0].get("distance_m", math.nan))
+            bearing = float(matches[0].get("bearing_rad", math.nan))
+            if not math.isfinite(distance) or distance < 0 or not math.isfinite(bearing):
+                raise RuntimeError("simulator resource observation has invalid route data")
+            return distance, bearing
+
+        started_at = asyncio.get_running_loop().time()
+        initial_reset_count = self._last_state.reset_count if self._last_state else None
+        first_distance: float | None = None
+        previous_distance = math.inf
+        stalled_segments = 0
+        try:
+            while True:
+                if self.emergency_stop or self._motion_stop_requested:
+                    return {}
+                elapsed_s = asyncio.get_running_loop().time() - started_at
+                if elapsed_s > RESOURCE_APPROACH_MAX_DURATION_S:
+                    raise RuntimeError("simulator resource approach exceeded its time bound")
+                distance, bearing = await target()
+                if first_distance is None:
+                    first_distance = distance
+                if "locomotion" in self.active_lanes:
+                    self.active_lanes["locomotion"]["distance_to_resource_m"] = distance
+                    self._refresh_active_task()
+                if distance <= RESOURCE_APPROACH_STOP_DISTANCE_M:
+                    self.controller.command = PolicyCommand()
+                    return {
+                        "mocked_simulation": True,
+                        "observed_distance_start_m": first_distance,
+                        "observed_distance_end_m": distance,
+                        "elapsed_s": round(elapsed_s, 2),
+                    }
+                stalled_segments = (
+                    stalled_segments + 1 if distance >= previous_distance - 0.005 else 0
+                )
+                if stalled_segments >= 10:
+                    raise RuntimeError("simulator resource approach made no forward progress")
+                previous_distance = distance
+                self.controller.command = PolicyCommand(
+                    x_velocity=speed_mps,
+                    yaw_velocity=max(-0.20, min(0.20, 0.8 * bearing)),
+                )
+                if not await self._run_segment(RESOURCE_APPROACH_SEGMENT_S):
+                    return {}
+                if (
+                    self._last_state is None
+                    or self._last_state.reset_count != initial_reset_count
+                ):
+                    return {}
+        except Exception:
+            await self._apply_safe_hold()
+            raise
 
     async def execute_motion_plan(
         self,
@@ -1672,13 +1791,6 @@ class SoridormiRuntimeToolService:
                         completed = await self._run_segment(float(command["duration_s"]))
                     else:
                         completed = handled
-                    if not completed:
-                        return {
-                            "completed": False,
-                            "stopped": True,
-                            "dry_run_only": False,
-                            "summary": f"Soridormi runtime stopped plan {plan_id}.",
-                        }
                     current_reset_count = (
                         self._last_state.reset_count if self._last_state is not None else None
                     )
@@ -1697,6 +1809,13 @@ class SoridormiRuntimeToolService:
                                 "Soridormi simulator reset during motion; "
                                 f"plan {plan_id} did not complete."
                             ),
+                        }
+                    if not completed:
+                        return {
+                            "completed": False,
+                            "stopped": True,
+                            "dry_run_only": False,
+                            "summary": f"Soridormi runtime stopped plan {plan_id}.",
                         }
                 return {
                     "completed": True,

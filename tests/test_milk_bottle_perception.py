@@ -83,6 +83,7 @@ def test_mock_observation_uses_scene_position_and_robot_heading() -> None:
         "description": "bottle of milk",
         "relative_direction": "in front of Chromie",
         "distance_m": 10.0,
+        "bearing_rad": 0.0,
     }]
     assert mock_milk_observation(bottle_xyz=None, **base)["objects"] == []
     assert mock_milk_observation(bottle_xyz=(70.0, 0.0, 0.86), **base)["objects"] == []
