@@ -66,10 +66,10 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
   composite, or both. Chromie owns composition across public leaves; Soridormi owns
   local planning inside each selected capability.
 - `acquire_and_deliver_resource` is exported as a simulation-only scripted/mock
-  named skill for the `physical_object + physical_handover` semantic scope. It
-  returns explicit `resource_outcome` acquisition/delivery evidence so paired
-  Chromie/Soridormi architecture can be exercised end to end without claiming a
-  real manipulator or hardware grasp capability.
+  skill. It reports mock resource evidence but does not navigate or grasp.
+  Motion crossing a MuJoCo reset now fails without completion evidence; see
+  [skill taxonomy](SORIDORMI_SKILL_TAXONOMY.md#resource_acquisition_delivery-provider-local-physical-resource-fulfillment).
+- Live 2026-09-25: direct walk +0.096 m; milk mock reset 1→2 and failed.
 - The separate scenario runner reads a world-map/dynamic-element file, builds
   bodies with MuJoCo `MjSpec`, starts Soridormi, and applies timed pose events.
   The default scenario places a mock bottle on a fixed table 10 m ahead and

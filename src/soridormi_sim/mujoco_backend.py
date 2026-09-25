@@ -47,6 +47,7 @@ class FakeMujocoBackend:
     last_command: MotorCommand | None = None
     last_visual_expression: VisualExpressionCommand | None = None
     last_visual_arm_pose: VisualArmPoseCommand | None = None
+    reset_count: int = 0
 
     def __post_init__(self) -> None:
         n = len(self.joint_names)
@@ -80,6 +81,7 @@ class FakeMujocoBackend:
     def get_state(self) -> RobotState:
         return RobotState(
             time=time.monotonic() - self.start_time,
+            reset_count=self.reset_count,
             joints=JointState(
                 names=list(self.joint_names),
                 positions=list(self.positions),
@@ -110,6 +112,7 @@ class FakeMujocoBackend:
         self.last_visual_arm_pose = command
 
     def reset(self) -> None:
+        self.reset_count += 1
         self.start_time = time.monotonic()
         n = len(self.joint_names)
         self.positions = [0.0] * n
@@ -567,6 +570,7 @@ class MujocoBackend:
 
         return RobotState(
             time=float(self.data.time),
+            reset_count=self.reset_count,
             joints=JointState(
                 names=list(self.actuator_names),
                 positions=positions,

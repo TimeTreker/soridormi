@@ -28,6 +28,7 @@ class FakeBackend:
     def get_state(self) -> RobotState:
         return RobotState(
             time=float(self.step_count) * 0.02,
+            reset_count=3,
             joints=JointState(
                 names=["left_hip", "right_hip"],
                 positions=[0.1, -0.1],
@@ -69,6 +70,7 @@ def test_api_roundtrip_read_state_and_send_command() -> None:
         state = client.read_state()
         assert state.joints.names == ["left_hip", "right_hip"]
         assert state.joints.positions == [0.1, -0.1]
+        assert state.reset_count == 3
         assert backend.step_count >= 1
 
         command = MotorCommand(

@@ -1634,6 +1634,11 @@ class SoridormiRuntimeToolService:
             if self.emergency_stop:
                 raise RuntimeError("cannot execute motion while emergency_stop is active")
             self._motion_stop_requested = False
+            initial_reset_count = (await self._read_state()).reset_count
+            if initial_reset_count is None:
+                raise RuntimeError(
+                    "simulator reset generation unavailable; refusing motion execution"
+                )
             self._set_active_lane(
                 lane,
                 {
@@ -1657,29 +1662,41 @@ class SoridormiRuntimeToolService:
                         raise RuntimeError(
                             "simulation resource markers require provider skill execution"
                         )
-                    if segment_handler is not None:
-                        handled = await segment_handler(command)
-                        if handled is not None:
-                            if not handled:
-                                return {
-                                    "completed": False,
-                                    "stopped": True,
-                                    "dry_run_only": False,
-                                    "summary": f"Soridormi runtime stopped plan {plan_id}.",
-                                }
-                            continue
-                    self.controller.command = PolicyCommand(
-                        x_velocity=float(command["vx"]),
-                        y_velocity=float(command["vy"]),
-                        yaw_velocity=float(command["yaw"]),
-                    )
-                    completed = await self._run_segment(float(command["duration_s"]))
+                    handled = await segment_handler(command) if segment_handler else None
+                    if handled is None:
+                        self.controller.command = PolicyCommand(
+                            x_velocity=float(command["vx"]),
+                            y_velocity=float(command["vy"]),
+                            yaw_velocity=float(command["yaw"]),
+                        )
+                        completed = await self._run_segment(float(command["duration_s"]))
+                    else:
+                        completed = handled
                     if not completed:
                         return {
                             "completed": False,
                             "stopped": True,
                             "dry_run_only": False,
                             "summary": f"Soridormi runtime stopped plan {plan_id}.",
+                        }
+                    current_reset_count = (
+                        self._last_state.reset_count if self._last_state is not None else None
+                    )
+                    if current_reset_count is None:
+                        await self._apply_safe_hold()
+                        raise RuntimeError(
+                            "simulator reset generation disappeared during motion"
+                        )
+                    if current_reset_count != initial_reset_count:
+                        await self._apply_safe_hold()
+                        return {
+                            "completed": False,
+                            "reset_detected": True,
+                            "dry_run_only": False,
+                            "summary": (
+                                "Soridormi simulator reset during motion; "
+                                f"plan {plan_id} did not complete."
+                            ),
                         }
                 return {
                     "completed": True,

@@ -375,7 +375,11 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 display_name="Execute Soridormi motion plan",
                 description="Execute a previously created and validated Soridormi motion plan.",
                 input_schema=_object_schema({"plan_id": {"type": "string", "minLength": 1}}, required=["plan_id"]),
-                output_schema=_object_schema({"completed": {"type": "boolean"}, "summary": {"type": "string"}}),
+                output_schema=_object_schema({
+                    "completed": {"type": "boolean"},
+                    "reset_detected": {"type": "boolean"},
+                    "summary": {"type": "string"},
+                }),
                 effects=["physical_motion"],
                 safety_class="physical_motion",
                 availability=ToolAvailability(modes=safe_modes, requires=["robot_standing", "not_emergency_stopped"]),
@@ -564,6 +568,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 output_schema=_object_schema(
                     {
                         "completed": {"type": "boolean"},
+                        "reset_detected": {"type": "boolean"},
                         "skill_id": {"type": "string"},
                         "mode": {"type": "string"},
                         "no_motion": {"type": "boolean"},

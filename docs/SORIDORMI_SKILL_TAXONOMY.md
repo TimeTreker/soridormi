@@ -155,6 +155,11 @@ resolution, acquisition, carry, and handover while returning explicit
 evidence architecture and must remain unavailable for hardware execution until the
 real embodied stack is qualified.
 
+The current scripted composite issues only a short local approach, pickup pose,
+return, and handover. It does not route to the scene bottle or scale travel to a
+source distance; the mock outcome must not be interpreted as physical retrieval.
+Any simulator reset during the sequence prevents completion evidence.
+
 ### head_social: head/neck social skills
 
 Implement safe scripted/keyframe social behaviors in MuJoCo first:

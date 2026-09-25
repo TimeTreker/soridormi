@@ -82,13 +82,17 @@ The checker validates model file existence, input/output names, shapes, and dtyp
 
 ## Displacement analysis
 
-runnable policy engine adds optional `base_position_xyz` and `base_quat_wxyz` fields to `RobotState`.
+The runnable policy engine adds optional `base_position_xyz` and `base_quat_wxyz` fields to `RobotState`.
 The MuJoCo backend fills them from the floating base qpos. The log analyzer now
 reports forward displacement:
 
 ```bash
 ./scripts/analyze_latest_policy_log.sh
 ```
+
+MuJoCo also fills `RobotState.reset_count` with its monotonic reset generation.
+Soridormi motion execution compares this generation before and after each plan
+segment so an auto-reset during a fall cannot be reported as completed motion.
 
 This separates cases where the policy moves but falls from cases where the policy
 never produces forward displacement.

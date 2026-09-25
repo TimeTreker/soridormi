@@ -29,6 +29,7 @@ class FakeRobot:
     def read_state(self) -> RobotState:
         return RobotState(
             time=self.time,
+            reset_count=0,
             joints=JointState(
                 names=["joint"],
                 positions=[0.0],
@@ -124,6 +125,7 @@ class HeadFakeRobot:
     def read_state(self) -> RobotState:
         return RobotState(
             time=self.time,
+            reset_count=0,
             joints=JointState(
                 names=list(self.names),
                 positions=list(self.positions),
@@ -164,6 +166,7 @@ class ResourceFakeRobot:
     def read_state(self) -> RobotState:
         return RobotState(
             time=self.time,
+            reset_count=0,
             joints=JointState(
                 names=list(self.names),
                 positions=list(self.positions),
@@ -187,6 +190,22 @@ class ResourceFakeRobot:
     def set_visual_arm_pose(self, command: VisualArmPoseCommand) -> str:
         self.visual_arm_poses.append(command)
         return f"visual arm pose applied: {command.pose}"
+
+
+class ResettingResourceFakeRobot(ResourceFakeRobot):
+    def __init__(self, *, reset_after_commands: int) -> None:
+        super().__init__()
+        self.reset_count = 0
+        self.reset_after_commands = reset_after_commands
+
+    def read_state(self) -> RobotState:
+        return super().read_state().model_copy(update={"reset_count": self.reset_count})
+
+    def send_motor_command(self, command: MotorCommand) -> None:
+        super().send_motor_command(command)
+        if len(self.commands) == self.reset_after_commands:
+            self.reset_count += 1
+            self.time = 0.0
 
 
 class FakeController:
@@ -244,6 +263,28 @@ def test_runtime_service_executes_bounded_plan_through_controller() -> None:
         assert service.active_task is None
         assert service.controller.command == PolicyCommand()
         assert any(command.x_velocity == 0.08 for command in service.controller.seen_commands)
+
+    asyncio.run(exercise())
+
+
+def test_motion_refuses_simulator_without_reset_generation() -> None:
+    class ResetlessRobot(FakeRobot):
+        def read_state(self) -> RobotState:
+            return super().read_state().model_copy(update={"reset_count": None})
+
+    async def exercise() -> None:
+        service = SoridormiRuntimeToolService(
+            robot=ResetlessRobot(), controller=FakeController()
+        )
+        plan = await service.call_tool(
+            "soridormi.motion.create_plan",
+            {"commands": [{"vx": 0.12, "vy": 0.0, "yaw": 0.0, "duration_s": 0.05}]},
+        )
+        with pytest.raises(RuntimeError, match="reset generation unavailable"):
+            await service.call_tool(
+                "soridormi.motion.execute_plan", {"plan_id": plan["plan_id"]}
+            )
+        assert service.robot.commands == []
 
     asyncio.run(exercise())
 
@@ -712,6 +753,42 @@ def test_runtime_service_executes_simulated_resource_acquisition_delivery() -> N
             "place",
             "rest",
         ]
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("reset_after_commands", [2, 18, 45])
+def test_resource_mock_cannot_complete_after_simulator_reset(
+    reset_after_commands: int,
+) -> None:
+    async def exercise() -> None:
+        robot = ResettingResourceFakeRobot(
+            reset_after_commands=reset_after_commands
+        )
+        service = SoridormiRuntimeToolService(
+            robot=robot,
+            controller=FakeController(),
+            control_hz=20.0,
+        )
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {
+                "skill_id": "acquire_and_deliver_resource",
+                "parameters": {
+                    "resource": {"kind": "physical_object", "description": "bottle of milk"},
+                    "source": {"status": "known", "description": "table ahead"},
+                    "recipient": {"description": "requester"},
+                },
+            },
+        )
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
+        )
+        assert result["completed"] is False
+        assert result["reset_detected"] is True
+        assert "resource_outcome" not in result
+        assert service.active_task is None
+        assert service.controller.command == PolicyCommand()
 
     asyncio.run(exercise())
 

@@ -35,6 +35,9 @@ class RobotState(BaseModel):
     time: float
     joints: JointState
     imu: IMUState
+    # Monotonic simulator reset generation. A motion executor must not treat a
+    # trajectory that crossed a reset as completed work.
+    reset_count: int | None = Field(default=None, ge=0)
     battery: BatteryState | None = None
     # Optional policy-observation metadata. MuJoCo fills this with
     # [left_foot_contact, right_foot_contact] as floats 0.0/1.0.
