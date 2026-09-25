@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import math
 import os
+import re
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -79,6 +80,7 @@ RESOURCE_RETURN_STOP_DISTANCE_M = 0.9
 RESOURCE_ROUTE_MAX_DURATION_S = 300.0
 RESOURCE_ROUTE_SEGMENT_S = 1.0
 RESOURCE_ALIGN_BEARING_RAD = 0.45
+RESOURCE_PACE_RECOVERY_AFTER_S = 20.0
 
 
 class RuntimeRobot(Protocol):
@@ -627,6 +629,8 @@ class SoridormiRuntimeToolService:
                         description,
                         speed_mps=FORWARD_WALK_SPEED_PRESETS_MPS[speed],
                         stop_distance_m=RESOURCE_APPROACH_STOP_DISTANCE_M,
+                        select_nearest_equivalent=True,
+                        allow_bounded_pace_recovery=speed in {"normal", "medium", "quick"},
                     )
                     return bool(approach_outcome)
                 if label == SIMULATED_RESOURCE_PICKUP_LABEL:
@@ -650,6 +654,7 @@ class SoridormiRuntimeToolService:
                         str(recipient.get("description") or ""),
                         speed_mps=FORWARD_WALK_SPEED_PRESETS_MPS[speed],
                         stop_distance_m=RESOURCE_RETURN_STOP_DISTANCE_M,
+                        allow_bounded_pace_recovery=speed in {"normal", "medium", "quick"},
                     )
                     return bool(return_outcome)
                 if label == SIMULATED_RESOURCE_HANDOVER_LABEL:
@@ -1670,7 +1675,9 @@ class SoridormiRuntimeToolService:
         return result
 
     async def _navigate_to_observed_resource(
-        self, description: str, *, speed_mps: float, stop_distance_m: float
+        self, description: str, *, speed_mps: float, stop_distance_m: float,
+        select_nearest_equivalent: bool = False,
+        allow_bounded_pace_recovery: bool = False,
     ) -> dict[str, Any]:
         """Walk toward a matching simulator marker using provider-only bearing feedback."""
 
@@ -1678,12 +1685,19 @@ class SoridormiRuntimeToolService:
         if not callable(observer):
             raise RuntimeError("simulator cannot observe the requested resource")
 
-        def normalized(value: str) -> str:
-            return " ".join(
-                word for word in value.casefold().split() if word not in {"a", "an", "the"}
+        def terms(value: str) -> frozenset[str]:
+            return frozenset(
+                word for word in re.findall(r"\w+", value.casefold())
+                if word not in {"a", "an", "the", "of", "some"}
             )
 
+        requested_terms = terms(description)
+        if not requested_terms:
+            raise RuntimeError("requested simulator resource has no identifying terms")
+        selected_ref: str | None = None
+
         async def target() -> tuple[float, float]:
+            nonlocal selected_ref
             async with self._robot_lock:
                 observed = await self._call_robot(observer)
             if not isinstance(observed, dict) or observed.get("mocked_simulation") is not True:
@@ -1692,14 +1706,28 @@ class SoridormiRuntimeToolService:
                 item
                 for item in observed.get("objects", [])
                 if isinstance(item, dict)
-                and normalized(str(item.get("description") or "")) == normalized(description)
+                and requested_terms.issubset(terms(str(item.get("description") or "")))
+                and (selected_ref is None or item.get("object_ref") == selected_ref)
             ]
-            if len(matches) != 1:
+            if not matches or len({terms(str(item.get("description") or "")) for item in matches}) != 1:
                 raise RuntimeError("requested resource is not uniquely observed in the simulator")
-            distance = float(matches[0].get("distance_m", math.nan))
-            bearing = float(matches[0].get("bearing_rad", math.nan))
-            if not math.isfinite(distance) or distance < 0 or not math.isfinite(bearing):
-                raise RuntimeError("simulator resource observation has invalid route data")
+            if len(matches) > 1 and not select_nearest_equivalent:
+                raise RuntimeError("requested recipient is not uniquely observed in the simulator")
+            if len(matches) > 1:
+                refs = [item.get("object_ref") for item in matches]
+                if any(not isinstance(ref, str) or not ref for ref in refs) or len(set(refs)) != len(refs):
+                    raise RuntimeError("equivalent simulator resources lack unique object references")
+            for item in matches:
+                distance = float(item.get("distance_m", math.nan))
+                bearing = float(item.get("bearing_rad", math.nan))
+                if not math.isfinite(distance) or distance < 0 or not math.isfinite(bearing):
+                    raise RuntimeError("simulator resource observation has invalid route data")
+            selected = min(matches, key=lambda item: (float(item["distance_m"]), str(item.get("object_ref") or "")))
+            if selected_ref is None:
+                ref = selected.get("object_ref")
+                selected_ref = ref if isinstance(ref, str) and ref else None
+            distance = float(selected["distance_m"])
+            bearing = float(selected["bearing_rad"])
             return distance, bearing
 
         started_at = asyncio.get_running_loop().time()
@@ -1709,6 +1737,8 @@ class SoridormiRuntimeToolService:
         previous_bearing = math.inf
         stalled_segments = 0
         stalled_alignment_segments = 0
+        effective_speed_mps = speed_mps
+        pace_recovered = False
         try:
             while True:
                 if self.emergency_stop or self._motion_stop_requested:
@@ -1719,6 +1749,17 @@ class SoridormiRuntimeToolService:
                 distance, bearing = await target()
                 if first_distance is None:
                     first_distance = distance
+                if (
+                    allow_bounded_pace_recovery
+                    and not pace_recovered
+                    and elapsed_s >= RESOURCE_PACE_RECOVERY_AFTER_S
+                    and (first_distance - distance) / elapsed_s
+                    < (distance - stop_distance_m) / (RESOURCE_ROUTE_MAX_DURATION_S - elapsed_s)
+                ):
+                    effective_speed_mps = max(
+                        speed_mps, FORWARD_WALK_SPEED_PRESETS_MPS["fast_limited"]
+                    )
+                    pace_recovered = True
                 if "locomotion" in self.active_lanes:
                     self.active_lanes["locomotion"]["distance_to_resource_m"] = distance
                     self._refresh_active_task()
@@ -1729,8 +1770,12 @@ class SoridormiRuntimeToolService:
                         "observed_distance_start_m": first_distance,
                         "observed_distance_end_m": distance,
                         "elapsed_s": round(elapsed_s, 2),
+                        "bounded_pace_recovery": pace_recovered,
                     }
-                yaw_velocity = max(-0.20, min(0.20, 0.8 * bearing))
+                yaw_velocity = (
+                    max(-0.20, min(0.20, 0.8 * bearing))
+                    if abs(bearing) > RESOURCE_ALIGN_BEARING_RAD else 0.0
+                )
                 if abs(bearing) > RESOURCE_ALIGN_BEARING_RAD:
                     stalled_alignment_segments = (
                         stalled_alignment_segments + 1
@@ -1744,7 +1789,7 @@ class SoridormiRuntimeToolService:
                     # A bounded walking arc changes heading while the next
                     # scene read closes the loop toward the target.
                     self.controller.command = PolicyCommand(
-                        x_velocity=speed_mps, yaw_velocity=yaw_velocity
+                        x_velocity=effective_speed_mps, yaw_velocity=yaw_velocity
                     )
                 else:
                     stalled_segments = (
@@ -1754,7 +1799,7 @@ class SoridormiRuntimeToolService:
                         raise RuntimeError("simulator target route made no forward progress")
                     previous_distance = distance
                     self.controller.command = PolicyCommand(
-                        x_velocity=speed_mps, yaw_velocity=yaw_velocity
+                        x_velocity=effective_speed_mps, yaw_velocity=yaw_velocity
                     )
                 if not await self._run_segment(RESOURCE_ROUTE_SEGMENT_S):
                     return {}

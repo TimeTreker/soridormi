@@ -251,6 +251,33 @@ class ObservedResourceFakeRobot(ResourceFakeRobot):
         }
 
 
+class MultipleWaterBottlesFakeRobot(ObservedResourceFakeRobot):
+    def __init__(self) -> None:
+        super().__init__(description="bottle of water")
+        self.other_distance_m = 1.4
+
+    def send_motor_command(self, command: MotorCommand) -> None:
+        super().send_motor_command(command)
+        if command.velocities and command.velocities[0] > 0:
+            self.other_distance_m = 0.75
+
+    def observe_scene(self) -> dict[str, object]:
+        scene = super().observe_scene()
+        objects = scene["objects"]
+        assert isinstance(objects, list)
+        objects[0]["object_ref"] = "water-nearest"
+        objects[0]["bearing_rad"] = 0.2
+        objects.append({
+            "object_ref": "water-other", "description": "bottle of water",
+            "distance_m": self.other_distance_m, "bearing_rad": 0.2,
+        })
+        objects.append({
+            "object_ref": "water-third", "description": "bottle of water",
+            "distance_m": 1.5, "bearing_rad": 0.2,
+        })
+        return scene
+
+
 class FakeController:
     def __init__(self) -> None:
         self.command = PolicyCommand()
@@ -675,7 +702,7 @@ def test_runtime_service_lists_velocity_scripted_head_and_visual_skills() -> Non
         resource_skill = skills["acquire_and_deliver_resource"]
         assert resource_skill["execution"] == "composite"
         assert resource_skill["timeout_s"] == 660.0
-        assert resource_skill["parameters_schema"]["properties"]["speed"]["default"] == "slow"
+        assert resource_skill["parameters_schema"]["properties"]["speed"]["default"] == "normal"
         assert resource_skill["parameters_schema"]["properties"]["resource"]["type"] == "object"
         assert resource_skill["metadata"]["semantic_scope"]["resource_kinds"] == ["physical_object"]
         assert resource_skill["metadata"]["semantic_scope"]["delivery_modes"] == [
@@ -846,6 +873,152 @@ def test_known_resource_walks_to_observed_scene_object_before_mock_handover(
         assert "returned to the observed recipient" in result["summary"]
         public_observation = await service.call_tool("soridormi.robot.observe_scene", {})
         assert "bearing_rad" not in public_observation["objects"][0]
+
+    asyncio.run(exercise())
+
+
+def test_equivalent_water_bottles_select_nearest_and_hold_object_reference() -> None:
+    async def exercise() -> None:
+        robot = MultipleWaterBottlesFakeRobot()
+        service = SoridormiRuntimeToolService(
+            robot=robot, controller=FakeController(), control_hz=20.0
+        )
+        await service._read_state()
+        result = await service._navigate_to_observed_resource(
+            "water", speed_mps=0.12, stop_distance_m=0.9,
+            select_nearest_equivalent=True,
+        )
+
+        assert result["observed_distance_start_m"] == 1.25
+        assert result["observed_distance_end_m"] <= 0.9
+        assert robot.distance_m <= 0.9
+        assert robot.other_distance_m == 0.75
+        assert all(
+            command.yaw_velocity == 0
+            for command in service.controller.seen_commands
+            if command.x_velocity > 0
+        )
+
+    asyncio.run(exercise())
+
+
+def test_water_request_completes_mock_delivery_with_multiple_bottles() -> None:
+    async def exercise() -> None:
+        robot = MultipleWaterBottlesFakeRobot()
+        service = SoridormiRuntimeToolService(
+            robot=robot, controller=FakeController(), control_hz=20.0
+        )
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {"skill_id": "acquire_and_deliver_resource", "parameters": {
+                "resource": {"kind": "physical_object", "description": "water"},
+                "source": {"status": "unknown"},
+                "recipient": {"description": "user"},
+            }},
+        )
+        assert service.skill_plans[plan["plan_id"]].plan.parameters["speed"] == "normal"
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
+        )
+        assert result["completed"] is True
+        assert result["resource_outcome"]["resource_delivered"] is True
+        assert result["resource_outcome"]["mocked_simulation"] is True
+        assert result["approach_outcome"]["observed_distance_start_m"] == 1.25
+        assert service.active_task is None
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("allow_recovery", [False, True])
+def test_resource_route_recovers_pace_only_when_allowed(
+    monkeypatch: pytest.MonkeyPatch, allow_recovery: bool
+) -> None:
+    import soridormi_runtime.mcp.runtime_tools as runtime_tools
+
+    class StationaryResourceRobot(ObservedResourceFakeRobot):
+        def send_motor_command(self, command: MotorCommand) -> None:
+            ResourceFakeRobot.send_motor_command(self, command)
+
+    async def exercise() -> None:
+        monkeypatch.setattr(runtime_tools, "RESOURCE_PACE_RECOVERY_AFTER_S", 0.1)
+        robot = StationaryResourceRobot()
+        service = SoridormiRuntimeToolService(
+            robot=robot, controller=FakeController(), control_hz=20.0
+        )
+        await service._read_state()
+        route = asyncio.create_task(service._navigate_to_observed_resource(
+            "bottle of milk", speed_mps=0.12, stop_distance_m=0.9,
+            allow_bounded_pace_recovery=allow_recovery,
+        ))
+        await asyncio.sleep(2.2)
+        service._motion_stop_requested = True
+        assert await route == {}
+        observed_speeds = {
+            command.x_velocity for command in service.controller.seen_commands
+        }
+        assert (0.18 in observed_speeds) is allow_recovery
+        assert 0.12 in observed_speeds
+
+    asyncio.run(exercise())
+
+
+def test_different_matching_resource_types_remain_ambiguous() -> None:
+    async def exercise() -> None:
+        robot = MultipleWaterBottlesFakeRobot()
+        original_observe = robot.observe_scene
+
+        def ambiguous_observe() -> dict[str, object]:
+            scene = original_observe()
+            objects = scene["objects"]
+            assert isinstance(objects, list)
+            objects.append({
+                "object_ref": "water-glass", "description": "glass of water",
+                "distance_m": 1.0, "bearing_rad": 0.0,
+            })
+            return scene
+
+        robot.observe_scene = ambiguous_observe  # type: ignore[method-assign]
+        service = SoridormiRuntimeToolService(
+            robot=robot, controller=FakeController(), control_hz=20.0
+        )
+        with pytest.raises(RuntimeError, match="not uniquely observed"):
+            await service._navigate_to_observed_resource(
+                "water", speed_mps=0.12, stop_distance_m=0.9,
+                select_nearest_equivalent=True,
+            )
+        assert not robot.commands or all(
+            command.velocities[0] == 0 for command in robot.commands
+        )
+
+    asyncio.run(exercise())
+
+
+def test_multiple_observed_people_do_not_select_a_delivery_recipient() -> None:
+    async def exercise() -> None:
+        robot = MultipleWaterBottlesFakeRobot()
+        original_observe = robot.observe_scene
+
+        def multiple_people() -> dict[str, object]:
+            scene = original_observe()
+            objects = scene["objects"]
+            assert isinstance(objects, list)
+            objects.append({
+                "object_ref": "other-person", "description": "user",
+                "distance_m": 1.0, "bearing_rad": 0.0,
+            })
+            return scene
+
+        robot.observe_scene = multiple_people  # type: ignore[method-assign]
+        service = SoridormiRuntimeToolService(
+            robot=robot, controller=FakeController(), control_hz=20.0
+        )
+        with pytest.raises(RuntimeError, match="recipient is not uniquely observed"):
+            await service._navigate_to_observed_resource(
+                "user", speed_mps=0.12, stop_distance_m=0.9
+            )
+        assert not robot.commands or all(
+            command.velocities[0] == 0 for command in robot.commands
+        )
 
     asyncio.run(exercise())
 

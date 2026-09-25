@@ -637,7 +637,7 @@
       "id": "acquire_and_deliver_resource",
       "category": "resource",
       "display_name": "Acquire and Deliver Resource",
-      "description": "Walk to a uniquely observed physical object, mock pickup, return to the observed recipient, then mock handover in simulation. Soridormi reads scene distances while walking; speed is an optional bounded pace.",
+      "description": "Walk to the nearest of equivalent observed physical objects, mock pickup, return to a uniquely observed recipient, then mock handover in simulation. Soridormi reads scene distances while walking and may recover a non-slow pace within the bounded presets.",
       "status": "available_sim_experimental",
       "execution": "composite",
       "capability_group": "resource_acquisition_delivery",
@@ -647,7 +647,7 @@
         "recipient": {},
         "speed": {
           "type": "string",
-          "default": "slow",
+          "default": "normal",
           "enum": ["slow", "normal", "medium", "quick", "fast_limited"]
         }
       },
@@ -725,8 +725,8 @@
           "speed": {
             "type": "string",
             "enum": ["slow", "normal", "medium", "quick", "fast_limited"],
-            "default": "slow",
-            "description": "Bounded walking pace; Soridormi uses scene observations for travel distance."
+            "default": "normal",
+            "description": "Bounded walking pace; Soridormi uses scene feedback and may raise a non-slow command within the advertised presets if progress cannot meet the route deadline."
           }
         },
         "required": [
@@ -766,7 +766,7 @@
         "resource_outcome_contract",
         "safe_idle_after_delivery"
       ],
-      "notes": "Simulation-only capability. Soridormi walks to a uniquely observed scene object and back to the observed recipient at a bounded pace; pickup, carry, and handover are mocked. No real manipulator/gripper capability is claimed.",
+      "notes": "Simulation-only capability. Soridormi selects the nearest equivalent observed scene object and walks to it, then returns to a uniquely observed recipient at a bounded pace. It can raise a non-slow command within the advertised presets if observed progress would miss the route deadline; explicit slow remains slow. Pickup, carry, and handover are mocked. Distinct matching object types remain ambiguous. No real manipulator/gripper capability is claimed.",
       "metadata": {
         "simulation_mock": "resource_acquisition_delivery",
         "semantic_scope": {

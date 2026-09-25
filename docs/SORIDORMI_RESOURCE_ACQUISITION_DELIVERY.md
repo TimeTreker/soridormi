@@ -154,15 +154,25 @@ This endpoint is local to the simulator process and absent from Soridormi's
 robot API, Chromie's tools, and hardware mode. Adding or removing bodies after
 startup is outside this runner's current contract; it compiles declared dynamic
 bodies before starting the simulator and changes their poses during playback.
-The resource navigation helper currently requires one observation matching a
-resource description. Three identical water bottles therefore appear in scene
-observation, but a generic "bottle of water" acquisition request is rejected as
-ambiguous until a target-selection contract is implemented.
+The resource navigation helper matches identifying words in the requested
+description against observed object descriptions. When several objects of the
+same observed type match, it selects the nearest and follows that object's
+observation reference during the walk. A generic "water" request can therefore
+select one of the three observed water bottles. Different matching object types
+remain ambiguous and prevent motion; a missing or invalid observation also
+prevents completion. This is simulator marker selection, not camera recognition.
+When the marker is within the bounded alignment cone, the locomotion command
+goes straight; a new observation starts another bounded walking turn if needed.
+The composite defaults to `normal` pace. After observing route progress, it
+can raise a non-`slow` command to the advertised `fast_limited` bound when the
+remaining distance would otherwise exceed its route deadline. An explicit
+`slow` request stays slow; a failed, stopped, or timed-out route never becomes
+mock pickup or delivery evidence.
 
 Open Duck Mini v2 does not currently expose a validated manipulator/gripper stack.
 To validate the cross-repository architecture now, Soridormi provides a
 **simulation-only implementation** of the complete resource contract. The runtime
-walks to a uniquely observed resource and back to a uniquely observed recipient,
+walks to a selected observed resource and back to a uniquely observed recipient,
 rechecking scene distance and bearing after bounded walking segments. A recipient
 behind Chromie is reached by a feedback-guided walking turn. Missing or ambiguous
 markers, stalled motion, reset, stop, and timeout prevent delivery evidence.
