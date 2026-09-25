@@ -14,6 +14,7 @@ from soridormi_sim.milk_bottle_scene import (
     MILK_BOTTLE_GEOM,
     MILK_TABLE_GEOM,
     USER_BODY_GEOM,
+    WATER_BOTTLE_GEOMS,
     build_milk_bottle_scene_xml,
     mock_scene_observation,
 )
@@ -101,6 +102,32 @@ def test_mock_observation_uses_scene_position_and_robot_heading() -> None:
     assert mock_scene_observation(
         bottle_xyz=None, user_xyz=(0.0, -70.0, 1.0), **base
     )["objects"] == []
+
+
+def test_mock_observation_reports_water_markers_to_the_left() -> None:
+    base = {
+        "bottle_xyz": None,
+        "robot_xyz": (0.0, 0.0, 0.0),
+        "robot_quat_wxyz": (1.0, 0.0, 0.0, 0.0),
+        "robot_time_s": 2.0,
+    }
+    water = {
+        WATER_BOTTLE_GEOMS[0]: (-0.35, 5.0, 0.15),
+        WATER_BOTTLE_GEOMS[1]: (0.0, 5.0, 0.15),
+        WATER_BOTTLE_GEOMS[2]: (0.35, 5.0, 0.15),
+    }
+    objects = mock_scene_observation(water_bottles_xyz=water, **base)["objects"]
+    assert {item["object_ref"] for item in objects} == set(WATER_BOTTLE_GEOMS)
+    assert all(item["description"] == "bottle of water" for item in objects)
+    assert all(item["relative_direction"] == "to Chromie's left" for item in objects)
+    assert all(4.9 <= item["distance_m"] <= 5.1 for item in objects)
+    assert all(item["bearing_rad"] > 0 for item in objects)
+    turned = {**base, "robot_quat_wxyz": (math.sqrt(0.5), 0.0, 0.0, math.sqrt(0.5))}
+    assert all(
+        item["relative_direction"] == "in front of Chromie"
+        for item in mock_scene_observation(water_bottles_xyz=water, **turned)["objects"]
+    )
+    assert mock_scene_observation(water_bottles_xyz={WATER_BOTTLE_GEOMS[0]: (0, 70, 0.15)}, **base)["objects"] == []
 
 
 def test_fake_simulator_and_local_adapter_cannot_invent_a_bottle() -> None:

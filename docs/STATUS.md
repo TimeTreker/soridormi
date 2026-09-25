@@ -75,8 +75,8 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
   Direct dirty-source proof had independently completed both walking legs.
 - The separate scenario runner reads a world-map/dynamic-element file, builds
   bodies with MuJoCo `MjSpec`, starts Soridormi, and applies timed pose events.
-  The default scenario places a bottle on a fixed table 10 m ahead, a standing
-  user 1.5 m right, and fixed chairs left. `observe_scene` reads scene geometry;
+  The default scene has milk 10 m ahead on a table, three water bottles about 5 m
+  left, a user 1.5 m right, and fixed chairs. `observe_scene` reads scene geometry;
   it is not camera or physical perception. Focused and live MuJoCo tests cover
   creation and movement. Chromie does not poll it on ordinary turns; no live
   scene-to-speech proof exists.

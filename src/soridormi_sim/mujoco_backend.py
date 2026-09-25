@@ -21,6 +21,7 @@ from .milk_bottle_scene import (
     MILK_BOTTLE_GEOM,
     MILK_TABLE_GEOM,
     USER_BODY_GEOM,
+    WATER_BOTTLE_GEOMS,
     mock_scene_observation,
 )
 from .robot_config import RobotConfig, load_robot_config
@@ -299,11 +300,21 @@ class MujocoBackend:
             if user_geom_id >= 0
             else None
         )
+        water_bottles_xyz = {}
+        for water_geom in WATER_BOTTLE_GEOMS:
+            water_geom_id = self.mujoco.mj_name2id(
+                self.model, self.mujoco.mjtObj.mjOBJ_GEOM, water_geom
+            )
+            if water_geom_id >= 0:
+                water_bottles_xyz[water_geom] = tuple(
+                    float(value) for value in self.data.geom_xpos[water_geom_id]
+                )
         xyz = self._slice(self.data.qpos, self.config.base.qpos_xyz_slice)
         quat = self._slice(self.data.qpos, self.config.base.qpos_quat_wxyz_slice)
         return mock_scene_observation(
             bottle_xyz=bottle_xyz,
             user_xyz=user_xyz,
+            water_bottles_xyz=water_bottles_xyz,
             robot_xyz=(float(xyz[0]), float(xyz[1]), float(xyz[2])),
             robot_quat_wxyz=(float(quat[0]), float(quat[1]), float(quat[2]), float(quat[3])),
             robot_time_s=float(self.data.time),

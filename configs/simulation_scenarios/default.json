@@ -78,6 +78,84 @@
           "rgba": [0.75, 0.52, 0.36, 1.0]
         }
       ]
+    },
+    {
+      "name": "scenario_water_bottle_1",
+      "position_xyz": [-0.35, 5.0, 0.15],
+      "geoms": [
+        {
+          "name": "soridormi_mock_water_bottle_1",
+          "shape": "cylinder",
+          "size": [0.055, 0.15, 0.0],
+          "rgba": [0.25, 0.72, 0.94, 0.9]
+        },
+        {
+          "name": "soridormi_mock_water_bottle_1_neck",
+          "shape": "cylinder",
+          "size": [0.03, 0.035, 0.0],
+          "local_position_xyz": [0.0, 0.0, 0.18],
+          "rgba": [0.25, 0.72, 0.94, 0.9]
+        },
+        {
+          "name": "soridormi_mock_water_bottle_1_cap",
+          "shape": "cylinder",
+          "size": [0.035, 0.02, 0.0],
+          "local_position_xyz": [0.0, 0.0, 0.235],
+          "rgba": [0.08, 0.34, 0.78, 1.0]
+        }
+      ]
+    },
+    {
+      "name": "scenario_water_bottle_2",
+      "position_xyz": [0.0, 5.0, 0.15],
+      "geoms": [
+        {
+          "name": "soridormi_mock_water_bottle_2",
+          "shape": "cylinder",
+          "size": [0.055, 0.15, 0.0],
+          "rgba": [0.25, 0.72, 0.94, 0.9]
+        },
+        {
+          "name": "soridormi_mock_water_bottle_2_neck",
+          "shape": "cylinder",
+          "size": [0.03, 0.035, 0.0],
+          "local_position_xyz": [0.0, 0.0, 0.18],
+          "rgba": [0.25, 0.72, 0.94, 0.9]
+        },
+        {
+          "name": "soridormi_mock_water_bottle_2_cap",
+          "shape": "cylinder",
+          "size": [0.035, 0.02, 0.0],
+          "local_position_xyz": [0.0, 0.0, 0.235],
+          "rgba": [0.08, 0.34, 0.78, 1.0]
+        }
+      ]
+    },
+    {
+      "name": "scenario_water_bottle_3",
+      "position_xyz": [0.35, 5.0, 0.15],
+      "geoms": [
+        {
+          "name": "soridormi_mock_water_bottle_3",
+          "shape": "cylinder",
+          "size": [0.055, 0.15, 0.0],
+          "rgba": [0.25, 0.72, 0.94, 0.9]
+        },
+        {
+          "name": "soridormi_mock_water_bottle_3_neck",
+          "shape": "cylinder",
+          "size": [0.03, 0.035, 0.0],
+          "local_position_xyz": [0.0, 0.0, 0.18],
+          "rgba": [0.25, 0.72, 0.94, 0.9]
+        },
+        {
+          "name": "soridormi_mock_water_bottle_3_cap",
+          "shape": "cylinder",
+          "size": [0.035, 0.02, 0.0],
+          "local_position_xyz": [0.0, 0.0, 0.235],
+          "rgba": [0.08, 0.34, 0.78, 1.0]
+        }
+      ]
     }
   ],
   "events": []

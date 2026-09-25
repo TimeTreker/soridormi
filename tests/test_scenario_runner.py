@@ -36,6 +36,16 @@ def test_default_scenario_owns_dynamic_bottle_separately_from_static_world() -> 
     assert user.position_xyz == (0.0, -1.5, 0.0)
     assert USER_BODY_GEOM in {geom.name for geom in user.geoms}
     assert all(not geom.collidable for geom in user.geoms)
+    water = scenario.dynamic_elements[2:]
+    assert [element.name for element in water] == [
+        "scenario_water_bottle_1", "scenario_water_bottle_2", "scenario_water_bottle_3"
+    ]
+    assert [element.position_xyz for element in water] == [
+        (-0.35, 5.0, 0.15), (0.0, 5.0, 0.15), (0.35, 5.0, 0.15)
+    ]
+    assert all(not geom.collidable for element in water for geom in element.geoms)
+    assert all(element.position_xyz[1] > 0 for element in water)
+    assert all(4.9 <= sum(axis * axis for axis in element.position_xyz[:2]) ** 0.5 <= 5.1 for element in water)
 
 
 def test_scenario_rejects_events_for_undeclared_elements() -> None:
@@ -94,7 +104,8 @@ def test_runner_creates_bottle_and_applies_sim_time_event(tmp_path: Path) -> Non
                     raise AssertionError("scenario runner did not start")
                 time.sleep(0.1)
         assert {item["name"] for item in initial["objects"]} == {
-            "scenario_milk_bottle", "scenario_user", "scenario_actor"
+            "scenario_milk_bottle", "scenario_user", "scenario_actor",
+            "scenario_water_bottle_1", "scenario_water_bottle_2", "scenario_water_bottle_3",
         }
 
         import zmq
@@ -105,7 +116,12 @@ def test_runner_creates_bottle_and_applies_sim_time_event(tmp_path: Path) -> Non
         robot.connect(f"tcp://127.0.0.1:{port}")
         try:
             robot.send_json({"kind": "observe_scene"})
-            assert robot.recv_json()["scene_observation"]["objects"][0]["distance_m"] == 10.0
+            initial_objects = robot.recv_json()["scene_observation"]["objects"]
+            assert initial_objects[0]["distance_m"] == 10.0
+            water_objects = [item for item in initial_objects if item["description"] == "bottle of water"]
+            assert len(water_objects) == 3
+            assert all(item["relative_direction"] == "to Chromie's left" for item in water_objects)
+            assert all(4.9 <= item["distance_m"] <= 5.1 for item in water_objects)
             for _ in range(4):
                 robot.send_json({"kind": "get_state"})
                 assert robot.recv_json()["ok"] is True
@@ -128,6 +144,9 @@ def test_runner_creates_bottle_and_applies_sim_time_event(tmp_path: Path) -> Non
                 "scenario_milk_bottle": 10.0,
                 "scenario_user": 0.0,
                 "scenario_actor": 2.0,
+                "scenario_water_bottle_1": -0.35,
+                "scenario_water_bottle_2": 0.0,
+                "scenario_water_bottle_3": 0.35,
             }
             for _ in range(4):
                 robot.send_json({"kind": "get_state"})
@@ -139,6 +158,9 @@ def test_runner_creates_bottle_and_applies_sim_time_event(tmp_path: Path) -> Non
                 if positions == {
                     "scenario_milk_bottle": 8.0, "scenario_user": 0.0,
                     "scenario_actor": 3.0,
+                    "scenario_water_bottle_1": -0.35,
+                    "scenario_water_bottle_2": 0.0,
+                    "scenario_water_bottle_3": 0.35,
                 }:
                     break
                 if time.monotonic() >= deadline:

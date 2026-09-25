@@ -262,8 +262,9 @@ For locomotion validation, start the real MuJoCo backend explicitly. The default
 ./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward --no-viewer
 ```
 
-For the default world with a scenario-owned milk bottle, a standing user beside
-Chromie, and timed dynamic elements, start the separate scenario runner:
+For the default world with a scenario-owned milk bottle 10 m ahead, three
+water bottles about 5 m to Chromie's left, a standing user beside Chromie,
+and timed dynamic elements, start the separate scenario runner:
 
 ```bash
 ./scripts/run_scenario.sh --viewer

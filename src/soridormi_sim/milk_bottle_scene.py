@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import math
 from pathlib import Path
+from typing import Mapping
 from xml.etree import ElementTree
 
 from .rough_ground_scene import rewrite_relative_includes
@@ -17,6 +18,7 @@ MILK_BOTTLE_GEOM = "soridormi_mock_milk_bottle"
 MILK_TABLE_GEOM = "soridormi_mock_milk_table_top"
 SCENARIO_BOTTLE_BODY = "scenario_milk_bottle"
 USER_BODY_GEOM = "soridormi_mock_user_torso"
+WATER_BOTTLE_GEOMS = tuple(f"soridormi_mock_water_bottle_{index}" for index in range(1, 4))
 
 
 def _left_chair_xml(index: int, x: float) -> str:
@@ -51,6 +53,7 @@ def mock_scene_observation(
     *,
     bottle_xyz: tuple[float, float, float] | None,
     user_xyz: tuple[float, float, float] | None = None,
+    water_bottles_xyz: Mapping[str, tuple[float, float, float]] | None = None,
     robot_xyz: tuple[float, float, float],
     robot_quat_wxyz: tuple[float, float, float, float],
     robot_time_s: float,
@@ -105,6 +108,32 @@ def mock_scene_observation(
                     "bearing_rad": bearing,
                 }
             )
+    for object_ref in WATER_BOTTLE_GEOMS:
+        target_xyz = (water_bottles_xyz or {}).get(object_ref)
+        if target_xyz is None:
+            continue
+        distance_m, bearing = polar(target_xyz)
+        # Scenario markers are available all around the robot. This is a
+        # simulated scene read, not a camera detection or a visual claim.
+        if distance_m > 60.0:
+            continue
+        if abs(bearing) <= math.pi / 4:
+            relative_direction = "in front of Chromie"
+        elif abs(bearing) >= 3 * math.pi / 4:
+            relative_direction = "behind Chromie"
+        elif bearing > 0:
+            relative_direction = "to Chromie's left"
+        else:
+            relative_direction = "to Chromie's right"
+        observations.append(
+            {
+                "object_ref": object_ref,
+                "description": "bottle of water",
+                "relative_direction": relative_direction,
+                "distance_m": round(distance_m, 3),
+                "bearing_rad": bearing,
+            }
+        )
     return {
         "source_kind": "mujoco_scene_marker",
         "mocked_simulation": True,
