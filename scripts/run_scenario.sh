@@ -9,13 +9,14 @@ usage() {
 Usage: ./scripts/run_scenario.sh [--scenario FILE] [--profile PROFILE] [--viewer|--no-viewer] [--validate]
 
 Read a simulation scenario, build its world with MuJoCo MjSpec, start the
-Soridormi simulator as a child process, and drive scenario events on simulation
-time. The default scenario places a milk bottle on the table 10 m ahead.
+Soridormi simulator as a child process, start the runtime-backed MCP service,
+and drive scenario events on simulation time. The default scenario places a
+milk bottle on the table 10 m ahead.
 If an earlier scenario from this checkout owns SIM_PORT, replace it before
 starting. Stop the current run with Ctrl-C or docker stop CONTAINER_NAME.
 
 The scenario file must be accessible on this host. --validate builds and
-compiles the scene without starting Soridormi or sending robot commands.
+compiles the scene without starting Soridormi, MCP, or sending robot commands.
 --profile applies the same simulator compatibility settings as run_sim_server.sh.
 USAGE
 }
@@ -146,6 +147,23 @@ if [ "$VALIDATE" = "1" ]; then
   RUNNER_ARGS+=(--validate)
 fi
 
+if [ "$VALIDATE" = "1" ]; then
+  exec docker compose -f compose.sim.yaml run --rm \
+    "${SORIDORMI_X11_DOCKER_ARGS[@]}" \
+    -v "$SCENARIO_PATH:/scenario/scenario.json:ro" \
+    -e SORIDORMI_MUJOCO_VIEWER="$VIEWER_ENABLED" \
+    -e SORIDORMI_SIM_POLICY_PROFILE="$SIM_POLICY_PROFILE" \
+    -e SIM_PORT="$sim_port" \
+    sim bash -lc '
+      source /opt/venvs/sim/bin/activate
+      if [ -n "${SORIDORMI_SIM_POLICY_PROFILE:-}" ]; then
+        eval "$(python -m soridormi_runtime.policy_profiles "${SORIDORMI_SIM_POLICY_PROFILE}" --shell)"
+      fi
+      python -m scenario_runner "$@"
+    ' \
+    scenario-runner "${RUNNER_ARGS[@]}"
+fi
+
 docker compose -f compose.sim.yaml run --rm \
   "${SORIDORMI_X11_DOCKER_ARGS[@]}" \
   -v "$SCENARIO_PATH:/scenario/scenario.json:ro" \
@@ -159,4 +177,37 @@ docker compose -f compose.sim.yaml run --rm \
     fi
     python -m scenario_runner "$@"
   ' \
-  scenario-runner "${RUNNER_ARGS[@]}"
+  scenario-runner "${RUNNER_ARGS[@]}" &
+scenario_pid=$!
+
+cleanup_scenario() {
+  local rc=$?
+  if kill -0 "$scenario_pid" 2>/dev/null; then
+    kill "$scenario_pid" 2>/dev/null || true
+    wait "$scenario_pid" 2>/dev/null || true
+  fi
+  soridormi_x11_cleanup "$rc" || true
+  return "$rc"
+}
+trap cleanup_scenario EXIT
+
+for _ in {1..150}; do
+  if tcp_port_active "$sim_port"; then
+    break
+  fi
+  if ! kill -0 "$scenario_pid" 2>/dev/null; then
+    wait "$scenario_pid"
+    exit $?
+  fi
+  sleep 0.2
+done
+if ! tcp_port_active "$sim_port"; then
+  echo "[soridormi][error] Scenario simulator did not become ready on port $sim_port." >&2
+  exit 1
+fi
+
+echo "[soridormi] Starting runtime-backed MCP for scenario on port $sim_port."
+SIM_PORT="$sim_port" docker compose -f compose.sim.yaml --profile mcp-runtime \
+  up -d --no-build --pull never mcp-runtime
+
+wait "$scenario_pid"

@@ -131,3 +131,20 @@ def test_run_scenario_refuses_active_runtime(tmp_path: Path) -> None:
     finally:
         owner.terminate()
         owner.wait(timeout=5)
+
+
+def test_run_scenario_declares_runtime_mcp_start_after_simulator_readiness() -> None:
+    script = (ROOT / "scripts/run_scenario.sh").read_text(encoding="utf-8")
+    readiness = 'if ! tcp_port_active "$sim_port"; then'
+    mcp_start = 'up -d --no-build --pull never mcp-runtime'
+    assert readiness in script
+    assert mcp_start in script
+    assert script.index(readiness, script.index("scenario_pid=$!")) < script.index(mcp_start)
+
+
+def test_run_scenario_validate_exits_before_runtime_mcp_start() -> None:
+    script = (ROOT / "scripts/run_scenario.sh").read_text(encoding="utf-8")
+    validate_branch = 'if [ "$VALIDATE" = "1" ]; then\n  exec docker compose'
+    mcp_start = 'up -d --no-build --pull never mcp-runtime'
+    assert validate_branch in script
+    assert script.index(validate_branch) < script.index(mcp_start)

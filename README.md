@@ -270,6 +270,11 @@ and timed dynamic elements, start the separate scenario runner:
 ./scripts/run_scenario.sh --viewer
 ```
 
+A normal scenario run also starts the runtime-backed `mcp-runtime` service after
+the simulator API becomes ready, so Chromie can connect directly to the default
+`http://127.0.0.1:8000/mcp` endpoint. `--validate` remains compile-only and does
+not start MCP.
+
 The runner reads `configs/simulation_scenarios/default.json`; use
 `--scenario PATH` for another scenario or `--validate` to compile without
 starting the simulator. Use `--profile open_duck_forward` when pairing it with
