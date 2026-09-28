@@ -132,6 +132,15 @@ also remains scene-tracked around the robot so Soridormi can return after
 pickup; it is not camera perception. User speech cannot populate these marker
 results.
 
+The scene read contract separates **poll cadence** from **material world change**.
+Every read receives a monotonic `observation_sequence`, while `scene_revision` and
+`scene_signature` remain stable until the bounded public scene interpretation changes
+(material object identity/direction or roughly 25 cm of distance). This lets Chromie
+poll perception continuously or periodically without treating every sensor read as a
+new cognitive event. Soridormi remains the sensor/perception provider; it does not own
+Chromie's Situation, Goal relevance, Memory activation, or semantic target choice.
+
+
 Chromie can project a validated result into Situation with the Soridormi
 observation as its source. The mock observation is separate from a user's
 report and cannot retrospectively turn that report into robot perception.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -225,6 +226,8 @@ class SoridormiLocalToolService:
                 return {
                     "observation_id": f"soridormi-local-scene-{uuid.uuid4().hex}",
                     "observation_sequence": 1,
+                    "scene_revision": 1,
+                    "scene_signature": hashlib.sha256(b"[]").hexdigest(),
                     "mode": self.mode,
                     "source_kind": "local_no_scene",
                     "mocked_simulation": True,

@@ -181,6 +181,9 @@ def test_simulator_api_and_runtime_tool_preserve_mock_provenance() -> None:
     assert first["mocked_simulation"] is True
     assert first["observation_sequence"] == 1
     assert second["observation_sequence"] == 2
+    assert first["scene_revision"] == second["scene_revision"] == 1
+    assert first["scene_signature"] == second["scene_signature"]
+    assert len(first["scene_signature"]) == 64
     assert first["observation_id"] != second["observation_id"]
 
 

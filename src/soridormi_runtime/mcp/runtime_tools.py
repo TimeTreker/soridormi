@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import math
 import os
 import re
@@ -141,6 +143,8 @@ class SoridormiRuntimeToolService:
     _last_state: RobotState | None = field(default=None, init=False, repr=False)
     _simulated_carried_resource: str | None = field(default=None, init=False, repr=False)
     _scene_observation_sequence: int = field(default=0, init=False, repr=False)
+    _scene_revision: int = field(default=0, init=False, repr=False)
+    _scene_signature: str | None = field(default=None, init=False, repr=False)
     _robot_executor: ThreadPoolExecutor | None = field(default=None, init=False, repr=False)
 
     @classmethod
@@ -1648,8 +1652,36 @@ class SoridormiRuntimeToolService:
             status["source_revision"] = self.source_revision
         return status
 
+    @staticmethod
+    def _scene_semantic_signature(objects: list[dict[str, Any]]) -> str:
+        """Return a stable identity for material scene change, not poll cadence.
+
+        Distance is bucketed at 25 cm so detector/pose jitter does not manufacture a
+        new world revision on every read. Provider-local continuous sensing may run at
+        a higher rate; downstream cognition can key off this semantic revision.
+        """
+
+        semantic = []
+        for item in objects:
+            distance = item.get("distance_m")
+            semantic.append({
+                "object_ref": str(item.get("object_ref") or ""),
+                "description": str(item.get("description") or ""),
+                "relative_direction": str(item.get("relative_direction") or ""),
+                "distance_bucket_025m": (
+                    int(round(float(distance) / 0.25))
+                    if isinstance(distance, (int, float)) and not isinstance(distance, bool)
+                    else None
+                ),
+            })
+        encoded = json.dumps(
+            sorted(semantic, key=lambda item: (item["object_ref"], item["description"])),
+            ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        ).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
     async def observe_scene(self) -> dict[str, Any]:
-        """Expose only current simulation scene-marker observations."""
+        """Expose current simulation scene markers with stable change identity."""
 
         if self.mode != "sim":
             raise RuntimeError("mock scene perception is available only in sim mode")
@@ -1661,13 +1693,20 @@ class SoridormiRuntimeToolService:
         if not isinstance(observed, dict) or observed.get("mocked_simulation") is not True:
             raise RuntimeError("invalid mock scene observation")
         result = dict(observed)
-        result["objects"] = [
+        objects = [
             {key: value for key, value in item.items() if key != "bearing_rad"}
             for item in observed.get("objects", [])
             if isinstance(item, dict)
         ]
+        result["objects"] = objects
+        signature = self._scene_semantic_signature(objects)
         self._scene_observation_sequence += 1
+        if signature != self._scene_signature:
+            self._scene_signature = signature
+            self._scene_revision += 1
         result["observation_sequence"] = self._scene_observation_sequence
+        result["scene_revision"] = max(1, self._scene_revision)
+        result["scene_signature"] = signature
         result["observation_id"] = f"soridormi-scene-{uuid.uuid4().hex}"
         result["mode"] = self.mode
         if self.source_revision:

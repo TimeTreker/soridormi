@@ -254,6 +254,8 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                     {
                         "observation_id": {"type": "string"},
                         "observation_sequence": {"type": "integer", "minimum": 1},
+                        "scene_revision": {"type": "integer", "minimum": 1},
+                        "scene_signature": {"type": "string", "minLength": 64, "maxLength": 64},
                         "mode": {"type": "string", "enum": ["sim"]},
                         "source_kind": {"type": "string"},
                         "mocked_simulation": {"type": "boolean", "const": True},

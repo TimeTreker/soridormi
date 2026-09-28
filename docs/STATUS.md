@@ -76,7 +76,7 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
 - The separate scenario runner reads a world-map/dynamic-element file, builds
   bodies with MuJoCo `MjSpec`, starts Soridormi, and applies timed pose events.
   The default scene has milk 10 m ahead on a table, three water bottles about 5 m
-  left, a user 1.5 m right, and fixed chairs. `observe_scene` reads scene geometry;
+  left, a user 1.5 m right, and fixed chairs. `observe_scene` reads scene geometry and now emits separate per-read `observation_sequence` plus stable semantic `scene_revision`/`scene_signature`, so an upstream ambient-perception loop can poll without manufacturing a cognitive event on every read;
   it is not camera or physical perception. Focused and live MuJoCo tests cover
   creation and movement. Chromie does not poll it on ordinary turns; no live
   scene-to-speech proof exists.
