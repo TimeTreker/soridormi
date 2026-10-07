@@ -73,8 +73,8 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
   handover completed, standing/safe idle, no active task. Scene was reset to
   milk ~10 m ahead and user 1.5 m right; MCP again reported safe idle.
   Direct dirty-source proof had independently completed both walking legs.
-- The separate scenario runner reads a world-map/dynamic-element file, builds
-  bodies with MuJoCo `MjSpec`, starts Soridormi, and applies timed pose events.
+- The scenario runner reads world maps through MuJoCo `MjSpec`, starts Soridormi, and applies timed pose events. `run_scenario.sh --build` rebuilds sim/runtime/MCP images; it replaces a same-checkout simulator on the same port only after runtime safe idle and reconnects MCP.
+  Unrelated port owners stay untouched.
   The default scene has milk 10 m ahead on a table, three water bottles about 5 m
   left, a user 1.5 m right, and fixed chairs. `observe_scene` reads scene geometry and now emits separate per-read `observation_sequence` plus stable semantic `scene_revision`/`scene_signature`, so an upstream ambient-perception loop can poll without manufacturing a cognitive event on every read;
   it is not camera or physical perception. Focused and live MuJoCo tests cover

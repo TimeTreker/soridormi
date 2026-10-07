@@ -278,10 +278,13 @@ not start MCP.
 The runner reads `configs/simulation_scenarios/default.json`; use
 `--scenario PATH` for another scenario or `--validate` to compile without
 starting the simulator. Use `--profile open_duck_forward` when pairing it with
-that policy runtime. The standalone simulator's `--scene default` contains
-the fixed table and chairs only. A new `run_scenario.sh` invocation replaces an
-earlier scenario from this checkout on the same `SIM_PORT` after confirming the
-runtime is safely idle. It leaves unrelated port owners alone. To stop a run,
+that policy runtime. Pass `--build` after changing Docker content to rebuild
+the simulator, runtime, and MCP images before changing a running service. The
+standalone simulator's `--scene default` contains the fixed table and chairs
+only. A new `run_scenario.sh` invocation replaces either a scenario or a
+standalone Soridormi simulator from this checkout on the same `SIM_PORT` after
+confirming the runtime is safely idle. It restarts MCP to reconnect to the new
+simulator and leaves unrelated port owners alone. To stop a run,
 press Ctrl-C in its terminal, or find and stop its container:
 
 ```bash
