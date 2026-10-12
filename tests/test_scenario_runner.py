@@ -172,3 +172,66 @@ def test_runner_creates_bottle_and_applies_sim_time_event(tmp_path: Path) -> Non
         runner.terminate()
         runner.communicate(timeout=10)
     assert list(tmp_path.glob("scenario-*")) == []
+
+
+class _Server:
+    def __init__(self, polls_alive: int) -> None:
+        self.polls_alive = polls_alive
+        self.returncode: int | None = None
+
+    def poll(self) -> int | None:
+        if self.polls_alive <= 0:
+            self.returncode = 0
+            return 0
+        self.polls_alive -= 1
+        return None
+
+
+def _event_scenario() -> Scenario:
+    payload = json.loads(DEFAULT_SCENARIO.read_text(encoding="utf-8"))
+    payload["events"] = [{"at_sim_time_s": 0.1, "element_name": "scenario_milk_bottle", "position_xyz": [8, 0, 0.86]}]
+    return Scenario.model_validate(payload)
+
+
+def test_runner_rides_out_a_scene_control_stall_and_retries_the_unconfirmed_event(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    zmq = pytest.importorskip("zmq")
+    pytest.importorskip("mujoco")
+    from scenario_runner.main import follow_scenario
+
+    state = {"ok": True, "robot_time_s": 0.2, "reset_count": 0, "objects": []}
+    replies: list[object] = [state, zmq.Again(), zmq.Again(), zmq.Again(), state, {"ok": True}, state]
+    sent: list[str] = []
+    ticks = iter(float(second) for second in range(100))
+
+    def request(_port: int, payload: dict[str, object]) -> dict[str, object]:
+        sent.append(str(payload["kind"]))
+        reply = replies.pop(0) if replies else state
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+    with pytest.raises(RuntimeError, match="simulator exited: 0"):
+        follow_scenario(_event_scenario(), _Server(polls_alive=6), 5556, request=request,
+                        stall_limit_s=60.0, clock=lambda: next(ticks), sleep=lambda _seconds: None)
+    assert sent[:6] == ["list_objects", "set_object_pose", "list_objects", "list_objects", "list_objects", "set_object_pose"]
+    output = capsys.readouterr().out
+    assert "Scene control missed a reply; simulator still running" in output
+    assert "Scene control recovered after" in output
+    assert output.count("Scenario event 0: scenario_milk_bottle") == 1
+
+
+def test_runner_fails_when_scene_control_stays_unresponsive() -> None:
+    zmq = pytest.importorskip("zmq")
+    pytest.importorskip("mujoco")
+    from scenario_runner.main import follow_scenario
+
+    ticks = iter(float(second) * 10.0 for second in range(100))
+
+    def request(_port: int, _payload: dict[str, object]) -> dict[str, object]:
+        raise zmq.Again()
+
+    with pytest.raises(RuntimeError, match="scene control unresponsive for 60.0s"):
+        follow_scenario(_event_scenario(), _Server(polls_alive=100), 5556, request=request,
+                        stall_limit_s=60.0, clock=lambda: next(ticks), sleep=lambda _seconds: None)

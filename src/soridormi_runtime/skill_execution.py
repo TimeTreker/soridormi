@@ -656,7 +656,7 @@ def _plan_look_at_person(
 
 def _plan_nod_yes(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
     skill_id = str(skill["id"])
-    count = _count_cycles(parameters.get("count", 2), minimum=2, maximum=8)
+    count = _count_cycles(parameters.get("count", 2), minimum=1, maximum=8)
     down_amplitude = _amplitude_radians(
         parameters.get("amplitude", "small"), small=0.18, medium=0.26
     )
@@ -692,7 +692,7 @@ def _plan_nod_yes(skill: dict[str, Any], parameters: Mapping[str, Any], profile:
 
 def _plan_shake_no(skill: dict[str, Any], parameters: Mapping[str, Any], profile: str) -> SkillPlan:
     skill_id = str(skill["id"])
-    count = _count_cycles(parameters.get("count", 2), minimum=2, maximum=8)
+    count = _count_cycles(parameters.get("count", 2), minimum=1, maximum=8)
     amplitude = _amplitude_radians(parameters.get("amplitude", "small"), small=0.28, medium=0.40)
     duration = float(parameters.get("duration_s", 4.0))
     segment_duration = duration / float(max(1, count * 2 + 2))

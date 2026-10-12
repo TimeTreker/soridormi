@@ -13,7 +13,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import mujoco
 import zmq
@@ -27,6 +27,10 @@ from soridormi_sim.social_eye_scene import (
 
 from .scenario import Scenario, load_scenario
 
+
+# A missed scene-control reply is a stall, not a simulator failure; only sustained
+# unresponsiveness fails a scenario whose simulator process is still running.
+SCENE_CONTROL_STALL_LIMIT_S = 60.0
 
 GEOM_TYPES = {
     "box": mujoco.mjtGeom.mjGEOM_BOX,
@@ -139,30 +143,7 @@ def run_scenario(scenario: Scenario, work_dir: Path) -> None:
                     raise TimeoutError("Soridormi scene control did not start")
                 time.sleep(0.1)
         print(f"Scenario runner loaded {scenario.name}: {model_path}", flush=True)
-        next_event = 0
-        previous_reset_count = 0
-        while server.poll() is None:
-            state = scene_request(control_port, {"kind": "list_objects"})
-            sim_time = float(state["robot_time_s"])
-            reset_count = int(state["reset_count"])
-            if reset_count != previous_reset_count:
-                next_event = 0
-                print("Scenario clock reset; replaying timed events", flush=True)
-            previous_reset_count = reset_count
-            while next_event < len(scenario.events) and scenario.events[next_event].at_sim_time_s <= sim_time:
-                event = scenario.events[next_event]
-                request: dict[str, object] = {
-                    "kind": "set_object_pose",
-                    "object_name": event.element_name,
-                    "position_xyz": list(event.position_xyz),
-                }
-                if event.quat_wxyz is not None:
-                    request["quat_wxyz"] = list(event.quat_wxyz)
-                scene_request(control_port, request)
-                print(f"Scenario event {next_event}: {event.element_name} at sim time {sim_time:.3f}s", flush=True)
-                next_event += 1
-            time.sleep(0.02 if next_event < len(scenario.events) else 0.2)
-        raise RuntimeError(f"Soridormi simulator exited: {server.returncode}")
+        follow_scenario(scenario, server, control_port)
     finally:
         if server.poll() is None:
             server.terminate()
@@ -171,6 +152,72 @@ def run_scenario(scenario: Scenario, work_dir: Path) -> None:
         except subprocess.TimeoutExpired:
             server.kill()
             server.wait()
+
+
+def follow_scenario(
+    scenario: Scenario,
+    server: subprocess.Popen[Any],
+    control_port: int,
+    *,
+    request: Callable[[int, dict[str, object]], dict[str, Any]] = scene_request,
+    stall_limit_s: float = SCENE_CONTROL_STALL_LIMIT_S,
+    clock: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> None:
+    """Replay timed events until the simulator process exits.
+
+    The simulator exiting is the failure signal. A reply that misses its timeout
+    while the process is alive (host memory pressure, a slow handler) is logged as
+    a stall and polled again; set_object_pose is absolute, so an unconfirmed event
+    is retried. Only control unresponsive for ``stall_limit_s`` fails the scenario.
+    """
+
+    next_event = 0
+    previous_reset_count = 0
+    stalled_since: float | None = None
+
+    def reply(payload: dict[str, object]) -> dict[str, Any] | None:
+        nonlocal stalled_since
+        try:
+            response = request(control_port, payload)
+        except zmq.Again:
+            now = clock()
+            if stalled_since is None:
+                stalled_since = now
+                print("Scene control missed a reply; simulator still running, polling again", flush=True)
+            elif now - stalled_since >= stall_limit_s:
+                raise RuntimeError(f"Soridormi scene control unresponsive for {now - stalled_since:.1f}s") from None
+            return None
+        if stalled_since is not None:
+            print(f"Scene control recovered after {clock() - stalled_since:.1f}s", flush=True)
+            stalled_since = None
+        return response
+
+    while server.poll() is None:
+        state = reply({"kind": "list_objects"})
+        if state is None:
+            continue
+        sim_time = float(state["robot_time_s"])
+        reset_count = int(state["reset_count"])
+        if reset_count != previous_reset_count:
+            next_event = 0
+            print("Scenario clock reset; replaying timed events", flush=True)
+        previous_reset_count = reset_count
+        while next_event < len(scenario.events) and scenario.events[next_event].at_sim_time_s <= sim_time:
+            event = scenario.events[next_event]
+            payload: dict[str, object] = {
+                "kind": "set_object_pose",
+                "object_name": event.element_name,
+                "position_xyz": list(event.position_xyz),
+            }
+            if event.quat_wxyz is not None:
+                payload["quat_wxyz"] = list(event.quat_wxyz)
+            if reply(payload) is None:
+                break
+            print(f"Scenario event {next_event}: {event.element_name} at sim time {sim_time:.3f}s", flush=True)
+            next_event += 1
+        sleep(0.02 if next_event < len(scenario.events) else 0.2)
+    raise RuntimeError(f"Soridormi simulator exited: {server.returncode}")
 
 
 def main(argv: list[str] | None = None) -> int:

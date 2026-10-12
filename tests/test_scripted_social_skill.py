@@ -368,6 +368,20 @@ def test_nod_yes_plan_uses_multi_keyframe_head_pitch_sequence() -> None:
     assert all(keyframe.positions_by_name["head_yaw"] == pytest.approx(0.0) for keyframe in plan.keyframes)
 
 
+@pytest.mark.parametrize("skill_id,joint", [("nod_yes", "head_pitch"), ("shake_no", "head_yaw")])
+def test_a_single_nod_or_shake_is_one_cycle(skill_id: str, joint: str) -> None:
+    """"Nod once" is an ordinary request; one cycle is neutral, out, back, neutral."""
+    plan = _registry().create_plan(skill_id, {"count": 1, "amplitude": "small", "duration_s": 2.0})
+
+    assert [keyframe.label for keyframe in plan.keyframes] == [
+        f"{skill_id}_neutral_start", f"{skill_id}_{'down' if skill_id == 'nod_yes' else 'right'}_1",
+        f"{skill_id}_{'up' if skill_id == 'nod_yes' else 'left'}_1", f"{skill_id}_neutral_end"]
+    assert plan.keyframes[0].positions_by_name[joint] == pytest.approx(0.0)
+    assert plan.keyframes[-1].positions_by_name[joint] == pytest.approx(0.0)
+    with pytest.raises(SkillExecutionError, match="min 1"):
+        _registry().create_plan(skill_id, {"count": 0, "amplitude": "small", "duration_s": 2.0})
+
+
 def test_shake_no_plan_uses_multi_keyframe_head_yaw_sequence() -> None:
     plan = _registry().create_plan("shake_no", {"count": 2, "amplitude": "small", "duration_s": 1.0})
 
@@ -399,9 +413,10 @@ def test_scripted_social_rejects_non_integer_count() -> None:
         _registry().create_plan("nod_yes", {"count": 2.5})
 
 
-def test_scripted_social_requires_at_least_two_cycles() -> None:
-    with pytest.raises(SkillExecutionError, match="min 2"):
-        _registry().create_plan("shake_no", {"count": 1})
+def test_scripted_social_requires_at_least_one_cycle() -> None:
+    # A single nod or shake is an ordinary request ("nod once"); zero cycles is no gesture.
+    with pytest.raises(SkillExecutionError, match="min 1"):
+        _registry().create_plan("shake_no", {"count": 0})
 
 
 def test_scripted_social_allows_longer_sim_exploration_counts() -> None:
