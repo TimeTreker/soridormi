@@ -90,12 +90,21 @@ def test_mock_observation_uses_scene_position_and_robot_heading() -> None:
     assert mock_scene_observation(bottle_xyz=None, **base)["objects"] == []
     assert mock_scene_observation(bottle_xyz=(70.0, 0.0, 0.86), **base)["objects"] == []
     turned = {**base, "robot_quat_wxyz": (math.sqrt(0.5), 0.0, 0.0, math.sqrt(0.5))}
-    assert mock_scene_observation(bottle_xyz=(10.0, 0.0, 0.86), **turned)["objects"] == []
+    # Turning changes where the milk is, not whether it is there: delivery walks to an
+    # observed marker and never searches for one.
+    beside = mock_scene_observation(bottle_xyz=(10.0, 0.0, 0.86), **turned)["objects"]
+    assert [item["relative_direction"] for item in beside] == ["to Chromie's right"]
+    behind = {**base, "robot_quat_wxyz": (0.0, 0.0, 0.0, 1.0)}
+    assert [
+        item["relative_direction"]
+        for item in mock_scene_observation(bottle_xyz=(10.0, 0.0, 0.86), **behind)["objects"]
+    ] == ["behind Chromie"]
     user = mock_scene_observation(
         bottle_xyz=None, user_xyz=(0.0, -1.5, 1.0), **base
     )["objects"]
     assert len(user) == 1
     assert user[0]["object_ref"] == USER_BODY_GEOM
+    assert user[0]["referent_id"] == "requester"
     assert user[0]["relative_direction"] == "to Chromie's right"
     assert user[0]["distance_m"] == 1.5
     assert user[0]["bearing_rad"] == pytest.approx(-math.pi / 2)

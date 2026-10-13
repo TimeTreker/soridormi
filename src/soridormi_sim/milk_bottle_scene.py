@@ -18,6 +18,7 @@ MILK_BOTTLE_GEOM = "soridormi_mock_milk_bottle"
 MILK_TABLE_GEOM = "soridormi_mock_milk_table_top"
 SCENARIO_BOTTLE_BODY = "scenario_milk_bottle"
 USER_BODY_GEOM = "soridormi_mock_user_torso"
+REQUESTER_REFERENT_ID = "requester"
 WATER_BOTTLE_GEOMS = tuple(f"soridormi_mock_water_bottle_{index}" for index in range(1, 4))
 
 
@@ -70,16 +71,26 @@ def mock_scene_observation(
         direction = math.atan2(dy, dx) - yaw
         return math.hypot(dx, dy), math.atan2(math.sin(direction), math.cos(direction))
 
+    def direction_label(bearing: float) -> str:
+        if abs(bearing) <= math.pi / 4:
+            return "in front of Chromie"
+        if abs(bearing) >= 3 * math.pi / 4:
+            return "behind Chromie"
+        return "to Chromie's left" if bearing > 0 else "to Chromie's right"
+
     if bottle_xyz is not None:
         distance_m, bearing = polar(bottle_xyz)
-        # A deliberately simple marker detector: 60 m range and a 90-degree
-        # forward field. The simulator geom, not the user's words, supplies pose.
-        if distance_m <= 60.0 and abs(bearing) <= math.pi / 4:
+        # Like the water and user markers, the milk marker is read all around the
+        # robot; delivery walks to an observed marker and never searches, so a
+        # forward-only field failed "bring me the milk" whenever Chromie faced away.
+        # This is a simulated scene read, not a camera detection. The simulator
+        # geom, not the user's words, supplies pose.
+        if distance_m <= 60.0:
             observations.append(
                 {
                     "object_ref": MILK_BOTTLE_GEOM,
                     "description": "bottle of milk",
-                    "relative_direction": "in front of Chromie",
+                    "relative_direction": direction_label(bearing),
                     "distance_m": round(distance_m, 3),
                     # Provider-internal steering input. The MCP perception tool
                     # removes this backend-frame value before exposing the scene.
@@ -91,19 +102,14 @@ def mock_scene_observation(
         # A named scenario actor is tracked through the simulator scene API,
         # including when behind the robot. This is not camera perception.
         if distance_m <= 60.0:
-            if abs(bearing) <= math.pi / 4:
-                relative_direction = "in front of Chromie"
-            elif abs(bearing) >= 3 * math.pi / 4:
-                relative_direction = "behind Chromie"
-            elif bearing > 0:
-                relative_direction = "to Chromie's left"
-            else:
-                relative_direction = "to Chromie's right"
             observations.append(
                 {
                     "object_ref": USER_BODY_GEOM,
                     "description": "user",
-                    "relative_direction": relative_direction,
+                    # The scenario user is the person speaking with Chromie, so a
+                    # delivery "to me" names this actor as its requester referent.
+                    "referent_id": REQUESTER_REFERENT_ID,
+                    "relative_direction": direction_label(bearing),
                     "distance_m": round(distance_m, 3),
                     "bearing_rad": bearing,
                 }
@@ -117,19 +123,11 @@ def mock_scene_observation(
         # simulated scene read, not a camera detection or a visual claim.
         if distance_m > 60.0:
             continue
-        if abs(bearing) <= math.pi / 4:
-            relative_direction = "in front of Chromie"
-        elif abs(bearing) >= 3 * math.pi / 4:
-            relative_direction = "behind Chromie"
-        elif bearing > 0:
-            relative_direction = "to Chromie's left"
-        else:
-            relative_direction = "to Chromie's right"
         observations.append(
             {
                 "object_ref": object_ref,
                 "description": "bottle of water",
-                "relative_direction": relative_direction,
+                "relative_direction": direction_label(bearing),
                 "distance_m": round(distance_m, 3),
                 "bearing_rad": bearing,
             }

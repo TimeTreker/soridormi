@@ -574,7 +574,12 @@
                 "type": [
                   "string",
                   "null"
-                ]
+                ],
+                "enum": [
+                  "requester",
+                  null
+                ],
+                "description": "\"requester\" when the recipient is the person who made this request (for example \"me\"); null for anyone or anything else."
               }
             },
             "required": [
@@ -714,7 +719,12 @@
                 "type": [
                   "string",
                   "null"
-                ]
+                ],
+                "enum": [
+                  "requester",
+                  null
+                ],
+                "description": "\"requester\" when the recipient is the person who made this request (for example \"me\"); null for anyone or anything else."
               }
             },
             "required": [
@@ -842,7 +852,7 @@
               "recipient"
             ],
             "minimum_arguments": 1,
-            "contract": "Place the exact human-semantic recipient inside recipient.description without renaming, translating, or replacing it."
+            "contract": "Place the exact human-semantic recipient inside recipient.description without renaming, translating, or replacing it. When that recipient is the person who made the request, also set recipient.referent_id to \"requester\"."
           },
           "physical_resource_route": {
             "source_entity_type": "route",

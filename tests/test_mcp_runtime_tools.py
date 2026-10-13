@@ -245,6 +245,7 @@ class ObservedResourceFakeRobot(ResourceFakeRobot):
                 "bearing_rad": 0.0,
             }, {
                 "description": self.user_description,
+                "referent_id": "requester",
                 "distance_m": self.user_distance_m,
                 "bearing_rad": 0.0,
             }],
@@ -872,7 +873,10 @@ def test_known_resource_walks_to_observed_scene_object_before_mock_handover(
         assert all(command.x_velocity >= 0 for command in service.controller.seen_commands)
         assert "returned to the observed recipient" in result["summary"]
         public_observation = await service.call_tool("soridormi.robot.observe_scene", {})
-        assert "bearing_rad" not in public_observation["objects"][0]
+        assert all(
+            "bearing_rad" not in item and "referent_id" not in item
+            for item in public_observation["objects"]
+        )
 
     asyncio.run(exercise())
 
@@ -1014,7 +1018,7 @@ def test_multiple_observed_people_do_not_select_a_delivery_recipient() -> None:
         )
         with pytest.raises(RuntimeError, match="recipient is not uniquely observed"):
             await service._navigate_to_observed_resource(
-                "user", speed_mps=0.12, stop_distance_m=0.9
+                "user", role="recipient", speed_mps=0.12, stop_distance_m=0.9
             )
         assert not robot.commands or all(
             command.velocities[0] == 0 for command in robot.commands
@@ -1040,7 +1044,7 @@ def test_known_resource_without_matching_observation_refuses_motion() -> None:
                 },
             },
         )
-        with pytest.raises(RuntimeError, match="not uniquely observed"):
+        with pytest.raises(RuntimeError, match="resource is not uniquely observed"):
             await service.call_tool("soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]})
         assert not robot.commands or all(
             command.velocities[0] == 0 for command in robot.commands
@@ -1067,12 +1071,55 @@ def test_missing_recipient_prevents_mock_delivery_after_pickup() -> None:
                 },
             },
         )
-        with pytest.raises(RuntimeError, match="not uniquely observed"):
+        with pytest.raises(RuntimeError, match="recipient is not uniquely observed"):
             await service.call_tool("soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]})
         assert any(command.x_velocity > 0 for command in service.controller.seen_commands)
         assert [pose.pose for pose in robot.visual_arm_poses][-1] == "rest"
         assert service.active_task is None
         assert service.controller.command == PolicyCommand()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize(
+    ("recipient", "delivered"),
+    [
+        ({"description": "me", "referent_id": "requester"}, True),
+        ({"description": "我", "referent_id": "requester"}, True),
+        ({"description": "me", "referent_id": None}, False),
+    ],
+)
+def test_the_requester_receives_a_delivery_by_referent_not_by_words(
+    recipient: dict[str, object], delivered: bool
+) -> None:
+    """Chromie live 2026-10-13: "Bring me the milk" sent recipient "me", which no
+    scene word matches. The person who asked travels as the requester referent."""
+
+    async def exercise() -> None:
+        robot = ObservedResourceFakeRobot()
+        service = SoridormiRuntimeToolService(
+            robot=robot, controller=FakeController(), control_hz=20.0
+        )
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {"skill_id": "acquire_and_deliver_resource", "parameters": {
+                "resource": {"kind": "physical_object", "description": "milk"},
+                "source": {"status": "unknown"},
+                "recipient": recipient,
+            }},
+        )
+        if not delivered:
+            with pytest.raises(RuntimeError, match="recipient is not uniquely observed"):
+                await service.call_tool(
+                    "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
+                )
+            return
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
+        )
+        assert result["completed"] is True
+        assert result["resource_outcome"]["resource_delivered"] is True
+        assert result["return_outcome"]["observed_distance_end_m"] <= 0.9
 
     asyncio.run(exercise())
 

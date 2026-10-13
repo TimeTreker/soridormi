@@ -120,17 +120,17 @@ option still builds a self-contained milk scene. Generated XML and relative
 assets are staged under ignored `/data/scenes`; the Open Duck submodule and
 official 14-actuator contract remain unchanged.
 `soridormi.robot.observe_scene` reads the named milk, water, and user geoms'
-*current MuJoCo positions* relative to the robot. The milk bottle uses a
-bounded forward-field mock
-observation with an exact observation ID, sequence, distance, and
-`mocked_simulation=true`. The detector is marker-based; it does not analyze
-camera pixels or establish physical-world perception. No milk bottle in the loaded
-scene, an out-of-range milk bottle, or a milk bottle outside the forward field yields an
-empty milk result. The three water bottles in the default scenario are
-scene-tracked around the robot, including 5 m to its left. The named user actor
-also remains scene-tracked around the robot so Soridormi can return after
-pickup; it is not camera perception. User speech cannot populate these marker
-results.
+*current MuJoCo positions* relative to the robot. Every marker within 60 m is
+scene-tracked all around the robot and reported with its relative direction, an
+exact observation ID, sequence, distance, and `mocked_simulation=true`. The
+delivery composite walks to an observed marker and never searches, so a marker
+hidden whenever Chromie faced elsewhere would fail ordinary delivery requests.
+The detector is marker-based; it does not analyze camera pixels or establish
+physical-world perception. No milk bottle in the loaded scene or an out-of-range
+milk bottle yields an empty milk result. The three water bottles in the default
+scenario include one 5 m to the robot's left. The named user actor is the person
+speaking with Chromie, so Soridormi can return to that requester after pickup;
+it is not camera perception. User speech cannot populate these marker results.
 
 The scene read contract separates **poll cadence** from **material world change**.
 Every read receives a monotonic `observation_sequence`, while `scene_revision` and
@@ -164,7 +164,12 @@ robot API, Chromie's tools, and hardware mode. Adding or removing bodies after
 startup is outside this runner's current contract; it compiles declared dynamic
 bodies before starting the simulator and changes their poses during playback.
 The resource navigation helper matches identifying words in the requested
-description against observed object descriptions. When several objects of the
+description against observed object descriptions. A recipient with
+`referent_id: "requester"` is instead the person who made the request: Soridormi
+returns to the observed requester actor whatever words name it ("me", "我").
+Without that referent, a speaker-relative description such as "me" matches no
+observed object, and the return leg fails as an unobserved recipient rather than
+guessing a person. When several objects of the
 same observed type match, it selects the nearest and follows that object's
 observation reference during the walk. A generic "water" request can therefore
 select one of the three observed water bottles. Different matching object types
@@ -214,7 +219,7 @@ A successful simulated execution returns bounded evidence such as:
     "resource_description": "a cup of water",
     "resource_acquired": true,
     "resource_delivered": true,
-    "recipient_description": "requester",
+    "recipient_description": "me",
     "mocked_simulation": true,
     "evidence_summary": "The simulation resource was acquired and handed over."
   }
@@ -243,8 +248,8 @@ The named skill accepts semantic parameters, not motor commands:
     "bindings": {}
   },
   "recipient": {
-    "description": "requester",
-    "referent_id": null
+    "description": "me",
+    "referent_id": "requester"
   }
 }
 ```

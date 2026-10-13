@@ -65,9 +65,9 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
   provider may advertise granular acquisition/delivery capabilities, the complete
   composite, or both. Chromie owns composition across public leaves; Soridormi owns
   local planning inside each selected capability.
-- `acquire_and_deliver_resource` selects a nearest equivalent object; isolated
-  default-water proof: 5.0→0.899 m, user 5.738→0.900 m, mock delivery/safe idle
-  with bounded pace recovery. Ambiguity, missing markers, stops/resets/timeouts fail.
+- `acquire_and_deliver_resource` walks to the nearest equivalent marker (all markers are read all around) and back to `recipient.referent_id: "requester"` (else matching words);
+  isolated default-water proof: 5.0→0.899 m, user 5.738→0.900 m, mock delivery/safe idle with bounded pace
+  recovery. Ambiguity, missing markers, stops/resets/timeouts fail. Live MCP/MuJoCo (Chromie text, 2026-10-13): milk seen 9.854 m to the left delivered to the requester in 5 min 38 s.
 - Full-scene MuJoCo/MCP proof, 2026-09-25, source `5d235b8`: bottle
   10.008→0.834 m in 155.26 s; user 9.425→0.883 m in 158.45 s; mock
   handover completed, standing/safe idle, no active task. Scene was reset to

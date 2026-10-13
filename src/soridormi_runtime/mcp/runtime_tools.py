@@ -83,6 +83,9 @@ RESOURCE_ROUTE_MAX_DURATION_S = 300.0
 RESOURCE_ROUTE_SEGMENT_S = 1.0
 RESOURCE_ALIGN_BEARING_RAD = 0.45
 RESOURCE_PACE_RECOVERY_AFTER_S = 20.0
+# Steering bearing and the requester role stay inside the provider; the public
+# scene contract exposes neither.
+PROVIDER_INTERNAL_SCENE_KEYS = frozenset({"bearing_rad", "referent_id"})
 
 
 class RuntimeRobot(Protocol):
@@ -656,6 +659,8 @@ class SoridormiRuntimeToolService:
                     speed = str((stored.plan.parameters or {}).get("speed") or "slow")
                     return_outcome = await self._navigate_to_observed_resource(
                         str(recipient.get("description") or ""),
+                        referent_id=str(recipient.get("referent_id") or "") or None,
+                        role="recipient",
                         speed_mps=FORWARD_WALK_SPEED_PRESETS_MPS[speed],
                         stop_distance_m=RESOURCE_RETURN_STOP_DISTANCE_M,
                         allow_bounded_pace_recovery=speed in {"normal", "medium", "quick"},
@@ -1694,7 +1699,7 @@ class SoridormiRuntimeToolService:
             raise RuntimeError("invalid mock scene observation")
         result = dict(observed)
         objects = [
-            {key: value for key, value in item.items() if key != "bearing_rad"}
+            {key: value for key, value in item.items() if key not in PROVIDER_INTERNAL_SCENE_KEYS}
             for item in observed.get("objects", [])
             if isinstance(item, dict)
         ]
@@ -1715,10 +1720,18 @@ class SoridormiRuntimeToolService:
 
     async def _navigate_to_observed_resource(
         self, description: str, *, speed_mps: float, stop_distance_m: float,
+        referent_id: str | None = None,
+        role: str = "resource",
         select_nearest_equivalent: bool = False,
         allow_bounded_pace_recovery: bool = False,
     ) -> dict[str, Any]:
-        """Walk toward a matching simulator marker using provider-only bearing feedback."""
+        """Walk toward a matching simulator marker using provider-only bearing feedback.
+
+        A declared referent selects the marker carrying that provider-internal role;
+        otherwise identifying words of the description select it. A speaker-relative
+        recipient such as "me" therefore travels as ``referent_id="requester"`` and
+        is never guessed from its words.
+        """
 
         observer = getattr(self.robot, "observe_scene", None)
         if not callable(observer):
@@ -1731,9 +1744,14 @@ class SoridormiRuntimeToolService:
             )
 
         requested_terms = terms(description)
-        if not requested_terms:
-            raise RuntimeError("requested simulator resource has no identifying terms")
+        if not referent_id and not requested_terms:
+            raise RuntimeError(f"requested simulator {role} has no identifying terms")
         selected_ref: str | None = None
+
+        def identifies(item: dict[str, Any]) -> bool:
+            if referent_id:
+                return item.get("referent_id") == referent_id
+            return requested_terms.issubset(terms(str(item.get("description") or "")))
 
         async def target() -> tuple[float, float]:
             nonlocal selected_ref
@@ -1745,13 +1763,15 @@ class SoridormiRuntimeToolService:
                 item
                 for item in observed.get("objects", [])
                 if isinstance(item, dict)
-                and requested_terms.issubset(terms(str(item.get("description") or "")))
+                and identifies(item)
                 and (selected_ref is None or item.get("object_ref") == selected_ref)
             ]
-            if not matches or len({terms(str(item.get("description") or "")) for item in matches}) != 1:
-                raise RuntimeError("requested resource is not uniquely observed in the simulator")
-            if len(matches) > 1 and not select_nearest_equivalent:
-                raise RuntimeError("requested recipient is not uniquely observed in the simulator")
+            if (
+                not matches
+                or len({terms(str(item.get("description") or "")) for item in matches}) != 1
+                or (len(matches) > 1 and not select_nearest_equivalent)
+            ):
+                raise RuntimeError(f"requested {role} is not uniquely observed in the simulator")
             if len(matches) > 1:
                 refs = [item.get("object_ref") for item in matches]
                 if any(not isinstance(ref, str) or not ref for ref in refs) or len(set(refs)) != len(refs):

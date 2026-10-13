@@ -151,7 +151,8 @@ matching contract.
 The implementation remains simulation-only because the current Open Duck Mini v2
 has no qualified manipulator/gripper stack. Soridormi walks toward a uniquely
 observed scene object in bounded one-second segments, then returns to a uniquely
-observed recipient. It re-reads simulator distance and bearing until it is within
+observed recipient; `recipient.referent_id: "requester"` names the person who made
+the request, whatever words describe them. It re-reads simulator distance and bearing until it is within
 0.9 m of each target. The user-reported distance stays in `source` as context;
 simulator geometry controls travel. `speed` optionally selects an existing
 bounded walking pace and defaults to `slow`. Missing or ambiguous scene
