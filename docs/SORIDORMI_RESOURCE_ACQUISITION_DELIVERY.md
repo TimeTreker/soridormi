@@ -168,13 +168,18 @@ description against observed object descriptions. A recipient with
 `referent_id: "requester"` is instead the person who made the request: Soridormi
 returns to the observed requester actor whatever words name it ("me", "我").
 Without that referent, a speaker-relative description such as "me" matches no
-observed object, and the return leg fails as an unobserved recipient rather than
+observed object, and the return leg ends as an unobserved recipient rather than
 guessing a person. When several objects of the
 same observed type match, it selects the nearest and follows that object's
 observation reference during the walk. A generic "water" request can therefore
 select one of the three observed water bottles. Different matching object types
-remain ambiguous and prevent motion; a missing or invalid observation also
-prevents completion. This is simulator marker selection, not camera recognition.
+remain ambiguous and prevent motion. A resource or recipient the scene does not
+uniquely show is a declared outcome, not an error: `completed: false`, `no_motion`
+true when nothing walked toward it, a `summary` naming what was not observed (or
+observed ambiguously), and `resource_outcome` stating `resource_acquired` and
+`resource_delivered` as they happened, so Chromie can tell the person. An invalid
+observation still fails as an error. This is simulator marker selection, not camera
+recognition.
 When the marker is within the bounded alignment cone, the locomotion command
 goes straight; a new observation starts another bounded walking turn if needed.
 The composite defaults to `normal` pace. After observing route progress, it
@@ -189,7 +194,8 @@ To validate the cross-repository architecture now, Soridormi provides a
 walks to a selected observed resource and back to a uniquely observed recipient,
 rechecking scene distance and bearing after bounded walking segments. A recipient
 behind Chromie is reached by a feedback-guided walking turn. Missing or ambiguous
-markers, stalled motion, reset, stop, and timeout prevent delivery evidence.
+markers end as declared non-completion; stalled motion, reset, stop, and timeout fail.
+None of them yields delivery evidence.
 Object acquisition, carrying, and handover remain idealized because the current
 body has no qualified manipulator/gripper stack. The provider returns completion
 evidence only after both walks finish.

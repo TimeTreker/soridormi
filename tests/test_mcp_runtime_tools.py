@@ -1044,8 +1044,16 @@ def test_known_resource_without_matching_observation_refuses_motion() -> None:
                 },
             },
         )
-        with pytest.raises(RuntimeError, match="resource is not uniquely observed"):
-            await service.call_tool("soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]})
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
+        )
+        # A missing object is a declared outcome the requester can be told about.
+        assert result["completed"] is False and result["no_motion"] is True
+        assert result["summary"] == (
+            "Soridormi did not observe 'bottle of milk' in the simulator scene, so it did not fetch it."
+        )
+        assert result["resource_outcome"]["resource_acquired"] is False
+        assert result["resource_outcome"]["resource_delivered"] is False
         assert not robot.commands or all(
             command.velocities[0] == 0 for command in robot.commands
         )
@@ -1071,8 +1079,16 @@ def test_missing_recipient_prevents_mock_delivery_after_pickup() -> None:
                 },
             },
         )
-        with pytest.raises(RuntimeError, match="recipient is not uniquely observed"):
-            await service.call_tool("soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]})
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
+        )
+        assert result["completed"] is False and result["no_motion"] is False
+        assert result["summary"] == (
+            "Soridormi fetched 'bottle of milk' but did not observe the recipient 'user' in the "
+            "simulator scene, so it did not hand it over."
+        )
+        assert result["resource_outcome"]["resource_acquired"] is True
+        assert result["resource_outcome"]["resource_delivered"] is False
         assert any(command.x_velocity > 0 for command in service.controller.seen_commands)
         assert [pose.pose for pose in robot.visual_arm_poses][-1] == "rest"
         assert service.active_task is None
@@ -1108,15 +1124,13 @@ def test_the_requester_receives_a_delivery_by_referent_not_by_words(
                 "recipient": recipient,
             }},
         )
-        if not delivered:
-            with pytest.raises(RuntimeError, match="recipient is not uniquely observed"):
-                await service.call_tool(
-                    "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
-                )
-            return
         result = await service.call_tool(
             "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
         )
+        if not delivered:
+            assert result["completed"] is False
+            assert "did not observe the recipient 'me'" in result["summary"]
+            return
         assert result["completed"] is True
         assert result["resource_outcome"]["resource_delivered"] is True
         assert result["return_outcome"]["observed_distance_end_m"] <= 0.9

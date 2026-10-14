@@ -88,6 +88,52 @@ RESOURCE_PACE_RECOVERY_AFTER_S = 20.0
 PROVIDER_INTERNAL_SCENE_KEYS = frozenset({"bearing_rad", "referent_id"})
 
 
+class ObservedTargetUnavailable(RuntimeError):
+    """The scene does not uniquely show a delivery target: a world fact, not a fault.
+
+    ``reason`` is ``not_observed`` or ``ambiguous``; ``before_motion`` is true when no
+    observation of this target had been selected yet, so no walk toward it began.
+    """
+
+    def __init__(self, role: str, *, reason: str, before_motion: bool) -> None:
+        super().__init__(f"requested {role} is not uniquely observed in the simulator")
+        self.role = role
+        self.reason = reason
+        self.before_motion = before_motion
+
+
+def unobserved_target_result(plan: Any, unavailable: ObservedTargetUnavailable) -> dict[str, Any]:
+    """Declared non-completion for a delivery whose resource or recipient is not observed."""
+
+    outcome = simulated_resource_outcome(plan)
+    target = (
+        repr(outcome["resource_description"]) if unavailable.role == "resource"
+        else f"the recipient {outcome['recipient_description']!r}"
+    )
+    seen = (
+        f"did not observe {target}" if unavailable.reason == "not_observed"
+        else f"observed more than one different object matching {target}"
+    )
+    if unavailable.role == "resource":
+        summary = f"Soridormi {seen} in the simulator scene, so it did not fetch it."
+    else:
+        summary = (
+            f"Soridormi fetched {outcome['resource_description']!r} but {seen} in the simulator "
+            "scene, so it did not hand it over."
+        )
+    return {
+        "completed": False,
+        "summary": summary,
+        "no_motion": unavailable.role == "resource" and unavailable.before_motion,
+        "resource_outcome": {
+            **outcome,
+            "resource_acquired": unavailable.role == "recipient",
+            "resource_delivered": False,
+            "evidence_summary": summary,
+        },
+    }
+
+
 class RuntimeRobot(Protocol):
     def read_state(self) -> RobotState: ...
 
@@ -670,15 +716,24 @@ class SoridormiRuntimeToolService:
                     await self._try_apply_visual_arm_pose("place")
                 return None
 
+            unavailable: ObservedTargetUnavailable | None = None
             try:
                 motion_result = await self.execute_motion_plan(
                     plan_id,
                     segment_handler=resource_segment_handler,
                 )
+            except ObservedTargetUnavailable as error:
+                # The scene answered the request: report it as a declared outcome so the
+                # requester can be told what was not seen (Chromie live 2026-10-14: a missing
+                # TV remote surfaced only as a tool error, spoken as "a fatal schema error").
+                unavailable = error
+                await asyncio.shield(self._try_apply_visual_arm_pose(fallback_visual_arm_pose))
             except (Exception, asyncio.CancelledError):
                 await asyncio.shield(self._try_apply_visual_arm_pose(fallback_visual_arm_pose))
                 raise
-            if motion_result.get("completed") is not True:
+            if unavailable is not None:
+                result = unobserved_target_result(stored.plan, unavailable)
+            elif motion_result.get("completed") is not True:
                 await self._try_apply_visual_arm_pose(fallback_visual_arm_pose)
                 result = {**motion_result, "no_motion": False}
             else:
@@ -1771,7 +1826,10 @@ class SoridormiRuntimeToolService:
                 or len({terms(str(item.get("description") or "")) for item in matches}) != 1
                 or (len(matches) > 1 and not select_nearest_equivalent)
             ):
-                raise RuntimeError(f"requested {role} is not uniquely observed in the simulator")
+                raise ObservedTargetUnavailable(
+                    role, reason="ambiguous" if matches else "not_observed",
+                    before_motion=selected_ref is None,
+                )
             if len(matches) > 1:
                 refs = [item.get("object_ref") for item in matches]
                 if any(not isinstance(ref, str) or not ref for ref in refs) or len(set(refs)) != len(refs):
