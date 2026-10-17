@@ -17,14 +17,23 @@ simulator (not camera perception) and carry no elevation, so the resolved
 pitch is level. The skill, activity, and task MCP paths reject caller-supplied
 `target_yaw_rad`/`target_pitch_rad`.
 
+Person perception feeds the scene observation, not a separate skill. Locating
+a person is perception; looking is the `look_at_person` action. Soridormi keeps
+one scene observation (simulator markers plus perceived people) that every
+target resolution reads, so Chromie never chains a "locate" call before acting
+and gaze, approach, and delivery cannot disagree about where someone is.
+
 Temporary mocked requester position: Soridormi cannot perceive people yet, so in
-simulation a `"requester"` gaze that finds no scene actor resolves to a declared
-mocked position at `SORIDORMI_MOCK_REQUESTER_BEARING_RAD` (robot-frame yaw,
-default `0.0`, straight ahead). The result keeps `status: resolved` and adds
+simulation the only person-perception provider is a declared mocked requester.
+When the scene shows no actor tagged `"requester"`, the observation gains a
+bearing-only `requester` at `SORIDORMI_MOCK_REQUESTER_BEARING_RAD` (robot-frame
+yaw, default `0.0`, straight ahead). A resolved gaze then reports
 `source: mocked_requester_position` and `object_ref: mocked_requester`, so it is
 never mistaken for perception. A scene actor tagged `"requester"` still wins.
-Set the variable to `off` to report `not_observed` instead. This stand-in is
-replaced when a person-perception skill exists; it never applies outside sim.
+The mock has no range, so routes ("walk to me") and the public
+`soridormi.robot.observe_scene` output do not use it. Set the variable to `off`
+to report `not_observed` instead. A real provider (sound direction, face
+detection) replaces it in the same observation; it never applies outside sim.
 
 When Soridormi cannot resolve the target, the skill ends without motion as a
 declared non-completion with `completed: false`, a summary naming what was not

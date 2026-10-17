@@ -1619,6 +1619,28 @@ def test_sim_requester_gaze_uses_the_declared_mocked_position_when_no_actor_is_s
     assert (max(head_yaw) if expected >= 0 else min(head_yaw)) == pytest.approx(expected, abs=1e-6)
 
 
+def test_mocked_requester_is_part_of_the_scene_observation_not_a_gaze_fallback() -> None:
+    async def exercise() -> None:
+        service = SoridormiRuntimeToolService(
+            robot=GazeFakeRobot(), controller=FakeController(), mock_requester_bearing_rad=0.2
+        )
+        observed = await service._observe_scene_objects(service.robot.observe_scene, "unavailable")
+        assert observed["objects"] == [{
+            "object_ref": "mocked_requester", "description": "requester",
+            "referent_id": "requester", "relative_direction": "mocked requester position",
+            "bearing_rad": 0.2, "source": "mocked_requester_position",
+        }]
+        # The public scene contract carries ranged markers only.
+        public = await service.call_tool("soridormi.robot.observe_scene", {})
+        assert public["objects"] == []
+
+        service.robot = GazeFakeRobot(REQUESTER_MARKER)
+        observed = await service._observe_scene_objects(service.robot.observe_scene, "unavailable")
+        assert [item["object_ref"] for item in observed["objects"]] == ["scenario_user"]
+
+    asyncio.run(exercise())
+
+
 @pytest.mark.parametrize(
     ("objects", "target_ref", "status", "summary"),
     [
