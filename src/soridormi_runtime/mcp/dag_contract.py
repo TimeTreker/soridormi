@@ -89,7 +89,7 @@ def build_soridormi_dag_contract(*, mode: str = "sim") -> dict[str, Any]:
             "Chromie names physical targets semantically (target_ref or recipient referent_id \"requester\" for the current speaker, objects by description, places by cited name); Soridormi resolves them from its own perception and reports a typed target_resolution instead of a default direction or the nearest keyword match.",
             "Soridormi reports any explicit requested value it does not execute as requested in value_adjustments; execution limits stay enforced.",
             "Speech or singing is never a Soridormi activity member; Chromie coordinates peer execution through coordination_id.",
-            "Chromie must use chromie.ask_confirmation before physical-motion execution unless the action is stop/cancel/emergency_stop.",
+            "Chromie must use chromie.ask_confirmation before physical-motion execution whenever the live skill catalog or the fresh plan reports requires_confirmation=true, which Soridormi reports for motion in every mode except sim; stop/cancel/emergency_stop never need it.",
             "Chromie must cover soridormi.motion.execute_plan with soridormi.safety.monitor_motion.",
             "Chromie must use soridormi.motion.create_plan before soridormi.motion.execute_plan.",
             "soridormi.robot.get_status is observational and is not a mandatory movement preflight; Soridormi Runtime and safety checks own execution readiness.",

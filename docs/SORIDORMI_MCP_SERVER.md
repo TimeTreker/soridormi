@@ -60,7 +60,12 @@ control ticks. Cancelling an in-flight MCP request also transitions the robot
 to safe hold. `robot.get_status` reports `safe_idle=true` only when no physical body lane is
 active and emergency stop is clear. `activity_idle` separately reports whether
 all Soridormi body-activity lanes are idle. Emergency-stop state remains active until
-the MCP process is restarted; inspect robot state before resuming.
+the MCP process is restarted; inspect robot state before resuming. After an
+emergency stop, the postcondition a caller such as Chromie can prove is the
+latched stop: once running work has ended, `robot.get_status` reports
+`emergency_stop=true`, no active body lane (`activity_idle=true`), and
+`safe_idle=false` by definition. `safe_idle=true`
+is reachable again only after the restart.
 
 Chromie should prefer the named-skill path for body requests:
 
