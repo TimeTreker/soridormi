@@ -14,7 +14,8 @@ orchestration.
 
 ```text
 Chromie proposes structured intent.
-Soridormi validates, plans, executes, monitors, and may refuse body behavior.
+Soridormi validates, plans, executes, monitors, and may report body behavior
+as unavailable or not allowed.
 Chromie never supplies raw joints, motors, torques, physical coordinates, or
 low-level action_14d outputs as execution authority.
 ```

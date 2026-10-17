@@ -102,7 +102,7 @@ structured body goals to Soridormi:
 
 1. `chromie` resolves the user request, ambiguity, and confirmation.
 2. `soridormi.task.get_capabilities` reads Soridormi-owned embodied readiness when Chromie needs current support/missing-subsystem state.
-3. `soridormi.task.preview` inspects Soridormi's no-motion embodied interpretation when clarification, refusal explanation, or pre-confirmation planning is useful.
+3. `soridormi.task.preview` inspects Soridormi's no-motion embodied interpretation when clarification, explaining a body limitation, or pre-confirmation planning is useful.
 4. `soridormi.task.submit` records the structured embodied goal when Chromie decides to create the task.
 5. `soridormi.task.status` or `soridormi.task.events` reports progress.
 6. `soridormi.task.cancel`, `soridormi.motion.stop`, or
@@ -123,7 +123,7 @@ should treat the MCP response as the runtime view of that body-owned contract.
 and bounded multi-step requests may complete as `skill_sequence_dry_run`.
 Cross-agent tasks currently stop at the Soridormi-owned `planning` hold.
 Blocked tasks can expose `plan_steps` and `blocked_subsystems` so Chromie's
-global DAG can report why Soridormi refused or held the request without
+global DAG can report why the body request is unavailable, not allowed, or held without
 inventing a lower-level workaround.
 They also expose `task_graph`, which is Soridormi's body-side DAG view with
 node IDs, sequence edges, current phase, terminal state, and

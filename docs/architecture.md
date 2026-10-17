@@ -89,5 +89,6 @@ safe-idle confirmation.
 ## Sim-to-real invariant
 
 Simulation and hardware expose the same high-level body contracts. Backend
-selection, feasibility, limits, and refusal remain Soridormi-owned. Chromie does
+selection, feasibility, limits, and unavailable/not-allowed body outcomes remain
+Soridormi-owned. Chromie does
 not lower user goals differently based on simulator implementation details.

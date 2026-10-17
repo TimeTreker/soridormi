@@ -80,7 +80,8 @@ Soridormi, and future capability providers; handles monitoring, cancellation,
 and recovery; and reconciles provider outcomes back into Goal state.
 
 The Activity lane does not own Goal meaning and does not silently select a
-replacement capability after refusal or a typed Soridormi not-found result.
+replacement capability after a Value Judgment refusal, a Soridormi
+unavailable/not-allowed limitation, or a typed Soridormi not-found result.
 
 ## Cognitive Runtime Coordinator
 

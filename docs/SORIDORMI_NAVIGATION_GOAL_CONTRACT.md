@@ -46,8 +46,8 @@ The machine-readable contract lives at
 ## Current status
 
 `navigate_to_target` is declared in the skill manifest as `future_perception`.
-It is intentionally not executable. Soridormi must refuse navigation goals when
-any of these are missing:
+It is intentionally not executable. Soridormi must report a navigation goal as
+unavailable, without motion, when any of these are missing:
 
 - resolved target identity;
 - target confidence;
@@ -81,7 +81,7 @@ Navigation training should not start as random walking. It should be staged:
 
 1. Relative short goals in MuJoCo, for example "move 0.3 m forward then stop".
 2. Body-frame waypoint following with no obstacles.
-3. Stop-before-obstacle and lost-target refusal.
+3. Stop-before-obstacle and lost-target typed not-found.
 4. Route segmented into short local trajectories.
 5. Place/object goals only after target resolution and localization evidence
    exists.
