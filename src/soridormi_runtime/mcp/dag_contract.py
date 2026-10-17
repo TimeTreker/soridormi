@@ -66,10 +66,11 @@ def build_soridormi_dag_contract(*, mode: str = "sim") -> dict[str, Any]:
         "chromie_concurrency_model": {
             "cognitive_core": "single_authoritative_mind",
             "lanes": [
-                "social_attention_proposal",
-                "speaking_execution",
+                "vocal_execution",
                 "activity_execution",
             ],
+            "behavior_domains": {"social_attention": "social_cognition"},
+            "expression_author": "social_cognition",
             "runtime_coordinator": "chromie",
             "speech_owner": "chromie",
             "body_provider": "soridormi",
@@ -82,9 +83,11 @@ def build_soridormi_dag_contract(*, mode: str = "sim") -> dict[str, Any]:
         },
         "rules": [
             "Soridormi tools do not implement Chromie speech, TTS, ASR, or user confirmation.",
-            "The Social-Attention Proposal Lane proposes only; it does not author speech, own Goals, authorize body actions, or operate actuators.",
-            "The Speaking Execution Lane and Activity Execution Lane are peer execution lanes beneath one Cognitive Core.",
-            "Chromie's authoritative planner selects exact body skills before the Activity Execution Lane calls soridormi.activity.compile.",
+            "Social Attention is a behavior domain owned by Chromie's Social Cognition and expressed through the Activity Execution Lane; it is not a third lane, owns no Goals, and operates no actuators.",
+            "The Vocal Execution Lane and Activity Execution Lane are the two peer execution lanes beneath one Cognitive Core.",
+            "Chromie's Planner selects exact body skills, and Social Cognition authors optional social expression, before the Activity Execution Lane calls soridormi.activity.compile; Soridormi decides only body-level how, such as gait and trajectory.",
+            "Chromie names physical targets semantically (target_ref or recipient referent_id \"requester\" for the current speaker, objects by description, places by cited name); Soridormi resolves them from its own perception and reports a typed target_resolution instead of a default direction or the nearest keyword match.",
+            "Soridormi reports any explicit requested value it does not execute as requested in value_adjustments; execution limits stay enforced.",
             "Speech or singing is never a Soridormi activity member; Chromie coordinates peer execution through coordination_id.",
             "Chromie must use chromie.ask_confirmation before physical-motion execution unless the action is stop/cancel/emergency_stop.",
             "Chromie must cover soridormi.motion.execute_plan with soridormi.safety.monitor_motion.",

@@ -1,20 +1,42 @@
 # Soridormi look-target provider boundary
 
-look-at-person skill made `look_at_person` executable in MuJoCo, but it intentionally did not run
-camera perception. look-target provider adds the structured target-provider boundary that future
-perception, Chromie, or a planner can call before the scripted head executor.
-
-The contract is:
+Soridormi resolves gaze targets itself. A caller such as Chromie names whom to
+look at with `target_ref` and never supplies yaw or pitch:
 
 ```text
-camera/person detector/planner/Chromie
-  -> structured target yaw/pitch
-  -> look_at_person scripted head trajectory
+Chromie: look_at_person(target_ref="requester")
+  -> Soridormi resolves the person from its own scene observation
+  -> bounded look_at_person head trajectory toward the observed bearing
   -> MuJoCo actuator commands
 ```
 
-Soridormi still does **not** know where the person is by itself. This patch only
-converts already-structured target hints into bounded `look_at_person` arguments.
+`"requester"` is the agreed referent for the person who made the current
+request; any other `target_ref` must match exactly one observed marker by its
+identifying words. In simulation the scene markers are read through the
+simulator (not camera perception) and carry no elevation, so the resolved
+pitch is level. The skill, activity, and task MCP paths reject caller-supplied
+`target_yaw_rad`/`target_pitch_rad`.
+
+When Soridormi cannot resolve the target, the skill ends without motion as a
+declared non-completion with `completed: false`, a summary naming what was not
+found, and a typed `target_resolution`:
+
+| `status` | Meaning |
+| --- | --- |
+| `resolved` | One observed target within the head range; the skill executes. |
+| `not_observed` | No observed marker matches the target. |
+| `ambiguous` | More than one observed marker matches; Soridormi does not pick one. |
+| `outside_head_range` | The target is observed beyond the head yaw range (or the stricter walking-overlay envelope); turning the body is a separate skill Chromie selects. |
+| `perception_unavailable` | The mode has no perception to locate the target (outside simulation today). |
+
+Soridormi never substitutes a straight-ahead (0/0) look and reports it as
+looking at the person.
+
+## Operator target tools
+
+The provider below converts already-structured target hints into bounded
+`look_at_person` yaw/pitch for operator tools, scripted acceptance, and future
+perception handoff files. It is not the path a Chromie request takes.
 
 social eye behavior changes the default gaze behavior: after acquiring a person target,
 `look_at_person` now keeps looking at that target instead of immediately
@@ -94,13 +116,15 @@ Then run:
 
 ## Bounds
 
-The provider clamps to the `look_at_person` manifest intent:
+The operator provider clamps to the `look_at_person` manifest intent:
 
 - yaw: `[-0.55, 0.55]` rad
 - pitch: `[-0.25, 0.20]` rad
 - confidence: `[0.0, 1.0]`
 
-Clamping keeps upstream modules from commanding unsafe head offsets.
+Clamping keeps operator inputs from commanding unsafe head offsets. The
+Chromie-facing runtime path does not clamp a resolved target into range; it
+reports `outside_head_range` instead.
 
 ## Live MuJoCo validation
 

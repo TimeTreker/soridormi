@@ -17,12 +17,12 @@ human/environment
   -> MuJoCo now; qualified hardware later
 ```
 
-Chromie proposals are advisory. Soridormi rejects executable intent metadata,
-raw controls, and physical coordinates, then independently validates every
-body plan.
+Chromie selects the exact capability and names targets; Soridormi resolves them,
+decides body-level how, and rejects executable intent metadata, raw controls,
+and physical coordinates, then independently validates every body plan.
 
 The maintained boundary keeps speech, singing, TTS synthesis, audible playback,
-and user-level interruption in Chromie's Speaking lane. Media playback is a
+and user-level interruption in Chromie's Vocal lane. Media playback is a
 peer Activity capability rather than a Soridormi body capability. Soridormi
 remains the embodied provider beneath Activity; changing the vocal or media
 hosting boundary requires a separate evidence-backed architecture decision.
@@ -42,8 +42,7 @@ facades; Planner owns direction and positive magnitude while the trusted provide
 adapter alone realizes signed `yaw_radps` / `vy_mps`. Provider execution schemas
 remain unchanged. `turn_in_place` count remains 1-8 with the existing 20-second
 total limit. General `walk_velocity` is not force-fit because its signed forward
-range is asymmetric; `look_at_person` still needs trusted target resolution rather
-than a sign transform, while its requested duration remains Planner-supplied.
+range is asymmetric; `look_at_person` names its target (Soridormi resolves direction); its duration remains Planner-supplied.
 Manifest validation covers facade schemas, realization targets and semantic
 `argument_realization` names. Native paired direction qualification remains open.
 See [Soridormi Skill Execution](SORIDORMI_SKILL_EXECUTION.md).
@@ -67,7 +66,8 @@ physical speaker/robot behavior or resolve current Planner semantic failures.
   local planning inside each selected capability.
 - `acquire_and_deliver_resource` walks to the nearest equivalent marker (all markers are read all around) and back to `recipient.referent_id: "requester"` (else matching words);
   isolated default-water proof: 5.0→0.899 m, user 5.738→0.900 m, mock delivery/safe idle with bounded pace
-  recovery. An unobserved or ambiguous target is a declared `completed: false` outcome with a summary; stops/resets/timeouts fail. Live MCP/MuJoCo (Chromie text, 2026-10-13): milk seen 9.854 m to the left delivered to the requester in 5 min 38 s.
+  recovery. An unobserved or ambiguous target, or a cited source place (the scene has no named places), is a declared `completed: false` outcome with a summary and typed `target_resolution`; pace recovery is reported in `value_adjustments`; stops/resets/timeouts fail. Live MCP/MuJoCo (Chromie text, 2026-10-13): milk seen 9.854 m to the left delivered to the requester in 5 min 38 s.
+- `look_at_person` takes only `target_ref` from callers (`"requester"` = current speaker); Soridormi resolves the bearing from scene markers (level pitch) on the skill and activity paths. Unobserved, ambiguous, out-of-head-range, or no-perception targets end without motion as a typed `target_resolution`; caller yaw/pitch is rejected. Raised forward speeds are reported in `value_adjustments`.
 - Full-scene MuJoCo/MCP proof, 2026-09-25, source `5d235b8`: bottle
   10.008→0.834 m in 155.26 s; user 9.425→0.883 m in 158.45 s; mock
   handover completed, standing/safe idle, no active task. Scene was reset to
@@ -182,12 +182,12 @@ completion from a task dry-run result.
 Body-wide `safe_idle` is owned by the runtime state. Task records project that
 state; they do not infer safe idle merely because emergency stop is clear.
 
-Target-oriented tasks require explicit structured targets and directions.
-Soridormi does not silently substitute a person, pose, or coordinate.
+Target-oriented requests name their target; Soridormi resolves it and reports a typed
+`target_resolution` not-found instead of substituting a person, pose, or direction.
 
 ## Not currently claimed
 
-- Chromie's three-lane runtime implementation in this repository; this repo
+- Chromie's two-execution-lane runtime implementation in this repository; this repo
   defines only the Soridormi provider-side contract
 - Speech, singing, TTS, or audible playback execution inside Soridormi
 - Media playback, microphone/speaker adaptation, or a unified body/vocal/media
@@ -215,7 +215,7 @@ Soridormi does not silently substitute a person, pose, or coordinate.
 
 - Qualify concurrent locomotion, gaze overlay, and visual expression in live
   MuJoCo and retain evidence for cancellation and safety preemption.
-- Update the companion Chromie repository with the single-core three-lane model
+- Update the companion Chromie repository with the single-core two-execution-lane model
   and coordinated-group lifecycle.
 - Keep semantic contracts independent of implementation sequence labels.
 - Keep body-state projections grounded in the live Soridormi runtime.

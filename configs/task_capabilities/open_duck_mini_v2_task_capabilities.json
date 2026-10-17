@@ -150,7 +150,7 @@
     },
     {
       "task_type": "look_at_target",
-      "description": "Head/body attention task that can dry-run to look-at skills.",
+      "description": "Head/body attention task that can dry-run to look-at skills. A person target is named by target_ref; Soridormi resolves its direction from its own perception.",
       "readiness": "skill_dry_run_ready",
       "execution_modes": [
         "skill_dry_run"
@@ -280,7 +280,7 @@
     },
     {
       "task_type": "deliver_object",
-      "description": "Object delivery; blocked until perception, navigation, manipulation, and handoff exist.",
+      "description": "Non-mocked object delivery with real manipulation; blocked until perception, navigation, manipulation, and handoff exist. Simulation delivery is live through the named skill acquire_and_deliver_resource, which is Chromie's delivery path.",
       "readiness": "future_blocked",
       "execution_modes": [
         "contract_only"

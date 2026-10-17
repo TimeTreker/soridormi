@@ -195,9 +195,7 @@ cases:
       task_type: look_at_target
       summary: look at user
       parameters:
-        target_ref: person
-        target_yaw_rad: 0.0
-        target_pitch_rad: -0.02
+        target_ref: requester
         duration_s: 2.0
       task_context:
         source: chromie

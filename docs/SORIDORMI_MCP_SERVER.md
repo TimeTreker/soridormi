@@ -75,8 +75,10 @@ soridormi.skill.list
 `soridormi.skill.create_plan` accepts optional `chromie_intent` proposal
 metadata. The required proposal constants make Chromie's role explicit, while
 Soridormi rejects execution semantics, raw controls, and physical coordinates
-inside that metadata. It remains Soridormi's responsibility to validate the
-skill, choose the body plan, monitor execution, and refuse when necessary.
+inside that metadata. Chromie selects the skill; it remains Soridormi's
+responsibility to validate it, realize its body-level plan (gait, trajectory,
+and the physical target Chromie named), monitor execution, and report a
+limitation or typed not-found when the body cannot do it.
 
 The lower-level `soridormi.motion.*` tools remain available for bounded
 velocity-plan integration tests and emergency controls. Neither path exposes
@@ -119,7 +121,7 @@ or gaze overlay is composed into the locomotion controller's command before one
 API and do not write motor commands. A future WBC may replace the internal
 composer, but it must preserve this single-authority contract.
 
-Speech and singing are not body-activity members. Chromie's Speaking Execution
+Speech and singing are not body-activity members. Chromie's Vocal Execution
 Lane starts and controls them as a peer lane. Chromie's Cognitive Runtime
 Coordinator may use one `coordination_id` to relate speech and the Soridormi
 body activity, while Soridormi remains authoritative for physical

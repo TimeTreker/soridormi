@@ -40,8 +40,11 @@ features and ordering.
 - Do not feed raw language or raw perception into the low-level action policy.
 - Do not invent targets, body state, capability, or completion results.
 - Project `safe_idle` and active motion from the live body runtime.
-- Preserve one Cognitive Core and three Chromie coordination lanes: Social-
-  Attention Proposal, Speaking Execution, and Activity Execution.
+- Preserve one Cognitive Core and two Chromie execution lanes, Vocal and
+  Activity; Social Attention is a behavior domain owned by Chromie's Social
+  Cognition, which authors optional social expression.
+- Chromie names physical targets; Soridormi resolves them from its own
+  perception and reports a typed not-found instead of a default or a guess.
 - Keep speech outside Soridormi; use `soridormi.activity.*` for compatible
   physical concurrency with declared resources and one final motor command.
 - Use semantic issue names rather than numbered project sequences.

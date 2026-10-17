@@ -25,7 +25,8 @@ from soridormi_runtime.skill_manifest import DEFAULT_SKILL_MANIFEST
 
 
 class ConcurrentRobot:
-    def __init__(self) -> None:
+    def __init__(self, *, requester_bearing_rad: float | None = 0.08) -> None:
+        self.requester_bearing_rad = requester_bearing_rad
         self.time = 0.0
         self.names = [*HEAD_JOINT_NAMES, "left_knee", "right_knee"]
         self.positions = [0.0] * len(self.names)
@@ -46,6 +47,19 @@ class ConcurrentRobot:
             base_position_xyz=[0.0, 0.0, 0.3],
             actuator_ctrl=list(self.positions),
         )
+
+    def observe_scene(self) -> dict[str, object]:
+        objects = []
+        if self.requester_bearing_rad is not None:
+            objects.append({
+                "object_ref": "scenario_user",
+                "description": "user",
+                "referent_id": "requester",
+                "relative_direction": "in front of Chromie",
+                "distance_m": 1.5,
+                "bearing_rad": self.requester_bearing_rad,
+            })
+        return {"mocked_simulation": True, "objects": objects}
 
     def send_motor_command(self, command: MotorCommand) -> None:
         self.commands.append(command)
@@ -105,9 +119,7 @@ def _concurrent_members(*, walk_duration_s: float = 0.5) -> list[dict[str, objec
             "member_id": "gaze",
             "skill_id": "look_at_person",
             "parameters": {
-                "target_ref": "person_1",
-                "target_yaw_rad": 0.08,
-                "target_pitch_rad": -0.04,
+                "target_ref": "requester",
                 "duration_s": 0.4,
                 "hold_fraction": 0.5,
                 "end_mode": "hold_target",
@@ -236,15 +248,79 @@ def test_activity_plan_rejects_standalone_gesture_during_locomotion() -> None:
 
 def test_activity_plan_rejects_head_overlay_outside_locomotion_envelope() -> None:
     members = _concurrent_members()
-    members[1]["parameters"] = {
-        "target_ref": "person_1",
-        "target_yaw_rad": 0.30,
-        "target_pitch_rad": 0.0,
-        "duration_s": 0.4,
+    members[1] = {
+        "member_id": "glance",
+        "skill_id": "look_direction",
+        "parameters": {"head_yaw_rad": 0.30, "duration_s": 0.4},
     }
 
     with pytest.raises(ValueError, match="head yaw.*exceeds"):
         compile_body_activity(_registry(), {"members": members})
+
+
+def test_activity_plan_rejects_caller_gaze_coordinates() -> None:
+    members = _concurrent_members()
+    members[1]["parameters"] = {
+        "target_ref": "requester",
+        "target_yaw_rad": 0.08,
+        "duration_s": 0.4,
+    }
+
+    with pytest.raises(ValueError, match="resolves target_ref from Soridormi perception"):
+        compile_body_activity(_registry(), {"members": members})
+
+
+def _run_activity(
+    robot: ConcurrentRobot, members: list[dict[str, object]]
+) -> tuple[dict[str, object], ConcurrentController]:
+    async def exercise() -> dict[str, object]:
+        service = SoridormiRuntimeToolService(
+            robot=robot, controller=controller, control_hz=100.0
+        )
+        plan = await service.call_tool("soridormi.activity.compile", {"members": members})
+        return await asyncio.wait_for(
+            service.call_tool(
+                "soridormi.activity.execute",
+                {"compiled_activity_id": plan["compiled_activity_id"]},
+            ),
+            timeout=3.0,
+        )
+
+    controller = ConcurrentController()
+    return asyncio.run(exercise()), controller
+
+
+def test_required_gaze_at_an_unobserved_requester_fails_before_motion() -> None:
+    robot = ConcurrentRobot(requester_bearing_rad=None)
+    result, controller = _run_activity(robot, _concurrent_members())
+
+    assert result["completed"] is False
+    assert result["status"] == "failed"
+    gaze = result["member_results"]["gaze"]
+    assert gaze["status"] == "target_unavailable"
+    assert gaze["target_resolution"] == {
+        "role": "gaze_target", "target_ref": "requester", "status": "not_observed",
+    }
+    assert "did not observe the requester" in result["failure_reason"]
+    assert not any(command.x_velocity > 0.0 for command in controller.seen_commands)
+    # At most the failure path's safe hold of the unchanged pose; no gaze or walk.
+    assert all(position == 0.0 for command in robot.commands for position in command.positions)
+
+
+def test_gaze_beyond_the_walking_overlay_envelope_is_reported_not_clamped() -> None:
+    robot = ConcurrentRobot(requester_bearing_rad=0.30)
+    members = _concurrent_members()
+    members[1]["optional"] = True
+    result, controller = _run_activity(robot, members)
+
+    assert result["completed"] is True
+    assert result["status"] == "completed_with_degradation"
+    gaze = result["member_results"]["gaze"]
+    assert gaze["completed"] is False
+    assert gaze["target_resolution"]["status"] == "outside_head_range"
+    assert any(command.x_velocity > 0.0 for command in controller.seen_commands)
+    head_yaw_index = robot.names.index("head_yaw")
+    assert all(abs(command.positions[head_yaw_index]) < 1e-9 for command in robot.commands)
 
 
 def test_local_activity_service_is_contract_only() -> None:
@@ -310,6 +386,10 @@ def test_runtime_executes_walk_gaze_and_blink_concurrently() -> None:
         assert result["member_results"]["gaze"][
             "composed_into_final_motor_command"
         ] is True
+        assert result["member_results"]["gaze"]["target_resolution"]["status"] == "resolved"
+        assert result["member_results"]["gaze"]["target_resolution"]["object_ref"] == (
+            "scenario_user"
+        )
         assert any(command.x_velocity > 0.0 for command in controller.seen_commands)
         head_yaw_index = robot.names.index("head_yaw")
         assert any(abs(command.positions[head_yaw_index]) > 0.01 for command in robot.commands)

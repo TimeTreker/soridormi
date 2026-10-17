@@ -12,9 +12,9 @@ Robot API
 ```
 
 Chromie owns human meaning and global orchestration. It has one Cognitive Core
-with a Social-Attention Proposal Lane, Speaking Execution Lane, Activity
-Execution Lane, and one shared runtime coordinator. These are coordination
-lanes, not independent minds.
+with two execution lanes, the Vocal Execution Lane and the Activity Execution
+Lane, and one shared runtime coordinator. These are not independent minds.
+Social Attention is a behavior domain owned by Chromie's Social Cognition.
 
 Soridormi owns physical meaning and body authority. Speech is a peer Chromie
 execution lane; it is not nested inside Soridormi or the Activity lane.

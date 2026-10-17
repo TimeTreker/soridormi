@@ -24,13 +24,13 @@ FORBIDDEN_LOW_LEVEL_KEY_PARTS = {
     "torque_commands",
     "actuator_ctrl",
 }
-ROUTE_RESULTS = {
-    "body_task",
-    "body_task_blocked",
+# Outcomes Chromie's architecture produces. There is no pre-semantic route label:
+# Chromie understands every request, and its Value Judgment refuses harmful ones.
+CHROMIE_OUTCOMES = {
+    "body_capability",
     "conversation_only",
-    "deep_thought",
-    "safety_refusal",
     "social_response",
+    "value_judgment_refusal",
 }
 BODY_TASK_FIELDS = (
     "soridormi_body_task",
@@ -93,7 +93,7 @@ def _assert_expected_task_result(case_id: str, result: dict[str, Any], expected:
 def test_text_input_acceptance_file_is_structured() -> None:
     suite = _load_suite()
 
-    assert suite["schema_version"] == "soridormi.chromie_text_input_acceptance.v1"
+    assert suite["schema_version"] == "soridormi.chromie_text_input_acceptance.v2"
     assert suite["suite_id"] == "chromie_text_input_acceptance"
     assert suite["owner"] == "soridormi"
     boundary = suite["policy_boundary"]
@@ -105,8 +105,10 @@ def test_text_input_acceptance_file_is_structured() -> None:
     cases = suite["cases"]
     assert len(cases) >= 8
     assert any(_contains_cjk(case["raw_user_text"]) for case in cases)
-    assert any(case["expected_chromie_route"]["route_result"] == "conversation_only" for case in cases)
-    assert any(case["expected_chromie_route"]["route_result"] == "deep_thought" for case in cases)
+    assert any(case["expected_chromie_outcome"]["outcome"] == "conversation_only" for case in cases)
+    assert any(
+        case["expected_chromie_outcome"]["outcome"] == "value_judgment_refusal" for case in cases
+    )
 
     seen_ids: set[str] = set()
     for case in cases:
@@ -115,8 +117,9 @@ def test_text_input_acceptance_file_is_structured() -> None:
         seen_ids.add(case["id"])
         assert case["raw_user_text"]
         assert case["language"]
-        route = case["expected_chromie_route"]["route_result"]
-        assert route in ROUTE_RESULTS, case["id"]
+        assert "expected_chromie_route" not in case, case["id"]
+        assert case["expected_chromie_outcome"]["outcome"] in CHROMIE_OUTCOMES, case["id"]
+        assert "interim_soridormi_body_task" not in case, case["id"]
         assert case["expected_user_response"]["response_kind"], case["id"]
         _assert_no_forbidden_keys(case)
 
@@ -125,10 +128,11 @@ def test_conversation_only_text_inputs_do_not_submit_body_tasks() -> None:
     suite = _load_suite()
 
     for case in suite["cases"]:
-        route = case["expected_chromie_route"]["route_result"]
-        if route in {"conversation_only", "safety_refusal"}:
+        outcome = case["expected_chromie_outcome"]["outcome"]
+        if outcome in {"conversation_only", "value_judgment_refusal"}:
             assert not _body_task_entries(case), case["id"]
             assert case.get("soridormi_body_task") is None, case["id"]
+            assert case.get("soridormi_skill_plan") is None, case["id"]
 
 
 def test_text_input_body_tasks_replay_against_soridormi_task_service() -> None:
@@ -161,3 +165,21 @@ def test_text_input_compound_walk_and_blink_preserves_both_actions() -> None:
     assert submitted_sequence[1]["parameters"]["count"] == 1
     assert result["estimated_duration_s"] >= 10.0
     assert result["no_motion"] is True
+
+
+def test_object_delivery_is_a_live_simulation_skill_not_a_blocked_task() -> None:
+    suite = _load_suite()
+    by_id = {case["id"]: case for case in suite["cases"]}
+    case = by_id["text_input.bring_water_delivery"]
+    forbidden = case["expected_user_response"]["forbidden_claims"]
+    assert "object delivery is not available yet" in forbidden
+    assert case.get("soridormi_body_task") is None
+
+    entry = case["soridormi_skill_plan"]
+    plan = SoridormiLocalToolService().call_tool(
+        "soridormi.skill.create_plan",
+        {"skill_id": entry["skill_id"], "parameters": entry["parameters"]},
+    )
+    assert plan["skill_id"] == entry["expected"]["skill_id"]
+    assert plan["requires_confirmation"] is entry["expected"]["requires_confirmation"]
+    assert entry["parameters"]["recipient"]["referent_id"] == "requester"

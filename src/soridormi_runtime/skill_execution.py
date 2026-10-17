@@ -1139,6 +1139,34 @@ def _plan_acquire_and_deliver_resource(
     )
 
 
+def value_adjustments_for_plan(plan: SkillPlan) -> list[dict[str, Any]]:
+    """Typed limitations for explicit values the plan does not execute as requested.
+
+    Soridormi keeps its execution limits enforced, but never rewrites a requested
+    value silently: each adjustment names the parameter, the requested and applied
+    values, and why, so the caller can tell the person what will actually happen.
+    """
+
+    parameters = dict(plan.parameters or {})
+    adjustments: list[dict[str, Any]] = []
+    if "requested_vx_mps" in parameters and "vx_mps" in parameters:
+        requested = float(parameters["requested_vx_mps"])
+        applied = float(parameters["vx_mps"])
+        adjustments.append(
+            {
+                "parameter": "vx_mps",
+                "requested": requested,
+                "applied": applied,
+                "reason": "min_forward_walk_speed",
+                "summary": (
+                    f"Forward speed {requested:.2f} m/s is below the lowest walking speed "
+                    f"the current policy holds, so Soridormi walks at {applied:.2f} m/s."
+                ),
+            }
+        )
+    return adjustments
+
+
 def simulated_resource_outcome(plan: SkillPlan) -> dict[str, Any]:
     """Return bounded stage evidence for the simulation-only resource mocks."""
 

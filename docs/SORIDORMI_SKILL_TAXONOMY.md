@@ -153,11 +153,15 @@ has no qualified manipulator/gripper stack. Soridormi walks toward a uniquely
 observed scene object in bounded one-second segments, then returns to a uniquely
 observed recipient; `recipient.referent_id: "requester"` names the person who made
 the request, whatever words describe them. It re-reads simulator distance and bearing until it is within
-0.9 m of each target. The user-reported distance stays in `source` as context;
-simulator geometry controls travel. `speed` optionally selects an existing
-bounded walking pace and defaults to `slow`. Missing or ambiguous scene
-observations, lack of progress, timeout, stop, and simulator reset prevent
-completion evidence. Acquisition, carrying, and handover remain explicit
+0.9 m of each target. The user-reported distance and direction stay in `source`
+as context; simulator geometry controls travel. A cited source place
+(`entity_type: location`) must be resolved by Soridormi; the simulator scene has
+no named places yet, so it ends as a typed `target_resolution` not-found before
+motion rather than being ignored. `speed` optionally selects an existing
+bounded walking pace and defaults to `normal`; any bounded pace recovery is
+reported in `value_adjustments`. Unobserved or ambiguous targets end as a
+declared `completed: false` with `target_resolution`; lack of progress, timeout,
+stop, and simulator reset fail. None of them yields completion evidence. Acquisition, carrying, and handover remain explicit
 simulation mocks in `resource_outcome`; the result
 must not be interpreted as physical retrieval or delivery. Hardware execution
 remains unavailable until the embodied stack is qualified.
@@ -344,10 +348,16 @@ and the Planner-owned transformation rule. Consumers may project this declaratio
 but must not invent provider-vocabulary mappings. For example, `walk_velocity`
 declares that human `speed` is realized through `vx_mps` and human `duration`
 through `duration_s`; an explicit numeric value must override the provider default.
+When Soridormi cannot execute an explicit value as requested (for example a forward
+speed below the lowest walking speed the policy holds), it keeps its execution limit
+and reports the change in `value_adjustments` on the plan and the result instead of
+rewriting the value silently.
 `look_at_person` likewise declares that a person-target `entity` may be realized
-through `target_ref`, but only by copying matching current trusted target evidence.
-A pronoun or entity surface alone does not satisfy that precondition, and neither
-Planner nor Host may infer yaw/pitch from it.
+through `target_ref`: `"requester"` for the person who made the request, otherwise a
+person description from current trusted target evidence. A pronoun surface alone does
+not satisfy that precondition. Neither Planner nor Host supplies yaw/pitch; Soridormi
+resolves the target from its own perception and reports a typed `target_resolution`
+when it cannot.
 `acquire_and_deliver_resource` declares the corresponding structured boundary:
 entity/item/quantity values may realize only into `resource`, spatial
 location/distance/direction values only into `source`, and recipient only into

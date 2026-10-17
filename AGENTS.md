@@ -49,9 +49,13 @@ robot_state.observation[101] + desired_command(vx_mps, vy_mps, yaw_radps) -> act
 - Do not let Chromie or any planner send raw joint actions, motor commands,
   physical coordinates, or low-level `action_14d` outputs.
 - Runtime body state is authoritative for `safe_idle`, active motion, and safety.
-- Chromie has one Cognitive Core with Social-Attention Proposal, Speaking
-  Execution, and Activity Execution lanes; they are coordination lanes, not
-  independent minds.
+- Chromie has one Cognitive Core with two execution lanes, Vocal and Activity;
+  they are not independent minds. Social Attention is a behavior domain owned
+  by Chromie's Social Cognition, which authors optional social expression.
+- Chromie selects the exact capability and names physical targets ("requester"
+  for the current speaker, objects by description, places by cited name);
+  Soridormi resolves the actual target and decides body-level how, reporting a
+  typed not-found rather than a default direction or nearest guess.
 - Speech and singing remain Chromie-owned peer capabilities. Soridormi owns
   physical resource arbitration, body-command composition, and safety.
 - Permit concurrent body behavior only through declared resources and

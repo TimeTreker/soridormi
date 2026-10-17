@@ -14,6 +14,8 @@ from soridormi_runtime.task_capabilities import (
     validate_task_capability_manifest,
 )
 
+from .body_targets import reject_caller_gaze_coordinates
+
 _TASK_CAPABILITY_MANIFEST = load_task_capability_manifest()
 _TASK_CAPABILITY_VALIDATION = validate_task_capability_manifest(_TASK_CAPABILITY_MANIFEST)
 if not _TASK_CAPABILITY_VALIDATION.ok:
@@ -413,10 +415,11 @@ def _skill_request_for_task(record: EmbodiedTaskRecord) -> tuple[str, dict[str, 
                 "look_direction",
                 _copy_present(parameters, "head_yaw_rad", "head_pitch_rad", "duration_s"),
             )
+        # The caller names the target; Soridormi resolves its direction from its own
+        # perception when executing, so caller yaw/pitch offsets are rejected.
+        reject_caller_gaze_coordinates("look_at_person", parameters)
         skill_parameters = _copy_present(
             parameters,
-            "target_yaw_rad",
-            "target_pitch_rad",
             "target_ref",
             "duration_s",
             "hold_fraction",
@@ -430,11 +433,6 @@ def _skill_request_for_task(record: EmbodiedTaskRecord) -> tuple[str, dict[str, 
                     "Soridormi must not invent a target"
                 )
             skill_parameters["target_ref"] = target_label
-        if "target_yaw_rad" not in skill_parameters and "target_pitch_rad" not in skill_parameters:
-            raise ValueError(
-                "look_at_target requires target_yaw_rad or target_pitch_rad; "
-                "Soridormi must not invent a body direction"
-            )
         return "look_at_person", skill_parameters
     if record.task_type == "perform_gesture":
         skill_id = _gesture_skill_id(parameters)

@@ -1,10 +1,11 @@
 # Soridormi scripted social skills
 
 Soridormi provides bounded MuJoCo-first head, gaze, and visual-expression
-skills for Open Duck Mini v2. These are body capability primitives; Chromie's
-Social-Attention Proposal Lane decides when an expression may be socially
-appropriate, and the single Cognitive Core decides whether and how to include it
-in an authoritative plan.
+skills for Open Duck Mini v2. These are body capability primitives. Chromie's
+Social Cognition authors optional social expression (an unrequested gaze, nod,
+or blink) and decides whether and when it is appropriate; a gesture the person
+explicitly asked for is Planner-selected Work. Either way Chromie selects the
+exact skill, and Soridormi realizes it.
 
 The current set includes `look_direction`, `look_at_person`, `nod_yes`,
 `shake_no`, `express_attention`, and `blink_eyes`. They do not author speech,
@@ -404,20 +405,24 @@ Acceptance gate:
 
 ## look-at-person skill look_at_person structured target skill
 
-`look_at_person` is now available as a MuJoCo-only experimental scripted social
-skill, but it intentionally does **not** run perception. A higher-level planner,
-perception module, or later Chromie layer must first resolve a bounded target
-direction, then Soridormi executes only that structured head trajectory:
+`look_at_person` is available as a MuJoCo-only experimental scripted social
+skill. Chromie names the person with `target_ref` (`"requester"` for the person
+who made the current request) and Soridormi resolves the direction from its own
+scene observation; an unobserved, ambiguous, or out-of-range target ends without
+motion as a typed `target_resolution` (see
+`docs/SORIDORMI_LOOK_TARGET_PROVIDER.md`):
 
 ```json
 {
-  "target_ref": "person",
-  "target_yaw_rad": 0.30,
-  "target_pitch_rad": -0.06,
+  "target_ref": "requester",
   "duration_s": 4.0,
   "end_mode": "hold_target"
 }
 ```
+
+Operator tools and scripted acceptance may still pass explicit
+`target_yaw_rad`/`target_pitch_rad` to the scripted executor, as in the
+validation commands below; the Chromie-facing MCP paths reject them.
 
 The behavior is neutral-home and axis bounded:
 
@@ -465,7 +470,7 @@ Second terminal:
 
 ## Look-target provider boundary
 
-`look_at_person` still does not run perception. Use
+For operator runs, use
 `./scripts/run_look_at_person_target.sh` or
 `python -m soridormi_runtime.look_at_person_target` to resolve a manual,
 JSON-fixture, or normalized image-point target into bounded `target_yaw_rad` and

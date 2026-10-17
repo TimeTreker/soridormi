@@ -137,6 +137,51 @@ class CapabilityBundle(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+_TARGET_RESOLUTION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "description": (
+        "How Soridormi resolved the physical target the caller described. role is "
+        "gaze_target, resource, recipient, or source; status is resolved, not_observed, "
+        "ambiguous, outside_head_range, perception_unavailable, or not_resolved (a cited "
+        "place). Any status other than resolved comes with completed=false and a summary "
+        "naming what was not found; Soridormi never substitutes a default direction or "
+        "the nearest keyword match."
+    ),
+    "properties": {
+        "role": {"type": "string"},
+        "status": {"type": "string"},
+        "target_ref": {"type": "string"},
+        "description": {"type": "string"},
+        "referent_id": {"type": "string"},
+        "place": {"type": "string"},
+        "object_ref": {"type": ["string", "null"]},
+        "relative_direction": {"type": ["string", "null"]},
+    },
+    "required": ["role", "status"],
+}
+
+_VALUE_ADJUSTMENTS_SCHEMA: dict[str, Any] = {
+    "type": "array",
+    "description": (
+        "Explicit requested values Soridormi does not execute as requested, such as a "
+        "forward speed below the lowest walking speed or a recovered delivery pace. "
+        "Execution limits stay enforced; each adjustment is a typed limitation the "
+        "caller reports instead of claiming the requested value."
+    ),
+    "items": {
+        "type": "object",
+        "properties": {
+            "parameter": {"type": "string"},
+            "requested": {},
+            "applied": {},
+            "reason": {"type": "string"},
+            "summary": {"type": "string"},
+        },
+        "required": ["parameter", "requested", "applied", "reason"],
+    },
+}
+
+
 def _object_schema(properties: dict[str, Any], required: list[str] | None = None) -> dict[str, Any]:
     schema = {"type": "object", "properties": properties}
     if required:
@@ -536,6 +581,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                         "skill_id": {"type": "string"},
                         "mode": {"type": "string"},
                         "summary": {"type": "string"},
+                        "value_adjustments": _VALUE_ADJUSTMENTS_SCHEMA,
                     },
                     required=["plan_id", "skill_id", "summary"],
                 ),
@@ -591,6 +637,8 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                             "type": "object",
                             "description": "Simulator recipient distances before and after returning.",
                         },
+                        "target_resolution": _TARGET_RESOLUTION_SCHEMA,
+                        "value_adjustments": _VALUE_ADJUSTMENTS_SCHEMA,
                     },
                     required=["completed", "skill_id", "no_motion"],
                 ),
@@ -782,7 +830,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                         "skills that must run concurrently. Do not include speech here."
                     ),
                     "speech_boundary": (
-                        "Chromie's Speaking Execution Lane owns speech and singing; "
+                        "Chromie's Vocal Execution Lane owns speech and singing; "
                         "link peer execution with coordination_id only."
                     ),
                 },

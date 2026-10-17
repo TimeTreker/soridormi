@@ -138,7 +138,9 @@ Every read receives a monotonic `observation_sequence`, while `scene_revision` a
 (material object identity/direction or roughly 25 cm of distance). This lets Chromie
 poll perception continuously or periodically without treating every sensor read as a
 new cognitive event. Soridormi remains the sensor/perception provider; it does not own
-Chromie's Situation, Goal relevance, Memory activation, or semantic target choice.
+Chromie's Situation, Goal relevance, Memory activation, or what the person asked for.
+Chromie describes the target (object by description, recipient by referent, place by
+cited name); Soridormi resolves the physical target that matches that description.
 
 
 Chromie can project a validated result into Situation with the Soridormi
@@ -164,29 +166,44 @@ robot API, Chromie's tools, and hardware mode. Adding or removing bodies after
 startup is outside this runner's current contract; it compiles declared dynamic
 bodies before starting the simulator and changes their poses during playback.
 The resource navigation helper matches identifying words in the requested
-description against observed object descriptions. A recipient with
+description against observed object descriptions; every identifying word of the
+request must appear in the observed description. A recipient with
 `referent_id: "requester"` is instead the person who made the request: Soridormi
 returns to the observed requester actor whatever words name it ("me", "我").
+`"requester"` is the agreed referent format for the current speaker; Chromie sets it
+whenever the recipient is the person who made the request, and `null` otherwise.
 Without that referent, a speaker-relative description such as "me" matches no
 observed object, and the return leg ends as an unobserved recipient rather than
-guessing a person. When several objects of the
-same observed type match, it selects the nearest and follows that object's
-observation reference during the walk. A generic "water" request can therefore
-select one of the three observed water bottles. Different matching object types
-remain ambiguous and prevent motion. A resource or recipient the scene does not
-uniquely show is a declared outcome, not an error: `completed: false`, `no_motion`
-true when nothing walked toward it, a `summary` naming what was not observed (or
-observed ambiguously), and `resource_outcome` stating `resource_acquired` and
-`resource_delivered` as they happened, so Chromie can tell the person. An invalid
-observation still fails as an error. This is simulator marker selection, not camera
-recognition.
+guessing a person. Several observed objects with the *same* observed description
+(for example three identical "bottle of water" markers) are interchangeable
+instances of what was asked for; choosing among them is execution-local, so
+Soridormi selects the nearest and follows that object's observation reference during
+the walk. Matches with *different* observed descriptions are ambiguous: Soridormi
+does not pick the nearest keyword match and does not move. A typed `source.bindings`
+entry with `entity_type: location` cites a place Soridormi must resolve; the
+simulator scene exposes objects and actors, not named places, so a cited place ends
+the request before motion as not resolved instead of being ignored. Distance,
+direction, and route bindings remain request context and do not choose between
+markers.
+
+A resource, recipient, or cited place Soridormi cannot resolve is a declared
+outcome, not an error: `completed: false`, `no_motion` true when nothing walked
+toward it, a `summary` naming what was not found, a typed `target_resolution`
+(`role` of `resource`, `recipient`, or `source`; `status` of `not_observed`,
+`ambiguous`, or `not_resolved`), and `resource_outcome` stating `resource_acquired`
+and `resource_delivered` as they happened, so Chromie can tell the person. An
+invalid observation still fails as an error. This is simulator marker selection,
+not camera recognition.
 When the marker is within the bounded alignment cone, the locomotion command
 goes straight; a new observation starts another bounded walking turn if needed.
-The composite defaults to `normal` pace. After observing route progress, it
-can raise a non-`slow` command to the advertised `fast_limited` bound when the
-remaining distance would otherwise exceed its route deadline. An explicit
-`slow` request stays slow; a failed, stopped, or timed-out route never becomes
-mock pickup or delivery evidence.
+The composite defaults to `normal` pace (the `speed` default in the skill
+manifest). After observing route progress, it can raise a non-`slow` command to
+the advertised `fast_limited` bound when the remaining distance would otherwise
+exceed its route deadline. Every such raise is reported as a typed limitation in
+`value_adjustments` (`parameter: speed`, `requested`, `applied: fast_limited`,
+`reason: bounded_pace_recovery`, and the `leg`), never applied silently. An
+explicit `slow` request stays slow; a failed, stopped, or timed-out route never
+becomes mock pickup or delivery evidence.
 
 Open Duck Mini v2 does not currently expose a validated manipulator/gripper stack.
 To validate the cross-repository architecture now, Soridormi provides a
@@ -194,7 +211,8 @@ To validate the cross-repository architecture now, Soridormi provides a
 walks to a selected observed resource and back to a uniquely observed recipient,
 rechecking scene distance and bearing after bounded walking segments. A recipient
 behind Chromie is reached by a feedback-guided walking turn. Missing or ambiguous
-markers end as declared non-completion; stalled motion, reset, stop, and timeout fail.
+markers, or an unresolved cited place, end as declared non-completion; stalled
+motion, reset, stop, and timeout fail.
 None of them yields delivery evidence.
 Object acquisition, carrying, and handover remain idealized because the current
 body has no qualified manipulator/gripper stack. The provider returns completion
@@ -260,9 +278,10 @@ The named skill accepts semantic parameters, not motor commands:
 }
 ```
 
-The provider may resolve an unknown source internally. Chromie must not send grasp
-poses, joint targets, physical coordinates, motor commands, or an implementation
-recipe.
+The provider resolves an unknown source from what it observes. A known source that
+cites a place must be resolvable by Soridormi, or the request ends as a typed
+not-found. Chromie must not send grasp poses, joint targets, physical coordinates,
+motor commands, or an implementation recipe.
 
 ## Promotion beyond the mock
 

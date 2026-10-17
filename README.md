@@ -29,12 +29,15 @@ Chromie must not send raw joint actions or low-level 14D policy actions.
 Chromie should call bounded skills such as `walk_velocity`, `look_at_person`,
 `nod_yes`, `stand_idle`, or `stop`; Soridormi validates and executes them.
 
-Chromie uses one Cognitive Core with Social-Attention Proposal, Speaking
-Execution, and Activity Execution lanes. For exact concurrent body behavior,
+Chromie uses one Cognitive Core with two execution lanes, Vocal and Activity;
+Social Attention is a behavior domain owned by Chromie's Social Cognition, which
+authors optional social expression. For exact concurrent body behavior,
 the Activity lane uses `soridormi.activity.*`. Soridormi may combine one primary
 locomotion member with compatible head/gaze overlays and independent visual
 expressions while retaining one final motor-command and safety authority.
-Speech and singing remain a peer Chromie lane.
+Speech and singing remain in Chromie's peer Vocal lane. Chromie names physical
+targets (`"requester"` for the current speaker, objects by description, places by
+cited name); Soridormi resolves them and reports a typed not-found when it cannot.
 
 ## Design goals
 

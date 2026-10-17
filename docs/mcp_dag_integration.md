@@ -65,8 +65,9 @@ joint, and torque APIs must remain outside LLM-visible manifests.
 
 ## Coordinated speaking and body activity
 
-Chromie has one Cognitive Core and three coordination lanes: Social-Attention
-Proposal, Speaking Execution, and Activity Execution. The lanes do not select
+Chromie has one Cognitive Core and two execution lanes: Vocal Execution and
+Activity Execution. Social Attention is a behavior domain owned by Social
+Cognition, which authors optional social expression. The lanes do not select
 meaning independently. The authoritative planner chooses exact capabilities,
 and the Cognitive Runtime Coordinator preserves start, dependency, and
 cancellation relationships.
@@ -74,11 +75,12 @@ cancellation relationships.
 For “walk toward me while singing and blinking,” the safe shape is:
 
 1. the Cognitive Core resolves the Goal and exact target;
-2. the planner selects `chromie.vocal.perform`, a locomotion skill, and
-   `blink_eyes` or a bounded gaze skill;
+2. the planner selects `chromie.vocal.perform`, a locomotion skill, and a
+   requested gaze skill (`look_at_person` with `target_ref: "requester"`);
+   Social Cognition may add an optional `blink_eyes`;
 3. `soridormi.activity.get_capabilities` checks current body concurrency;
 4. `soridormi.activity.compile` validates exact body members and resources;
-5. Chromie's coordinator starts the Speaking lane and
+5. Chromie's coordinator starts the Vocal lane and
    `soridormi.activity.execute` using the same `coordination_id`;
 6. `soridormi.safety.monitor_motion` and `soridormi.activity.status` monitor
    physical execution;
@@ -86,9 +88,9 @@ For “walk toward me while singing and blinking,” the safe shape is:
    may independently preempt physical work for safety;
 8. completion speech waits for authoritative lane outcomes.
 
-Social Attention may propose gaze, blinking, acknowledgment, or suppression,
-but the proposal is accepted, rejected, or transformed by the single Cognitive
-Core before exact capabilities are dispatched. The Activity lane invokes and
+Unrequested gaze, blinking, or acknowledgment is optional social expression
+authored by Chromie's Social Cognition and bound to its act, not authored by the
+Planner; requested gestures remain Planner-selected Work. The Activity lane invokes and
 monitors the selected provider calls; it does not reinterpret the Goal.
 
 Soridormi never receives speech meaning as a body member. It owns physical

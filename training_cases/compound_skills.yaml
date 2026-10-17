@@ -35,9 +35,7 @@ cases:
         - member_id: gaze
           skill_id: look_at_person
           parameters:
-            target_ref: person_1
-            target_yaw_rad: 0.08
-            target_pitch_rad: -0.04
+            target_ref: requester
             duration_s: 6.0
         - member_id: blink
           skill_id: blink_eyes

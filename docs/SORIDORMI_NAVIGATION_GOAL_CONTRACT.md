@@ -10,13 +10,17 @@ walk forward to the house
 
 That sentence contains two different responsibilities:
 
-- Chromie language/task layer: parse the user request and identify that "house"
-  is a place/object goal.
-- Soridormi embodied-control layer: move the robot only after a target, route,
+- Chromie language/task layer: parse the user request, identify that "house"
+  is a place goal, and cite the place by name.
+- Soridormi embodied-control layer: resolve the cited place to an actual target
+  from its own perception and maps, then move the robot only after a route,
   local trajectory, and safety context have been resolved.
 
-Raw place language must not be passed to the low-level policy or treated as a
-velocity command. `walk forward` can lower to bounded locomotion. `to the house`
+Chromie names the place; it never computes coordinates for it. Soridormi owns
+place resolution. A cited place Soridormi cannot resolve is a typed not-found
+outcome (`target_resolution` with `status: not_resolved`), not an excuse to walk
+toward something else. Raw place language must not be passed to the low-level
+policy or treated as a velocity command. `walk forward` can lower to bounded locomotion. `to the house`
 requires sensing, target resolution, localization, routing, local planning,
 obstacle checking, execution, and stop/recovery handling.
 
@@ -56,10 +60,17 @@ any of these are missing:
 The safe current behavior for "walk forward to the house" is therefore:
 
 ```text
-refuse unresolved navigation goal
-or
-ask Chromie/perception for a structured target
+report the cited place as not resolved (typed not-found), without motion
 ```
+
+The same rule applies to a place cited as a delivery source. When
+`acquire_and_deliver_resource` (or `acquire_resource`) receives a typed
+`source.bindings` entry with `entity_type: location`, Soridormi must resolve that
+place. The simulator scene currently exposes objects and actors, not named
+places, so the provider ends the request before motion with
+`target_resolution: {"role": "source", "status": "not_resolved", "place": ...}`
+instead of ignoring the place and walking to any matching marker. Distance,
+direction, and route bindings remain request context.
 
 It is not safe to approximate this as plain `walk_velocity` unless the user
 explicitly requested a short local walk with no destination.

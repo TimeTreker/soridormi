@@ -2,14 +2,16 @@
 
 ## Invariant
 
-Chromie has one authoritative Cognitive Core and three concurrent coordination
-lanes. The lanes are not independent minds.
+Chromie has one authoritative Cognitive Core and two concurrent execution
+lanes: Vocal and Activity. The lanes are not independent minds. Social
+Attention is a behavior domain owned by Chromie's Social Cognition (SC), not a
+third lane.
 
 ```text
 One Cognitive Core
         |
-        +-- Social-Attention Proposal Lane
-        +-- Speaking Execution Lane
+        +-- Social Cognition (all social expression: speech, gesture, gaze)
+        +-- Vocal Execution Lane
         +-- Activity Execution Lane
                     |
                     +-- Trusted Capability Providers
@@ -18,7 +20,7 @@ One Cognitive Core
 
 ```text
 one mind
-multiple concurrent proposal and execution lanes
+two concurrent execution lanes
 multiple peer providers
 one physical safety authority inside Soridormi
 ```
@@ -26,47 +28,44 @@ one physical safety authority inside Soridormi
 ## Cognitive Core
 
 The Cognitive Core owns user meaning, Goal Association, Goal lifecycle,
-planning, personality, and model-authored communicative meaning. It accepts,
-rejects, combines, or suppresses social-attention proposals and selects exact
-capabilities and timing relationships.
+planning, Value Judgment, personality, and model-authored communicative
+meaning. Chromie's Planner selects the exact capability and arguments for
+Goal-owned Work, including body skills. Soridormi decides only body-level how,
+such as gait, trajectory, and the physical target that matches a described
+person, object, or place.
+
+Chromie's Value Judgment alone decides whether Chromie should do a requested
+thing; it understands a harmful request and refuses it. Soridormi has no
+pre-semantic route filter. Soridormi reporting that the body cannot do
+something safely is a limitation, not a refusal.
 
 Execution lanes do not reinterpret what the user meant.
 
-## Social-Attention Proposal Lane
+## Social Cognition and Social Attention
 
-This lane observes interaction state and submits bounded proposals such as:
+Social Cognition is Chromie's communication interface. It owns whether, when,
+and how Chromie communicates, including optional social expression such as
+gaze, a nod, or a blink. That expression is authored by SC, not by the
+Planner; it is bound to an SC act outside Goal-owned plan steps and runs
+through the Activity Execution Lane. A gesture the person explicitly asked for
+remains Planner-selected Work.
 
-```text
-maintain attention on person_1
-natural blink is appropriate
-brief acknowledgement is appropriate
-avoid speaking while the user is still talking
-suspend proactive expression during physical recovery
-```
+Social Attention must not create or own Goals, authorize Goal Work, operate
+actuators, or override physical safety. Internal events such as planning or
+waiting are never expression anchors, so no "thinking" gesture is required.
 
-It must not author speech meaning, create or own Goals, select final
-capabilities, authorize actions, operate actuators, or override physical safety.
+## Vocal Execution Lane
 
-Its proposals can affect three destinations:
-
-```text
-communication proposal or suppression -> Speaking coordination
-physical-expression proposal           -> authoritative planner -> Activity
-attention/context update                -> Cognitive Core
-```
-
-## Speaking Execution Lane
-
-The Speaking lane is a peer execution lane. It owns TTS, playback, singing,
+The Vocal lane is a peer execution lane. It owns TTS, playback, singing,
 humming, output ordering, barge-in, interruption, and speech cancellation.
 
-It receives authored communication from the Cognitive Core and Response
-Composer. It does not invent independent meaning.
+It receives authored communication from SC. It does not invent independent
+meaning.
 
 Speech may overlap body activity:
 
 ```text
-Speaking: "I'm coming."
+Vocal: "I'm coming."
 Activity: Soridormi walks toward the user.
 ```
 
@@ -75,17 +74,17 @@ different timing contracts and must not be conflated.
 
 ## Activity Execution Lane
 
-The Activity lane executes and monitors work selected for Goals. It invokes
-information, memory, home-automation, Soridormi, and future capability
-providers; handles monitoring, cancellation, and recovery; and reconciles
-provider outcomes back into Goal state.
+The Activity lane executes and monitors work selected for Goals and SC-authored
+optional expression. It invokes information, memory, home-automation,
+Soridormi, and future capability providers; handles monitoring, cancellation,
+and recovery; and reconciles provider outcomes back into Goal state.
 
 The Activity lane does not own Goal meaning and does not silently select a
-replacement capability after refusal.
+replacement capability after refusal or a typed Soridormi not-found result.
 
 ## Cognitive Runtime Coordinator
 
-The shared coordinator operates above Speaking and Activity. It receives the
+The shared coordinator operates above the Vocal and Activity lanes. It receives the
 authoritative plan, validates dependencies and timing, handles confirmation,
 starts coordinated groups, propagates interaction cancellation, collects
 outcomes, and prevents unsupported completion claims.
@@ -116,6 +115,6 @@ reconcile naturally.
 ## Repository ownership
 
 This Soridormi repository defines and tests the provider-side body concurrency
-contract. The companion Chromie repository must implement the three lanes,
-coordinator, coordinated-group lifecycle, speaking behavior, and Goal
+contract. The companion Chromie repository implements the two execution lanes,
+Social Cognition, the coordinator, coordinated-group lifecycle, and Goal
 reconciliation without creating additional cognitive agents.

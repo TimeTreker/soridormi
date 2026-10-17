@@ -86,7 +86,7 @@ run_docs_gate() {
     docs/mcp_capability_manifest.md \
     docs/CHROMIE_SORIDORMI_TASK_AGENT_IMPLEMENTATION_PLAN.md \
     docs/SORIDORMI_EXECUTION_ROADMAP.md >/dev/null
-  rg -n "Social-Attention Proposal Lane|Speaking Execution Lane|Activity Execution Lane" \
+  rg -n "Vocal Execution Lane|Activity Execution Lane" \
     docs/CHROMIE_COGNITIVE_CONCURRENCY_MODEL.md \
     docs/CHROMIE_SORIDORMI_MULTI_AGENT_ARCHITECTURE.md >/dev/null
   rg -n "soridormi.activity.compile|one final.*motor|one final motor" \

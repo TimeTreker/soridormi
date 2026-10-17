@@ -6,15 +6,19 @@ Current status lives in `docs/STATUS.md`.
 ## Boundary contract
 
 Chromie owns user language, clarification, confirmation, memory, global task
-state, provider selection, and user-facing reporting.
+state, Value Judgment (the only refusal of a request), exact capability and
+provider selection, and user-facing reporting.
 
-Soridormi owns robot state, embodied readiness, body-task interpretation,
-bounded skill lowering, physical-resource arbitration, body-command
-composition, safety, execution authority, monitoring, recovery, and refusal.
+Soridormi owns robot state, embodied readiness, physical target resolution,
+bounded skill lowering (gait, trajectory, pace inside the selected skill),
+physical-resource arbitration, body-command composition, safety, execution
+authority, monitoring, and recovery. When the body cannot do something safely
+it reports a limitation; it does not replace the selected skill.
 
-Chromie has one Cognitive Core and three coordination lanes. Goal meaning and
-capability selection remain in the Cognitive Core/planner; the Activity lane
-only executes and monitors selected provider work.
+Chromie has one Cognitive Core and two execution lanes, Vocal and Activity;
+Social Attention is a behavior domain owned by Social Cognition. Goal meaning
+and capability selection remain in the Cognitive Core/planner; the Activity
+lane only executes and monitors selected provider work.
 
 ## Task-level MCP surface
 
@@ -59,7 +63,7 @@ activity.get_capabilities
 
 The activity API is effectful in the runtime-backed MuJoCo adapter. It is not a
 semantic task executor: the authoritative planner must first select exact body
-skills. Speech or singing remains in Chromie's peer Speaking lane.
+skills. Speech or singing remains in Chromie's peer Vocal lane.
 
 A future rich task executor may call the skill or activity path internally only
 after monitored execution, cancellation, recovery, and completion contracts
@@ -102,7 +106,12 @@ manipulation, and unsafe physical requests remain blocked or refused.
 ## Information integrity
 
 Soridormi fails closed when a structured task lacks required body information.
-It does not invent a target, pose, route, or capability.
+It does not invent a target, pose, route, or capability. Chromie names a target
+(`"requester"` for the current speaker, an object by description, a place by
+its cited name); Soridormi resolves it from its own perception, and a target it
+cannot uniquely resolve is a typed `target_resolution` non-completion. Explicit
+values Soridormi does not execute as requested are reported in
+`value_adjustments`.
 
 Body-wide `safe_idle` is supplied by the live runtime state to task payloads.
 The task store cannot infer it merely from its own no-motion lifecycle.
@@ -111,8 +120,10 @@ The task store cannot infer it merely from its own no-motion lifecycle.
 
 Acceptance cases cover stop redirects, semantic walking, structured gesture
 sequences, cross-agent speech/motion coordination, target approach refusal,
-navigation refusal, object-delivery refusal, unsafe-request refusal, event
-polling, retry identity, timeout, and safe-idle reporting.
+navigation refusal, live simulated object delivery through
+`acquire_and_deliver_resource`, Chromie Value Judgment refusal of unsafe
+requests (no Soridormi body task), event polling, retry identity, timeout, and
+safe-idle reporting.
 
 ## Remaining semantic issues
 
@@ -124,8 +135,8 @@ revision, and no false physical-completion claims.
 
 ### Chromie coordinated-group integration
 
-Implement the companion Chromie coordinator for Social-Attention proposals,
-peer Speaking and Activity execution, shared `coordination_id`, interaction
+Implement the companion Chromie coordinator for Social Cognition expression,
+peer Vocal and Activity execution, shared `coordination_id`, interaction
 cancellation, and Goal outcome reconciliation.
 
 ### Rich-task monitored executor
