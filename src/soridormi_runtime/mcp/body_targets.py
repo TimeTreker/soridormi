@@ -33,9 +33,9 @@ TARGET_OUTSIDE_HEAD_RANGE = "outside_head_range"
 TARGET_PERCEPTION_UNAVAILABLE = "perception_unavailable"
 PLACE_NOT_RESOLVED = "not_resolved"
 
-# Temporary simulation stand-in until Soridormi can perceive people: a sim gaze
-# request for the requester with no scene actor resolves to a declared mocked
-# position, and ``target_resolution.source`` says so.
+# Temporary simulation person-perception provider until Soridormi can perceive
+# people: when the scene shows no requester, the observation gains a declared
+# mocked requester at a configured bearing, and its ``source`` says so.
 MOCKED_REQUESTER_OBJECT_REF = "mocked_requester"
 MOCKED_REQUESTER_SOURCE = "mocked_requester_position"
 
@@ -47,6 +47,34 @@ def scene_terms(value: str) -> frozenset[str]:
         word for word in re.findall(r"\w+", value.casefold())
         if word not in {"a", "an", "the", "of", "some"}
     )
+
+
+def with_perceived_people(
+    objects: list[dict[str, Any]], *, mock_requester_bearing_rad: float | None
+) -> list[dict[str, Any]]:
+    """Add person perception to a scene observation's objects.
+
+    Soridormi has no person perception yet, so the only provider is a declared
+    mocked requester position. It adds a bearing-only ``requester`` observation
+    when the scene shows none; a real provider (sound direction, face detection)
+    replaces it here, feeding every target resolution the same observation.
+    """
+
+    if mock_requester_bearing_rad is None or any(
+        item.get("referent_id") == REQUESTER_REFERENT_ID for item in objects
+    ):
+        return objects
+    return [
+        *objects,
+        {
+            "object_ref": MOCKED_REQUESTER_OBJECT_REF,
+            "description": "requester",
+            "referent_id": REQUESTER_REFERENT_ID,
+            "relative_direction": "mocked requester position",
+            "bearing_rad": mock_requester_bearing_rad,
+            "source": MOCKED_REQUESTER_SOURCE,
+        },
+    ]
 
 
 def reject_caller_gaze_coordinates(skill_id: str, parameters: Any) -> None:

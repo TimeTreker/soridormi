@@ -68,8 +68,6 @@ from .body_activity import (
 )
 from .body_targets import (
     GAZE_TARGET_SKILLS,
-    MOCKED_REQUESTER_OBJECT_REF,
-    MOCKED_REQUESTER_SOURCE,
     PLACE_NOT_RESOLVED,
     REQUESTER_REFERENT_ID,
     TARGET_AMBIGUOUS,
@@ -81,6 +79,7 @@ from .body_targets import (
     gaze_target_unavailable_result,
     reject_caller_gaze_coordinates,
     scene_terms,
+    with_perceived_people,
 )
 from .local_tools import (
     MotionPlan,
@@ -208,10 +207,10 @@ def _env_bool(name: str, default: bool = False) -> bool:
 def _mock_requester_bearing_from_env() -> float | None:
     """Temporary simulation stand-in for perceiving where the requester is.
 
-    Until Soridormi has a person-perception skill, a sim gaze request for the
-    ``"requester"`` that finds no scene actor uses this mocked bearing (radians,
-    robot frame, 0 = straight ahead). Set ``SORIDORMI_MOCK_REQUESTER_BEARING_RAD``
-    to ``off`` to disable it and report ``not_observed`` instead.
+    Until Soridormi can perceive people, a sim scene observation that shows no
+    requester gains a mocked requester at this bearing (radians, robot frame,
+    0 = straight ahead). Set ``SORIDORMI_MOCK_REQUESTER_BEARING_RAD`` to ``off``
+    to disable it so a requester target reports ``not_observed`` instead.
     """
 
     value = (os.environ.get("SORIDORMI_MOCK_REQUESTER_BEARING_RAD") or "0.0").strip()
@@ -1909,15 +1908,14 @@ class SoridormiRuntimeToolService:
         observer = getattr(self.robot, "observe_scene", None)
         if not callable(observer):
             raise RuntimeError("simulator does not expose scene observation")
-        async with self._robot_lock:
-            observed = await self._call_robot(observer)
-        if not isinstance(observed, dict) or observed.get("mocked_simulation") is not True:
-            raise RuntimeError("invalid mock scene observation")
+        observed = await self._observe_scene_objects(observer, "invalid mock scene observation")
         result = dict(observed)
+        # The public scene contract carries ranged markers; a bearing-only person
+        # observation stays internal to target resolution.
         objects = [
             {key: value for key, value in item.items() if key not in PROVIDER_INTERNAL_SCENE_KEYS}
-            for item in observed.get("objects", [])
-            if isinstance(item, dict)
+            for item in observed["objects"]
+            if "distance_m" in item
         ]
         result["objects"] = objects
         signature = self._scene_semantic_signature(objects)
@@ -1933,6 +1931,21 @@ class SoridormiRuntimeToolService:
         if self.source_revision:
             result["source_revision"] = self.source_revision
         return result
+
+    async def _observe_scene_objects(self, observer: Any, error: str) -> dict[str, Any]:
+        """Soridormi's one scene observation: simulator markers plus perceived people."""
+
+        async with self._robot_lock:
+            observed = await self._call_robot(observer)
+        if not isinstance(observed, dict) or observed.get("mocked_simulation") is not True:
+            raise RuntimeError(error)
+        objects = [item for item in observed.get("objects", []) if isinstance(item, dict)]
+        return {
+            **observed,
+            "objects": with_perceived_people(
+                objects, mock_requester_bearing_rad=self.mock_requester_bearing_rad
+            ),
+        }
 
     def _gaze_yaw_limit_rad(self, skill_id: str) -> float:
         rule = (self.skill_registry.skills[skill_id].get("parameters") or {}).get(
@@ -1956,11 +1969,10 @@ class SoridormiRuntimeToolService:
         observer = getattr(self.robot, "observe_scene", None)
         if self.mode != "sim" or not callable(observer):
             return {**resolution, "status": TARGET_PERCEPTION_UNAVAILABLE}, None
-        async with self._robot_lock:
-            observed = await self._call_robot(observer)
-        if not isinstance(observed, dict) or observed.get("mocked_simulation") is not True:
-            raise RuntimeError("simulator target observation is unavailable")
-        objects = [item for item in observed.get("objects", []) if isinstance(item, dict)]
+        observed = await self._observe_scene_objects(
+            observer, "simulator target observation is unavailable"
+        )
+        objects = observed["objects"]
         if target_ref == REQUESTER_REFERENT_ID:
             matches = [item for item in objects if item.get("referent_id") == target_ref]
         else:
@@ -1969,21 +1981,6 @@ class SoridormiRuntimeToolService:
                 item for item in objects
                 if requested and requested.issubset(scene_terms(str(item.get("description") or "")))
             ]
-        if (
-            not matches
-            and target_ref == REQUESTER_REFERENT_ID
-            and self.mock_requester_bearing_rad is not None
-        ):
-            # Temporary: no person perception yet, so the sim uses a declared
-            # mocked requester position. The resolution says so explicitly.
-            matches = [
-                {
-                    "object_ref": MOCKED_REQUESTER_OBJECT_REF,
-                    "relative_direction": "mocked requester position",
-                    "bearing_rad": self.mock_requester_bearing_rad,
-                }
-            ]
-            resolution["source"] = MOCKED_REQUESTER_SOURCE
         if not matches:
             return {**resolution, "status": TARGET_NOT_OBSERVED}, None
         if len(matches) > 1:
@@ -1998,6 +1995,8 @@ class SoridormiRuntimeToolService:
                 "relative_direction": selected.get("relative_direction"),
             }
         )
+        if selected.get("source"):
+            resolution["source"] = selected["source"]
         if abs(bearing) > max_abs_yaw_rad:
             return {**resolution, "status": TARGET_OUTSIDE_HEAD_RANGE}, None
         return {**resolution, "status": TARGET_RESOLVED}, bearing
@@ -2064,14 +2063,14 @@ class SoridormiRuntimeToolService:
 
         async def target() -> tuple[float, float]:
             nonlocal selected_ref
-            async with self._robot_lock:
-                observed = await self._call_robot(observer)
-            if not isinstance(observed, dict) or observed.get("mocked_simulation") is not True:
-                raise RuntimeError("simulator resource observation is unavailable")
+            observed = await self._observe_scene_objects(
+                observer, "simulator resource observation is unavailable"
+            )
+            # A route needs range; a bearing-only person observation cannot be walked to.
             matches = [
                 item
-                for item in observed.get("objects", [])
-                if isinstance(item, dict)
+                for item in observed["objects"]
+                if "distance_m" in item
                 and identifies(item)
                 and (selected_ref is None or item.get("object_ref") == selected_ref)
             ]
