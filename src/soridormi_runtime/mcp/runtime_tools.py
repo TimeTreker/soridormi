@@ -68,6 +68,8 @@ from .body_activity import (
 )
 from .body_targets import (
     GAZE_TARGET_SKILLS,
+    MOCKED_REQUESTER_OBJECT_REF,
+    MOCKED_REQUESTER_SOURCE,
     PLACE_NOT_RESOLVED,
     REQUESTER_REFERENT_ID,
     TARGET_AMBIGUOUS,
@@ -203,6 +205,24 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on", "y"}
 
 
+def _mock_requester_bearing_from_env() -> float | None:
+    """Temporary simulation stand-in for perceiving where the requester is.
+
+    Until Soridormi has a person-perception skill, a sim gaze request for the
+    ``"requester"`` that finds no scene actor uses this mocked bearing (radians,
+    robot frame, 0 = straight ahead). Set ``SORIDORMI_MOCK_REQUESTER_BEARING_RAD``
+    to ``off`` to disable it and report ``not_observed`` instead.
+    """
+
+    value = (os.environ.get("SORIDORMI_MOCK_REQUESTER_BEARING_RAD") or "0.0").strip()
+    if value.lower() in {"off", "none", "disabled"}:
+        return None
+    bearing = float(value)
+    if not math.isfinite(bearing):
+        raise ValueError("SORIDORMI_MOCK_REQUESTER_BEARING_RAD must be finite or 'off'")
+    return bearing
+
+
 def _env_int(name: str, default: int = 0) -> int:
     value = os.environ.get(name)
     if value is None or value.strip() == "":
@@ -228,6 +248,9 @@ class SoridormiRuntimeToolService:
     )
     task_store: EmbodiedTaskStore = field(default_factory=EmbodiedTaskStore)
     emergency_stop: bool = False
+    mock_requester_bearing_rad: float | None = field(
+        default_factory=_mock_requester_bearing_from_env
+    )
     active_task: dict[str, Any] | None = None
     active_lanes: dict[str, dict[str, Any]] = field(default_factory=dict)
     _motion_stop_requested: bool = field(default=False, init=False, repr=False)
@@ -1946,6 +1969,21 @@ class SoridormiRuntimeToolService:
                 item for item in objects
                 if requested and requested.issubset(scene_terms(str(item.get("description") or "")))
             ]
+        if (
+            not matches
+            and target_ref == REQUESTER_REFERENT_ID
+            and self.mock_requester_bearing_rad is not None
+        ):
+            # Temporary: no person perception yet, so the sim uses a declared
+            # mocked requester position. The resolution says so explicitly.
+            matches = [
+                {
+                    "object_ref": MOCKED_REQUESTER_OBJECT_REF,
+                    "relative_direction": "mocked requester position",
+                    "bearing_rad": self.mock_requester_bearing_rad,
+                }
+            ]
+            resolution["source"] = MOCKED_REQUESTER_SOURCE
         if not matches:
             return {**resolution, "status": TARGET_NOT_OBSERVED}, None
         if len(matches) > 1:

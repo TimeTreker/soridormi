@@ -33,6 +33,12 @@ TARGET_OUTSIDE_HEAD_RANGE = "outside_head_range"
 TARGET_PERCEPTION_UNAVAILABLE = "perception_unavailable"
 PLACE_NOT_RESOLVED = "not_resolved"
 
+# Temporary simulation stand-in until Soridormi can perceive people: a sim gaze
+# request for the requester with no scene actor resolves to a declared mocked
+# position, and ``target_resolution.source`` says so.
+MOCKED_REQUESTER_OBJECT_REF = "mocked_requester"
+MOCKED_REQUESTER_SOURCE = "mocked_requester_position"
+
 
 def scene_terms(value: str) -> frozenset[str]:
     """Identifying words used to match a description against scene markers."""

@@ -290,7 +290,10 @@ def _run_activity(
     return asyncio.run(exercise()), controller
 
 
-def test_required_gaze_at_an_unobserved_requester_fails_before_motion() -> None:
+def test_required_gaze_at_an_unobserved_requester_fails_before_motion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SORIDORMI_MOCK_REQUESTER_BEARING_RAD", "off")
     robot = ConcurrentRobot(requester_bearing_rad=None)
     result, controller = _run_activity(robot, _concurrent_members())
 

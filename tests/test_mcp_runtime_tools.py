@@ -1597,6 +1597,28 @@ def test_look_at_the_requester_resolves_the_direction_from_the_scene(
     assert max(head_yaw) == pytest.approx(0.3, abs=1e-6)
 
 
+@pytest.mark.parametrize("bearing", [None, 0.2])
+def test_sim_requester_gaze_uses_the_declared_mocked_position_when_no_actor_is_seen(
+    monkeypatch: pytest.MonkeyPatch, bearing: float | None
+) -> None:
+    if bearing is not None:
+        monkeypatch.setenv("SORIDORMI_MOCK_REQUESTER_BEARING_RAD", str(bearing))
+    else:
+        monkeypatch.delenv("SORIDORMI_MOCK_REQUESTER_BEARING_RAD", raising=False)
+    robot = GazeFakeRobot()
+    _plan, result = _execute_look_at(monkeypatch, robot, "requester")
+
+    assert result["completed"] is True
+    assert result["target_resolution"] == {
+        "role": "gaze_target", "target_ref": "requester", "status": "resolved",
+        "source": "mocked_requester_position", "object_ref": "mocked_requester",
+        "relative_direction": "mocked requester position",
+    }
+    head_yaw = [command.positions[robot.names.index("head_yaw")] for command in robot.commands]
+    expected = bearing or 0.0
+    assert (max(head_yaw) if expected >= 0 else min(head_yaw)) == pytest.approx(expected, abs=1e-6)
+
+
 @pytest.mark.parametrize(
     ("objects", "target_ref", "status", "summary"),
     [
@@ -1620,6 +1642,7 @@ def test_an_unresolvable_gaze_target_is_a_declared_non_completion(
     status: str,
     summary: str,
 ) -> None:
+    monkeypatch.setenv("SORIDORMI_MOCK_REQUESTER_BEARING_RAD", "off")
     robot = GazeFakeRobot(*objects)
     _plan, result = _execute_look_at(monkeypatch, robot, target_ref)
 
