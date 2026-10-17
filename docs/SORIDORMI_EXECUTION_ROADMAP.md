@@ -54,15 +54,15 @@ Acceptance:
 
 ## Concurrent cognitive and embodied execution
 
-Preserve one Cognitive Core with Social-Attention Proposal, Speaking Execution,
-and Activity Execution lanes. The Soridormi provider executes exact compatible
+Preserve one Cognitive Core with Vocal Execution and Activity Execution lanes;
+Social Attention is a Social Cognition behavior domain. The Soridormi provider executes exact compatible
 body members through physical resource arbitration and final command
 composition.
 
 Acceptance:
 
-- social attention remains proposal-only;
-- speaking and activity are peer execution lanes;
+- Social Attention is a Social Cognition behavior domain, not a lane;
+- vocal and activity are peer execution lanes;
 - speech is not a Soridormi body member;
 - at most one primary locomotion member is accepted;
 - head/gaze overlays stay inside declared envelopes;

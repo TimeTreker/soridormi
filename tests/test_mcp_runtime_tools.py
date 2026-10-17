@@ -848,7 +848,7 @@ def test_known_resource_walks_to_observed_scene_object_before_mock_handover(
                 "parameters": {
                     "resource": {"kind": "physical_object", "description": "bottle of milk"},
                     "source": {"status": "known", "description": "table ahead", "bindings": {
-                        "distance": "50 meters", "location": "in front of Chromie"
+                        "distance": "50 meters", "direction": "ahead"
                     }},
                     "recipient": {"description": "user"},
                     **({"speed": speed} if speed else {}),
@@ -1536,4 +1536,281 @@ def test_turn_repetition_uses_existing_ordered_execution_and_cancellation(termin
         assert service.active_task is None
         assert service.controller.command == PolicyCommand()
         assert any(command.yaw_velocity == -0.12 for command in service.controller.seen_commands)
+    asyncio.run(exercise())
+
+
+class GazeFakeRobot(HeadFakeRobot):
+    """Head robot whose simulated scene shows the given markers."""
+
+    def __init__(self, *objects: dict[str, object]) -> None:
+        super().__init__()
+        self.objects = [dict(item) for item in objects]
+
+    def observe_scene(self) -> dict[str, object]:
+        return {"mocked_simulation": True, "objects": [dict(item) for item in self.objects]}
+
+
+REQUESTER_MARKER = {
+    "object_ref": "scenario_user", "description": "user", "referent_id": "requester",
+    "relative_direction": "in front of Chromie", "distance_m": 1.5, "bearing_rad": 0.3,
+}
+
+
+def _execute_look_at(
+    monkeypatch: pytest.MonkeyPatch, robot: HeadFakeRobot, target_ref: str
+) -> tuple[dict[str, object], dict[str, object]]:
+    async def no_sleep(_delay: float) -> None:
+        return None
+
+    monkeypatch.setattr("soridormi_runtime.mcp.runtime_tools.asyncio.sleep", no_sleep)
+
+    async def exercise() -> tuple[dict[str, object], dict[str, object]]:
+        service = SoridormiRuntimeToolService(
+            robot=robot, controller=FakeController(), control_hz=50.0
+        )
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {"skill_id": "look_at_person",
+             "parameters": {"target_ref": target_ref, "duration_s": 1.0}},
+        )
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
+        )
+        return plan, result
+
+    return asyncio.run(exercise())
+
+
+def test_look_at_the_requester_resolves_the_direction_from_the_scene(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    robot = GazeFakeRobot(REQUESTER_MARKER)
+    plan, result = _execute_look_at(monkeypatch, robot, "requester")
+
+    assert "resolves target_ref 'requester'" in str(plan["summary"])
+    assert result["completed"] is True
+    assert result["target_resolution"] == {
+        "role": "gaze_target", "target_ref": "requester", "status": "resolved",
+        "object_ref": "scenario_user", "relative_direction": "in front of Chromie",
+    }
+    head_yaw = [command.positions[robot.names.index("head_yaw")] for command in robot.commands]
+    assert max(head_yaw) == pytest.approx(0.3, abs=1e-6)
+
+
+@pytest.mark.parametrize("bearing", [None, 0.2])
+def test_sim_requester_gaze_uses_the_declared_mocked_position_when_no_actor_is_seen(
+    monkeypatch: pytest.MonkeyPatch, bearing: float | None
+) -> None:
+    if bearing is not None:
+        monkeypatch.setenv("SORIDORMI_MOCK_REQUESTER_BEARING_RAD", str(bearing))
+    else:
+        monkeypatch.delenv("SORIDORMI_MOCK_REQUESTER_BEARING_RAD", raising=False)
+    robot = GazeFakeRobot()
+    _plan, result = _execute_look_at(monkeypatch, robot, "requester")
+
+    assert result["completed"] is True
+    assert result["target_resolution"] == {
+        "role": "gaze_target", "target_ref": "requester", "status": "resolved",
+        "source": "mocked_requester_position", "object_ref": "mocked_requester",
+        "relative_direction": "mocked requester position",
+    }
+    head_yaw = [command.positions[robot.names.index("head_yaw")] for command in robot.commands]
+    expected = bearing or 0.0
+    assert (max(head_yaw) if expected >= 0 else min(head_yaw)) == pytest.approx(expected, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("objects", "target_ref", "status", "summary"),
+    [
+        ((), "requester", "not_observed",
+         "Soridormi did not observe the requester in the scene, so it did not look."),
+        (({**REQUESTER_MARKER, "referent_id": None},
+          {**REQUESTER_MARKER, "object_ref": "other", "referent_id": None}),
+         "user", "ambiguous",
+         "Soridormi observed more than one target matching 'user' in the scene, "
+         "so it did not look."),
+        (({**REQUESTER_MARKER, "bearing_rad": 2.0, "relative_direction": "to Chromie's left"},),
+         "requester", "outside_head_range",
+         "Soridormi observed the requester to Chromie's left, beyond the head's turning "
+         "range, so it did not look."),
+    ],
+)
+def test_an_unresolvable_gaze_target_is_a_declared_non_completion(
+    monkeypatch: pytest.MonkeyPatch,
+    objects: tuple[dict[str, object], ...],
+    target_ref: str,
+    status: str,
+    summary: str,
+) -> None:
+    monkeypatch.setenv("SORIDORMI_MOCK_REQUESTER_BEARING_RAD", "off")
+    robot = GazeFakeRobot(*objects)
+    _plan, result = _execute_look_at(monkeypatch, robot, target_ref)
+
+    # Never a straight-ahead look reported as "looked at the person".
+    assert result["completed"] is False
+    assert result["no_motion"] is True
+    assert result["summary"] == summary
+    assert result["target_resolution"]["status"] == status
+    assert robot.commands == []
+
+
+def test_look_at_without_perception_reports_it_instead_of_looking_ahead(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    robot = HeadFakeRobot()
+    _plan, result = _execute_look_at(monkeypatch, robot, "requester")
+
+    assert result["completed"] is False
+    assert result["target_resolution"]["status"] == "perception_unavailable"
+    assert robot.commands == []
+
+
+def test_look_at_rejects_caller_supplied_gaze_coordinates() -> None:
+    service = SoridormiRuntimeToolService(
+        robot=GazeFakeRobot(REQUESTER_MARKER), controller=FakeController(), control_hz=50.0
+    )
+    with pytest.raises(ValueError, match="operator-tool inputs"):
+        asyncio.run(service.call_tool(
+            "soridormi.skill.create_plan",
+            {"skill_id": "look_at_person",
+             "parameters": {"target_ref": "requester", "target_yaw_rad": 0.0}},
+        ))
+    skills = {item["skill_id"]: item for item in service.list_runtime_skills()["skills"]}
+    properties = skills["look_at_person"]["parameters_schema"]["properties"]
+    assert "target_yaw_rad" not in properties and "target_pitch_rad" not in properties
+
+
+def test_a_cited_place_soridormi_cannot_resolve_is_a_declared_non_completion() -> None:
+    async def exercise() -> None:
+        robot = ObservedResourceFakeRobot()
+        service = SoridormiRuntimeToolService(
+            robot=robot, controller=FakeController(), control_hz=20.0
+        )
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {
+                "skill_id": "acquire_and_deliver_resource",
+                "parameters": {
+                    "resource": {"kind": "physical_object", "description": "bottle of milk"},
+                    "source": {"status": "known", "bindings": {"location": {
+                        "name": "location", "entity_type": "location",
+                        "value": "the kitchen", "confidence": 1.0,
+                    }}},
+                    "recipient": {"description": "me", "referent_id": "requester"},
+                },
+            },
+        )
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
+        )
+
+        # The milk is visible, but the request named where to fetch it from; the
+        # place is not ignored in favour of any matching marker.
+        assert result["completed"] is False and result["no_motion"] is True
+        assert result["target_resolution"] == {
+            "role": "source", "status": "not_resolved", "place": "the kitchen",
+        }
+        assert result["summary"] == (
+            "Soridormi cannot resolve the place 'the kitchen' in the simulator scene, "
+            "so it did not fetch 'bottle of milk'."
+        )
+        assert result["resource_outcome"]["resource_acquired"] is False
+        assert not any(
+            command.x_velocity > 0 for command in service.controller.seen_commands
+        )
+
+    asyncio.run(exercise())
+
+
+def test_an_unobserved_resource_reports_a_typed_target_resolution() -> None:
+    async def exercise() -> None:
+        service = SoridormiRuntimeToolService(
+            robot=ObservedResourceFakeRobot(description="cup of water"),
+            controller=FakeController(), control_hz=20.0,
+        )
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {"skill_id": "acquire_and_deliver_resource", "parameters": {
+                "resource": {"kind": "physical_object", "description": "bottle of milk"},
+                "source": {"status": "unknown"},
+                "recipient": {"description": "me", "referent_id": "requester"},
+            }},
+        )
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
+        )
+        assert result["target_resolution"] == {
+            "role": "resource", "status": "not_observed", "description": "bottle of milk",
+        }
+
+    asyncio.run(exercise())
+
+
+def test_a_raised_forward_speed_is_reported_as_a_value_adjustment() -> None:
+    async def exercise() -> None:
+        service = _service()
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {"skill_id": "walk_velocity", "parameters": {
+                "vx_mps": 0.05, "vy_mps": 0.0, "yaw_radps": 0.0, "duration_s": 0.5,
+            }},
+        )
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
+        )
+        expected = {
+            "parameter": "vx_mps", "requested": 0.05,
+            "applied": MIN_FORWARD_WALK_SPEED_MPS, "reason": "min_forward_walk_speed",
+        }
+        for payload in (plan, result):
+            adjustments = payload["value_adjustments"]
+            assert len(adjustments) == 1
+            assert {key: adjustments[0][key] for key in expected} == expected
+        assert any(
+            command.x_velocity == pytest.approx(MIN_FORWARD_WALK_SPEED_MPS)
+            for command in service.controller.seen_commands
+        )
+
+        exact = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {"skill_id": "walk_velocity", "parameters": {
+                "vx_mps": 0.15, "vy_mps": 0.0, "yaw_radps": 0.0, "duration_s": 0.5,
+            }},
+        )
+        assert exact["value_adjustments"] == []
+
+    asyncio.run(exercise())
+
+
+def test_a_recovered_delivery_pace_is_reported_as_a_value_adjustment() -> None:
+    async def exercise() -> None:
+        service = SoridormiRuntimeToolService(
+            robot=ObservedResourceFakeRobot(), controller=FakeController(), control_hz=20.0
+        )
+        legs: list[str] = []
+
+        async def navigate(_description: str, **kwargs: object) -> dict[str, object]:
+            legs.append(str(kwargs.get("role", "resource")))
+            return {"mocked_simulation": True, "bounded_pace_recovery": len(legs) == 1}
+
+        service._navigate_to_observed_resource = navigate  # type: ignore[method-assign]
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {"skill_id": "acquire_and_deliver_resource", "parameters": {
+                "resource": {"kind": "physical_object", "description": "bottle of milk"},
+                "source": {"status": "unknown"},
+                "recipient": {"description": "me", "referent_id": "requester"},
+            }},
+        )
+        result = await service.call_tool(
+            "soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]}
+        )
+
+        assert legs == ["resource", "recipient"]
+        assert result["completed"] is True
+        assert [
+            (item["parameter"], item["requested"], item["applied"], item["leg"])
+            for item in result["value_adjustments"]
+        ] == [("speed", "normal", "fast_limited", "approach")]
+
     asyncio.run(exercise())

@@ -68,7 +68,7 @@ def test_look_at_target_without_target_fails_closed() -> None:
         {
             "task_type": "look_at_target",
             "summary": "look toward an unspecified target",
-            "parameters": {"target_yaw_rad": 0.1},
+            "parameters": {"duration_s": 2.0},
         },
     )
 
@@ -78,32 +78,29 @@ def test_look_at_target_without_target_fails_closed() -> None:
     assert "must not invent a target" in result["reason"]
 
 
-def test_look_at_target_without_direction_fails_closed() -> None:
+def test_look_at_target_rejects_caller_supplied_direction() -> None:
     result = SoridormiLocalToolService().call_tool(
         "soridormi.task.preview",
         {
             "task_type": "look_at_target",
-            "summary": "look toward the doorway",
-            "parameters": {"target_label": "doorway"},
+            "summary": "look toward the requester",
+            "parameters": {"target_ref": "requester", "target_yaw_rad": 0.1},
         },
     )
 
     assert result["accepted"] is False
     assert result["status"] == "failed"
     assert result["reason_code"] == "skill_planning_failed"
-    assert "must not invent a body direction" in result["reason"]
+    assert "resolves target_ref from Soridormi perception" in result["reason"]
 
 
-def test_look_at_target_preserves_explicit_target_and_direction() -> None:
+def test_look_at_target_names_the_target_and_leaves_direction_to_soridormi() -> None:
     result = SoridormiLocalToolService().call_tool(
         "soridormi.task.preview",
         {
             "task_type": "look_at_target",
-            "summary": "look toward the doorway",
-            "parameters": {
-                "target_label": "doorway",
-                "target_yaw_rad": 0.1,
-            },
+            "summary": "look at the requester",
+            "parameters": {"target_label": "requester"},
         },
     )
 

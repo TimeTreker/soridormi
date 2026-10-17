@@ -642,7 +642,7 @@
       "id": "acquire_and_deliver_resource",
       "category": "resource",
       "display_name": "Acquire and Deliver Resource",
-      "description": "Walk to the nearest of equivalent observed physical objects, mock pickup, return to a uniquely observed recipient, then mock handover in simulation. Soridormi reads scene distances while walking and may recover a non-slow pace within the bounded presets.",
+      "description": "Walk to the nearest of identically described observed physical objects, mock pickup, return to a uniquely observed recipient, then mock handover in simulation. Soridormi reads scene distances while walking and may recover a non-slow pace within the bounded presets, reporting it in value_adjustments. A cited source location Soridormi cannot resolve, or a resource or recipient the scene does not uniquely show, ends as a typed target_resolution non-completion.",
       "status": "available_sim_experimental",
       "execution": "composite",
       "capability_group": "resource_acquisition_delivery",
@@ -736,7 +736,7 @@
             "type": "string",
             "enum": ["slow", "normal", "medium", "quick", "fast_limited"],
             "default": "normal",
-            "description": "Bounded walking pace; Soridormi uses scene feedback and may raise a non-slow command within the advertised presets if progress cannot meet the route deadline."
+            "description": "Bounded walking pace; Soridormi uses scene feedback and may raise a non-slow command within the advertised presets if progress cannot meet the route deadline, and reports any raise in value_adjustments."
           }
         },
         "required": [
@@ -776,7 +776,7 @@
         "resource_outcome_contract",
         "safe_idle_after_delivery"
       ],
-      "notes": "Simulation-only capability. Soridormi selects the nearest equivalent observed scene object and walks to it, then returns to a uniquely observed recipient at a bounded pace. It can raise a non-slow command within the advertised presets if observed progress would miss the route deadline; explicit slow remains slow. Pickup, carry, and handover are mocked. Distinct matching object types remain ambiguous. No real manipulator/gripper capability is claimed.",
+      "notes": "Simulation-only capability. Soridormi selects the nearest of identically described observed scene objects and walks to it, then returns to a uniquely observed recipient at a bounded pace. It can raise a non-slow command within the advertised presets if observed progress would miss the route deadline and reports that raise in value_adjustments; explicit slow remains slow. Pickup, carry, and handover are mocked. Distinct matching object types remain ambiguous. A typed location binding in source names a place Soridormi must resolve; the simulator scene has no named places yet, so a cited place ends as target_resolution not_resolved before motion. Distance, direction, and route bindings stay request context and do not choose between markers. No real manipulator/gripper capability is claimed.",
       "metadata": {
         "simulation_mock": "resource_acquisition_delivery",
         "semantic_scope": {
@@ -2155,7 +2155,7 @@
               "target_ref"
             ],
             "minimum_arguments": 1,
-            "contract": "For a person-directed gaze Responsibility, copy target_ref only from matching current trusted target evidence supplied by perception or bounded conversation context. Never use an ungrounded pronoun surface, invent a person reference, or infer target yaw/pitch. Soridormi retains target-resolution and bounded motion authority."
+            "contract": "For a person-directed gaze Responsibility, set target_ref to \"requester\" when the person to look at is the person who made this request; otherwise copy a person description from current trusted target evidence. Never use an ungrounded pronoun surface, invent a person reference, or supply target yaw/pitch. Soridormi resolves the person from its own perception and reports a typed target_resolution, including not_observed, instead of looking straight ahead."
           },
           "person_addressee_target": {
             "source_entity_type": "addressee",
@@ -2164,7 +2164,7 @@
               "target_ref"
             ],
             "minimum_arguments": 1,
-            "contract": "For a person-directed gaze Responsibility whose semantic target is the addressee, copy target_ref only from matching current trusted target evidence supplied by perception or bounded conversation context. Never use an ungrounded pronoun surface, invent a person reference, or infer target yaw/pitch. Soridormi retains target-resolution and bounded motion authority."
+            "contract": "For a person-directed gaze Responsibility whose semantic target is the addressee, set target_ref to \"requester\" when the addressee is the person who made this request; otherwise copy a person description from current trusted target evidence. Never use an ungrounded pronoun surface, invent a person reference, or supply target yaw/pitch. Soridormi resolves the person from its own perception and reports a typed target_resolution, including not_observed, instead of looking straight ahead."
           },
           "gaze_duration": {
             "source_entity_type": "duration",
@@ -2178,7 +2178,7 @@
         }
       },
       "display_name": "Look At Person",
-      "description": "Turn head toward a structured person target direction provided by an external planner/perception layer and, by default, hold gaze on that target. Soridormi does not run perception here; it only executes bounded yaw/pitch offsets.",
+      "description": "Turn head toward a named person and, by default, hold gaze on that person. Soridormi resolves target_ref (\"requester\" is the person who made this request) from its own scene observation; an unobserved, ambiguous, or out-of-head-range target ends without motion as a typed target_resolution.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
       "capability_group": "head_social",
@@ -2215,8 +2215,42 @@
           "default": "hold_target"
         }
       },
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "target_ref": {
+            "type": "string",
+            "minLength": 1,
+            "description": "\"requester\" for the person who made this request; otherwise a description of the person to look at. Soridormi resolves the direction itself."
+          },
+          "duration_s": {
+            "type": "number",
+            "minimum": 0.2,
+            "maximum": 10.0,
+            "default": 4.0
+          },
+          "hold_fraction": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 0.8,
+            "default": 0.5
+          },
+          "end_mode": {
+            "type": "string",
+            "enum": [
+              "hold_target",
+              "return_neutral"
+            ],
+            "default": "hold_target"
+          }
+        },
+        "required": [
+          "target_ref"
+        ],
+        "additionalProperties": false
+      },
       "preconditions": [
-        "structured_target_direction_available",
+        "target_ref_resolved_by_soridormi_perception",
         "not_fallen",
         "sim_or_dry_run"
       ],
@@ -2238,7 +2272,7 @@
         "joint_limit_margin",
         "base_stability"
       ],
-      "notes": "This implementation consumes structured target_yaw_rad/target_pitch_rad only. It uses the default gaze behavior to hold_target so the robot does not immediately return to neutral after looking at somebody. It does not run camera perception, person detection, raw natural language parsing, arms, hands, torso, or hardware. Concurrent locomotion overlays use a stricter bounded yaw/pitch and velocity envelope declared in concurrency.locomotion_envelope.",
+      "notes": "Callers name the target only; target_yaw_rad/target_pitch_rad are operator-tool inputs (look_at_person_target, scripted acceptance) and are rejected on the MCP skill, activity, and task paths. In simulation Soridormi resolves target_ref against its scene markers (\"requester\" by referent, otherwise by identifying words) and looks along the observed bearing with level pitch, because scene markers carry no elevation. The default end_mode holds the target so the robot does not immediately return to neutral after looking at somebody. Outside simulation no perception resolves the target, so the skill reports perception_unavailable. It does not run camera perception, raw natural language parsing, arms, hands, torso, or hardware. Concurrent locomotion overlays use a stricter bounded yaw/pitch and velocity envelope declared in concurrency.locomotion_envelope.",
       "concurrency": {
         "ability_class": "subtle_expression",
         "control_coupling": "body_command_overlay",

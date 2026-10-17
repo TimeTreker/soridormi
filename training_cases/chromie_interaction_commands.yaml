@@ -305,9 +305,7 @@ cases:
     chromie_translation:
       body_skill: look_at_person
       body_parameters:
-        target_source: structured_person_target
-        target_yaw_rad: 0.0
-        target_pitch_rad: -0.03
+        target_ref: requester
         duration_s: 2.0
       speech_owned_by: chromie
       utterance_intent: greeting

@@ -94,7 +94,7 @@ exact named skills
   -> one final motor command and authoritative body evidence
 ```
 
-Speech and singing remain in Chromie's peer Speaking Execution Lane. A shared
+Speech and singing remain in Chromie's peer Vocal Execution Lane. A shared
 `coordination_id` may relate the lanes, but it does not transfer speech meaning
 or physical authority. Soridormi can reject, constrain, cancel, stop, or recover
 physical execution independently for safety.

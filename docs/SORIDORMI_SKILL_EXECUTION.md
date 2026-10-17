@@ -47,8 +47,11 @@ explicit velocity is genuinely intended.
 
 Forward walking commands below `0.12 m/s` are raised to `0.12 m/s` before
 runtime command overrides are emitted. This keeps tiny "walk" requests from
-turning into a wiggle-in-place pattern. Use `stop`, `stand_idle`, or
-`turn_in_place` when the intended behavior is stationary.
+turning into a wiggle-in-place pattern. The raise is never silent: the plan and
+the execution result report it in `value_adjustments` (`parameter: vx_mps`,
+`requested`, `applied`, `reason: min_forward_walk_speed`) so Chromie tells the
+person the actual speed instead of claiming the requested one. Use `stop`,
+`stand_idle`, or `turn_in_place` when the intended behavior is stationary.
 
 Machine-readable output:
 
@@ -123,8 +126,9 @@ The runtime MCP adapter lowers bounded locomotion segments to velocity commands.
 `walk_forward`, `walk_velocity`, and `curve_walk` also apply the shared minimum
 useful forward walk speed of `0.12 m/s`. The resolved plan keeps
 `requested_vx_mps` and `min_forward_speed_mps` metadata when a numeric command
-is adjusted, so debugging can see both the user/planner request and the command
-sent to the runtime.
+is adjusted, and the MCP plan/result project it as a typed `value_adjustments`
+entry, so both the user/planner request and the command sent to the runtime are
+visible to the caller.
 
 ## Concurrent body-activity execution
 

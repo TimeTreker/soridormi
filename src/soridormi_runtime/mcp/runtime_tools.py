@@ -5,11 +5,10 @@ import hashlib
 import json
 import math
 import os
-import re
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import partial
 from typing import Any, Awaitable, Callable, Protocol
 
@@ -43,6 +42,7 @@ from soridormi_runtime.skill_execution import (
     SIMULATED_RESOURCE_PICKUP_LABEL,
     SkillExecutionRegistry,
     simulated_resource_outcome,
+    value_adjustments_for_plan,
 )
 from soridormi_runtime.skill_manifest import (
     DEFAULT_SKILL_MANIFEST,
@@ -65,6 +65,22 @@ from .body_activity import (
     body_activity_capabilities_payload,
     compile_body_activity,
     skill_concurrency_projection,
+)
+from .body_targets import (
+    GAZE_TARGET_SKILLS,
+    MOCKED_REQUESTER_OBJECT_REF,
+    MOCKED_REQUESTER_SOURCE,
+    PLACE_NOT_RESOLVED,
+    REQUESTER_REFERENT_ID,
+    TARGET_AMBIGUOUS,
+    TARGET_NOT_OBSERVED,
+    TARGET_OUTSIDE_HEAD_RANGE,
+    TARGET_PERCEPTION_UNAVAILABLE,
+    TARGET_RESOLVED,
+    cited_source_places,
+    gaze_target_unavailable_result,
+    reject_caller_gaze_coordinates,
+    scene_terms,
 )
 from .local_tools import (
     MotionPlan,
@@ -95,15 +111,26 @@ class ObservedTargetUnavailable(RuntimeError):
     observation of this target had been selected yet, so no walk toward it began.
     """
 
-    def __init__(self, role: str, *, reason: str, before_motion: bool) -> None:
-        super().__init__(f"requested {role} is not uniquely observed in the simulator")
+    def __init__(
+        self, role: str, *, reason: str, before_motion: bool, place: str | None = None
+    ) -> None:
+        super().__init__(
+            f"cited source place {place!r} is not resolved in the simulator"
+            if role == "source"
+            else f"requested {role} is not uniquely observed in the simulator"
+        )
         self.role = role
         self.reason = reason
         self.before_motion = before_motion
+        self.place = place
 
 
 def unobserved_target_result(plan: Any, unavailable: ObservedTargetUnavailable) -> dict[str, Any]:
-    """Declared non-completion for a delivery whose resource or recipient is not observed."""
+    """Declared non-completion for a resource request whose target Soridormi cannot resolve.
+
+    The unresolved target is a resource or recipient the scene does not uniquely show,
+    or a cited source place Soridormi cannot resolve.
+    """
 
     outcome = simulated_resource_outcome(plan)
     target = (
@@ -114,9 +141,21 @@ def unobserved_target_result(plan: Any, unavailable: ObservedTargetUnavailable) 
         f"did not observe {target}" if unavailable.reason == "not_observed"
         else f"observed more than one different object matching {target}"
     )
-    if unavailable.role == "resource":
+    resolution: dict[str, Any] = {"role": unavailable.role, "status": unavailable.reason}
+    if unavailable.role == "source":
+        resolution["place"] = unavailable.place
+        summary = (
+            f"Soridormi cannot resolve the place {unavailable.place!r} in the simulator "
+            f"scene, so it did not fetch {outcome['resource_description']!r}."
+        )
+    elif unavailable.role == "resource":
+        resolution["description"] = outcome["resource_description"]
         summary = f"Soridormi {seen} in the simulator scene, so it did not fetch it."
     else:
+        resolution["description"] = outcome["recipient_description"]
+        recipient = (plan.parameters or {}).get("recipient")
+        if isinstance(recipient, dict) and recipient.get("referent_id"):
+            resolution["referent_id"] = recipient["referent_id"]
         summary = (
             f"Soridormi fetched {outcome['resource_description']!r} but {seen} in the simulator "
             "scene, so it did not hand it over."
@@ -124,7 +163,8 @@ def unobserved_target_result(plan: Any, unavailable: ObservedTargetUnavailable) 
     return {
         "completed": False,
         "summary": summary,
-        "no_motion": unavailable.role == "resource" and unavailable.before_motion,
+        "no_motion": unavailable.role != "recipient" and unavailable.before_motion,
+        "target_resolution": resolution,
         "resource_outcome": {
             **outcome,
             "resource_acquired": unavailable.role == "recipient",
@@ -132,6 +172,18 @@ def unobserved_target_result(plan: Any, unavailable: ObservedTargetUnavailable) 
             "evidence_summary": summary,
         },
     }
+
+
+class GazeTargetUnavailable(RuntimeError):
+    """A required activity gaze target is not resolvable; nothing moved."""
+
+
+def activity_value_adjustments(record: BodyActivityPlanRecord) -> list[dict[str, Any]]:
+    return [
+        {**adjustment, "member_id": member.member_id}
+        for member in record.members
+        for adjustment in value_adjustments_for_plan(member.plan)
+    ]
 
 
 class RuntimeRobot(Protocol):
@@ -151,6 +203,24 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if value is None or value.strip() == "":
         return default
     return value.strip().lower() in {"1", "true", "yes", "on", "y"}
+
+
+def _mock_requester_bearing_from_env() -> float | None:
+    """Temporary simulation stand-in for perceiving where the requester is.
+
+    Until Soridormi has a person-perception skill, a sim gaze request for the
+    ``"requester"`` that finds no scene actor uses this mocked bearing (radians,
+    robot frame, 0 = straight ahead). Set ``SORIDORMI_MOCK_REQUESTER_BEARING_RAD``
+    to ``off`` to disable it and report ``not_observed`` instead.
+    """
+
+    value = (os.environ.get("SORIDORMI_MOCK_REQUESTER_BEARING_RAD") or "0.0").strip()
+    if value.lower() in {"off", "none", "disabled"}:
+        return None
+    bearing = float(value)
+    if not math.isfinite(bearing):
+        raise ValueError("SORIDORMI_MOCK_REQUESTER_BEARING_RAD must be finite or 'off'")
+    return bearing
 
 
 def _env_int(name: str, default: int = 0) -> int:
@@ -178,6 +248,9 @@ class SoridormiRuntimeToolService:
     )
     task_store: EmbodiedTaskStore = field(default_factory=EmbodiedTaskStore)
     emergency_stop: bool = False
+    mock_requester_bearing_rad: float | None = field(
+        default_factory=_mock_requester_bearing_from_env
+    )
     active_task: dict[str, Any] | None = None
     active_lanes: dict[str, dict[str, Any]] = field(default_factory=dict)
     _motion_stop_requested: bool = field(default=False, init=False, repr=False)
@@ -485,11 +558,14 @@ class SoridormiRuntimeToolService:
         validate_chromie_intent(args.get("chromie_intent"))
         record = compile_body_activity(self.skill_registry, args)
         self.activity_plans[record.plan_id] = record
-        return record.to_dict(
-            mode=self.mode,
-            backend=self.backend,
-            dry_run_only=False,
-        )
+        return {
+            **record.to_dict(
+                mode=self.mode,
+                backend=self.backend,
+                dry_run_only=False,
+            ),
+            "value_adjustments": activity_value_adjustments(record),
+        }
 
     def runtime_activity_status(self, plan_id: str) -> dict[str, Any]:
         return self._activity_record(plan_id).to_dict(
@@ -561,6 +637,7 @@ class SoridormiRuntimeToolService:
             raise ValueError("skill_id is required")
         if skill_id not in self._runtime_skill_ids():
             raise ValueError(f"skill {skill_id!r} is not supported by the runtime adapter")
+        reject_caller_gaze_coordinates(skill_id, args.get("parameters") or {})
 
         plan = self.skill_registry.create_plan(
             skill_id,
@@ -603,7 +680,15 @@ class SoridormiRuntimeToolService:
             "plan_id": plan_id,
             "skill_id": skill_id,
             "mode": self.mode,
-            "summary": plan.summary.replace("Dry-run", "Runtime"),
+            "summary": (
+                f"Runtime {skill_id}: Soridormi resolves target_ref "
+                f"{(plan.parameters or {}).get('target_ref')!r} from its scene observation "
+                "when executing and looks toward it within the head range; an unobserved, "
+                "ambiguous, or out-of-range target ends without motion."
+                if skill_id in GAZE_TARGET_SKILLS
+                else plan.summary.replace("Dry-run", "Runtime")
+            ),
+            "value_adjustments": value_adjustments_for_plan(plan),
             "estimated_duration_s": (
                 None if skill_id == "acquire_and_deliver_resource" else plan.total_duration_s
             ),
@@ -625,7 +710,10 @@ class SoridormiRuntimeToolService:
         if stored.plan.execution in {"policy_velocity", "skill_wrapper"}:
             result = await self.execute_motion_plan(plan_id)
         elif stored.plan.execution == "scripted_keyframe":
-            result = await self.execute_scripted_head_skill(plan_id)
+            if stored.plan.skill_id in GAZE_TARGET_SKILLS:
+                result = await self._execute_gaze_target_skill(plan_id)
+            else:
+                result = await self.execute_scripted_head_skill(plan_id)
         elif stored.plan.execution == "visual_expression":
             result = await self.execute_visual_expression_skill(plan_id)
         elif stored.plan.execution == "visual_arm_gesture":
@@ -677,7 +765,7 @@ class SoridormiRuntimeToolService:
                 nonlocal approach_outcome, return_outcome
                 label = str(command.get("label") or "")
                 if observed_approach and label == RESOURCE_APPROACH_LABEL:
-                    speed = str((stored.plan.parameters or {}).get("speed") or "slow")
+                    speed = str((stored.plan.parameters or {}).get("speed") or "normal")
                     approach_outcome = await self._navigate_to_observed_resource(
                         description,
                         speed_mps=FORWARD_WALK_SPEED_PRESETS_MPS[speed],
@@ -702,7 +790,7 @@ class SoridormiRuntimeToolService:
                     return completed
                 if observed_approach and label == RESOURCE_RETURN_LABEL:
                     recipient = (stored.plan.parameters or {}).get("recipient") or {}
-                    speed = str((stored.plan.parameters or {}).get("speed") or "slow")
+                    speed = str((stored.plan.parameters or {}).get("speed") or "normal")
                     return_outcome = await self._navigate_to_observed_resource(
                         str(recipient.get("description") or ""),
                         referent_id=str(recipient.get("referent_id") or "") or None,
@@ -717,7 +805,15 @@ class SoridormiRuntimeToolService:
                 return None
 
             unavailable: ObservedTargetUnavailable | None = None
+            cited_places = cited_source_places(stored.plan.parameters or {})
             try:
+                if cited_places:
+                    # The simulator scene shows objects and actors, not named places, so
+                    # a cited place is unresolved: never ignore it and walk to any match.
+                    raise ObservedTargetUnavailable(
+                        "source", reason=PLACE_NOT_RESOLVED, before_motion=True,
+                        place=cited_places[0],
+                    )
                 motion_result = await self.execute_motion_plan(
                     plan_id,
                     segment_handler=resource_segment_handler,
@@ -752,7 +848,25 @@ class SoridormiRuntimeToolService:
                 visual_arm_pose_applied = await self._try_apply_visual_arm_pose(
                     final_visual_arm_pose
                 )
+                requested_speed = str((stored.plan.parameters or {}).get("speed") or "normal")
+                pace_adjustments = [
+                    {
+                        "parameter": "speed",
+                        "requested": requested_speed,
+                        "applied": "fast_limited",
+                        "reason": "bounded_pace_recovery",
+                        "leg": leg,
+                        "summary": (
+                            f"Observed progress on the {leg} leg would have missed the route "
+                            f"time bound at {requested_speed!r} pace, so Soridormi raised it "
+                            "to the bounded 'fast_limited' pace."
+                        ),
+                    }
+                    for leg, outcome in (("approach", approach_outcome), ("return", return_outcome))
+                    if outcome and outcome.get("bounded_pace_recovery")
+                ]
                 result = {
+                    **({"value_adjustments": pace_adjustments} if pace_adjustments else {}),
                     **motion_result,
                     "completed": True,
                     "summary": summary,
@@ -772,6 +886,10 @@ class SoridormiRuntimeToolService:
             **result,
             "skill_id": stored.plan.skill_id,
             "mode": self.mode,
+            "value_adjustments": [
+                *value_adjustments_for_plan(stored.plan),
+                *result.get("value_adjustments", []),
+            ],
             "no_motion": bool(
                 result.get(
                     "no_motion",
@@ -835,7 +953,8 @@ class SoridormiRuntimeToolService:
                 optional_failures = [
                     result
                     for result in record.member_results.values()
-                    if result.get("status") == "failed" and result.get("optional") is True
+                    if result.get("status") in {"failed", "target_unavailable"}
+                    and result.get("optional") is True
                 ]
                 record.status = "completed_with_degradation" if optional_failures else "completed"
             record.completed_at = time.time()
@@ -855,6 +974,7 @@ class SoridormiRuntimeToolService:
                 "degraded": record.status == "completed_with_degradation",
                 "cancelled": record.status == "cancelled",
                 "motor_commands_sent": has_physical and record.started_at is not None,
+                "value_adjustments": activity_value_adjustments(record),
                 "summary": (
                     f"Soridormi body activity {record.status}; "
                     f"{len(record.members)} member(s) reconciled."
@@ -1061,6 +1181,46 @@ class SoridormiRuntimeToolService:
                 raise RuntimeError("only one standalone body member is supported")
             head_member = standalone[0]
 
+        gaze_resolution: dict[str, Any] | None = None
+        if head_member is not None and head_member.skill_id in GAZE_TARGET_SKILLS:
+            yaw_limit = self._gaze_yaw_limit_rad(head_member.skill_id)
+            envelope_yaw = head_member.concurrency_envelope.get(
+                "max_abs_head_yaw_rad_during_locomotion"
+            )
+            if primary is not None and envelope_yaw is not None:
+                yaw_limit = min(yaw_limit, float(envelope_yaw))
+            gaze_resolution, yaw = await self._resolve_gaze_target(
+                str((head_member.plan.parameters or {}).get("target_ref") or ""),
+                max_abs_yaw_rad=yaw_limit,
+            )
+            if yaw is None:
+                unavailable = gaze_target_unavailable_result(gaze_resolution, mode=self.mode)
+                record.member_results[head_member.member_id] = {
+                    "member_id": head_member.member_id,
+                    "skill_id": head_member.skill_id,
+                    "status": "target_unavailable",
+                    "completed": False,
+                    "optional": head_member.optional,
+                    "summary": unavailable["summary"],
+                    "target_resolution": gaze_resolution,
+                }
+                if not head_member.optional:
+                    # A required gaze target the body cannot find ends the activity
+                    # before any motion; it is never replaced by a straight-ahead look.
+                    raise GazeTargetUnavailable(unavailable["summary"])
+                head_member = None
+                if primary is None and not standalone:
+                    return {"completed": True}
+            else:
+                resolved_member = replace(
+                    head_member, plan=self._resolved_gaze_plan(head_member.plan, yaw)
+                )
+                record.members = tuple(
+                    resolved_member if member.member_id == resolved_member.member_id else member
+                    for member in record.members
+                )
+                head_member = resolved_member
+
         locks: list[asyncio.Lock] = []
         if primary is not None or standalone or (head_member is not None and primary is None):
             locks.append(self._locomotion_lock)
@@ -1170,6 +1330,7 @@ class SoridormiRuntimeToolService:
                     "optional": head_member.optional,
                     "estimated_duration_s": head_duration_s,
                     "composed_into_final_motor_command": True,
+                    **({"target_resolution": gaze_resolution} if gaze_resolution else {}),
                 }
             return {"completed": True}
         except asyncio.CancelledError:
@@ -1773,6 +1934,104 @@ class SoridormiRuntimeToolService:
             result["source_revision"] = self.source_revision
         return result
 
+    def _gaze_yaw_limit_rad(self, skill_id: str) -> float:
+        rule = (self.skill_registry.skills[skill_id].get("parameters") or {}).get(
+            "target_yaw_rad"
+        ) or {}
+        return min(abs(float(rule.get("min", 0.0))), abs(float(rule.get("max", 0.0))))
+
+    async def _resolve_gaze_target(
+        self, target_ref: str, *, max_abs_yaw_rad: float
+    ) -> tuple[dict[str, Any], float | None]:
+        """Resolve a gaze ``target_ref`` from Soridormi's own scene observation.
+
+        ``"requester"`` is the person who made the current request; any other
+        reference must match exactly one observed marker by its identifying words.
+        Returns the typed ``target_resolution`` and the head yaw toward the target,
+        or ``None`` when the target is unobserved, ambiguous, or beyond the head
+        range. Scene markers carry no elevation, so the resolved pitch stays level.
+        """
+
+        resolution: dict[str, Any] = {"role": "gaze_target", "target_ref": target_ref}
+        observer = getattr(self.robot, "observe_scene", None)
+        if self.mode != "sim" or not callable(observer):
+            return {**resolution, "status": TARGET_PERCEPTION_UNAVAILABLE}, None
+        async with self._robot_lock:
+            observed = await self._call_robot(observer)
+        if not isinstance(observed, dict) or observed.get("mocked_simulation") is not True:
+            raise RuntimeError("simulator target observation is unavailable")
+        objects = [item for item in observed.get("objects", []) if isinstance(item, dict)]
+        if target_ref == REQUESTER_REFERENT_ID:
+            matches = [item for item in objects if item.get("referent_id") == target_ref]
+        else:
+            requested = scene_terms(target_ref)
+            matches = [
+                item for item in objects
+                if requested and requested.issubset(scene_terms(str(item.get("description") or "")))
+            ]
+        if (
+            not matches
+            and target_ref == REQUESTER_REFERENT_ID
+            and self.mock_requester_bearing_rad is not None
+        ):
+            # Temporary: no person perception yet, so the sim uses a declared
+            # mocked requester position. The resolution says so explicitly.
+            matches = [
+                {
+                    "object_ref": MOCKED_REQUESTER_OBJECT_REF,
+                    "relative_direction": "mocked requester position",
+                    "bearing_rad": self.mock_requester_bearing_rad,
+                }
+            ]
+            resolution["source"] = MOCKED_REQUESTER_SOURCE
+        if not matches:
+            return {**resolution, "status": TARGET_NOT_OBSERVED}, None
+        if len(matches) > 1:
+            return {**resolution, "status": TARGET_AMBIGUOUS}, None
+        selected = matches[0]
+        bearing = float(selected.get("bearing_rad", math.nan))
+        if not math.isfinite(bearing):
+            raise RuntimeError("simulator target observation has invalid bearing data")
+        resolution.update(
+            {
+                "object_ref": selected.get("object_ref"),
+                "relative_direction": selected.get("relative_direction"),
+            }
+        )
+        if abs(bearing) > max_abs_yaw_rad:
+            return {**resolution, "status": TARGET_OUTSIDE_HEAD_RANGE}, None
+        return {**resolution, "status": TARGET_RESOLVED}, bearing
+
+    def _resolved_gaze_plan(self, plan: Any, yaw_rad: float) -> Any:
+        parameters = {
+            key: value
+            for key, value in dict(plan.parameters or {}).items()
+            if key in (self.skill_registry.skills[plan.skill_id].get("parameters") or {})
+        }
+        return self.skill_registry.create_plan(
+            plan.skill_id,
+            {**parameters, "target_yaw_rad": yaw_rad, "target_pitch_rad": 0.0},
+            profile=plan.profile,
+        )
+
+    async def _execute_gaze_target_skill(self, plan_id: str) -> dict[str, Any]:
+        if self.emergency_stop:
+            raise RuntimeError("cannot execute skill while emergency_stop is active")
+        stored = self.skill_plans[plan_id]
+        resolution, yaw = await self._resolve_gaze_target(
+            str((stored.plan.parameters or {}).get("target_ref") or ""),
+            max_abs_yaw_rad=self._gaze_yaw_limit_rad(stored.plan.skill_id),
+        )
+        if yaw is None:
+            return gaze_target_unavailable_result(resolution, mode=self.mode)
+        self.skill_plans[plan_id] = NamedSkillPlan(
+            plan_id=plan_id,
+            plan=self._resolved_gaze_plan(stored.plan, yaw),
+            created_at=stored.created_at,
+        )
+        result = await self.execute_scripted_head_skill(plan_id)
+        return {**result, "target_resolution": resolution}
+
     async def _navigate_to_observed_resource(
         self, description: str, *, speed_mps: float, stop_distance_m: float,
         referent_id: str | None = None,
@@ -1792,12 +2051,7 @@ class SoridormiRuntimeToolService:
         if not callable(observer):
             raise RuntimeError("simulator cannot observe the requested resource")
 
-        def terms(value: str) -> frozenset[str]:
-            return frozenset(
-                word for word in re.findall(r"\w+", value.casefold())
-                if word not in {"a", "an", "the", "of", "some"}
-            )
-
+        terms = scene_terms
         requested_terms = terms(description)
         if not referent_id and not requested_terms:
             raise RuntimeError(f"requested simulator {role} has no identifying terms")

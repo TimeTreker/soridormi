@@ -87,8 +87,11 @@ def test_look_at_person_manifest_promoted_to_structured_target_skill() -> None:
     assert skill["execution"] == "scripted_keyframe"
     assert skill["required_actuator_groups"] == ["head_neck"]
     assert skill["safety"]["hardware_enabled"] is False
-    assert "structured" in skill["notes"]
+    assert "operator-tool inputs" in skill["notes"]
     assert "does not run camera perception" in skill["notes"]
+    assert set(skill["parameters_schema"]["properties"]) == {
+        "target_ref", "duration_s", "hold_fraction", "end_mode",
+    }
     assert skill["parameters"]["end_mode"]["default"] == "hold_target"
 
 

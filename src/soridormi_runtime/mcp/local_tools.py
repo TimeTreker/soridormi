@@ -11,6 +11,7 @@ from soridormi_runtime.skill_execution import (
     SkillExecutionRegistry,
     SkillPlan,
     simulated_resource_outcome,
+    value_adjustments_for_plan,
 )
 from soridormi_runtime.skill_manifest import (
     DEFAULT_SKILL_MANIFEST,
@@ -23,6 +24,7 @@ from .body_activity import (
     compile_body_activity,
     skill_concurrency_projection,
 )
+from .body_targets import reject_caller_gaze_coordinates
 from .source_identity import current_source_revision
 from .task_tools import EmbodiedTaskStore, task_capabilities_payload
 
@@ -468,6 +470,7 @@ class SoridormiLocalToolService:
             raise ValueError(
                 "resource acquisition/delivery simulation mocks are unavailable outside sim mode"
             )
+        reject_caller_gaze_coordinates(skill_id, args.get("parameters") or {})
         plan = self.skill_registry.create_plan(
             skill_id,
             args.get("parameters") or {},
@@ -489,6 +492,7 @@ class SoridormiLocalToolService:
                 (skill or {}).get("requires_confirmation", self.mode != "sim")
             ),
             "interruptible": bool((plan.safety or {}).get("interruptible", True)),
+            "value_adjustments": value_adjustments_for_plan(plan),
         }
 
     def execute_skill_plan(self, plan_id: str) -> dict[str, Any]:

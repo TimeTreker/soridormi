@@ -305,17 +305,18 @@ def test_status_schema_exposes_concurrent_body_lanes() -> None:
     assert properties["activity_idle"]["type"] == "boolean"
 
 
-def test_dag_contract_freezes_single_core_three_lane_model() -> None:
+def test_dag_contract_freezes_single_core_two_execution_lane_model() -> None:
     bundle = build_soridormi_capability_bundle(mode="sim")
     contract = bundle.dag_contract
 
     assert contract["chromie_concurrency_model"] == {
         "cognitive_core": "single_authoritative_mind",
         "lanes": [
-            "social_attention_proposal",
-            "speaking_execution",
+            "vocal_execution",
             "activity_execution",
         ],
+        "behavior_domains": {"social_attention": "social_cognition"},
+        "expression_author": "social_cognition",
         "runtime_coordinator": "chromie",
         "speech_owner": "chromie",
         "body_provider": "soridormi",

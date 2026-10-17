@@ -7,6 +7,8 @@ from typing import Any, Mapping
 
 from soridormi_runtime.skill_execution import SkillExecutionRegistry, SkillPlan
 
+from .body_targets import reject_caller_gaze_coordinates
+
 
 ABILITY_CLASS_LOCOMOTION = "locomotion_whole_body"
 ABILITY_CLASS_SUBTLE_EXPRESSION = "subtle_expression"
@@ -328,6 +330,7 @@ def compile_body_activity(
             raise ValueError(
                 f"body activity member {member_id!r} parameters must be an object"
             )
+        reject_caller_gaze_coordinates(skill_id, parameters)
         plan = registry.create_plan(skill_id, parameters, profile=profile)
         skill = registry.skills[skill_id]
         contract = _concurrency_contract(skill)

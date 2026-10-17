@@ -6,7 +6,7 @@ Soridormi executes compatible physical abilities concurrently while retaining
 one final motor-command and physical-safety authority.
 
 Speech and singing are not Soridormi body members. They remain a peer Chromie
-Speaking Execution Lane linked by `coordination_id`.
+Vocal Execution Lane linked by `coordination_id`.
 
 ## Ability classes
 
@@ -88,8 +88,9 @@ soridormi.activity.status
 soridormi.activity.cancel
 ```
 
-The authoritative planner selects exact body skills first. The Activity
-Execution Lane then creates one opaque Soridormi body-activity plan.
+Chromie's Planner selects exact body skills first, and Social Cognition may add
+optional social expression. The Activity Execution Lane then creates one opaque
+Soridormi body-activity plan.
 
 Example:
 
@@ -111,9 +112,7 @@ Example:
       "member_id": "gaze",
       "skill_id": "look_at_person",
       "parameters": {
-        "target_ref": "person_1",
-        "target_yaw_rad": 0.08,
-        "target_pitch_rad": -0.04,
+        "target_ref": "requester",
         "duration_s": 4.0
       }
     },
@@ -128,7 +127,15 @@ Example:
 ```
 
 Chromie may run a song under the same `coordination_id`, but the song remains a
-peer speaking-lane execution and is not sent to this API.
+peer Vocal-lane execution and is not sent to this API.
+
+The gaze member names its target only. When the activity executes, Soridormi
+resolves `target_ref` from its own scene observation and checks the bearing
+against the walking-overlay envelope. A target it cannot resolve, or one beyond
+that envelope, is reported in the member result as `status: target_unavailable`
+with a typed `target_resolution`; it is never replaced by a straight-ahead look.
+An optional gaze member degrades the activity (`completed_with_degradation`); a
+required one fails it before any motion.
 
 ## Command composition
 
@@ -165,6 +172,7 @@ Current implementation provides:
 Not yet claimed:
 
 - live balance-margin-based overlay reduction or suspension;
-- autonomous person tracking or target perception;
+- continuous person tracking or camera-based target perception (gaze targets
+  are resolved once per execution from simulator scene markers);
 - hardware execution;
 - concurrent whole-body gestures that have not passed simulator qualification.
