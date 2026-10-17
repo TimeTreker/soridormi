@@ -145,7 +145,9 @@ _TARGET_RESOLUTION_SCHEMA: dict[str, Any] = {
         "ambiguous, outside_head_range, perception_unavailable, or not_resolved (a cited "
         "place). Any status other than resolved comes with completed=false and a summary "
         "naming what was not found; Soridormi never substitutes a default direction or "
-        "the nearest keyword match."
+        "the nearest keyword match. source, when present, names a non-perceived origin "
+        "of the resolved target: mocked_requester_position is a configured simulation "
+        "stand-in, not an observation of the person."
     ),
     "properties": {
         "role": {"type": "string"},
@@ -156,6 +158,7 @@ _TARGET_RESOLUTION_SCHEMA: dict[str, Any] = {
         "place": {"type": "string"},
         "object_ref": {"type": ["string", "null"]},
         "relative_direction": {"type": ["string", "null"]},
+        "source": {"type": "string"},
     },
     "required": ["role", "status"],
 }
@@ -431,7 +434,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 safety_class="physical_motion",
                 availability=ToolAvailability(modes=safe_modes, requires=["robot_standing", "not_emergency_stopped"]),
                 execution=ExecutionPolicy(can_run_parallel=False, exclusive_group="soridormi.robot_motion", timeout_s=15.0, idempotent=False, side_effect_free=False),
-                confirmation=ConfirmationPolicy(required=True, reason="This tool can move the robot.", required_in_modes=["hardware_dry_run", "hardware"], skippable_in_modes=["sim"]),
+                confirmation=ConfirmationPolicy(required=True, reason="This tool can move the robot.", required_in_modes=["hardware_shadow", "hardware_dry_run", "hardware"], skippable_in_modes=["sim"]),
                 monitoring=MonitoringPolicy(
                     requires_safety_monitor=True,
                     recommended_monitor_tools=["soridormi.safety.monitor_motion"],

@@ -48,7 +48,10 @@ decides only body-level how (gait, trajectory, pace within the selected skill)
 and whether the body can safely do it; it does not replace a selected skill.
 A body that cannot do something safely reports a limitation, not a refusal:
 whether Chromie should do something at all is decided by Chromie's Value
-Judgment.
+Judgment. The task API's terminal `status: refused` (with its `policy_refusal`
+event and `report_refusal` action) is this body limitation: the request is
+unavailable or not allowed for the body now. Chromie treats it as a limitation,
+never as a Value Judgment refusal.
 
 Chromie describes physical targets semantically and in one agreed format:
 `target_ref` or recipient `referent_id` `"requester"` for the person who made the
@@ -232,8 +235,8 @@ because the simulation mock exists.
 Walk forward to the house.
 ```
 
-This is not a velocity command. Soridormi must refuse it until target
-resolution, localization, route planning, local obstacle checking, and bounded
+This is not a velocity command. Soridormi reports it as unavailable, without
+motion, until target resolution, localization, route planning, local obstacle checking, and bounded
 local trajectory planning exist. See
 `docs/SORIDORMI_NAVIGATION_GOAL_CONTRACT.md`.
 
