@@ -24,16 +24,19 @@ target resolution reads, so Chromie never chains a "locate" call before acting
 and gaze, approach, and delivery cannot disagree about where someone is.
 
 Temporary mocked requester position: Soridormi cannot perceive people yet, so in
-simulation the only person-perception provider is a declared mocked requester.
-When the scene shows no actor tagged `"requester"`, the observation gains a
-bearing-only `requester` at `SORIDORMI_MOCK_REQUESTER_BEARING_RAD` (robot-frame
-yaw, default `0.0`, straight ahead). A resolved gaze then reports
-`source: mocked_requester_position` and `object_ref: mocked_requester`, so it is
-never mistaken for perception. A scene actor tagged `"requester"` still wins.
-The mock has no range, so routes ("walk to me") and the public
-`soridormi.robot.observe_scene` output do not use it. Set the variable to `off`
-to report `not_observed` instead. A real provider (sound direction, face
-detection) replaces it in the same observation; it never applies outside sim.
+simulation the only person-perception provider besides a scene actor tagged
+`"requester"` is an opt-in mocked requester. It exists only when
+`SORIDORMI_MOCK_REQUESTER_BEARING_RAD` is set to a finite robot-frame yaw; unset,
+empty, or `off` configures none, so a requester the scene does not show reports
+`not_observed` and an unknown bearing never becomes a straight-ahead look. When
+configured and the scene shows no requester actor, the observation gains a
+bearing-only `requester` at that yaw, and a resolved gaze reports
+`source: mocked_requester_position` and `object_ref: mocked_requester` in
+`target_resolution`, so a caller never reports it as having perceived the
+person. A scene actor tagged `"requester"` still wins. The mock has no range, so
+routes ("walk to me") and the public `soridormi.robot.observe_scene` output do
+not use it. A real provider (sound direction, face detection) replaces it in the
+same observation; it never applies outside sim.
 
 When Soridormi cannot resolve the target, the skill ends without motion as a
 declared non-completion with `completed: false`, a summary naming what was not
@@ -48,7 +51,8 @@ found, and a typed `target_resolution`:
 | `perception_unavailable` | The mode has no perception to locate the target (outside simulation today). |
 
 Soridormi never substitutes a straight-ahead (0/0) look and reports it as
-looking at the person.
+looking at the person. A `resolved` status whose `source` is
+`mocked_requester_position` is a configured simulation stand-in, not perception.
 
 ## Operator target tools
 

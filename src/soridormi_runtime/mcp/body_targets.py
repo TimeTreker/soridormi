@@ -56,7 +56,9 @@ def with_perceived_people(
 
     Soridormi has no person perception yet, so the only provider is a declared
     mocked requester position. It adds a bearing-only ``requester`` observation
-    when the scene shows none; a real provider (sound direction, face detection)
+    only when a mock bearing is configured and the scene shows no requester; with
+    no configured bearing nothing is added, so the requester is not observed. A
+    real provider (sound direction, face detection)
     replaces it here, feeding every target resolution the same observation.
     """
 

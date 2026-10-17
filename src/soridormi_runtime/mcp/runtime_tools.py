@@ -208,13 +208,15 @@ def _mock_requester_bearing_from_env() -> float | None:
     """Temporary simulation stand-in for perceiving where the requester is.
 
     Until Soridormi can perceive people, a sim scene observation that shows no
-    requester gains a mocked requester at this bearing (radians, robot frame,
-    0 = straight ahead). Set ``SORIDORMI_MOCK_REQUESTER_BEARING_RAD`` to ``off``
-    to disable it so a requester target reports ``not_observed`` instead.
+    requester gains a mocked requester at the bearing configured in
+    ``SORIDORMI_MOCK_REQUESTER_BEARING_RAD`` (radians, robot frame, 0 = straight
+    ahead). Unset, empty, or ``off`` configures no mock, so a requester target
+    the scene does not show reports ``not_observed``: an unknown bearing is never
+    defaulted to straight ahead.
     """
 
-    value = (os.environ.get("SORIDORMI_MOCK_REQUESTER_BEARING_RAD") or "0.0").strip()
-    if value.lower() in {"off", "none", "disabled"}:
+    value = (os.environ.get("SORIDORMI_MOCK_REQUESTER_BEARING_RAD") or "").strip()
+    if not value or value.lower() in {"off", "none", "disabled"}:
         return None
     bearing = float(value)
     if not math.isfinite(bearing):

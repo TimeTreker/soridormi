@@ -1103,6 +1103,9 @@ def test_missing_recipient_prevents_mock_delivery_after_pickup() -> None:
         ({"description": "me", "referent_id": "requester"}, True),
         ({"description": "我", "referent_id": "requester"}, True),
         ({"description": "me", "referent_id": None}, False),
+        # A Host discourse referent Soridormi's perception does not carry is a typed
+        # not-found, never matched by the description's words.
+        ({"description": "user", "referent_id": "discourse_ref_alice"}, False),
     ],
 )
 def test_the_requester_receives_a_delivery_by_referent_not_by_words(
@@ -1129,7 +1132,15 @@ def test_the_requester_receives_a_delivery_by_referent_not_by_words(
         )
         if not delivered:
             assert result["completed"] is False
-            assert "did not observe the recipient 'me'" in result["summary"]
+            assert f"did not observe the recipient {recipient['description']!r}" in result["summary"]
+            expected = {
+                "role": "recipient", "status": "not_observed",
+                "description": recipient["description"],
+            }
+            if recipient["referent_id"]:
+                expected["referent_id"] = recipient["referent_id"]
+            assert result["target_resolution"] == expected
+            assert result["resource_outcome"]["resource_delivered"] is False
             return
         assert result["completed"] is True
         assert result["resource_outcome"]["resource_delivered"] is True
@@ -1597,26 +1608,42 @@ def test_look_at_the_requester_resolves_the_direction_from_the_scene(
     assert max(head_yaw) == pytest.approx(0.3, abs=1e-6)
 
 
-@pytest.mark.parametrize("bearing", [None, 0.2])
+@pytest.mark.parametrize("bearing", [0.0, 0.2, -0.3])
 def test_sim_requester_gaze_uses_the_declared_mocked_position_when_no_actor_is_seen(
-    monkeypatch: pytest.MonkeyPatch, bearing: float | None
+    monkeypatch: pytest.MonkeyPatch, bearing: float
 ) -> None:
-    if bearing is not None:
-        monkeypatch.setenv("SORIDORMI_MOCK_REQUESTER_BEARING_RAD", str(bearing))
-    else:
-        monkeypatch.delenv("SORIDORMI_MOCK_REQUESTER_BEARING_RAD", raising=False)
+    monkeypatch.setenv("SORIDORMI_MOCK_REQUESTER_BEARING_RAD", str(bearing))
     robot = GazeFakeRobot()
     _plan, result = _execute_look_at(monkeypatch, robot, "requester")
 
     assert result["completed"] is True
+    # A configured mock is reported as mocked, never as perceiving the person.
     assert result["target_resolution"] == {
         "role": "gaze_target", "target_ref": "requester", "status": "resolved",
         "source": "mocked_requester_position", "object_ref": "mocked_requester",
         "relative_direction": "mocked requester position",
     }
     head_yaw = [command.positions[robot.names.index("head_yaw")] for command in robot.commands]
-    expected = bearing or 0.0
-    assert (max(head_yaw) if expected >= 0 else min(head_yaw)) == pytest.approx(expected, abs=1e-6)
+    assert (max(head_yaw) if bearing >= 0 else min(head_yaw)) == pytest.approx(bearing, abs=1e-6)
+
+
+@pytest.mark.parametrize("configured", [None, "", "off"])
+def test_an_unconfigured_mock_requester_is_not_observed_not_a_straight_ahead_look(
+    monkeypatch: pytest.MonkeyPatch, configured: str | None
+) -> None:
+    if configured is None:
+        monkeypatch.delenv("SORIDORMI_MOCK_REQUESTER_BEARING_RAD", raising=False)
+    else:
+        monkeypatch.setenv("SORIDORMI_MOCK_REQUESTER_BEARING_RAD", configured)
+    robot = GazeFakeRobot()
+    _plan, result = _execute_look_at(monkeypatch, robot, "requester")
+
+    assert result["completed"] is False
+    assert result["no_motion"] is True
+    assert result["target_resolution"] == {
+        "role": "gaze_target", "target_ref": "requester", "status": "not_observed",
+    }
+    assert robot.commands == []
 
 
 def test_mocked_requester_is_part_of_the_scene_observation_not_a_gaze_fallback() -> None:
