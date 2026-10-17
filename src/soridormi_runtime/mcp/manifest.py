@@ -655,7 +655,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 confirmation=ConfirmationPolicy(
                     required=True,
                     reason="This exercises a body-skill provider contract.",
-                    required_in_modes=["hardware_shadow", "hardware_dry_run"],
+                    required_in_modes=["hardware_shadow", "hardware_dry_run", "hardware"],
                     skippable_in_modes=["sim"],
                 ),
                 monitoring=MonitoringPolicy(
@@ -861,7 +861,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 confirmation=ConfirmationPolicy(
                     required=True,
                     reason="A coordinated body activity may move the robot.",
-                    required_in_modes=["hardware_shadow", "hardware_dry_run"],
+                    required_in_modes=["hardware_shadow", "hardware_dry_run", "hardware"],
                     skippable_in_modes=["sim"],
                 ),
                 monitoring=MonitoringPolicy(
@@ -914,7 +914,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                 confirmation=ConfirmationPolicy(
                     required=True,
                     reason="A coordinated body activity may move the robot.",
-                    required_in_modes=["hardware_shadow", "hardware_dry_run"],
+                    required_in_modes=["hardware_shadow", "hardware_dry_run", "hardware"],
                     skippable_in_modes=["sim"],
                 ),
                 monitoring=MonitoringPolicy(
