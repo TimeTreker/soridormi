@@ -11,7 +11,8 @@ Build a reusable Open Duck Mini v2 body/cerebellum runtime that:
 - preserves a trusted official-policy baseline;
 - runs the same body contracts against MuJoCo and future hardware;
 - exposes bounded skills and structured embodied tasks to Chromie;
-- validates, monitors, interrupts, recovers, and refuses independently;
+- validates, monitors, interrupts, recovers, and independently reports a body
+  request it cannot or may not perform as an unavailable/not-allowed limitation;
 - supports replaceable policies and reproducible training/evaluation;
 - never exposes raw low-level body control as LLM authority; and
 - remains an embodied body/cerebellum provider unless retained evidence proves

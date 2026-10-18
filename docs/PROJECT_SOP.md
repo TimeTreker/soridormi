@@ -17,7 +17,8 @@ Different simulator or hardware backend.
 ```
 
 Chromie never authorizes raw joints, motors, torques, physical coordinates, or
-`action_14d`. Soridormi may refuse every request.
+`action_14d`. Soridormi may report any request as unavailable or not allowed
+for the body (a limitation, not a Value Judgment refusal).
 
 ## Trusted baseline
 

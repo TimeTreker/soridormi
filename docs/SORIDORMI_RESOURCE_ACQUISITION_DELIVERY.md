@@ -172,6 +172,10 @@ request must appear in the observed description. A recipient with
 returns to the observed requester actor whatever words name it ("me", "我").
 `"requester"` is the agreed referent format for the current speaker; Chromie sets it
 whenever the recipient is the person who made the request, and `null` otherwise.
+Soridormi matches any other `referent_id` only against an observed person that its
+own perception tags with that referent; a Host discourse ID it does not perceive
+ends as a typed recipient `not_observed` (with that `referent_id`) and is never
+matched by the description's words.
 Without that referent, a speaker-relative description such as "me" matches no
 observed object, and the return leg ends as an unobserved recipient rather than
 guessing a person. Several observed objects with the *same* observed description
