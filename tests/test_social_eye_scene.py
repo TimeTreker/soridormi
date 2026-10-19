@@ -230,7 +230,8 @@ def test_build_visual_arm_robot_xml_adds_only_non_contact_geoms() -> None:
     assert left_mount["mesh"] == visual_arm_mesh_name("shoulder")
     left_shoulder = geoms[VISUAL_ARM_SHOULDER_NAMES[0]]
     assert left_shoulder["type"] == "cylinder"
-    assert left_shoulder["fromto"] == "-0.02 0.083 0.094 -0.02 0.092 0.094"
+    assert left_shoulder["fromto"] == "-0.02 0.0655 0.094 -0.02 0.0725 0.094"
+    assert left_rest["shoulder_cap"]["mesh"] == visual_arm_mesh_name("shoulder_cap")
     meshes = {mesh.attrib["name"]: mesh.attrib for mesh in root.findall(".//asset/mesh")}
     assert set(meshes) == set(VISUAL_ARM_MESH_NAMES)
     left_shoulder_axle = geoms[VISUAL_ARM_SHOULDER_AXLE_NAMES[0]]

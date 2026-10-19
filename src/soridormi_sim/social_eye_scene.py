@@ -60,6 +60,7 @@ VISUAL_ARM_THUMB_COMPONENTS = (
 )
 VISUAL_ARM_COMPONENTS = (
     (
+        "shoulder_cap",
         "upper",
         "elbow",
         "elbow_axle",
@@ -160,7 +161,7 @@ class VisualArmConfig:
     """
 
     shoulder_x_m: float = -0.02
-    shoulder_y_offset_m: float = 0.092
+    shoulder_y_offset_m: float = 0.093
     shoulder_z_m: float = 0.094
     shoulder_mount_y_offset_m: float = 0.055
     shoulder_housing_size_m: float = 0.044
@@ -173,7 +174,10 @@ class VisualArmConfig:
     shell_taper: float = 0.86
     shell_chamfer_m: float = 0.009
     shoulder_joint_radius_m: float = 0.019
-    shoulder_joint_depth_m: float = 0.009
+    shoulder_joint_depth_m: float = 0.007
+    shoulder_cap_radius_m: float = 0.0205
+    shoulder_cap_reach_m: float = 0.026
+    shoulder_cap_width_m: float = 0.047
     elbow_joint_radius_m: float = 0.0145
     elbow_joint_half_depth_m: float = 0.0195
     joint_axle_radius_m: float = 0.0072
@@ -487,7 +491,7 @@ def visual_arm_mesh_name(part: str) -> str:
     return f"soridormi_arm_{part}_shell_mesh"
 
 
-VISUAL_ARM_MESH_PARTS = ("shoulder", "upper", "forearm", "palm")
+VISUAL_ARM_MESH_PARTS = ("shoulder", "shoulder_cap", "upper", "forearm", "palm")
 VISUAL_ARM_MESH_NAMES = tuple(visual_arm_mesh_name(part) for part in VISUAL_ARM_MESH_PARTS)
 
 
@@ -495,11 +499,24 @@ def build_visual_arm_mesh_assets(config: VisualArmConfig | None = None) -> str:
     cfg = config or VisualArmConfig()
     housing = cfg.shoulder_housing_size_m
     housing_depth = (
-        cfg.shoulder_y_offset_m - cfg.shoulder_joint_depth_m - cfg.shoulder_mount_y_offset_m
+        cfg.shoulder_y_offset_m
+        - cfg.shoulder_cap_radius_m
+        - cfg.shoulder_joint_depth_m
+        - cfg.shoulder_mount_y_offset_m
     )
     shells = {
         "shoulder": _chamfered_shell_vertices(
             housing_depth + cfg.shell_chamfer_m, housing, housing, cfg.shell_chamfer_m, 0.92
+        ),
+        # The rounded shoulder pad turns with the upper arm and hides its top
+        # end, so raised arms roll out of the shoulder instead of a block
+        # poking out of the fixed servo housing.
+        "shoulder_cap": _chamfered_shell_vertices(
+            cfg.shoulder_cap_radius_m + cfg.shoulder_cap_reach_m,
+            cfg.shoulder_cap_width_m,
+            cfg.shoulder_cap_width_m * 0.92,
+            cfg.shell_chamfer_m * 1.45,
+            0.9,
         ),
         "upper": _chamfered_shell_vertices(
             cfg.upper_arm_length_m - 0.004,
@@ -603,7 +620,17 @@ def _visual_arm_pose_xml(side: str, pose: str, config: VisualArmConfig) -> str:
     palm_end = _vector_add(palm_start, _vector_scale(hand_forward, config.palm_length_m))
 
     xml = (
-        _shell_xml(name("upper"), "upper", shoulder, elbow, elbow_axis, arm_rgba)
+        _shell_xml(
+            name("shoulder_cap"),
+            "shoulder_cap",
+            _vector_subtract(
+                shoulder, _vector_scale(upper_direction, config.shoulder_cap_radius_m)
+            ),
+            _vector_add(shoulder, _vector_scale(upper_direction, config.shoulder_cap_reach_m)),
+            elbow_axis,
+            arm_rgba,
+        )
+        + _shell_xml(name("upper"), "upper", shoulder, elbow, elbow_axis, arm_rgba)
         + _cylinder_xml(
             name("elbow"),
             elbow,
@@ -744,11 +771,11 @@ def build_visual_arm_geoms(config: VisualArmConfig | None = None) -> str:
         VISUAL_ARM_SHOULDER_AXLE_NAMES,
     ):
         sign = 1.0 if side == "left" else -1.0
-        shoulder, _elbow, _hand = _arm_pose_points(side, "rest", cfg)
         outward = (0.0, sign, 0.0)
-        # A chamfered servo housing sits flush on the trunk side; the orange
-        # shoulder drum on its outer face echoes the hip servos below it.
-        drum_outer = cfg.shoulder_y_offset_m
+        # A chamfered servo housing sits flush on the trunk side and its orange
+        # drum echoes the hip servos. Each pose's rounded shoulder pad turns on
+        # a graphite hub just outside that drum.
+        drum_outer = cfg.shoulder_y_offset_m - cfg.shoulder_cap_radius_m
         drum_inner = drum_outer - cfg.shoulder_joint_depth_m
         housing_start = (cfg.shoulder_x_m, sign * cfg.shoulder_mount_y_offset_m, cfg.shoulder_z_m)
         housing_end = (
@@ -775,9 +802,9 @@ def build_visual_arm_geoms(config: VisualArmConfig | None = None) -> str:
         chunks.append(
             _cylinder_xml(
                 shoulder_axle_name,
-                shoulder,
+                (cfg.shoulder_x_m, sign * (drum_outer + 0.0015), cfg.shoulder_z_m),
                 outward,
-                0.0018,
+                0.0015,
                 cfg.joint_axle_radius_m,
                 cfg.joint_axle_rgba,
             )

@@ -15,7 +15,10 @@ of looking like balls mounted on top of the head.
 The arms are styled to match the Open Duck body rather than a human arm. All
 geoms attach to `trunk_assembly`. A chamfered grey servo housing sits flush on
 each trunk side and carries an orange shoulder drum, echoing the hip servos
-below it. The upper arm and forearm are short, chunky, faceted shell meshes
+below it. Each pose adds a rounded, faceted shoulder pad that turns with the
+upper arm on a graphite hub just outside that drum and hides the top of the
+upper arm, so a raised arm rolls out of the shoulder instead of a block poking
+out of a fixed joint. The upper arm and forearm are short, chunky, faceted shell meshes
 (inline convex-hull `mesh` assets generated with the overlay) that taper
 slightly toward the hand, like the printed trunk and thigh shells. Every
 display pose preserves a `0.068m` upper arm and `0.056m` forearm. Those follow
