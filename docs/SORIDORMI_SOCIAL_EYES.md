@@ -18,11 +18,14 @@ each trunk side and carries an orange shoulder drum, echoing the hip servos
 below it. The upper arm and forearm are short, chunky, faceted shell meshes
 (inline convex-hull `mesh` assets generated with the overlay) that taper
 slightly toward the hand, like the printed trunk and thigh shells. Every
-display pose preserves a `0.058m` upper arm and `0.052m` forearm, so the whole
-arm with its palm is about as long as the trunk is tall. Orange hinge drums
-with graphite axle pins mark the elbows, a graphite cuff and wrist lead into a
-chamfered block palm, and four short, rounded fingers plus a thumb keep the
-hand in the same toy scale. Knuckle spheres share the finger colour and radius,
+display pose preserves a `0.068m` upper arm and `0.056m` forearm. Those follow
+small-humanoid proportions: shoulder to fingertip is about 0.35 of the robot's
+roughly `0.49m` height (NAO is about 0.38, an adult human about 0.44), and the
+upper arm is about 1.2 times the forearm. Graphite hinge drums with a small
+orange axle cap mark the elbows, a graphite cuff and wrist lead into a
+chamfered block palm, and four short fingers set closer than their width merge
+into a rounded mitten with a separate thumb, keeping the hand in the same toy
+scale. Knuckle spheres share the finger colour and radius,
 so each digit reads as one rounded piece. In `rest` the forearms are held
 forward of the thighs with the palms turned toward the body. The four fingers
 still follow an MCP/PIP/DIP layout with a separate CMC/MCP/IP thumb chain and a

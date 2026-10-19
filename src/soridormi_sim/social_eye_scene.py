@@ -152,8 +152,11 @@ class VisualArmConfig:
     """Cosmetic arm styling matched to the Open Duck shell.
 
     Segments are chamfered, slightly tapering shells in the trunk's grey with
-    orange hinge drums like the hip servos, so the arms read as part of the
-    same chunky body rather than thin tubes with human hands.
+    an orange shoulder drum like the hip servos, so the arms read as part of
+    the same chunky body rather than thin tubes with human hands. Lengths
+    follow small-humanoid proportions: shoulder to fingertip is about 0.35 of
+    the robot's height (NAO is about 0.38, an adult human about 0.44), with an
+    upper arm about 1.2 times the forearm.
     """
 
     shoulder_x_m: float = -0.02
@@ -161,8 +164,8 @@ class VisualArmConfig:
     shoulder_z_m: float = 0.094
     shoulder_mount_y_offset_m: float = 0.055
     shoulder_housing_size_m: float = 0.044
-    upper_arm_length_m: float = 0.058
-    forearm_length_m: float = 0.052
+    upper_arm_length_m: float = 0.068
+    forearm_length_m: float = 0.056
     upper_arm_width_m: float = 0.04
     upper_arm_depth_m: float = 0.036
     forearm_width_m: float = 0.036
@@ -178,9 +181,9 @@ class VisualArmConfig:
     wrist_radius_m: float = 0.0115
     palm_thickness_m: float = 0.018
     palm_width_m: float = 0.034
-    palm_length_m: float = 0.022
-    finger_radius_m: float = 0.0054
-    finger_length_m: float = 0.018
+    palm_length_m: float = 0.024
+    finger_radius_m: float = 0.0058
+    finger_length_m: float = 0.019
     arm_rgba: str = "0.917647 0.917647 0.917647 1"
     hand_rgba: str = "0.917647 0.917647 0.917647 1"
     joint_rgba: str = "0.909804 0.572549 0.164706 1"
@@ -607,7 +610,7 @@ def _visual_arm_pose_xml(side: str, pose: str, config: VisualArmConfig) -> str:
             elbow_axis,
             config.elbow_joint_half_depth_m,
             config.elbow_joint_radius_m,
-            joint_rgba,
+            joint_axle_rgba,
         )
         + _cylinder_xml(
             name("elbow_axle"),
@@ -615,7 +618,7 @@ def _visual_arm_pose_xml(side: str, pose: str, config: VisualArmConfig) -> str:
             elbow_axis,
             config.elbow_joint_half_depth_m + 0.0012,
             config.joint_axle_radius_m,
-            joint_axle_rgba,
+            joint_rgba,
         )
         + _shell_xml(name("forearm"), "forearm", elbow, forearm_shell_end, elbow_axis, arm_rgba)
         + _cylinder_xml(
@@ -637,12 +640,12 @@ def _visual_arm_pose_xml(side: str, pose: str, config: VisualArmConfig) -> str:
         + _shell_xml(name("palm"), "palm", palm_start, palm_end, medial, hand_rgba)
     )
 
-    # Short, chunky, nearly parallel fingers keep the hand in the same toy
-    # scale as the body. Knuckle spheres share the finger colour and radius so
-    # each digit reads as one rounded piece rather than a string of beads.
+    # Short, chunky fingers sit closer together than their width, so they
+    # merge into a rounded mitten (in the spirit of NAO and Pepper hands) in
+    # the same toy scale as the body, with only a soft groove between digits.
     segment_scales = (1.0, 0.94, 0.88)
-    finger_offsets = {"index": 0.0114, "middle": 0.0038, "ring": -0.0038, "little": -0.0114}
-    finger_lengths = {"index": 0.95, "middle": 1.0, "ring": 0.95, "little": 0.82}
+    finger_offsets = {"index": 0.0105, "middle": 0.0035, "ring": -0.0035, "little": -0.0105}
+    finger_lengths = {"index": 0.96, "middle": 1.0, "ring": 0.96, "little": 0.88}
     middle_bend, distal_bend = _finger_bend_weights(pose)
     for finger, offset in finger_offsets.items():
         length = config.finger_length_m * finger_lengths[finger]

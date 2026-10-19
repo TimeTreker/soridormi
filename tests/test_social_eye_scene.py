@@ -223,8 +223,8 @@ def test_build_visual_arm_robot_xml_adds_only_non_contact_geoms() -> None:
     for joint in ("cmc", "mcp", "ip"):
         assert left_rest[f"thumb_{joint}"]["type"] == "sphere"
     assert left_rest["upper"]["rgba"].startswith("0.917647 0.917647 0.917647")
-    assert left_rest["elbow"]["rgba"].startswith("0.909804 0.572549 0.164706")
-    assert left_rest["elbow_axle"]["rgba"].startswith("0.223529 0.219608 0.219608")
+    assert left_rest["elbow"]["rgba"].startswith("0.223529 0.219608 0.219608")
+    assert left_rest["elbow_axle"]["rgba"].startswith("0.909804 0.572549 0.164706")
     left_mount = geoms[VISUAL_ARM_SHOULDER_MOUNT_NAMES[0]]
     assert left_mount["type"] == "mesh"
     assert left_mount["mesh"] == visual_arm_mesh_name("shoulder")
@@ -249,17 +249,19 @@ def test_visual_arm_poses_keep_plausible_segment_proportions() -> None:
 
             assert upper_length == pytest.approx(config.upper_arm_length_m)
             assert forearm_length == pytest.approx(config.forearm_length_m)
-            assert forearm_length / upper_length == pytest.approx(0.052 / 0.058)
+            assert forearm_length / upper_length == pytest.approx(0.056 / 0.068)
 
 
 def test_visual_arm_shells_match_body_proportions() -> None:
     config = VisualArmConfig()
     reach = config.upper_arm_length_m + config.forearm_length_m + config.palm_length_m
-    # Chunky, short limbs in the trunk's scale: about as long as the trunk is
-    # tall, with shells at least a third as thick as they are long.
-    assert 0.12 < reach < 0.15
-    assert config.upper_arm_width_m / config.upper_arm_length_m > 0.6
-    assert config.forearm_width_m / config.forearm_length_m > 0.6
+    # Small-humanoid proportions for the roughly 0.49m robot: shoulder to
+    # palm stays near 0.3 of its height (fingers bring it to about 0.35), the
+    # upper arm is about 1.2 times the forearm, and the shells stay chunky.
+    assert 0.13 < reach < 0.16
+    assert 1.1 < config.upper_arm_length_m / config.forearm_length_m < 1.35
+    assert config.upper_arm_width_m / config.upper_arm_length_m > 0.55
+    assert config.forearm_width_m / config.forearm_length_m > 0.55
     assert config.forearm_width_m < config.upper_arm_width_m
 
 
