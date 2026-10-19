@@ -12,26 +12,25 @@ round `0.02m` radius face discs at the hand-tuned anchor
 (`quat="0.707107 0 0.707107 0"`) so they sit on the forward face plane instead
 of looking like balls mounted on top of the head.
 
-The arms use body-overlapping shoulder mounts plus shoulder, upper-arm, elbow,
-forearm, cuff, wrist, palm, and finger geoms attached to `trunk_assembly`. Every
-display pose now preserves an `0.082m` upper arm and `0.070m` forearm, giving a
-consistent forearm-to-upper-arm ratio of about `0.85` instead of stretching the
-segments to arbitrary pose coordinates. The mounts bridge each shoulder into
-the tapered torso instead of leaving an air gap. Short orange cylindrical
-housings and graphite axle pins give the shoulders and elbows the compact hinge
-language used by Open Duck rather than a ball-joint appearance. They add no
-joints, actuators,
-inertials, sensors, or contacts. Every arm geom explicitly declares `contype=0`
-and `conaffinity=0`. A short white cuff now ends before a narrow orange wrist;
-the wrist connects to a flattened, lengthened palm instead of being hidden in a
-large spherical hand. The four fingers follow the human MCP/PIP/DIP layout with
-three tapered phalange segments, while the opposing thumb uses a separate
-CMC/MCP/IP chain. Only the root knuckles retain a muted warm accent; smaller
-PIP/DIP knuckles use a quiet warm gray. Each fixed hand pose applies a modest,
-anatomically ordered finger curl. These knuckles remain non-contact visual
-geoms, not MuJoCo kinematic `joint` elements or a claim of physical finger
-actuation. Raised and forward gestures use explicit wrist directions instead
-of simply continuing every hand along the forearm.
+The arms are styled to match the Open Duck body rather than a human arm. All
+geoms attach to `trunk_assembly`. A chamfered grey servo housing sits flush on
+each trunk side and carries an orange shoulder drum, echoing the hip servos
+below it. The upper arm and forearm are short, chunky, faceted shell meshes
+(inline convex-hull `mesh` assets generated with the overlay) that taper
+slightly toward the hand, like the printed trunk and thigh shells. Every
+display pose preserves a `0.058m` upper arm and `0.052m` forearm, so the whole
+arm with its palm is about as long as the trunk is tall. Orange hinge drums
+with graphite axle pins mark the elbows, a graphite cuff and wrist lead into a
+chamfered block palm, and four short, rounded fingers plus a thumb keep the
+hand in the same toy scale. Knuckle spheres share the finger colour and radius,
+so each digit reads as one rounded piece. In `rest` the forearms are held
+forward of the thighs with the palms turned toward the body. The four fingers
+still follow an MCP/PIP/DIP layout with a separate CMC/MCP/IP thumb chain and a
+modest pose-specific curl; raised and forward gestures use explicit wrist
+directions instead of simply continuing every hand along the forearm. None of
+this adds joints, actuators, inertials, sensors, or contacts: the knuckles are
+not MuJoCo kinematic `joint` elements or a claim of physical finger actuation,
+and every arm geom explicitly declares `contype=0` and `conaffinity=0`.
 
 The same generated cosmetic profile adds rounded off-white shin shells plus
 compact orange ankle accents to the existing moving lower-leg bodies. The
