@@ -12,9 +12,16 @@ RUN groupadd --gid "${GROUP_ID}" "${USERNAME}" \
 
 WORKDIR /app
 COPY pyproject.toml README.md /app/
+# Dependencies come from pyproject.toml alone, so a source change reuses them; the
+# project is then installed editable without dependencies. Downloads stay in a
+# BuildKit cache mount outside the image.
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -c 'import tomllib; p = tomllib.load(open("pyproject.toml", "rb"))["project"]; print("\n".join(p["dependencies"] + p["optional-dependencies"]["mcp"]))' > /tmp/requirements.txt \
+    && pip install -r /tmp/requirements.txt \
+    && rm /tmp/requirements.txt
 COPY configs /app/configs
 COPY src /app/src
-RUN pip install --no-cache-dir -e ".[mcp]"
+RUN --mount=type=cache,target=/root/.cache/pip pip install --no-deps -e .
 
 USER ${USERNAME}
 
