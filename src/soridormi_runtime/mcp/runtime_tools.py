@@ -76,6 +76,7 @@ from .body_targets import (
     TARGET_PERCEPTION_UNAVAILABLE,
     TARGET_RESOLVED,
     cited_source_places,
+    gaze_target_turned_summary,
     gaze_target_unavailable_result,
     reject_caller_gaze_coordinates,
     scene_terms,
@@ -98,6 +99,16 @@ RESOURCE_ROUTE_MAX_DURATION_S = 300.0
 RESOURCE_ROUTE_SEGMENT_S = 1.0
 RESOURCE_ALIGN_BEARING_RAD = 0.45
 RESOURCE_PACE_RECOVERY_AFTER_S = 20.0
+# A standalone look at a target beyond the head's range turns the body first
+# (`_turn_toward_gaze_target`).
+# The slowest pace the gait walks at; below it the policy barely moves.
+GAZE_TURN_FORWARD_MPS = FORWARD_WALK_SPEED_PRESETS_MPS["slow"]
+GAZE_TURN_YAW_RADPS = 0.2
+GAZE_TURN_SEGMENT_S = 1.0
+GAZE_TURN_MAX_DURATION_S = 20.0
+GAZE_TURN_STALLED_SEGMENTS = 3
+GAZE_TURN_HEAD_MARGIN_RAD = 0.1
+GAZE_TURN_MIN_CLEARANCE_M = 0.5
 # Steering bearing and the requester role stay inside the provider; the public
 # scene contract exposes neither.
 PROVIDER_INTERNAL_SCENE_KEYS = frozenset({"bearing_rad", "referent_id"})
@@ -684,8 +695,9 @@ class SoridormiRuntimeToolService:
             "summary": (
                 f"Runtime {skill_id}: Soridormi resolves target_ref "
                 f"{(plan.parameters or {}).get('target_ref')!r} from its scene observation "
-                "when executing and looks toward it within the head range; an unobserved, "
-                "ambiguous, or out-of-range target ends without motion."
+                "when executing and looks toward it, first turning the body toward a target "
+                "beyond the head range; an unobserved or ambiguous target, or one it cannot "
+                "turn toward, ends without a look."
                 if skill_id in GAZE_TARGET_SKILLS
                 else plan.summary.replace("Dry-run", "Runtime")
             ),
@@ -1190,12 +1202,23 @@ class SoridormiRuntimeToolService:
             )
             if primary is not None and envelope_yaw is not None:
                 yaw_limit = min(yaw_limit, float(envelope_yaw))
-            gaze_resolution, yaw = await self._resolve_gaze_target(
-                str((head_member.plan.parameters or {}).get("target_ref") or ""),
-                max_abs_yaw_rad=yaw_limit,
-            )
+            target_ref = str((head_member.plan.parameters or {}).get("target_ref") or "")
+            if primary is None:
+                # No locomotion owns the heading, so the body may turn toward the target.
+                gaze_resolution, yaw, body_turned = await self._resolve_gaze_target_turning_body(
+                    target_ref, max_abs_yaw_rad=yaw_limit,
+                )
+            else:
+                gaze_resolution, yaw = await self._resolve_gaze_target(
+                    target_ref, max_abs_yaw_rad=yaw_limit,
+                )
+                body_turned = False
+            if body_turned:
+                gaze_resolution = {**gaze_resolution, "body_turned": True}
             if yaw is None:
-                unavailable = gaze_target_unavailable_result(gaze_resolution, mode=self.mode)
+                unavailable = gaze_target_unavailable_result(
+                    gaze_resolution, mode=self.mode, body_turned=body_turned
+                )
                 record.member_results[head_member.member_id] = {
                     "member_id": head_member.member_id,
                     "skill_id": head_member.skill_id,
@@ -1206,8 +1229,8 @@ class SoridormiRuntimeToolService:
                     "target_resolution": gaze_resolution,
                 }
                 if not head_member.optional:
-                    # A required gaze target the body cannot find ends the activity
-                    # before any motion; it is never replaced by a straight-ahead look.
+                    # A required gaze target the body cannot find or turn toward ends the
+                    # activity; it is never replaced by a straight-ahead look.
                     raise GazeTargetUnavailable(unavailable["summary"])
                 head_member = None
                 if primary is None and not standalone:
@@ -1967,6 +1990,22 @@ class SoridormiRuntimeToolService:
         range. Scene markers carry no elevation, so the resolved pitch stays level.
         """
 
+        resolution, selected = await self._observe_gaze_target(target_ref)
+        if selected is None:
+            return resolution, None
+        bearing = float(selected["bearing_rad"])
+        if abs(bearing) > max_abs_yaw_rad:
+            return {**resolution, "status": TARGET_OUTSIDE_HEAD_RANGE}, None
+        return {**resolution, "status": TARGET_RESOLVED}, bearing
+
+    async def _observe_gaze_target(
+        self, target_ref: str
+    ) -> tuple[dict[str, Any], dict[str, Any] | None]:
+        """The typed resolution and the one observed marker matching ``target_ref``.
+
+        The marker is ``None`` with a not-observed, ambiguous or unavailable status.
+        """
+
         resolution: dict[str, Any] = {"role": "gaze_target", "target_ref": target_ref}
         observer = getattr(self.robot, "observe_scene", None)
         if self.mode != "sim" or not callable(observer):
@@ -1999,9 +2038,89 @@ class SoridormiRuntimeToolService:
         )
         if selected.get("source"):
             resolution["source"] = selected["source"]
-        if abs(bearing) > max_abs_yaw_rad:
-            return {**resolution, "status": TARGET_OUTSIDE_HEAD_RANGE}, None
-        return {**resolution, "status": TARGET_RESOLVED}, bearing
+        return resolution, selected
+
+    async def _turn_toward_gaze_target(
+        self, target_ref: str, *, max_abs_yaw_rad: float
+    ) -> dict[str, Any]:
+        """Turn the body until a target beyond the head's turning range is within it.
+
+        Asked to look at a person who stands beyond the head's range, Soridormi turns
+        toward them first, as a person would. The forward gait barely yaws with zero
+        translation (2026-10-20: 0.05 rad for a 0.8 rad in-place command), so the turn
+        is a walking arc at the slowest pace, closed on the observed bearing, as the
+        resource route aligns. Only a marker with range is turned toward: a bearing-only observation
+        does not move with the body. The arc never closes within
+        ``GAZE_TURN_MIN_CLEARANCE_M`` of the target and gives up after
+        ``GAZE_TURN_MAX_DURATION_S`` or ``GAZE_TURN_STALLED_SEGMENTS`` segments without progress.
+
+        Returns ``moved`` (the body moved) and ``within_range``; ``reason`` names why a
+        turn that did not reach the range stopped.
+        """
+
+        def report(moved: bool, within_range: bool, reason: str = "") -> dict[str, Any]:
+            return {"moved": moved, "within_range": within_range, "reason": reason}
+
+        _, selected = await self._observe_gaze_target(target_ref)
+        if selected is None or "distance_m" not in selected:
+            return report(False, False, "target_has_no_range")
+        target_bearing = max_abs_yaw_rad - GAZE_TURN_HEAD_MARGIN_RAD
+        moved = False
+        async with self._locomotion_lock:
+            if self.emergency_stop:
+                raise RuntimeError("cannot execute skill while emergency_stop is active")
+            self._motion_stop_requested = False
+            initial_reset_count = (await self._read_state()).reset_count
+            self._set_active_lane(
+                "locomotion",
+                {"skill_id": "look_at_person", "purpose": "turn_toward_gaze_target",
+                 "started_at": time.time(), "command_index": 0},
+            )
+            started_at = asyncio.get_running_loop().time()
+            previous_bearing = math.inf
+            stalled_segments = 0
+            try:
+                while True:
+                    if self.emergency_stop or self._motion_stop_requested:
+                        return report(moved, False, "stopped")
+                    _, selected = await self._observe_gaze_target(target_ref)
+                    if selected is None:
+                        return report(moved, False, "target_lost")
+                    bearing = float(selected["bearing_rad"])
+                    distance = float(selected.get("distance_m", math.nan))
+                    if abs(bearing) <= target_bearing:
+                        return report(moved, True)
+                    if not math.isfinite(distance) or (
+                        distance - GAZE_TURN_FORWARD_MPS * GAZE_TURN_SEGMENT_S
+                        < GAZE_TURN_MIN_CLEARANCE_M
+                    ):
+                        return report(moved, False, "too_close_to_turn")
+                    if asyncio.get_running_loop().time() - started_at > GAZE_TURN_MAX_DURATION_S:
+                        return report(moved, False, "turn_time_bound")
+                    # The gait starts slowly from standing (2026-10-20: a 90 degree turn
+                    # took about 10 s), so only a run of stalled segments gives up.
+                    stalled_segments = stalled_segments + 1 if abs(bearing) >= previous_bearing - 0.005 else 0
+                    if stalled_segments >= GAZE_TURN_STALLED_SEGMENTS:
+                        return report(moved, False, "turn_made_no_progress")
+                    previous_bearing = abs(bearing)
+                    self.controller.command = PolicyCommand(
+                        x_velocity=GAZE_TURN_FORWARD_MPS,
+                        yaw_velocity=math.copysign(GAZE_TURN_YAW_RADPS, bearing),
+                    )
+                    moved = True
+                    if not await self._run_segment(GAZE_TURN_SEGMENT_S):
+                        return report(moved, False, "stopped")
+                    if self._last_state is None or self._last_state.reset_count != initial_reset_count:
+                        return report(moved, False, "simulator_reset")
+            except asyncio.CancelledError:
+                await asyncio.shield(self._apply_safe_hold())
+                raise
+            except Exception:
+                await self._apply_safe_hold()
+                raise
+            finally:
+                self.controller.command = PolicyCommand()
+                self._clear_active_lane("locomotion")
 
     def _resolved_gaze_plan(self, plan: Any, yaw_rad: float) -> Any:
         parameters = {
@@ -2019,19 +2138,36 @@ class SoridormiRuntimeToolService:
         if self.emergency_stop:
             raise RuntimeError("cannot execute skill while emergency_stop is active")
         stored = self.skill_plans[plan_id]
-        resolution, yaw = await self._resolve_gaze_target(
+        resolution, yaw, turned = await self._resolve_gaze_target_turning_body(
             str((stored.plan.parameters or {}).get("target_ref") or ""),
             max_abs_yaw_rad=self._gaze_yaw_limit_rad(stored.plan.skill_id),
         )
         if yaw is None:
-            return gaze_target_unavailable_result(resolution, mode=self.mode)
+            return gaze_target_unavailable_result(resolution, mode=self.mode, body_turned=turned)
         self.skill_plans[plan_id] = NamedSkillPlan(
             plan_id=plan_id,
             plan=self._resolved_gaze_plan(stored.plan, yaw),
             created_at=stored.created_at,
         )
         result = await self.execute_scripted_head_skill(plan_id)
+        if turned:
+            result = {**result, "body_turned": True,
+                      "summary": gaze_target_turned_summary(resolution, looked=result.get("completed") is True)}
         return {**result, "target_resolution": resolution}
+
+    async def _resolve_gaze_target_turning_body(
+        self, target_ref: str, *, max_abs_yaw_rad: float
+    ) -> tuple[dict[str, Any], float | None, bool]:
+        """Resolve a standalone gaze target, turning the body first when it is beyond
+        the head's range. Returns the resolution, head yaw and whether the body moved."""
+
+        resolution, yaw = await self._resolve_gaze_target(target_ref, max_abs_yaw_rad=max_abs_yaw_rad)
+        if yaw is not None or resolution.get("status") != TARGET_OUTSIDE_HEAD_RANGE:
+            return resolution, yaw, False
+        turn = await self._turn_toward_gaze_target(target_ref, max_abs_yaw_rad=max_abs_yaw_rad)
+        if turn["moved"]:
+            resolution, yaw = await self._resolve_gaze_target(target_ref, max_abs_yaw_rad=max_abs_yaw_rad)
+        return resolution, yaw, bool(turn["moved"])
 
     async def _navigate_to_observed_resource(
         self, description: str, *, speed_mps: float, stop_distance_m: float,

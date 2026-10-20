@@ -38,16 +38,25 @@ routes ("walk to me") and the public `soridormi.robot.observe_scene` output do
 not use it. A real provider (sound direction, face detection) replaces it in the
 same observation; it never applies outside sim.
 
-When Soridormi cannot resolve the target, the skill ends without motion as a
+A standalone look (no locomotion owns the heading) at a target observed beyond
+the head's yaw range first turns the body toward it. The forward gait barely
+yaws with zero translation, so the turn is a walking arc at the slowest pace
+(0.12 m/s, 0.2 rad/s, one-second segments) closed on the observed bearing until the target
+is 0.1 rad inside the head range. It never turns toward a bearing-only target,
+never closes within 0.5 m of the target, and stops after 20 s or three
+segments in which the bearing does not shrink (a 90 degree turn takes about 10 s). The result reports `body_turned: true` whenever the
+body moved.
+
+When Soridormi cannot resolve the target, the skill ends without a look as a
 declared non-completion with `completed: false`, a summary naming what was not
-found, and a typed `target_resolution`:
+found, and a typed `target_resolution` (`no_motion` is false only after a turn):
 
 | `status` | Meaning |
 | --- | --- |
 | `resolved` | One observed target within the head range; the skill executes. |
 | `not_observed` | No observed marker matches the target. |
 | `ambiguous` | More than one observed marker matches; Soridormi does not pick one. |
-| `outside_head_range` | The target is observed beyond the head yaw range (or the stricter walking-overlay envelope); turning the body is a separate skill Chromie selects. |
+| `outside_head_range` | The target is observed beyond the head yaw range (or the stricter walking-overlay envelope) and Soridormi could not turn toward it: a walking overlay, a bearing-only target, the 0.5 m clearance, or the turn's time or progress bound. |
 | `perception_unavailable` | The mode has no perception to locate the target (outside simulation today). |
 
 Soridormi never substitutes a straight-ahead (0/0) look and reports it as

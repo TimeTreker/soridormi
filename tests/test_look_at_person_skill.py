@@ -85,7 +85,8 @@ def test_look_at_person_manifest_promoted_to_structured_target_skill() -> None:
 
     assert skill["status"] == "available_sim_experimental"
     assert skill["execution"] == "scripted_keyframe"
-    assert skill["required_actuator_groups"] == ["head_neck"]
+    # A standalone look beyond the head range turns the body first.
+    assert skill["required_actuator_groups"] == ["head_neck", "legs"]
     assert skill["safety"]["hardware_enabled"] is False
     assert "operator-tool inputs" in skill["notes"]
     assert "does not run camera perception" in skill["notes"]

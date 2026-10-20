@@ -2178,7 +2178,7 @@
         }
       },
       "display_name": "Look At Person",
-      "description": "Turn head toward a named person and, by default, hold gaze on that person. Soridormi resolves target_ref (\"requester\" is the person who made this request) from its own scene observation; an unobserved, ambiguous, or out-of-head-range target ends without motion as a typed target_resolution.",
+      "description": "Turn toward a named person and, by default, hold gaze on that person. Soridormi resolves target_ref (\"requester\" is the person who made this request) from its own scene observation and turns the head toward the person; when the person stands beyond the head's turning range and no locomotion is running, Soridormi first turns the body toward them. An unobserved or ambiguous target, or one Soridormi cannot turn toward, ends without a look as a typed target_resolution.",
       "status": "available_sim_experimental",
       "execution": "scripted_keyframe",
       "capability_group": "head_social",
@@ -2255,7 +2255,8 @@
         "sim_or_dry_run"
       ],
       "required_actuator_groups": [
-        "head_neck"
+        "head_neck",
+        "legs"
       ],
       "safety": {
         "requires_standing": false,
@@ -2272,7 +2273,7 @@
         "joint_limit_margin",
         "base_stability"
       ],
-      "notes": "Callers name the target only; target_yaw_rad/target_pitch_rad are operator-tool inputs (look_at_person_target, scripted acceptance) and are rejected on the MCP skill, activity, and task paths. In simulation Soridormi resolves target_ref against its scene markers (\"requester\" by referent, otherwise by identifying words) and looks along the observed bearing with level pitch, because scene markers carry no elevation. The default end_mode holds the target so the robot does not immediately return to neutral after looking at somebody. Outside simulation no perception resolves the target, so the skill reports perception_unavailable. It does not run camera perception, raw natural language parsing, arms, hands, torso, or hardware. Concurrent locomotion overlays use a stricter bounded yaw/pitch and velocity envelope declared in concurrency.locomotion_envelope.",
+      "notes": "Callers name the target only; target_yaw_rad/target_pitch_rad are operator-tool inputs (look_at_person_target, scripted acceptance) and are rejected on the MCP skill, activity, and task paths. In simulation Soridormi resolves target_ref against its scene markers (\"requester\" by referent, otherwise by identifying words) and looks along the observed bearing with level pitch, because scene markers carry no elevation. A standalone look at a target beyond the head range first turns the body with a walking arc at the slowest pace closed on the observed bearing, inside the locomotion lock; it never turns during a locomotion overlay, toward a bearing-only target, or closer than 0.5 m, and reports body_turned when the body moved. The default end_mode holds the target so the robot does not immediately return to neutral after looking at somebody. Outside simulation no perception resolves the target, so the skill reports perception_unavailable. It does not run camera perception, raw natural language parsing, arms, hands, torso, or hardware. Concurrent locomotion overlays use a stricter bounded yaw/pitch and velocity envelope declared in concurrency.locomotion_envelope.",
       "concurrency": {
         "ability_class": "subtle_expression",
         "control_coupling": "body_command_overlay",
