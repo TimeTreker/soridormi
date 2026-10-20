@@ -1678,7 +1678,9 @@ def test_mocked_requester_is_part_of_the_scene_observation_not_a_gaze_fallback()
          "user", "ambiguous",
          "Soridormi observed more than one target matching 'user' in the scene, "
          "so it did not look."),
-        (({**REQUESTER_MARKER, "bearing_rad": 2.0, "relative_direction": "to Chromie's left"},),
+        # A bearing-only marker does not move with the body, so it is not turned toward.
+        (({key: value for key, value in REQUESTER_MARKER.items() if key != "distance_m"}
+          | {"bearing_rad": 2.0, "relative_direction": "to Chromie's left"},),
          "requester", "outside_head_range",
          "Soridormi observed the requester to Chromie's left, beyond the head's turning "
          "range, so it did not look."),
@@ -1701,6 +1703,92 @@ def test_an_unresolvable_gaze_target_is_a_declared_non_completion(
     assert result["summary"] == summary
     assert result["target_resolution"]["status"] == status
     assert robot.commands == []
+
+
+class TurningGazeRobot(GazeFakeRobot):
+    """Scene whose requester bearing follows a script, one value per observation."""
+
+    def __init__(self, marker: dict[str, object], bearings: list[float]) -> None:
+        super().__init__(marker)
+        self.bearings = list(bearings)
+
+    def observe_scene(self) -> dict[str, object]:
+        if len(self.bearings) > 1:
+            self.objects[0]["bearing_rad"] = self.bearings.pop(0)
+        else:
+            self.objects[0]["bearing_rad"] = self.bearings[0]
+        return super().observe_scene()
+
+
+def _execute_turning_look(
+    monkeypatch: pytest.MonkeyPatch, robot: GazeFakeRobot
+) -> tuple[dict[str, object], FakeController]:
+    monkeypatch.setattr("soridormi_runtime.mcp.runtime_tools.GAZE_TURN_SEGMENT_S", 0.01)
+    controller = FakeController()
+
+    async def exercise() -> dict[str, object]:
+        service = SoridormiRuntimeToolService(robot=robot, controller=controller, control_hz=200.0)
+        plan = await service.call_tool(
+            "soridormi.skill.create_plan",
+            {"skill_id": "look_at_person", "parameters": {"target_ref": "requester", "duration_s": 1.0}},
+        )
+        result = await service.call_tool("soridormi.skill.execute_plan", {"plan_id": plan["plan_id"]})
+        assert service.active_lanes == {}
+        assert service.controller.command == PolicyCommand()
+        return result
+
+    return asyncio.run(exercise()), controller
+
+
+def test_a_person_beyond_the_head_range_is_turned_toward_then_looked_at(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Live 2026-10-20 ("转过来看着我"): the requester stood 0.74 rad to the right, "in front"
+    but beyond the 0.55 rad head range, and the look ended without motion. The body now turns
+    toward them on a short arc closed on the observed bearing, then the head looks."""
+    robot = TurningGazeRobot({**REQUESTER_MARKER, "distance_m": 0.75}, [-0.74, -0.74, -0.74, -0.6, -0.3])
+    result, controller = _execute_turning_look(monkeypatch, robot)
+
+    assert result["completed"] is True
+    assert result["body_turned"] is True
+    assert result["summary"] == (
+        "Soridormi turned toward the requester, who was beyond the head's turning range, and looked."
+    )
+    assert result["target_resolution"]["status"] == "resolved"
+    turning = [command for command in controller.seen_commands if command.yaw_velocity]
+    assert turning and {(command.x_velocity, command.yaw_velocity) for command in turning} == {
+        (MIN_FORWARD_WALK_SPEED_MPS, -0.2)
+    }
+    head_yaw = [command.positions[robot.names.index("head_yaw")] for command in robot.commands]
+    assert min(head_yaw) == pytest.approx(-0.3, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("distance", "bearings", "moved"),
+    [
+        (0.5, [0.9], False),  # an arc would close within the 0.5 m clearance
+        (1.5, [0.9], True),  # the bearing does not shrink: the turn gives up
+    ],
+)
+def test_a_turn_that_cannot_reach_the_head_range_reports_it(
+    monkeypatch: pytest.MonkeyPatch, distance: float, bearings: list[float], moved: bool
+) -> None:
+    robot = TurningGazeRobot(
+        {**REQUESTER_MARKER, "distance_m": distance, "relative_direction": "to Chromie's left"}, bearings
+    )
+    result, controller = _execute_turning_look(monkeypatch, robot)
+
+    assert result["completed"] is False
+    assert result["target_resolution"]["status"] == "outside_head_range"
+    assert result["no_motion"] is (not moved)
+    assert result.get("body_turned", False) is moved
+    seen = "observed the requester to Chromie's left, beyond the head's turning range, so it did not look."
+    assert result["summary"] == (
+        f"Soridormi turned toward the requester but still {seen}" if moved else f"Soridormi {seen}"
+    )
+    assert any(command.yaw_velocity for command in controller.seen_commands) is moved
+    if not moved:
+        assert robot.commands == []
 
 
 def test_look_at_without_perception_reports_it_instead_of_looking_ahead(

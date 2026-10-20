@@ -126,8 +126,14 @@ def gaze_target_label(target_ref: str) -> str:
     return "the requester" if target_ref == REQUESTER_REFERENT_ID else repr(target_ref)
 
 
-def gaze_target_unavailable_result(resolution: Mapping[str, Any], *, mode: str) -> dict[str, Any]:
-    """Declared non-completion for a gaze target Soridormi could not resolve."""
+def gaze_target_unavailable_result(
+    resolution: Mapping[str, Any], *, mode: str, body_turned: bool = False
+) -> dict[str, Any]:
+    """Declared non-completion for a gaze target Soridormi could not resolve.
+
+    ``body_turned`` reports that Soridormi turned toward the target first, so the
+    body did move although it did not look.
+    """
 
     status = str(resolution.get("status"))
     target = gaze_target_label(str(resolution.get("target_ref") or ""))
@@ -143,9 +149,26 @@ def gaze_target_unavailable_result(resolution: Mapping[str, Any], *, mode: str) 
         )
     else:
         seen = f"has no perception in {mode} mode to locate {target}"
+    if body_turned:
+        return {
+            "completed": False,
+            "no_motion": False,
+            "body_turned": True,
+            "summary": f"Soridormi turned toward {target} but still {seen}, so it did not look.",
+            "target_resolution": dict(resolution),
+        }
     return {
         "completed": False,
         "no_motion": True,
         "summary": f"Soridormi {seen}, so it did not look.",
         "target_resolution": dict(resolution),
     }
+
+
+def gaze_target_turned_summary(resolution: Mapping[str, Any], *, looked: bool) -> str:
+    """Summary of a look that first turned the body toward its target."""
+
+    target = gaze_target_label(str(resolution.get("target_ref") or ""))
+    if looked:
+        return f"Soridormi turned toward {target}, who was beyond the head's turning range, and looked."
+    return f"Soridormi turned toward {target}, who was beyond the head's turning range; the look did not complete."
