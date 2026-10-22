@@ -18,6 +18,7 @@ from soridormi_sim.social_eye_scene import (
     SOCIAL_EYE_FRAME_Z_AXIS_NAME,
     VISUAL_ARM_COMPONENTS,
     VISUAL_ARM_GEOM_NAMES,
+    VISUAL_ARM_MESH_NAMES,
     VISUAL_ARM_POSES,
     VISUAL_ARM_SHOULDER_AXLE_NAMES,
     VISUAL_ARM_SHOULDER_MOUNT_NAMES,
@@ -33,6 +34,7 @@ from soridormi_sim.social_eye_scene import (
     build_visual_leg_shell_robot_xml,
     generate_social_eye_scene,
     visual_arm_geom_name,
+    visual_arm_mesh_name,
     visual_leg_geom_name,
 )
 
@@ -203,7 +205,9 @@ def test_build_visual_arm_robot_xml_adds_only_non_contact_geoms() -> None:
         component: geoms[visual_arm_geom_name("left", "rest", component)]
         for component in VISUAL_ARM_COMPONENTS
     }
-    assert left_rest["palm"]["type"] == "ellipsoid"
+    for shell in ("upper", "forearm", "palm"):
+        assert left_rest[shell]["type"] == "mesh"
+        assert left_rest[shell]["mesh"] == visual_arm_mesh_name(shell)
     assert left_rest["elbow"]["type"] == "cylinder"
     assert left_rest["elbow_axle"]["type"] == "cylinder"
     assert left_rest["cuff"]["type"] == "cylinder"
@@ -213,23 +217,23 @@ def test_build_visual_arm_robot_xml_adds_only_non_contact_geoms() -> None:
             assert left_rest[f"{finger}_{segment}"]["type"] == "capsule"
         for joint in ("mcp", "pip", "dip"):
             assert left_rest[f"{finger}_{joint}"]["type"] == "sphere"
+            assert left_rest[f"{finger}_{joint}"]["rgba"] == left_rest["palm"]["rgba"]
     for segment in ("metacarpal", "proximal", "distal"):
         assert left_rest[f"thumb_{segment}"]["type"] == "capsule"
     for joint in ("cmc", "mcp", "ip"):
         assert left_rest[f"thumb_{joint}"]["type"] == "sphere"
     assert left_rest["upper"]["rgba"].startswith("0.917647 0.917647 0.917647")
-    assert left_rest["upper"]["size"] == "0.018"
-    assert left_rest["forearm"]["size"] == "0.015"
-    assert left_rest["elbow"]["rgba"].startswith("0.909804 0.572549 0.164706")
-    assert left_rest["elbow_axle"]["rgba"].startswith("0.223529 0.219608 0.219608")
-    assert left_rest["index_mcp"]["rgba"].startswith("0.93 0.66 0.28")
-    assert left_rest["index_pip"]["rgba"].startswith("0.82 0.82 0.80")
+    assert left_rest["elbow"]["rgba"].startswith("0.223529 0.219608 0.219608")
+    assert left_rest["elbow_axle"]["rgba"].startswith("0.909804 0.572549 0.164706")
     left_mount = geoms[VISUAL_ARM_SHOULDER_MOUNT_NAMES[0]]
-    assert left_mount["type"] == "capsule"
-    assert left_mount["fromto"] == "-0.02 0.055 0.105 -0.02 0.07765 0.105"
+    assert left_mount["type"] == "mesh"
+    assert left_mount["mesh"] == visual_arm_mesh_name("shoulder")
     left_shoulder = geoms[VISUAL_ARM_SHOULDER_NAMES[0]]
     assert left_shoulder["type"] == "cylinder"
-    assert left_shoulder["fromto"] == "-0.029 0.09 0.105 -0.011 0.09 0.105"
+    assert left_shoulder["fromto"] == "-0.02 0.0655 0.094 -0.02 0.0725 0.094"
+    assert left_rest["shoulder_cap"]["mesh"] == visual_arm_mesh_name("shoulder_cap")
+    meshes = {mesh.attrib["name"]: mesh.attrib for mesh in root.findall(".//asset/mesh")}
+    assert set(meshes) == set(VISUAL_ARM_MESH_NAMES)
     left_shoulder_axle = geoms[VISUAL_ARM_SHOULDER_AXLE_NAMES[0]]
     assert left_shoulder_axle["type"] == "cylinder"
     assert left_shoulder_axle["rgba"] == "0.223529 0.219608 0.219608 1"
@@ -246,7 +250,20 @@ def test_visual_arm_poses_keep_plausible_segment_proportions() -> None:
 
             assert upper_length == pytest.approx(config.upper_arm_length_m)
             assert forearm_length == pytest.approx(config.forearm_length_m)
-            assert forearm_length / upper_length == pytest.approx(0.07 / 0.082)
+            assert forearm_length / upper_length == pytest.approx(0.056 / 0.068)
+
+
+def test_visual_arm_shells_match_body_proportions() -> None:
+    config = VisualArmConfig()
+    reach = config.upper_arm_length_m + config.forearm_length_m + config.palm_length_m
+    # Small-humanoid proportions for the roughly 0.49m robot: shoulder to
+    # palm stays near 0.3 of its height (fingers bring it to about 0.35), the
+    # upper arm is about 1.2 times the forearm, and the shells stay chunky.
+    assert 0.13 < reach < 0.16
+    assert 1.1 < config.upper_arm_length_m / config.forearm_length_m < 1.35
+    assert config.upper_arm_width_m / config.upper_arm_length_m > 0.55
+    assert config.forearm_width_m / config.forearm_length_m > 0.55
+    assert config.forearm_width_m < config.upper_arm_width_m
 
 
 def test_visual_arm_hands_use_pose_specific_wrist_directions() -> None:
@@ -276,12 +293,12 @@ def test_visual_arm_hands_use_pose_specific_wrist_directions() -> None:
         "welcome_close",
     ):
         dx, dy, dz = finger_vector(pose)
-        assert dz > 0.024
+        assert dz > 0.016
         assert abs(dx) < 0.004
         assert abs(dy) < 0.003
 
     reach_dx, _reach_dy, reach_dz = finger_vector("reach")
-    assert reach_dx > 0.024
+    assert reach_dx > 0.016
     assert reach_dz < 0
 
 

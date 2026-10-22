@@ -25,6 +25,8 @@ SOCIAL_EYE_GEOM_NAMES = (
 )
 SOCIAL_EYE_COMMENT = "                <!-- Soridormi generated social eye visuals. -->\n"
 VISUAL_ARM_COMMENT = "        <!-- Soridormi generated visual-only arms. -->\n"
+VISUAL_ARM_ASSET_OPEN = "  <asset>  <!-- Soridormi generated visual-arm shells. -->\n"
+VISUAL_ARM_ASSET_CLOSE = "  </asset>  <!-- end Soridormi visual-arm shells -->\n"
 DEFAULT_ROBOT_PREFIX = "soridormi_social_eyes_"
 
 VISUAL_ARM_POSES = (
@@ -58,6 +60,7 @@ VISUAL_ARM_THUMB_COMPONENTS = (
 )
 VISUAL_ARM_COMPONENTS = (
     (
+        "shoulder_cap",
         "upper",
         "elbow",
         "elbow_axle",
@@ -147,33 +150,48 @@ class SocialEyeConfig:
 
 @dataclass(frozen=True)
 class VisualArmConfig:
+    """Cosmetic arm styling matched to the Open Duck shell.
+
+    Segments are chamfered, slightly tapering shells in the trunk's grey with
+    an orange shoulder drum like the hip servos, so the arms read as part of
+    the same chunky body rather than thin tubes with human hands. Lengths
+    follow small-humanoid proportions: shoulder to fingertip is about 0.35 of
+    the robot's height (NAO is about 0.38, an adult human about 0.44), with an
+    upper arm about 1.2 times the forearm.
+    """
+
     shoulder_x_m: float = -0.02
-    shoulder_y_offset_m: float = 0.09
-    shoulder_z_m: float = 0.105
+    shoulder_y_offset_m: float = 0.093
+    shoulder_z_m: float = 0.094
     shoulder_mount_y_offset_m: float = 0.055
-    shoulder_mount_radius_m: float = 0.0175
-    upper_arm_length_m: float = 0.082
-    forearm_length_m: float = 0.07
-    upper_arm_radius_m: float = 0.018
-    forearm_radius_m: float = 0.015
+    shoulder_housing_size_m: float = 0.044
+    upper_arm_length_m: float = 0.068
+    forearm_length_m: float = 0.056
+    upper_arm_width_m: float = 0.04
+    upper_arm_depth_m: float = 0.036
+    forearm_width_m: float = 0.036
+    forearm_depth_m: float = 0.032
+    shell_taper: float = 0.86
+    shell_chamfer_m: float = 0.009
     shoulder_joint_radius_m: float = 0.019
-    shoulder_joint_half_depth_m: float = 0.009
-    elbow_joint_radius_m: float = 0.0175
-    elbow_joint_half_depth_m: float = 0.0075
-    joint_axle_radius_m: float = 0.0065
-    cuff_radius_m: float = 0.0125
-    wrist_radius_m: float = 0.008
-    palm_thickness_m: float = 0.0065
-    palm_width_m: float = 0.0105
-    palm_length_m: float = 0.026
-    finger_radius_m: float = 0.0034
-    finger_joint_radius_m: float = 0.0038
+    shoulder_joint_depth_m: float = 0.007
+    shoulder_cap_radius_m: float = 0.0205
+    shoulder_cap_reach_m: float = 0.026
+    shoulder_cap_width_m: float = 0.047
+    elbow_joint_radius_m: float = 0.0145
+    elbow_joint_half_depth_m: float = 0.0195
+    joint_axle_radius_m: float = 0.0072
+    cuff_radius_m: float = 0.0165
+    wrist_radius_m: float = 0.0115
+    palm_thickness_m: float = 0.018
+    palm_width_m: float = 0.034
+    palm_length_m: float = 0.024
+    finger_radius_m: float = 0.0058
+    finger_length_m: float = 0.019
     arm_rgba: str = "0.917647 0.917647 0.917647 1"
     hand_rgba: str = "0.917647 0.917647 0.917647 1"
     joint_rgba: str = "0.909804 0.572549 0.164706 1"
     joint_axle_rgba: str = "0.223529 0.219608 0.219608 1"
-    finger_joint_rgba: str = "0.82 0.82 0.80 1"
-    finger_root_joint_rgba: str = "0.93 0.66 0.28 1"
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -229,8 +247,8 @@ def _arm_pose_points(
     )
     points = {
         "rest": (
-            (-0.025, sign * 0.155, 0.055),
-            (-0.005, sign * 0.184, 0.0),
+            (0.03, sign * 0.115, 0.07),
+            (0.07, sign * 0.115, 0.03),
         ),
         "reach": (
             (0.04, sign * 0.125, 0.08),
@@ -421,195 +439,324 @@ def _finger_bend_weights(pose: str) -> tuple[float, float]:
     return (0.05, 0.12)
 
 
+def _rgba_with_alpha(rgba: str, alpha: str) -> str:
+    return " ".join(rgba.split()[:3] + [alpha])
+
+
+def _visual_geom_xml(name: str, geom_type: str, placement: str, rgba: str) -> str:
+    return (
+        f'        <geom name="{name}" type="{geom_type}" class="visual" contype="0" '
+        f'conaffinity="0" {placement} rgba="{rgba}"/>\n'
+    )
+
+
+def _chamfered_shell_vertices(
+    length: float,
+    width: float,
+    depth: float,
+    chamfer: float,
+    taper: float,
+) -> list[tuple[float, float, float]]:
+    """Return hull points of an octagonal shell along +z that tapers toward +z.
+
+    The cross-section is a box with chamfered edges and both ends are bevelled,
+    matching the faceted printed shells of the Open Duck trunk and thighs.
+    """
+
+    def ring(
+        half_x: float, half_y: float, cut: float, z: float
+    ) -> list[tuple[float, float, float]]:
+        points = []
+        for sx in (-1.0, 1.0):
+            for sy in (-1.0, 1.0):
+                points.append((sx * half_x, sy * (half_y - cut), z))
+                points.append((sx * (half_x - cut), sy * half_y, z))
+        return points
+
+    half_length = 0.5 * length - chamfer
+    vertices: list[tuple[float, float, float]] = []
+    for z, scale, inset in (
+        (-half_length - chamfer, 1.0, chamfer),
+        (-half_length, 1.0, 0.0),
+        (half_length, taper, 0.0),
+        (half_length + chamfer, taper, chamfer),
+    ):
+        half_x = 0.5 * depth * scale - inset
+        half_y = 0.5 * width * scale - inset
+        vertices.extend(ring(half_x, half_y, min(chamfer, half_x, half_y) * 0.9, z))
+    return vertices
+
+
+def visual_arm_mesh_name(part: str) -> str:
+    return f"soridormi_arm_{part}_shell_mesh"
+
+
+VISUAL_ARM_MESH_PARTS = ("shoulder", "shoulder_cap", "upper", "forearm", "palm")
+VISUAL_ARM_MESH_NAMES = tuple(visual_arm_mesh_name(part) for part in VISUAL_ARM_MESH_PARTS)
+
+
+def build_visual_arm_mesh_assets(config: VisualArmConfig | None = None) -> str:
+    cfg = config or VisualArmConfig()
+    housing = cfg.shoulder_housing_size_m
+    housing_depth = (
+        cfg.shoulder_y_offset_m
+        - cfg.shoulder_cap_radius_m
+        - cfg.shoulder_joint_depth_m
+        - cfg.shoulder_mount_y_offset_m
+    )
+    shells = {
+        "shoulder": _chamfered_shell_vertices(
+            housing_depth + cfg.shell_chamfer_m, housing, housing, cfg.shell_chamfer_m, 0.92
+        ),
+        # The rounded shoulder pad turns with the upper arm and hides its top
+        # end, so raised arms roll out of the shoulder instead of a block
+        # poking out of the fixed servo housing.
+        "shoulder_cap": _chamfered_shell_vertices(
+            cfg.shoulder_cap_radius_m + cfg.shoulder_cap_reach_m,
+            cfg.shoulder_cap_width_m,
+            cfg.shoulder_cap_width_m * 0.92,
+            cfg.shell_chamfer_m * 1.45,
+            0.9,
+        ),
+        "upper": _chamfered_shell_vertices(
+            cfg.upper_arm_length_m - 0.004,
+            cfg.upper_arm_width_m,
+            cfg.upper_arm_depth_m,
+            cfg.shell_chamfer_m,
+            cfg.shell_taper,
+        ),
+        "forearm": _chamfered_shell_vertices(
+            cfg.forearm_length_m - 0.012,
+            cfg.forearm_width_m,
+            cfg.forearm_depth_m,
+            cfg.shell_chamfer_m,
+            cfg.shell_taper,
+        ),
+        "palm": _chamfered_shell_vertices(
+            cfg.palm_length_m,
+            cfg.palm_width_m,
+            cfg.palm_thickness_m,
+            cfg.shell_chamfer_m * 0.7,
+            0.94,
+        ),
+    }
+    chunks = [VISUAL_ARM_ASSET_OPEN]
+    for part, vertices in shells.items():
+        flat = " ".join(_format_xyz(vertex) for vertex in vertices)
+        chunks.append(f'    <mesh name="{visual_arm_mesh_name(part)}" vertex="{flat}"/>\n')
+    chunks.append(VISUAL_ARM_ASSET_CLOSE)
+    return "".join(chunks)
+
+
+def _shell_xml(
+    name: str,
+    part: str,
+    start: tuple[float, float, float],
+    end: tuple[float, float, float],
+    hinge: tuple[float, float, float],
+    rgba: str,
+) -> str:
+    """Place a centred shell mesh between two points with its width on ``hinge``."""
+    axis = _unit_vector(_vector_subtract(end, start))
+    width_axis = _perpendicular_unit(hinge, axis)
+    quat = _quat_from_axes(_vector_cross(width_axis, axis), width_axis, axis)
+    center = _vector_scale(_vector_add(start, end), 0.5)
+    return _visual_geom_xml(
+        name,
+        "mesh",
+        f'mesh="{visual_arm_mesh_name(part)}" pos="{_format_xyz(center)}" '
+        f'quat="{_format_xyz(quat)}"',
+        rgba,
+    )
+
+
+def _cylinder_xml(
+    name: str,
+    center: tuple[float, float, float],
+    axis: tuple[float, float, float],
+    half_depth: float,
+    radius: float,
+    rgba: str,
+    geom_type: str = "cylinder",
+) -> str:
+    offset = _vector_scale(axis, half_depth)
+    return _visual_geom_xml(
+        name,
+        geom_type,
+        f'fromto="{_format_xyz(_vector_subtract(center, offset))} '
+        f'{_format_xyz(_vector_add(center, offset))}" size="{_format_float(radius)}"',
+        rgba,
+    )
+
+
 def _visual_arm_pose_xml(side: str, pose: str, config: VisualArmConfig) -> str:
     shoulder, elbow, wrist = _arm_pose_points(side, pose, config)
     alpha = "1" if pose == "rest" else "0"
-    arm_rgba = " ".join(config.arm_rgba.split()[:3] + [alpha])
-    hand_rgba = " ".join(config.hand_rgba.split()[:3] + [alpha])
-    joint_rgba = " ".join(config.joint_rgba.split()[:3] + [alpha])
-    joint_axle_rgba = " ".join(config.joint_axle_rgba.split()[:3] + [alpha])
-    upper = visual_arm_geom_name(side, pose, "upper")
-    elbow_name = visual_arm_geom_name(side, pose, "elbow")
-    elbow_axle_name = visual_arm_geom_name(side, pose, "elbow_axle")
-    forearm = visual_arm_geom_name(side, pose, "forearm")
-    cuff = visual_arm_geom_name(side, pose, "cuff")
-    wrist_name = visual_arm_geom_name(side, pose, "wrist")
-    palm = visual_arm_geom_name(side, pose, "palm")
+    arm_rgba = _rgba_with_alpha(config.arm_rgba, alpha)
+    hand_rgba = _rgba_with_alpha(config.hand_rgba, alpha)
+    joint_rgba = _rgba_with_alpha(config.joint_rgba, alpha)
+    joint_axle_rgba = _rgba_with_alpha(config.joint_axle_rgba, alpha)
+
+    def name(component: str) -> str:
+        return visual_arm_geom_name(side, pose, component)
 
     hand_forward = _arm_hand_direction(pose, elbow, wrist)
     sign = 1.0 if side == "left" else -1.0
-    medial = _perpendicular_unit((0.0, -sign, 0.0), hand_forward)
-    palm_normal = _unit_vector(_vector_cross(medial, hand_forward))
-    palm_quat = _quat_from_axes(palm_normal, medial, hand_forward)
-    curl_direction = _unit_vector(_vector_scale(_vector_cross(medial, hand_forward), sign))
+    inward = _perpendicular_unit((0.0, -sign, 0.0), hand_forward)
+    if pose == "rest":
+        # Relaxed hands turn their palms toward the body, thumbs up.
+        medial = _perpendicular_unit((0.0, 0.0, 1.0), hand_forward)
+        curl_direction = inward
+    else:
+        medial = inward
+        curl_direction = _unit_vector(_vector_scale(_vector_cross(medial, hand_forward), sign))
     forearm_direction = _unit_vector(_vector_subtract(wrist, elbow))
     upper_direction = _unit_vector(_vector_subtract(elbow, shoulder))
     elbow_axis = _arm_hinge_axis(upper_direction, forearm_direction)
-    elbow_start = _vector_subtract(
-        elbow, _vector_scale(elbow_axis, config.elbow_joint_half_depth_m)
-    )
-    elbow_end = _vector_add(elbow, _vector_scale(elbow_axis, config.elbow_joint_half_depth_m))
-    elbow_axle_start = _vector_subtract(
-        elbow, _vector_scale(elbow_axis, config.elbow_joint_half_depth_m * 1.3)
-    )
-    elbow_axle_end = _vector_add(
-        elbow, _vector_scale(elbow_axis, config.elbow_joint_half_depth_m * 1.3)
-    )
-    cuff_start = _vector_subtract(wrist, _vector_scale(forearm_direction, 0.02))
-    cuff_end = _vector_subtract(wrist, _vector_scale(forearm_direction, 0.008))
-    wrist_start = _vector_subtract(wrist, _vector_scale(forearm_direction, 0.004))
-    wrist_end = _vector_add(wrist, _vector_scale(hand_forward, 0.006))
-    palm_start = _vector_add(wrist, _vector_scale(hand_forward, 0.005))
+    cuff_center = _vector_subtract(wrist, _vector_scale(forearm_direction, 0.0075))
+    forearm_shell_end = _vector_subtract(wrist, _vector_scale(forearm_direction, 0.012))
+    wrist_center = _vector_add(wrist, _vector_scale(hand_forward, 0.0005))
+    palm_start = _vector_add(wrist, _vector_scale(hand_forward, 0.003))
     palm_end = _vector_add(palm_start, _vector_scale(hand_forward, config.palm_length_m))
-    palm_center = _vector_add(palm_start, _vector_scale(hand_forward, config.palm_length_m * 0.5))
-    finger_joint_rgba = " ".join(config.finger_joint_rgba.split()[:3] + [alpha])
-    finger_root_joint_rgba = " ".join(config.finger_root_joint_rgba.split()[:3] + [alpha])
 
     xml = (
-        f'        <geom name="{upper}" type="capsule" class="visual" contype="0" conaffinity="0" '
-        f'fromto="{_format_xyz(shoulder)} {_format_xyz(elbow)}" '
-        f'size="{_format_float(config.upper_arm_radius_m)}" rgba="{arm_rgba}"/>\n'
-        f'        <geom name="{elbow_name}" type="cylinder" class="visual" contype="0" conaffinity="0" '
-        f'fromto="{_format_xyz(elbow_start)} {_format_xyz(elbow_end)}" '
-        f'size="{_format_float(config.elbow_joint_radius_m)}" rgba="{joint_rgba}"/>\n'
-        f'        <geom name="{elbow_axle_name}" type="cylinder" class="visual" contype="0" conaffinity="0" '
-        f'fromto="{_format_xyz(elbow_axle_start)} {_format_xyz(elbow_axle_end)}" '
-        f'size="{_format_float(config.joint_axle_radius_m)}" rgba="{joint_axle_rgba}"/>\n'
-        f'        <geom name="{forearm}" type="capsule" class="visual" contype="0" conaffinity="0" '
-        f'fromto="{_format_xyz(elbow)} {_format_xyz(cuff_start)}" '
-        f'size="{_format_float(config.forearm_radius_m)}" rgba="{arm_rgba}"/>\n'
-        f'        <geom name="{cuff}" type="cylinder" class="visual" contype="0" conaffinity="0" '
-        f'fromto="{_format_xyz(cuff_start)} {_format_xyz(cuff_end)}" '
-        f'size="{_format_float(config.cuff_radius_m)}" rgba="{arm_rgba}"/>\n'
-        f'        <geom name="{wrist_name}" type="cylinder" class="visual" contype="0" conaffinity="0" '
-        f'fromto="{_format_xyz(wrist_start)} {_format_xyz(wrist_end)}" '
-        f'size="{_format_float(config.wrist_radius_m)}" rgba="{joint_rgba}"/>\n'
-        f'        <geom name="{palm}" type="ellipsoid" class="visual" contype="0" conaffinity="0" '
-        f'pos="{_format_xyz(palm_center)}" quat="{_format_xyz(palm_quat)}" '
-        f'size="{_format_xyz((config.palm_thickness_m, config.palm_width_m, config.palm_length_m * 0.5))}" '
-        f'rgba="{hand_rgba}"/>\n'
+        _shell_xml(
+            name("shoulder_cap"),
+            "shoulder_cap",
+            _vector_subtract(
+                shoulder, _vector_scale(upper_direction, config.shoulder_cap_radius_m)
+            ),
+            _vector_add(shoulder, _vector_scale(upper_direction, config.shoulder_cap_reach_m)),
+            elbow_axis,
+            arm_rgba,
+        )
+        + _shell_xml(name("upper"), "upper", shoulder, elbow, elbow_axis, arm_rgba)
+        + _cylinder_xml(
+            name("elbow"),
+            elbow,
+            elbow_axis,
+            config.elbow_joint_half_depth_m,
+            config.elbow_joint_radius_m,
+            joint_axle_rgba,
+        )
+        + _cylinder_xml(
+            name("elbow_axle"),
+            elbow,
+            elbow_axis,
+            config.elbow_joint_half_depth_m + 0.0012,
+            config.joint_axle_radius_m,
+            joint_rgba,
+        )
+        + _shell_xml(name("forearm"), "forearm", elbow, forearm_shell_end, elbow_axis, arm_rgba)
+        + _cylinder_xml(
+            name("cuff"),
+            cuff_center,
+            forearm_direction,
+            0.0028,
+            config.cuff_radius_m,
+            joint_axle_rgba,
+        )
+        + _cylinder_xml(
+            name("wrist"),
+            wrist_center,
+            hand_forward,
+            0.0035,
+            config.wrist_radius_m,
+            joint_rgba,
+        )
+        + _shell_xml(name("palm"), "palm", palm_start, palm_end, medial, hand_rgba)
     )
 
-    finger_specs = {
-        "index": (0.009, 0.024),
-        "middle": (0.003, 0.026),
-        "ring": (-0.003, 0.0245),
-        "little": (-0.009, 0.02),
-    }
+    # Short, chunky fingers sit closer together than their width, so they
+    # merge into a rounded mitten (in the spirit of NAO and Pepper hands) in
+    # the same toy scale as the body, with only a soft groove between digits.
+    segment_scales = (1.0, 0.94, 0.88)
+    finger_offsets = {"index": 0.0105, "middle": 0.0035, "ring": -0.0035, "little": -0.0105}
+    finger_lengths = {"index": 0.96, "middle": 1.0, "ring": 0.96, "little": 0.88}
     middle_bend, distal_bend = _finger_bend_weights(pose)
-    for finger, (offset, length) in finger_specs.items():
-        mcp = _vector_add(palm_end, _vector_scale(medial, offset))
-        fan = _vector_scale(medial, offset * 7.5)
-        proximal_direction = _unit_vector(_vector_add(hand_forward, fan))
+    for finger, offset in finger_offsets.items():
+        length = config.finger_length_m * finger_lengths[finger]
+        mcp = _vector_add(
+            _vector_subtract(palm_end, _vector_scale(hand_forward, config.finger_radius_m)),
+            _vector_scale(medial, offset),
+        )
         middle_direction = _unit_vector(
-            _vector_add(
-                _vector_add(hand_forward, fan),
-                _vector_scale(curl_direction, middle_bend),
-            )
+            _vector_add(hand_forward, _vector_scale(curl_direction, middle_bend))
         )
         distal_direction = _unit_vector(
-            _vector_add(
-                _vector_add(hand_forward, fan),
-                _vector_scale(curl_direction, distal_bend),
-            )
+            _vector_add(hand_forward, _vector_scale(curl_direction, distal_bend))
         )
-        pip = _vector_add(mcp, _vector_scale(proximal_direction, length * 0.42))
-        dip = _vector_add(pip, _vector_scale(middle_direction, length * 0.33))
-        tip = _vector_add(dip, _vector_scale(distal_direction, length * 0.25))
-
-        for joint_index, (joint, position) in enumerate((("mcp", mcp), ("pip", pip), ("dip", dip))):
-            joint_scale = (1.05, 0.95, 0.85)[joint_index]
-            knuckle_rgba = finger_root_joint_rgba if joint == "mcp" else finger_joint_rgba
-            xml += (
-                f'        <geom name="{visual_arm_geom_name(side, pose, f"{finger}_{joint}")}" '
-                f'type="sphere" class="visual" contype="0" conaffinity="0" '
-                f'pos="{_format_xyz(position)}" '
-                f'size="{_format_float(config.finger_joint_radius_m * joint_scale)}" '
-                f'rgba="{knuckle_rgba}"/>\n'
-            )
-
-        for segment_index, (segment, start, end) in enumerate(
-            (
-                ("proximal", mcp, pip),
-                ("middle", pip, dip),
-                ("distal", dip, tip),
-            )
+        pip = _vector_add(mcp, _vector_scale(hand_forward, length * 0.45))
+        dip = _vector_add(pip, _vector_scale(middle_direction, length * 0.32))
+        tip = _vector_add(dip, _vector_scale(distal_direction, length * 0.23))
+        for scale, (joint, position) in zip(
+            segment_scales, (("mcp", mcp), ("pip", pip), ("dip", dip))
         ):
-            segment_scale = (1.0, 0.88, 0.76)[segment_index]
-            xml += (
-                f'        <geom name="{visual_arm_geom_name(side, pose, f"{finger}_{segment}")}" '
-                f'type="capsule" class="visual" contype="0" conaffinity="0" '
+            xml += _visual_geom_xml(
+                name(f"{finger}_{joint}"),
+                "sphere",
+                f'pos="{_format_xyz(position)}" '
+                f'size="{_format_float(config.finger_radius_m * scale)}"',
+                hand_rgba,
+            )
+        for scale, (segment, start, end) in zip(
+            segment_scales,
+            (("proximal", mcp, pip), ("middle", pip, dip), ("distal", dip, tip)),
+        ):
+            xml += _visual_geom_xml(
+                name(f"{finger}_{segment}"),
+                "capsule",
                 f'fromto="{_format_xyz(start)} {_format_xyz(end)}" '
-                f'size="{_format_float(config.finger_radius_m * segment_scale)}" '
-                f'rgba="{hand_rgba}"/>\n'
+                f'size="{_format_float(config.finger_radius_m * scale)}"',
+                hand_rgba,
             )
 
     thumb_cmc = _vector_add(
-        _vector_add(wrist, _vector_scale(hand_forward, config.palm_length_m * 0.38)),
-        _vector_scale(medial, config.palm_width_m * 0.72),
+        _vector_add(palm_start, _vector_scale(hand_forward, config.palm_length_m * 0.35)),
+        _vector_scale(medial, config.palm_width_m * 0.42),
     )
-    thumb_metacarpal_direction = _unit_vector(
-        _vector_add(
+    thumb_directions = (
+        _unit_vector(_vector_add(_vector_scale(hand_forward, 0.5), medial)),
+        _unit_vector(
             _vector_add(
-                _vector_scale(hand_forward, 0.35),
-                _vector_scale(medial, 1.0),
-            ),
-            _vector_scale(curl_direction, 0.08),
-        )
-    )
-    thumb_proximal_direction = _unit_vector(
-        _vector_add(
+                _vector_add(hand_forward, _vector_scale(medial, 0.55)),
+                _vector_scale(curl_direction, 0.15 + middle_bend * 0.2),
+            )
+        ),
+        _unit_vector(
             _vector_add(
-                _vector_scale(hand_forward, 0.6),
-                _vector_scale(medial, 0.8),
-            ),
-            _vector_scale(curl_direction, 0.18 + middle_bend * 0.2),
-        )
+                _vector_add(hand_forward, _vector_scale(medial, 0.3)),
+                _vector_scale(curl_direction, 0.25 + distal_bend * 0.25),
+            )
+        ),
     )
-    thumb_distal_direction = _unit_vector(
-        _vector_add(
-            _vector_add(
-                _vector_scale(hand_forward, 0.72),
-                _vector_scale(medial, 0.62),
-            ),
-            _vector_scale(curl_direction, 0.28 + distal_bend * 0.25),
-        )
-    )
-    thumb_mcp = _vector_add(thumb_cmc, _vector_scale(thumb_metacarpal_direction, 0.007))
-    thumb_ip = _vector_add(thumb_mcp, _vector_scale(thumb_proximal_direction, 0.008))
-    thumb_tip = _vector_add(thumb_ip, _vector_scale(thumb_distal_direction, 0.007))
-
-    for joint_index, (joint, position) in enumerate(
-        (
-            ("cmc", thumb_cmc),
-            ("mcp", thumb_mcp),
-            ("ip", thumb_ip),
-        )
+    thumb_mcp = _vector_add(thumb_cmc, _vector_scale(thumb_directions[0], 0.006))
+    thumb_ip = _vector_add(thumb_mcp, _vector_scale(thumb_directions[1], 0.0065))
+    thumb_tip = _vector_add(thumb_ip, _vector_scale(thumb_directions[2], 0.0055))
+    thumb_radius = config.finger_radius_m * 1.05
+    for scale, (joint, position) in zip(
+        segment_scales, (("cmc", thumb_cmc), ("mcp", thumb_mcp), ("ip", thumb_ip))
     ):
-        joint_scale = (1.05, 0.95, 0.85)[joint_index]
-        knuckle_rgba = finger_root_joint_rgba if joint == "cmc" else finger_joint_rgba
-        xml += (
-            f'        <geom name="{visual_arm_geom_name(side, pose, f"thumb_{joint}")}" '
-            f'type="sphere" class="visual" contype="0" conaffinity="0" '
-            f'pos="{_format_xyz(position)}" '
-            f'size="{_format_float(config.finger_joint_radius_m * joint_scale)}" '
-            f'rgba="{knuckle_rgba}"/>\n'
+        xml += _visual_geom_xml(
+            name(f"thumb_{joint}"),
+            "sphere",
+            f'pos="{_format_xyz(position)}" size="{_format_float(thumb_radius * scale)}"',
+            hand_rgba,
         )
-
-    for segment_index, (segment, start, end) in enumerate(
+    for scale, (segment, start, end) in zip(
+        segment_scales,
         (
             ("metacarpal", thumb_cmc, thumb_mcp),
             ("proximal", thumb_mcp, thumb_ip),
             ("distal", thumb_ip, thumb_tip),
-        )
+        ),
     ):
-        segment_scale = (1.0, 0.9, 0.8)[segment_index]
-        xml += (
-            f'        <geom name="{visual_arm_geom_name(side, pose, f"thumb_{segment}")}" '
-            f'type="capsule" class="visual" contype="0" conaffinity="0" '
+        xml += _visual_geom_xml(
+            name(f"thumb_{segment}"),
+            "capsule",
             f'fromto="{_format_xyz(start)} {_format_xyz(end)}" '
-            f'size="{_format_float(config.finger_radius_m * segment_scale)}" '
-            f'rgba="{hand_rgba}"/>\n'
+            f'size="{_format_float(thumb_radius * scale)}"',
+            hand_rgba,
         )
     return xml
 
@@ -624,54 +771,43 @@ def build_visual_arm_geoms(config: VisualArmConfig | None = None) -> str:
         VISUAL_ARM_SHOULDER_AXLE_NAMES,
     ):
         sign = 1.0 if side == "left" else -1.0
-        shoulder, _elbow, _hand = _arm_pose_points(side, "rest", cfg)
-        mount = (
+        outward = (0.0, sign, 0.0)
+        # A chamfered servo housing sits flush on the trunk side and its orange
+        # drum echoes the hip servos. Each pose's rounded shoulder pad turns on
+        # a graphite hub just outside that drum.
+        drum_outer = cfg.shoulder_y_offset_m - cfg.shoulder_cap_radius_m
+        drum_inner = drum_outer - cfg.shoulder_joint_depth_m
+        housing_start = (cfg.shoulder_x_m, sign * cfg.shoulder_mount_y_offset_m, cfg.shoulder_z_m)
+        housing_end = (
             cfg.shoulder_x_m,
-            sign * cfg.shoulder_mount_y_offset_m,
+            sign * (drum_inner + cfg.shell_chamfer_m),
             cfg.shoulder_z_m,
         )
-        mount_end = (
-            cfg.shoulder_x_m,
-            shoulder[1] - sign * cfg.shoulder_joint_radius_m * 0.65,
-            cfg.shoulder_z_m,
-        )
-        shoulder_axis = (1.0, 0.0, 0.0)
-        shoulder_start = _vector_subtract(
-            shoulder,
-            _vector_scale(shoulder_axis, cfg.shoulder_joint_half_depth_m),
-        )
-        shoulder_end = _vector_add(
-            shoulder,
-            _vector_scale(shoulder_axis, cfg.shoulder_joint_half_depth_m),
-        )
-        shoulder_axle_start = _vector_subtract(
-            shoulder,
-            _vector_scale(shoulder_axis, cfg.shoulder_joint_half_depth_m * 1.3),
-        )
-        shoulder_axle_end = _vector_add(
-            shoulder,
-            _vector_scale(shoulder_axis, cfg.shoulder_joint_half_depth_m * 1.3),
+        drum_center = (cfg.shoulder_x_m, sign * 0.5 * (drum_inner + drum_outer), cfg.shoulder_z_m)
+        chunks.append(
+            _shell_xml(
+                mount_name, "shoulder", housing_start, housing_end, (1.0, 0.0, 0.0), cfg.arm_rgba
+            )
         )
         chunks.append(
-            f'        <geom name="{mount_name}" type="capsule" class="visual" '
-            f'contype="0" conaffinity="0" '
-            f'fromto="{_format_xyz(mount)} {_format_xyz(mount_end)}" '
-            f'size="{_format_float(cfg.shoulder_mount_radius_m)}" '
-            f'rgba="{cfg.arm_rgba}"/>\n'
+            _cylinder_xml(
+                shoulder_name,
+                drum_center,
+                outward,
+                0.5 * cfg.shoulder_joint_depth_m,
+                cfg.shoulder_joint_radius_m,
+                cfg.joint_rgba,
+            )
         )
         chunks.append(
-            f'        <geom name="{shoulder_name}" type="cylinder" class="visual" '
-            f'contype="0" conaffinity="0" '
-            f'fromto="{_format_xyz(shoulder_start)} {_format_xyz(shoulder_end)}" '
-            f'size="{_format_float(cfg.shoulder_joint_radius_m)}" '
-            f'rgba="{cfg.joint_rgba}"/>\n'
-        )
-        chunks.append(
-            f'        <geom name="{shoulder_axle_name}" type="cylinder" class="visual" '
-            f'contype="0" conaffinity="0" '
-            f'fromto="{_format_xyz(shoulder_axle_start)} {_format_xyz(shoulder_axle_end)}" '
-            f'size="{_format_float(cfg.joint_axle_radius_m)}" '
-            f'rgba="{cfg.joint_axle_rgba}"/>\n'
+            _cylinder_xml(
+                shoulder_axle_name,
+                (cfg.shoulder_x_m, sign * (drum_outer + 0.0015), cfg.shoulder_z_m),
+                outward,
+                0.0015,
+                cfg.joint_axle_radius_m,
+                cfg.joint_axle_rgba,
+            )
         )
         for pose in VISUAL_ARM_POSES:
             chunks.append(_visual_arm_pose_xml(side, pose, cfg))
@@ -803,6 +939,12 @@ def _remove_existing_social_eye_geoms(robot_xml: str) -> str:
 
 def _remove_existing_visual_arm_geoms(robot_xml: str) -> str:
     xml = robot_xml.replace(VISUAL_ARM_COMMENT, "")
+    xml = re.sub(
+        rf"{re.escape(VISUAL_ARM_ASSET_OPEN)}.*?{re.escape(VISUAL_ARM_ASSET_CLOSE)}",
+        "",
+        xml,
+        flags=re.MULTILINE | re.DOTALL,
+    )
     legacy_names = tuple(
         visual_arm_geom_name(side, pose, component)
         for side in VISUAL_ARM_SIDES
@@ -886,6 +1028,13 @@ def build_visual_arm_robot_xml(
     if insert_at < 0:
         raise ValueError("robot MuJoCo XML does not contain a trunk visual insertion marker")
     xml = robot_xml[:insert_at] + build_visual_arm_geoms(config) + robot_xml[insert_at:]
+    worldbody_at = xml.find("<worldbody")
+    if worldbody_at < 0:
+        raise ValueError("robot MuJoCo XML does not contain a worldbody")
+    line_start = xml.rfind("\n", 0, worldbody_at) + 1
+    if xml[line_start:worldbody_at].strip():
+        line_start = worldbody_at
+    xml = xml[:line_start] + build_visual_arm_mesh_assets(config) + xml[line_start:]
     ElementTree.fromstring(xml)
     return xml
 
