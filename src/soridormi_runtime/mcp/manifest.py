@@ -1487,6 +1487,123 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
         ],
     )
 
+    attention_status_schema = {
+        "type": "object",
+        "properties": {
+            "attention_id": {"type": "string"},
+            "skill_id": {"type": "string", "const": "attend_to_person"},
+            "active": {"type": "boolean"},
+            "started": {"type": "boolean"},
+            "stopped": {"type": "boolean"},
+            "status": {
+                "type": "string",
+                "enum": ["idle", "running", "suspended", "turning", "ended", "target_unavailable"],
+            },
+            "end_reason": {"type": ["string", "null"]},
+            "target_ref": {"type": "string"},
+            "posture": {"type": "string", "enum": ["listening", "thinking"]},
+            "target_status": {"type": ["string", "null"]},
+            "target_resolution": _TARGET_RESOLUTION_SCHEMA,
+            "suspensions": {"type": "integer", "minimum": 0},
+            "transitions": {"type": "array", "items": {"type": "object"}},
+        },
+        "required": ["skill_id", "active", "status"],
+        "additionalProperties": True,
+    }
+    attention_agent = AgentManifest(
+        agent_id="soridormi.attention",
+        display_name="Soridormi Sustained Social Attention Agent",
+        description=(
+            "Start, read and stop the long-running attend_to_person skill: Soridormi "
+            "follows one perceived person every control frame (gaze, natural blinks and "
+            "glance-aways, a listening or thinking posture) until a stop or a lifetime "
+            "end. Physical skills suspend it and it resumes after them; it never nods "
+            "or shakes the head."
+        ),
+        transport=TransportSpec(
+            kind="local_cli",
+            command="python",
+            args=["-m", "soridormi_runtime.mcp.call_tool"],
+        ),
+        status=AgentStatus(available=True, details={"mode": mode}),
+        tags=["soridormi", "social-attention", "long-running", "perception"],
+        tools=[
+            ToolCapability(
+                name="soridormi.attention.start",
+                agent_id="soridormi.attention",
+                description=(
+                    "Start attending to the person target_ref names (\"requester\" is the "
+                    "current speaker), or change the posture of the running attention to the "
+                    "same person. Another person ends the running attention first. Soridormi "
+                    "resolves the person itself; an unobserved or ambiguous person is a typed "
+                    "target_unavailable and nothing starts."
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "target_ref": {"type": "string", "minLength": 1},
+                        "posture": {"type": "string", "enum": ["listening", "thinking"]},
+                        "target_lost_s": {"type": "number", "minimum": 1, "maximum": 30},
+                        "max_duration_s": {"type": "number", "minimum": 5, "maximum": 600},
+                    },
+                    "required": ["target_ref"],
+                    "additionalProperties": False,
+                },
+                output_schema=attention_status_schema,
+                effects=["physical_motion", "visual_expression"],
+                safety_class="physical_motion",
+                availability=ToolAvailability(modes=["sim"]),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=5.0,
+                    idempotent=False,
+                    side_effect_free=False,
+                ),
+                confirmation=ConfirmationPolicy(
+                    required=False,
+                    required_in_modes=["hardware_shadow", "hardware_dry_run", "hardware"],
+                    skippable_in_modes=["sim"],
+                ),
+                failure_modes=["target_unavailable", "emergency_stop_active", "skill_unavailable"],
+                default_failure_policy=FailurePolicy(strategy="stop_and_report"),
+            ),
+            ToolCapability(
+                name="soridormi.attention.status",
+                agent_id="soridormi.attention",
+                description="Read the running or last attention: status, end reason and transitions.",
+                input_schema=_object_schema({}),
+                output_schema=attention_status_schema,
+                effects=["read_only"],
+                safety_class="safe_read",
+                availability=ToolAvailability(modes=safe_modes),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=1.0,
+                    idempotent=True,
+                    side_effect_free=True,
+                ),
+            ),
+            ToolCapability(
+                name="soridormi.attention.stop",
+                agent_id="soridormi.attention",
+                description="End the running attention within one control frame; the head holds where it is.",
+                input_schema=_object_schema({"reason": {"type": "string"}}),
+                output_schema=attention_status_schema,
+                effects=["physical_motion", "safety_control"],
+                safety_class="safety_critical",
+                availability=ToolAvailability(modes=safe_modes),
+                execution=ExecutionPolicy(
+                    can_run_parallel=True,
+                    timeout_s=3.0,
+                    idempotent=True,
+                    side_effect_free=False,
+                ),
+                confirmation=ConfirmationPolicy(required=False),
+                default_failure_policy=FailurePolicy(strategy="emergency_stop"),
+            ),
+        ],
+    )
+
     return CapabilityBundle(
         source="soridormi",
         agents=[
@@ -1494,6 +1611,7 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
             motion_agent,
             skill_agent,
             activity_agent,
+            attention_agent,
             task_agent,
             safety_agent,
             testing_agent,

@@ -278,6 +278,21 @@ class SoridormiLocalToolService:
                     str(args.get("compiled_activity_id") or args.get("plan_id") or ""),
                     reason=str(args.get("reason") or "cancelled by caller"),
                 )
+            if tool_name in {"soridormi.attention.status", "soridormi.attention.stop"}:
+                return {"skill_id": "attend_to_person", "active": False, "status": "idle"}
+            if tool_name == "soridormi.attention.start":
+                # The local dry run perceives no people, so nobody can be attended to.
+                return {
+                    "skill_id": "attend_to_person",
+                    "started": False,
+                    "active": False,
+                    "status": "target_unavailable",
+                    "target_resolution": {
+                        "role": "gaze_target",
+                        "target_ref": str(args.get("target_ref") or ""),
+                        "status": "perception_unavailable",
+                    },
+                }
             body_safe_idle = not self.emergency_stop
             if tool_name == "soridormi.task.get_capabilities":
                 return task_capabilities_payload(

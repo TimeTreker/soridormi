@@ -173,7 +173,7 @@ Implement safe scripted/keyframe social behaviors in MuJoCo first:
 ```text
 look_direction
 look_at_person
-track_person later
+attend_to_person (long-running; soridormi.attention.*)
 nod_yes
 shake_no
 bow

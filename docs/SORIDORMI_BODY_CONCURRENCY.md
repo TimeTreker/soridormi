@@ -172,7 +172,9 @@ Current implementation provides:
 Not yet claimed:
 
 - live balance-margin-based overlay reduction or suspension;
-- continuous person tracking or camera-based target perception (gaze targets
-  are resolved once per execution from simulator scene markers);
+- camera-based target perception (gaze targets come from simulator scene markers;
+  `attend_to_person` re-observes them five times a second and yields the body to
+  every physical skill rather than composing with it, see
+  [Sustained social attention](SORIDORMI_MCP_SERVER.md#sustained-social-attention));
 - hardware execution;
 - concurrent whole-body gestures that have not passed simulator qualification.

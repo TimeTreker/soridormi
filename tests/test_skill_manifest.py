@@ -46,7 +46,7 @@ REQUIRED_SKILLS = {
     "look_direction",
     "look_at_person",
     "blink_eyes",
-    "track_person",
+    "attend_to_person",
     "nod_yes",
     "shake_no",
     "bow",

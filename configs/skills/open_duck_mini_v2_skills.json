@@ -2293,26 +2293,85 @@
       }
     },
     {
-      "id": "track_person",
+      "id": "attend_to_person",
       "category": "social",
-      "display_name": "Track Person",
-      "description": "Continuously track a person with head/neck while body remains safe.",
-      "status": "future_perception",
+      "metadata": {
+        "behavior_domains": [
+          "social_attention",
+          "orientation"
+        ],
+        "lifecycle": "long_running"
+      },
+      "display_name": "Attend To Person",
+      "description": "Keep attention on one perceived person across a conversation: the head follows the person every control frame, the eyes blink and the gaze drifts away briefly at natural intervals, in a listening or thinking posture. It carries no meaning and never nods or shakes the head. A person beyond the head's range is turned toward like look_at_person does. Physical skills suspend it and it resumes after them; stop and emergency stop end it, as do the person unseen for target_lost_s and max_duration_s. Started, read and stopped through soridormi.attention.*.",
+      "status": "available_sim_experimental",
       "execution": "scripted_tracking",
       "capability_group": "head_social",
       "parameters": {
-        "max_duration_s": {
+        "target_ref": {
+          "type": "string"
+        },
+        "posture": {
+          "type": "string",
+          "enum": [
+            "listening",
+            "thinking"
+          ],
+          "default": "listening"
+        },
+        "target_lost_s": {
           "min": 1.0,
           "max": 30.0,
           "default": 5.0
+        },
+        "max_duration_s": {
+          "min": 5.0,
+          "max": 600.0,
+          "default": 600.0
         }
       },
+      "parameters_schema": {
+        "type": "object",
+        "properties": {
+          "target_ref": {
+            "type": "string",
+            "minLength": 1,
+            "description": "\"requester\" for the current speaker trusted target evidence shows; otherwise a person description from that evidence, never a pronoun or yaw/pitch. Soridormi resolves the person every frame from its own perception."
+          },
+          "posture": {
+            "type": "string",
+            "enum": [
+              "listening",
+              "thinking"
+            ],
+            "default": "listening"
+          },
+          "target_lost_s": {
+            "type": "number",
+            "minimum": 1.0,
+            "maximum": 30.0,
+            "default": 5.0
+          },
+          "max_duration_s": {
+            "type": "number",
+            "minimum": 5.0,
+            "maximum": 600.0,
+            "default": 600.0
+          }
+        },
+        "required": [
+          "target_ref"
+        ],
+        "additionalProperties": false
+      },
       "preconditions": [
-        "perception_agent_available",
-        "not_fallen"
+        "target_ref_resolved_by_soridormi_perception",
+        "not_fallen",
+        "sim_or_dry_run"
       ],
       "required_actuator_groups": [
-        "head_neck"
+        "head_neck",
+        "legs"
       ],
       "safety": {
         "requires_standing": false,
@@ -2320,15 +2379,28 @@
         "requires_not_walking": false,
         "requires_flat_ground": false,
         "interruptible": true,
-        "fallback": "neutral_head",
+        "fallback": "hold_head",
         "sim_first": true,
         "hardware_enabled": false
       },
       "evaluation": [
         "tracking_error",
         "joint_limit_margin",
-        "lost_target_rate"
-      ]
+        "lost_target_rate",
+        "suspension_resume"
+      ],
+      "notes": "Soridormi steps the standing balance policy at zero velocity with the head composed in, one tick at a time under the locomotion and head-overlay locks, and stops stepping while any physical skill holds the locomotion lock. The person is re-observed five times a second; the head moves at most 0.35 rad/s toward the person plus the posture offset (listening: 0.07 rad down; thinking: 0.12 rad aside and 0.08 rad up), and a one-sided glance-away of 0.15 rad lasting 0.6-1.1 s comes every 7-14 s. Natural blinks every 2.5-6 s take visual.eyes only when it is free. A person beyond the head range for 2 s is turned toward with look_at_person's slow walking arc. Outside simulation no perception resolves a person, so the skill is not offered.",
+      "concurrency": {
+        "ability_class": "subtle_expression",
+        "control_coupling": "standalone_body_motion",
+        "write_resources": [
+          "body.primary_motion",
+          "body.head_pose",
+          "visual.eyes"
+        ],
+        "parallel_safe_with": [],
+        "safety_preemption": "suspend_for_body_skill"
+      }
     },
     {
       "id": "blink_eyes",

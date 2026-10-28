@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 import os
+import random
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -45,8 +46,22 @@ from soridormi_runtime.skill_execution import (
     value_adjustments_for_plan,
 )
 from soridormi_runtime.skill_manifest import (
+    AVAILABLE_STATUSES,
     DEFAULT_SKILL_MANIFEST,
     parameters_schema_for_skill,
+)
+from soridormi_runtime.social_attention import (
+    ATTEND_TO_PERSON_SKILL_ID,
+    BLINK_CLOSED_S,
+    FOLLOW_VELOCITY_RADPS,
+    HEAD_YAW_LIMIT_RAD,
+    OBSERVE_INTERVAL_S,
+    OUT_OF_RANGE_TURN_S,
+    AttentionBehavior,
+    AttentionLifetime,
+    AttentionRequest,
+    AttentionRun,
+    step_head,
 )
 from soridormi_runtime.sync_preroll import preroll_sync_simulator
 from soridormi_runtime.visual_arm_gesture_skill import (
@@ -282,6 +297,11 @@ class SoridormiRuntimeToolService:
     _scene_revision: int = field(default=0, init=False, repr=False)
     _scene_signature: str | None = field(default=None, init=False, repr=False)
     _robot_executor: ThreadPoolExecutor | None = field(default=None, init=False, repr=False)
+    _attention: AttentionRun | None = field(default=None, init=False, repr=False)
+    _attention_task: asyncio.Task[None] | None = field(default=None, init=False, repr=False)
+    _attention_side_tasks: set[asyncio.Task[None]] = field(
+        default_factory=set, init=False, repr=False
+    )
 
     @classmethod
     def from_env(
@@ -401,6 +421,12 @@ class SoridormiRuntimeToolService:
                 str(args.get("compiled_activity_id") or args.get("plan_id") or ""),
                 reason=str(args.get("reason") or "cancelled by caller"),
             )
+        if tool_name == "soridormi.attention.start":
+            return await self.start_attention(args)
+        if tool_name == "soridormi.attention.status":
+            return self.attention_status()
+        if tool_name == "soridormi.attention.stop":
+            return await self.stop_attention(reason=str(args.get("reason") or "stopped_by_caller"))
         body_safe_idle = self._body_safe_idle()
         if tool_name == "soridormi.task.get_capabilities":
             return task_capabilities_payload(
@@ -490,9 +516,19 @@ class SoridormiRuntimeToolService:
     def _parameters_schema(skill: dict[str, Any]) -> dict[str, Any]:
         return parameters_schema_for_skill(skill)
 
+    def _attention_skill(self) -> dict[str, Any] | None:
+        """The long-running attend_to_person entry when this runtime can perceive people."""
+
+        skill = self.skill_registry.skills.get(ATTEND_TO_PERSON_SKILL_ID)
+        if skill is None or skill.get("status") not in AVAILABLE_STATUSES or self.mode != "sim":
+            return None
+        return skill
+
     def list_runtime_skills(self) -> dict[str, Any]:
         skills: list[dict[str, Any]] = []
-        for skill_id in self._runtime_skill_ids():
+        attention = self._attention_skill()
+        long_running = (ATTEND_TO_PERSON_SKILL_ID,) if attention is not None else ()
+        for skill_id in (*self._runtime_skill_ids(), *long_running):
             skill = self.skill_registry.skills[skill_id]
             execution = str(skill.get("execution") or "")
             if execution in {"visual_expression", "visual_arm_gesture"}:
@@ -529,6 +565,18 @@ class SoridormiRuntimeToolService:
                     ),
                     "metadata": metadata,
                     **skill_concurrency_projection(skill),
+                    **(
+                        {
+                            "lifecycle": "long_running",
+                            "lifecycle_tools": {
+                                "start": "soridormi.attention.start",
+                                "status": "soridormi.attention.status",
+                                "stop": "soridormi.attention.stop",
+                            },
+                        }
+                        if skill_id in long_running
+                        else {}
+                    ),
                 }
             )
         return {"mode": self.mode, "skills": skills}
@@ -2422,8 +2470,218 @@ class SoridormiRuntimeToolService:
                 self.controller.command = PolicyCommand()
                 self._clear_active_lane(lane)
 
+    async def start_attention(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Start (or change the posture of) the long-running attend_to_person skill.
+
+        The call returns once the run starts; ``soridormi.attention.status`` reports it
+        and ``soridormi.attention.stop`` ends it. A person Soridormi cannot find never
+        starts a run: the result is a typed ``target_unavailable``, never a guessed look.
+        """
+
+        if self.emergency_stop:
+            raise RuntimeError("cannot start attention while emergency_stop is active")
+        skill = self._attention_skill()
+        if skill is None:
+            raise RuntimeError("attend_to_person is not available in this runtime")
+        request = AttentionRequest.from_args(args, skill)
+        current = self._attention
+        if current is not None and current.active:
+            if current.request.target_ref == request.target_ref:
+                current.posture = request.posture
+                return {**current.to_dict(), "started": False, "updated": True}
+            await self.stop_attention(reason="switched")
+        resolution, selected = await self._observe_gaze_target(request.target_ref)
+        if selected is None:
+            return {
+                "skill_id": ATTEND_TO_PERSON_SKILL_ID,
+                "started": False,
+                "active": False,
+                "status": "target_unavailable",
+                "target_resolution": resolution,
+            }
+        run = AttentionRun(
+            attention_id=f"attention-{uuid.uuid4().hex[:12]}",
+            request=request,
+            posture=request.posture,
+            target_status=TARGET_RESOLVED,
+        )
+        self._attention = run
+        self._attention_task = asyncio.create_task(self._run_attention(run))
+        return {**run.to_dict(), "started": True}
+
+    def attention_status(self) -> dict[str, Any]:
+        if self._attention is None:
+            return {"skill_id": ATTEND_TO_PERSON_SKILL_ID, "active": False, "status": "idle"}
+        return self._attention.to_dict()
+
+    async def stop_attention(self, *, reason: str) -> dict[str, Any]:
+        run = self._attention
+        if run is None or not run.active:
+            return {**self.attention_status(), "stopped": False}
+        run.request_stop(reason)
+        task = self._attention_task
+        if task is not None and not task.done():
+            # The loop observes the request within one control tick.
+            await asyncio.wait({task}, timeout=2.0)
+            if not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+        run.end(reason)
+        return {**run.to_dict(), "stopped": True}
+
+    async def _run_attention(self, run: AttentionRun) -> None:
+        """Follow the person every control frame until a stop or a lifetime end.
+
+        Any executor that claims the body (the locomotion lock every physical skill
+        holds) suspends attention: it stops stepping and resumes after release. The
+        person unseen while suspended does not count toward ``target_lost_s``.
+        """
+
+        started = self._attention_clock()
+        period_s = 1.0 / self.control_hz
+        max_step = FOLLOW_VELOCITY_RADPS * period_s
+        behavior = AttentionBehavior(run.posture, rng=random.Random(run.attention_id))
+        lifetime = AttentionLifetime(run.request)
+        head: tuple[float, float] | None = None
+        bearing: float | None = None
+        next_observe_s = 0.0
+        out_of_range_since: float | None = None
+        first_observation = True
+        reset_count: int | None = None
+        try:
+            while True:
+                now_s = self._attention_clock() - started
+                if self.emergency_stop:
+                    run.end("emergency_stop")
+                    return
+                if run.stop_reason is not None:
+                    run.end(run.stop_reason)
+                    return
+                if self._locomotion_lock.locked():
+                    run.mark("suspended", "body_claimed_by_task")
+                    head = None
+                    end_reason = lifetime.end_reason(now_s, seen=True)
+                    if end_reason is not None:
+                        run.end(end_reason)
+                        return
+                    await asyncio.sleep(period_s)
+                    continue
+                if now_s >= next_observe_s:
+                    next_observe_s = now_s + OBSERVE_INTERVAL_S
+                    resolution, selected = await self._observe_gaze_target(run.request.target_ref)
+                    bearing = None if selected is None else float(selected["bearing_rad"])
+                    run.target_status = (
+                        str(resolution.get("status") or TARGET_NOT_OBSERVED)
+                        if selected is None
+                        else TARGET_OUTSIDE_HEAD_RANGE
+                        if abs(bearing or 0.0) > HEAD_YAW_LIMIT_RAD
+                        else TARGET_RESOLVED
+                    )
+                    end_reason = lifetime.end_reason(now_s, seen=selected is not None)
+                    if end_reason is not None:
+                        run.end(end_reason)
+                        return
+                    if run.target_status == TARGET_OUTSIDE_HEAD_RANGE:
+                        if out_of_range_since is None:
+                            out_of_range_since = now_s
+                    else:
+                        out_of_range_since = None
+                    if out_of_range_since is not None and (
+                        first_observation or now_s - out_of_range_since >= OUT_OF_RANGE_TURN_S
+                    ):
+                        run.mark("turning", "person_beyond_head_range")
+                        report = await self._turn_toward_gaze_target(
+                            run.request.target_ref, max_abs_yaw_rad=HEAD_YAW_LIMIT_RAD
+                        )
+                        if report["moved"]:
+                            run.body_turns += 1
+                            run.motor_commands_sent = True
+                        # A person the body cannot turn toward is looked at from the head's
+                        # limit; the turn is retried only after a longer wait.
+                        out_of_range_since = None if report["within_range"] else now_s + 10.0
+                        head = None
+                        next_observe_s = 0.0
+                    first_observation = False
+                    if run.stop_reason is not None or self.emergency_stop:
+                        continue
+                run.mark("running", "resumed" if run.status == "suspended" else "following")
+                tick_started = self._attention_clock()
+                async with self._locomotion_lock, self._head_overlay_lock:
+                    state = self._last_state or await self._read_state()
+                    if reset_count is None:
+                        reset_count = state.reset_count
+                    elif state.reset_count != reset_count:
+                        run.end("simulator_reset")
+                        return
+                    if head is None:
+                        controls = command_positions_by_name(state)
+                        head = (
+                            float(controls.get("head_yaw", 0.0)),
+                            float(controls.get("head_pitch", 0.0)),
+                        )
+                    behavior.posture = run.posture
+                    limited = (
+                        None
+                        if bearing is None
+                        else max(-HEAD_YAW_LIMIT_RAD, min(HEAD_YAW_LIMIT_RAD, bearing))
+                    )
+                    goal = behavior.head_goal(now_s, limited, head)
+                    head = step_head(head, goal, max_step)
+                    self.controller.command = PolicyCommand()
+                    await self._step_composed_controller(
+                        {"neck_pitch": 0.0, "head_pitch": head[1], "head_yaw": head[0], "head_roll": 0.0}
+                    )
+                    run.motor_commands_sent = True
+                if behavior.blink_due(now_s):
+                    self._schedule_attention_blink(run)
+                await asyncio.sleep(
+                    max(0.0, period_s - (self._attention_clock() - tick_started))
+                )
+        except asyncio.CancelledError:
+            run.end(run.stop_reason or "cancelled")
+            raise
+        except Exception as exc:  # noqa: BLE001 - a failed attention run ends typed and safe.
+            print(f"Soridormi attention run failed: {exc!r}")
+            run.end("failed")
+            await self._apply_safe_hold()
+
+    @staticmethod
+    def _attention_clock() -> float:
+        return asyncio.get_running_loop().time()
+
+    def _schedule_attention_blink(self, run: AttentionRun) -> None:
+        """A natural blink; skipped while another skill owns the eyes."""
+
+        applier = getattr(self.robot, "set_visual_expression", None)
+        lock = self._independent_output_lock("visual.eyes")
+        if not callable(applier) or lock.locked():
+            return
+        task = asyncio.create_task(self._attention_blink(run, applier, lock))
+        self._attention_side_tasks.add(task)
+        task.add_done_callback(self._attention_side_tasks.discard)
+
+    async def _attention_blink(
+        self, run: AttentionRun, applier: Callable[..., Any], lock: asyncio.Lock
+    ) -> None:
+        try:
+            async with lock:
+                try:
+                    await self._apply_visual_expression_command(
+                        applier, VisualExpressionCommand(expression="eyes_closed", intensity=1.0)
+                    )
+                    await asyncio.sleep(BLINK_CLOSED_S)
+                finally:
+                    await self._apply_visual_expression_command(
+                        applier, VisualExpressionCommand(expression="eyes_open", intensity=1.0)
+                    )
+            run.blinks += 1
+        except Exception as exc:  # noqa: BLE001 - a natural blink is optional output.
+            print(f"Soridormi attention blink failed soft: {exc!r}")
+
     async def stop_motion(self, *, cancelled: bool) -> dict[str, Any]:
         self._motion_stop_requested = True
+        if self._attention is not None:
+            self._attention.request_stop("motion_stop")
         await self._apply_safe_hold()
         key = "cancelled" if cancelled else "stopped"
         return {
@@ -2435,6 +2693,8 @@ class SoridormiRuntimeToolService:
     async def emergency_stop_motion(self, *, reason: str) -> dict[str, Any]:
         self.emergency_stop = True
         self._motion_stop_requested = True
+        if self._attention is not None:
+            self._attention.request_stop("emergency_stop")
         await self._apply_safe_hold()
         return {
             "stopped": True,

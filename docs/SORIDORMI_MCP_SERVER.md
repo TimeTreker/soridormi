@@ -126,6 +126,36 @@ or gaze overlay is composed into the locomotion controller's command before one
 API and do not write motor commands. A future WBC may replace the internal
 composer, but it must preserve this single-authority contract.
 
+## Sustained social attention
+
+The long-running `attend_to_person` skill (Chromie's long-running social skill,
+owner decision 2026-10-28) has its own lifecycle tools because it lasts across a
+conversation rather than one bounded plan:
+
+```text
+soridormi.attention.start   target_ref, posture (listening | thinking)
+soridormi.attention.status
+soridormi.attention.stop
+```
+
+`soridormi.skill.list` lists the skill with `lifecycle: long_running` and these
+`lifecycle_tools`; the plan and activity paths reject it. `start` returns once the
+run starts: Soridormi re-observes the person five times a second and steps the
+standing policy at zero velocity with the head composed in, one tick at a time
+under the locomotion and head-overlay locks. It follows the person (at most
+0.35 rad/s), holds the posture offset, glances away briefly to one side every
+7-14 s, blinks every 2.5-6 s when `visual.eyes` is free, and turns the body toward
+a person beyond the head range for 2 s. It never nods or shakes the head. Any
+physical skill holding the locomotion lock suspends it; it resumes after release.
+It ends on `stop`, motion stop, emergency stop, the person unseen for
+`target_lost_s` (default 5 s, not counted while suspended), `max_duration_s`
+(default and maximum 600 s), or a simulator reset. `start` for the attended person
+changes only the posture; another person ends the run first. An unobserved or
+ambiguous person is `target_unavailable` and nothing starts. The run reports
+`status`, `end_reason` and its transitions; it is not an active task and does not
+make the body unsafe-idle. Outside simulation no perception resolves a person, so
+the skill is not offered.
+
 Speech and singing are not body-activity members. Chromie's Vocal Execution
 Lane starts and controls them as a peer lane. Chromie's Cognitive Runtime
 Coordinator may use one `coordination_id` to relate speech and the Soridormi
