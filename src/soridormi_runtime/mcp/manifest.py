@@ -317,6 +317,8 @@ def build_soridormi_capability_bundle(*, mode: str = "sim") -> CapabilityBundle:
                                     "description": {"type": "string"},
                                     "relative_direction": {"type": "string"},
                                     "distance_m": {"type": "number"},
+                                    # The person speaking with Chromie (owner decision 2026-10-28).
+                                    "current_speaker": {"type": "boolean"},
                                 },
                                 "required": [
                                     "object_ref", "description", "relative_direction",
