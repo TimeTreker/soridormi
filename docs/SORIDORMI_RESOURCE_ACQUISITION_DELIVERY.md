@@ -131,6 +131,10 @@ milk bottle yields an empty milk result. The three water bottles in the default
 scenario include one 5 m to the robot's left. The named user actor is the person
 speaking with Chromie, so Soridormi can return to that requester after pickup;
 it is not camera perception. User speech cannot populate these marker results.
+The public observation marks that actor `current_speaker: true` (owner decision
+2026-10-28: Chromie reads who is speaking from Soridormi's perception rather than
+assuming it); the requester referent and every bearing stay internal. A speaker
+localization provider (sound direction, voice) replaces the scenario's mark later.
 
 The scene read contract separates **poll cadence** from **material world change**.
 Every read receives a monotonic `observation_sequence`, while `scene_revision` and

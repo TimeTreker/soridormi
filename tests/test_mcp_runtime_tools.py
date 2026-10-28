@@ -877,6 +877,13 @@ def test_known_resource_walks_to_observed_scene_object_before_mock_handover(
             "bearing_rad" not in item and "referent_id" not in item
             for item in public_observation["objects"]
         )
+        # Chromie reads who is speaking from the scene, not from the internal referent.
+        assert [
+            item["description"] for item in public_observation["objects"] if item.get("current_speaker")
+        ] == ["user"]
+        assert all(
+            item.get("current_speaker", True) is True for item in public_observation["objects"]
+        )
 
     asyncio.run(exercise())
 

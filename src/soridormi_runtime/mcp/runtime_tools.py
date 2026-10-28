@@ -109,8 +109,10 @@ GAZE_TURN_MAX_DURATION_S = 20.0
 GAZE_TURN_STALLED_SEGMENTS = 3
 GAZE_TURN_HEAD_MARGIN_RAD = 0.1
 GAZE_TURN_MIN_CLEARANCE_M = 0.5
-# Steering bearing and the requester role stay inside the provider; the public
-# scene contract exposes neither.
+# Steering bearing and the requester referent stay inside the provider. The public
+# scene contract marks the person the scene says is speaking with Chromie as
+# ``current_speaker`` instead (owner decision 2026-10-28: Chromie reads who is speaking
+# from Soridormi's perception rather than assuming it).
 PROVIDER_INTERNAL_SCENE_KEYS = frozenset({"bearing_rad", "referent_id"})
 
 
@@ -1913,6 +1915,7 @@ class SoridormiRuntimeToolService:
                 "object_ref": str(item.get("object_ref") or ""),
                 "description": str(item.get("description") or ""),
                 "relative_direction": str(item.get("relative_direction") or ""),
+                "current_speaker": item.get("current_speaker") is True,
                 "distance_bucket_025m": (
                     int(round(float(distance) / 0.25))
                     if isinstance(distance, (int, float)) and not isinstance(distance, bool)
@@ -1938,7 +1941,10 @@ class SoridormiRuntimeToolService:
         # The public scene contract carries ranged markers; a bearing-only person
         # observation stays internal to target resolution.
         objects = [
-            {key: value for key, value in item.items() if key not in PROVIDER_INTERNAL_SCENE_KEYS}
+            {
+                **{key: value for key, value in item.items() if key not in PROVIDER_INTERNAL_SCENE_KEYS},
+                **({"current_speaker": True} if item.get("referent_id") == REQUESTER_REFERENT_ID else {}),
+            }
             for item in observed["objects"]
             if "distance_m" in item
         ]
