@@ -299,6 +299,7 @@ class SoridormiRuntimeToolService:
     _robot_executor: ThreadPoolExecutor | None = field(default=None, init=False, repr=False)
     _attention: AttentionRun | None = field(default=None, init=False, repr=False)
     _attention_task: asyncio.Task[None] | None = field(default=None, init=False, repr=False)
+    _attention_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
     _attention_side_tasks: set[asyncio.Task[None]] = field(
         default_factory=set, init=False, repr=False
     )
@@ -2095,7 +2096,11 @@ class SoridormiRuntimeToolService:
         return resolution, selected
 
     async def _turn_toward_gaze_target(
-        self, target_ref: str, *, max_abs_yaw_rad: float
+        self,
+        target_ref: str,
+        *,
+        max_abs_yaw_rad: float,
+        should_yield: Callable[[], bool] | None = None,
     ) -> dict[str, Any]:
         """Turn the body until a target beyond the head's turning range is within it.
 
@@ -2137,6 +2142,9 @@ class SoridormiRuntimeToolService:
                 while True:
                     if self.emergency_stop or self._motion_stop_requested:
                         return report(moved, False, "stopped")
+                    if should_yield is not None and should_yield():
+                        # Sustained attention's turn gives the body up between segments.
+                        return report(moved, False, "yielded")
                     _, selected = await self._observe_gaze_target(target_ref)
                     if selected is None:
                         return report(moved, False, "target_lost")
@@ -2484,12 +2492,16 @@ class SoridormiRuntimeToolService:
         if skill is None:
             raise RuntimeError("attend_to_person is not available in this runtime")
         request = AttentionRequest.from_args(args, skill)
+        async with self._attention_lock:  # one run at a time, even for overlapping callers
+            return await self._start_attention_locked(request)
+
+    async def _start_attention_locked(self, request: AttentionRequest) -> dict[str, Any]:
         current = self._attention
         if current is not None and current.active:
             if current.request.target_ref == request.target_ref:
                 current.posture = request.posture
                 return {**current.to_dict(), "started": False, "updated": True}
-            await self.stop_attention(reason="switched")
+            await self._stop_attention_locked(reason="switched")
         resolution, selected = await self._observe_gaze_target(request.target_ref)
         if selected is None:
             return {
@@ -2515,6 +2527,10 @@ class SoridormiRuntimeToolService:
         return self._attention.to_dict()
 
     async def stop_attention(self, *, reason: str) -> dict[str, Any]:
+        async with self._attention_lock:
+            return await self._stop_attention_locked(reason=reason)
+
+    async def _stop_attention_locked(self, *, reason: str) -> dict[str, Any]:
         run = self._attention
         if run is None or not run.active:
             return {**self.attention_status(), "stopped": False}
@@ -2557,7 +2573,7 @@ class SoridormiRuntimeToolService:
                 if run.stop_reason is not None:
                     run.end(run.stop_reason)
                     return
-                if self._locomotion_lock.locked():
+                if self._locomotion_lock.locked() or self._body_wanted_by_task():
                     run.mark("suspended", "body_claimed_by_task")
                     head = None
                     end_reason = lifetime.end_reason(now_s, seen=True)
@@ -2586,12 +2602,18 @@ class SoridormiRuntimeToolService:
                             out_of_range_since = now_s
                     else:
                         out_of_range_since = None
-                    if out_of_range_since is not None and (
-                        first_observation or now_s - out_of_range_since >= OUT_OF_RANGE_TURN_S
+                    if (
+                        out_of_range_since is not None
+                        and (first_observation or now_s - out_of_range_since >= OUT_OF_RANGE_TURN_S)
+                        and run.stop_reason is None
+                        and not self.emergency_stop
+                        and not self._locomotion_lock.locked()
                     ):
                         run.mark("turning", "person_beyond_head_range")
                         report = await self._turn_toward_gaze_target(
-                            run.request.target_ref, max_abs_yaw_rad=HEAD_YAW_LIMIT_RAD
+                            run.request.target_ref,
+                            max_abs_yaw_rad=HEAD_YAW_LIMIT_RAD,
+                            should_yield=lambda: run.stop_reason is not None or self._body_wanted_by_task(),
                         )
                         if report["moved"]:
                             run.body_turns += 1
@@ -2604,9 +2626,20 @@ class SoridormiRuntimeToolService:
                     first_observation = False
                     if run.stop_reason is not None or self.emergency_stop:
                         continue
+                if (
+                    self._locomotion_lock.locked() or self._body_wanted_by_task()
+                    or run.stop_reason is not None or self.emergency_stop
+                ):
+                    continue  # a task took or wants the body, or a stop came, during the reads above
                 run.mark("running", "resumed" if run.status == "suspended" else "following")
                 tick_started = self._attention_clock()
                 async with self._locomotion_lock, self._head_overlay_lock:
+                    if run.stop_reason is not None or self.emergency_stop:
+                        continue
+                    if self._attention_clock() - tick_started > 2.0 * period_s:
+                        # The body was busy after all: start again from where it is now.
+                        head, next_observe_s = None, 0.0
+                        continue
                     state = self._last_state or await self._read_state()
                     if reset_count is None:
                         reset_count = state.reset_count
@@ -2648,6 +2681,11 @@ class SoridormiRuntimeToolService:
     @staticmethod
     def _attention_clock() -> float:
         return asyncio.get_running_loop().time()
+
+    def _body_wanted_by_task(self) -> bool:
+        """Whether a physical skill is waiting for the locomotion lock attention holds."""
+
+        return bool(getattr(self._locomotion_lock, "_waiters", None))
 
     def _schedule_attention_blink(self, run: AttentionRun) -> None:
         """A natural blink; skipped while another skill owns the eyes."""

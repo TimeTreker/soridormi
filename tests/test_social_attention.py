@@ -363,7 +363,6 @@ def test_behavior_and_lifetime_are_pure_and_bounded() -> None:
 def test_a_person_beyond_the_head_range_is_turned_toward_first(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("soridormi_runtime.mcp.runtime_tools.GAZE_TURN_SEGMENT_S", 0.01)
     turned: list[int] = [0]
 
     def beyond_until_turned(now: float) -> float:
@@ -371,15 +370,14 @@ def test_a_person_beyond_the_head_range_is_turned_toward_first(
         return min(-1.0 + 0.1 * turned[0], -0.3)
 
     service, robot, clock = _attending_service(monkeypatch, beyond_until_turned)
-    controller = service.controller
-    original = controller.compute
 
-    def counting_compute(state: Any) -> MotorCommand:
-        if controller.command.yaw_velocity:
-            turned[0] += 1
-        return original(state)
+    async def one_step_segment(duration_s: float) -> bool:
+        # One controller step per segment, so the test does not depend on real time.
+        await service._step_controller()
+        turned[0] += 1
+        return True
 
-    controller.compute = counting_compute  # type: ignore[method-assign]
+    monkeypatch.setattr(service, "_run_segment", one_step_segment)
 
     async def exercise() -> dict[str, Any]:
         await service.call_tool("soridormi.attention.start", {"target_ref": "requester"})
@@ -390,7 +388,86 @@ def test_a_person_beyond_the_head_range_is_turned_toward_first(
 
     status = asyncio.run(exercise())
 
+    # The turn stops once the person is inside the head range less its margin; the head
+    # then follows the person there.
+    from soridormi_runtime.mcp.runtime_tools import GAZE_TURN_HEAD_MARGIN_RAD
+    reached = -1.0 + 0.1 * turned[0]
+    assert abs(reached) <= 0.55 - GAZE_TURN_HEAD_MARGIN_RAD < abs(reached) + 0.1
     assert status["body_turns"] == 1 and status["status"] == "running"
     assert [item["status"] for item in status["transitions"]][:3] == ["running", "turning", "running"]
-    assert robot.head_trace[-1][1] == pytest.approx(-0.3, abs=1e-6)
+    assert robot.head_trace[-1][1] == pytest.approx(reached, abs=1e-6)
     assert service.active_lanes == {} and service.controller.command.yaw_velocity == 0.0
+
+
+def test_a_stop_during_the_observation_never_starts_a_body_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Review 2026-10-28: a stop that lands while attention reads the scene must not be
+    followed by the slow walking arc toward a person beyond the head range."""
+    monkeypatch.setattr("soridormi_runtime.mcp.runtime_tools.GAZE_TURN_SEGMENT_S", 0.01)
+    service, robot, clock = _attending_service(monkeypatch, lambda now: -1.0)
+    observed = [0]
+    original = robot.observe_scene
+
+    def observe_then_stop() -> dict[str, object]:
+        observed[0] += 1
+        if observed[0] == 2 and service._attention is not None:  # the loop's first read
+            service._attention.request_stop("motion_stop")
+        return original()
+
+    robot.observe_scene = observe_then_stop  # type: ignore[method-assign]
+
+    async def exercise() -> dict[str, Any]:
+        await service.call_tool("soridormi.attention.start", {"target_ref": "requester"})
+        await _run_until(clock, 2.0, service)
+        return service.attention_status()
+
+    status = asyncio.run(exercise())
+
+    assert status["end_reason"] == "motion_stop" and status["body_turns"] == 0
+    assert not any(command.yaw_velocity for command in service.controller.seen_commands)
+
+
+def test_a_task_waiting_for_the_body_interrupts_the_turn(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("soridormi_runtime.mcp.runtime_tools.GAZE_TURN_SEGMENT_S", 0.01)
+    service, robot, clock = _attending_service(monkeypatch, lambda now: -1.0)
+    task_ran: list[float] = []
+
+    async def task_skill() -> None:
+        async with service._locomotion_lock:  # what every physical skill holds
+            task_ran.append(clock.now)
+            assert service.attention_status()["status"] == "suspended"
+            await REAL_SLEEP(0)
+
+    async def exercise() -> dict[str, Any]:
+        await service.call_tool("soridormi.attention.start", {"target_ref": "requester"})
+        while service.attention_status()["status"] != "turning" or not service.active_lanes:
+            await REAL_SLEEP(0)
+        await asyncio.wait_for(task_skill(), timeout=5.0)
+        await _run_until(clock, clock.now + 0.5, service)
+        status = service.attention_status()
+        await service.call_tool("soridormi.attention.stop", {})
+        return status
+
+    status = asyncio.run(exercise())
+
+    assert task_ran and status["active"] is True
+
+
+def test_overlapping_starts_leave_one_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    service, robot, clock = _attending_service(monkeypatch, lambda now: 0.1)
+
+    async def exercise() -> list[dict[str, Any]]:
+        results = await asyncio.gather(
+            service.call_tool("soridormi.attention.start", {"target_ref": "requester"}),
+            service.call_tool("soridormi.attention.start", {"target_ref": "requester", "posture": "thinking"}),
+        )
+        await _run_until(clock, 1.0, service)
+        await service.call_tool("soridormi.attention.stop", {})
+        return list(results)
+
+    first, second = asyncio.run(exercise())
+
+    assert first["started"] is True and second["updated"] is True
+    assert second["attention_id"] == first["attention_id"]
+    assert service._attention_task is not None and service._attention_task.done()
